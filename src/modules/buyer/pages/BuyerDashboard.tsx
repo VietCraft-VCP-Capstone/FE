@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Search, Heart, ShoppingBag, Star } from 'lucide-react';
+import { Heart, Star } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import '../../../shared/components/layouts.css';
 
-export function BuyerDashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
+export function BuyerDashboard({ user }: { user: any; onLogout: () => void }) {
   const [products, setProducts] = useState<any[]>([]);
-  const [search, setSearch] = useState('');
 
   useEffect(() => {
     productsService.getAll().then((data) => { setProducts(data.slice(0, 5)); });
@@ -39,31 +38,7 @@ export function BuyerDashboard({ user, onLogout }: { user: any; onLogout: () => 
   ];
 
   return (
-    <div className="buyer-dashboard-page">
-      <header className="buyer-header-nav">
-        <div className="buyer-header-container">
-          <div className="buyer-logo">
-            <span className="logo-green">Viet</span><span className="logo-purple">Craft</span>
-          </div>
-          <nav className="buyer-nav-menu">
-            <a href="#kham-pha">Khám Phá</a>
-            <a href="#qua-tang">Quà Tặng</a>
-            <a href="#bo-suu-tap">Bộ Sưu Tập</a>
-            <a href="#duoi-100k">Dưới 100k</a>
-          </nav>
-          <div className="buyer-search-bar">
-            <Search className="search-icon" size={16} />
-            <input type="text" placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <div className="buyer-actions">
-            <button className="icon-btn"><Heart size={20} /></button>
-            <button className="icon-btn relative"><ShoppingBag size={20} /><span className="badge">0</span></button>
-            <button className="buyer-avatar" onClick={onLogout} title="Đăng xuất">{name[0].toUpperCase()}</button>
-          </div>
-        </div>
-      </header>
-      <main className="buyer-main-content">
-        <div className="buyer-wrapper">
+    <div className="buyer-wrapper">
           <div className="buyer-intro-banner"><h1>Chào mừng trở lại, {name}!</h1></div>
           <div className="buyer-tab-pills">
             <button className="active">Đã quan tâm</button>
@@ -170,20 +145,6 @@ export function BuyerDashboard({ user, onLogout }: { user: any; onLogout: () => 
               </div>
             </div>
           </section>
-        </div>
-      </main>
-      <footer className="buyer-footer-block">
-        <div className="footer-layout">
-          <div className="footer-col brand-col">
-            <h2>VietCraft</h2>
-            <p>Nền tảng Print-on-Demand kết nối nghệ thuật với đời sống của người sáng tạo Việt.</p>
-            <p className="copyright">© 2026 VietCraft. Bản quyền thuộc về nghệ nhân Việt Nam.</p>
-          </div>
-          <div className="footer-col"><h3>MUA SẮM</h3><ul><li><a href="#kham-pha">Khám Phá</a></li><li><a href="#qua-tang">Quà Tặng</a></li><li><a href="#the-qua-tang">Thẻ Quà Tặng</a></li></ul></div>
-          <div className="footer-col"><h3>BÁN HÀNG</h3><ul><li><a href="#ban-tren-vietcraft">Bán hàng trên VietCraft</a></li><li><a href="#dien-dan">Diễn đàn người bán</a></li></ul></div>
-          <div className="footer-col"><h3>VỀ CHÚNG TÔI & TRỢ GIÚP</h3><ul><li><a href="#ve-vietcraft">Về VietCraft</a></li><li><a href="#tro-giup">Trung Tâm Trợ Giúp</a></li><li><a href="#bao-mat">Chính Sách Bảo Mật</a></li><li><a href="#dieu-khoan">Điều Khoản Sử Dụng</a></li></ul></div>
-        </div>
-      </footer>
     </div>
   );
 }
