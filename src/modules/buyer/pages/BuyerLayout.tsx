@@ -36,7 +36,7 @@ export function BuyerLayout({ user }: BuyerLayoutProps) {
       </main>
 
       {/* Footer */}
-      {location.pathname !== '/cart' && <BuyerFooter />}
+      {!location.pathname.startsWith('/cart') && !location.pathname.startsWith('/product') && <BuyerFooter />}
     </div>
   );
 }

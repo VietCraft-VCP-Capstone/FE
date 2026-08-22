@@ -15,6 +15,7 @@ import { BuyerProfilePage } from '../modules/buyer/pages/BuyerProfilePage';
 import { BuyerFavoritesPage } from '../modules/buyer/pages/BuyerFavoritesPage';
 import { BuyerOrdersPage } from '../modules/buyer/pages/BuyerOrdersPage';
 import { BuyerOrderDetailPage } from '../modules/buyer/pages/BuyerOrderDetailPage';
+import { BuyerProductDetailPage } from '../modules/buyer/pages/BuyerProductDetailPage';
 import { useAuth } from '../modules/auth/hooks/useAuth';
 
 function RolePortal({ user, onLogout }: { user: any; onLogout: () => void }) {
@@ -48,6 +49,7 @@ export function AppRouter() {
         }
       >
         <Route index element={<BuyerDashboard user={user} onLogout={logout} />} />
+        <Route path="product/:id" element={<BuyerProductDetailPage />} />
       </Route>
 
       {/* Các route yêu cầu quyền Buyer */}
@@ -66,6 +68,7 @@ export function AppRouter() {
         <Route path="/favorites" element={<BuyerFavoritesPage />} />
         <Route path="/orders" element={<BuyerOrdersPage />} />
         <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
+        <Route path="/product/:id" element={<BuyerProductDetailPage />} />
       </Route>
 
       <Route path="/login" element={<LoginPage onLogin={login} onGoogleLogin={googleLogin} user={user} />} />

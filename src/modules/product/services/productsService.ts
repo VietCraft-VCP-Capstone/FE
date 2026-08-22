@@ -13,6 +13,10 @@ export const productsService = {
         const res = await api.get(`/products/${id}`);
         return res.data;
     },
+    getRelated: async (id: string) => {
+        const res = await api.get(`/products/${id}/related`);
+        return res.data;
+    },
     create: async (productData: any) => {
         const res = await api.post('/products', productData);
         return res.data;
