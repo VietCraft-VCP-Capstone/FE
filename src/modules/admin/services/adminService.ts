@@ -13,6 +13,12 @@ const authHeader = () => ({
   Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
 });
 
+// ponytail: mockup lưu path tương đối /uploads/... trên BE (8080), FE chạy 3000.
+// Ghép origin tại API boundary để ảnh POD hiển thị đúng ở trang kiểm duyệt.
+const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+const absImg = (u: any) => (typeof u === 'string' && u && !u.startsWith('http') ? ORIGIN + u : u);
+const resolveImages = (p: any) => (p && Array.isArray(p.images) ? { ...p, images: p.images.map(absImg) } : p);
+
 export const adminService = {
   // ==================== CATEGORIES ====================
 
@@ -127,7 +133,8 @@ export const adminService = {
       params: { status, page, limit },
       headers: authHeader(),
     });
-    return data.data;
+    const d = data.data;
+    return Array.isArray(d?.products) ? { ...d, products: d.products.map(resolveImages) } : d;
   },
 
   async unpublishProduct(productId: string, reason?: string): Promise<ModerateProduct> {

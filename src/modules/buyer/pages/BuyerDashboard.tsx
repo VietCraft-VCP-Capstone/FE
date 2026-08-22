@@ -3,8 +3,9 @@ import { Search, Heart, ShoppingBag, Star, MessageCircle } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import '../../../shared/components/layouts.css';
 
-export function BuyerDashboard({ user }: { user: any; onLogout: () => void }) {
+export function BuyerDashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   const [products, setProducts] = useState<any[]>([]);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     productsService.getAll().then((data) => { setProducts(data.slice(0, 5)); });
@@ -170,6 +171,8 @@ export function BuyerDashboard({ user }: { user: any; onLogout: () => void }) {
               </div>
             </div>
           </section>
+        </div>
+      </main>
     </div>
   );
 }

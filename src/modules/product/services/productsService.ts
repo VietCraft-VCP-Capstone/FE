@@ -1,9 +1,15 @@
 import api from '../../../infrastructure/api/interceptors';
 
+// ponytail: mockup lưu path tương đối /uploads/... trên BE (8080), FE chạy 3000.
+// Ghép origin ngay tại API boundary → mọi nơi đọc p.images (bảng, drawer) hiển thị đúng.
+const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+const absImg = (u: any) => (typeof u === 'string' && u && !u.startsWith('http') ? ORIGIN + u : u);
+const resolveImages = (p: any) => (p && Array.isArray(p.images) ? { ...p, images: p.images.map(absImg) } : p);
+
 export const productsService = {
     getAll: async () => {
         const res = await api.get('/products');
-        return res.data;
+        return Array.isArray(res.data) ? res.data.map(resolveImages) : res.data;
     },
     getFeaturedShops: async () => {
         const res = await api.get('/products/featured-shops');
