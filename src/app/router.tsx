@@ -8,7 +8,7 @@ import { ResetPasswordPage } from '../modules/auth/pages/ResetPasswordPage';
 import { AdminPortal } from '../modules/admin/pages/AdminPortal';
 import { SellerPortal } from '../modules/seller/pages/SellerPortal';
 import { BuyerLayout } from '../modules/buyer/pages/BuyerLayout';
-import { BuyerDashboard } from '../modules/buyer/pages/BuyerDashboard';
+import { BuyerDashboard } from '../modules/buyer/pages/BuyerHomePage';
 import { BuyerCartPage } from '../modules/buyer/pages/BuyerCartPage';
 import { BuyerCheckoutPage } from '../modules/buyer/pages/BuyerCheckoutPage';
 import { BuyerProfilePage } from '../modules/buyer/pages/BuyerProfilePage';
