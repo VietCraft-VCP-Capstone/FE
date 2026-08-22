@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Heart, ShoppingBag, Star } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Star, MessageCircle } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import '../../../shared/components/layouts.css';
 
@@ -58,6 +58,7 @@ export function BuyerDashboard({ user, onLogout }: { user: any; onLogout: () => 
           <div className="buyer-actions">
             <button className="icon-btn"><Heart size={20} /></button>
             <button className="icon-btn relative"><ShoppingBag size={20} /><span className="badge">0</span></button>
+            <button className="icon-btn" title="Tin nhắn"><MessageCircle size={20} /></button>
             <button className="buyer-avatar" onClick={onLogout} title="Đăng xuất">{name[0].toUpperCase()}</button>
           </div>
         </div>
