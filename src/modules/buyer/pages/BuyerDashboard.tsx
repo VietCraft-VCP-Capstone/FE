@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Heart, ShoppingBag } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Star, MessageCircle } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
 import { ProductCard } from '../../../shared/components/ProductCard';
 import '../../../shared/components/layouts.css';
 
-export function BuyerDashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
+export function BuyerDashboard({ user }: { user: any; onLogout: () => void }) {
   const [products, setProducts] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
@@ -109,6 +110,9 @@ export function BuyerDashboard({ user, onLogout }: { user: any; onLogout: () => 
               <ShoppingBag size={20} />
               {cartCount > 0 && <span className="badge">{cartCount}</span>}
             </Link>
+            <button className="icon-btn"><Heart size={20} /></button>
+            <button className="icon-btn relative"><ShoppingBag size={20} /><span className="badge">0</span></button>
+            <button className="icon-btn" title="Tin nhắn"><MessageCircle size={20} /></button>
             <button className="buyer-avatar" onClick={onLogout} title="Đăng xuất">{name[0].toUpperCase()}</button>
           </div>
         </div>
@@ -163,6 +167,71 @@ export function BuyerDashboard({ user, onLogout }: { user: any; onLogout: () => 
           </section>
         </div>
       </main>
+          <section className="buyer-section">
+            <div className="section-head"><h2>⚡ Ưu đãi chớp nhoáng</h2></div>
+            <div className="buyer-grid-5">
+              {flashDeals.map((fd) => (
+                <div key={fd.id} className="buyer-card">
+                  <div className="card-media">
+                    <img src={fd.image} alt={fd.title} />
+                    <span className="discount-tag">{fd.discount}</span>
+                    <button className="fav-overlay"><Heart size={14} /></button>
+                  </div>
+                  <div className="card-info">
+                    <h3>{fd.title}</h3>
+                    <div className="price-row"><span className="new-price">{fd.price.toLocaleString('vi-VN')}đ</span><span className="old-price">{fd.oldPrice.toLocaleString('vi-VN')}đ</span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="buyer-section">
+            <div className="section-head"><h2>✨ Gợi ý từ AI dựa trên sở thích của bạn</h2></div>
+            <div className="buyer-grid-4">
+              {aiSuggestions.map((ai, i) => (
+                <div key={i} className="buyer-card">
+                  <div className="card-media"><img src={ai.image} alt={ai.title} /></div>
+                  <div className="card-info">
+                    <h3>{ai.title}</h3>
+                    <div className="stars-row">{[...Array(ai.rating)].map((_, s) => <Star key={s} size={12} className="star-icon fill-amber-500 text-amber-500" />)}</div>
+                    <p className="price-tag">{ai.price.toLocaleString('vi-VN')}đ</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="buyer-section">
+            <div className="section-head"><h2>Cập nhật từ gian hàng bạn theo dõi</h2></div>
+            <div className="buyer-grid-3">
+              {subbedShops.map((shop, i) => (
+                <div key={i} className="shop-update-card">
+                  <div className="shop-head">
+                    <img src={shop.image} alt={shop.name} className="shop-avatar" />
+                    <div><h3>{shop.name}</h3><p>{shop.caption}</p></div>
+                  </div>
+                  <div className="shop-thumbnails">{shop.thumbnails.map((t, idx) => <img key={idx} src={t} alt="thumbnail" />)}</div>
+                  <button className="shop-view-btn">Xem bộ sưu tập mới</button>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="buyer-section pb-12">
+            <div className="section-head"><h2>Khám phá các phong cách mới</h2></div>
+            <div className="buyer-grid-3">
+              <div className="style-card text-card-1">
+                <img src="https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=400" alt="Vẻ Đẹp Đương Đại" />
+                <div className="style-overlay"><h3>Vẻ Đẹp Đương Đại</h3></div>
+              </div>
+              <div className="style-card text-card-2">
+                <img src="https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=400" alt="Góc Làm Việc Tối Giản" />
+                <div className="style-overlay"><h3>Góc Làm Việc Tối Giản</h3></div>
+              </div>
+              <div className="style-card text-card-3">
+                <img src="https://images.unsplash.com/photo-1608156639585-b3a032ef9689?auto=format&fit=crop&w=400" alt="Nghệ Thuật Đường Phố" />
+                <div className="style-overlay"><h3>Nghệ Thuật Đường Phố</h3></div>
+              </div>
+            </div>
+          </section>
     </div>
   );
 }

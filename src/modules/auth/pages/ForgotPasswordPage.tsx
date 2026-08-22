@@ -30,7 +30,7 @@ export function ForgotPasswordPage() {
 
   const pill: React.CSSProperties = {
     width: '100%', border: '1.5px solid #e2e0dd', borderRadius: 50,
-    padding: '10px 16px', fontSize: 13, boxSizing: 'border-box', outline: 'none',
+    padding: '10px 18px', fontSize: 15, boxSizing: 'border-box', outline: 'none',
     background: '#fff', color: '#1c1917',
   };
 
@@ -48,45 +48,45 @@ export function ForgotPasswordPage() {
       </div>
 
       {/* Right form */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '32px 40px', boxSizing: 'border-box', background: '#fff' }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
-          <div style={{ marginBottom: 20 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '32px 40px', boxSizing: 'border-box', background: '#fff', overflowY: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: 480, margin: 'auto' }}>
+          <div style={{ marginBottom: 12 }}>
             <Link to="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontSize: 20, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
+              <span style={{ fontSize: 30, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
             </Link>
           </div>
 
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Quên mật khẩu?</h1>
-          <p style={{ fontSize: 13, color: '#78716c', margin: '0 0 18px' }}>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Quên mật khẩu?</h1>
+          <p style={{ fontSize: 14, color: '#78716c', margin: '0 0 12px' }}>
             Nhập email tài khoản của bạn để nhận mã xác thực OTP đặt lại mật khẩu.
           </p>
 
-          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 5 }}>Email</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Email</label>
               <input type="email" placeholder="nhapemail@example.com" value={email} onChange={e => setEmail(e.target.value)} disabled={loading}
                 style={pill} />
             </div>
 
             {error && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 14px' }}>
-                <AlertCircle size={15} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 13, color: '#dc2626' }}>{error}</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px' }}>
+                <AlertCircle size={17} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 15, color: '#dc2626' }}>{error}</span>
               </div>
             )}
 
             <button type="submit" disabled={loading}
               style={{
-                background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '11px', fontSize: 14, fontWeight: 700,
+                background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '12px', fontSize: 16, fontWeight: 700,
                 cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '8px 0 0'
               }}>
-              {loading && <Loader2 size={16} className="animate-spin" />}
+              {loading && <Loader2 size={18} className="animate-spin" />}
               {loading ? 'Đang gửi...' : 'Gửi mã xác thực'}
             </button>
           </form>
 
-          <p style={{ textAlign: 'center', fontSize: 13, color: '#78716c', marginTop: 16 }}>
+          <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 12 }}>
             Quay lại{' '}<Link to="/login" style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng nhập</Link>
           </p>
         </div>

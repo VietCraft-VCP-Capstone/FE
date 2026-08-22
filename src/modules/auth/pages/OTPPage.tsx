@@ -119,20 +119,20 @@ export function OTPPage({ onVerified }: OTPPageProps) {
       </div>
 
       {/* Right form */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '48px 40px', boxSizing: 'border-box', background: '#fff' }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
-          <div style={{ marginBottom: 40 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '48px 40px', boxSizing: 'border-box', background: '#fff', overflowY: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: 480, margin: 'auto' }}>
+          <div style={{ marginBottom: 20 }}>
             <Link to="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontSize: 20, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
+              <span style={{ fontSize: 23, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
             </Link>
           </div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#330033', margin: '0 0 12px', textAlign: 'left' }}>Nhập mã xác thực</h1>
-          <p style={{ fontSize: 13, color: '#78716c', margin: '0 0 32px', lineHeight: 1.6, textAlign: 'left' }}>
+          <h1 style={{ fontSize: 32, fontWeight: 800, color: '#330033', margin: '0 0 8px', textAlign: 'left' }}>Nhập mã xác thực</h1>
+          <p style={{ fontSize: 15, color: '#78716c', margin: '0 0 20px', lineHeight: 1.6, textAlign: 'left' }}>
             Vui lòng nhập mã OTP gồm 6 chữ số đã được gửi đến địa chỉ email <strong style={{ color: '#1c1917' }}>{maskedEmail}</strong>.
           </p>
 
           <form onSubmit={handleSubmit} noValidate>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 28, justifyContent: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 14, marginBottom: 20, justifyContent: 'flex-start' }}>
               {digits.map((d, i) => (
                 <input key={i} ref={el => { refs.current[i] = el; }} type="text" inputMode="numeric"
                   pattern="\d" maxLength={1} value={d}
@@ -142,7 +142,7 @@ export function OTPPage({ onVerified }: OTPPageProps) {
                   disabled={loading}
                   aria-label={`Chữ số ${i + 1}`}
                   style={{
-                    width: '46px', height: '56px', textAlign: 'center', fontSize: 22, fontWeight: 700,
+                    width: '53px', height: '64px', textAlign: 'center', fontSize: 25, fontWeight: 700,
                     border: `1.5px solid ${d ? '#007700' : '#d1d5db'}`,
                     borderRadius: 8, outline: 'none', background: '#fff',
                     color: '#007700', cursor: 'text', opacity: loading ? 0.6 : 1,
@@ -152,26 +152,26 @@ export function OTPPage({ onVerified }: OTPPageProps) {
               ))}
             </div>
 
-            {error && <p style={{ color: '#dc2626', fontSize: 13, margin: '0 0 14px', textAlign: 'left' }}>{error}</p>}
-            {resent && <p style={{ color: '#007700', fontSize: 13, margin: '0 0 14px', textAlign: 'left' }}>✓ Đã gửi lại mã OTP vào email.</p>}
+            {error && <p style={{ color: '#dc2626', fontSize: 15, margin: '0 0 12px', textAlign: 'left' }}>{error}</p>}
+            {resent && <p style={{ color: '#007700', fontSize: 15, margin: '0 0 12px', textAlign: 'left' }}>✓ Đã gửi lại mã OTP vào email.</p>}
 
             <button type="submit" disabled={loading}
-              style={{ width: '100%', background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '13px', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20 }}>
-              {loading && <Loader2 size={16} className="animate-spin" />}
+              style={{ width: '100%', background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '12px', fontSize: 17, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+              {loading && <Loader2 size={18} className="animate-spin" />}
               {loading ? 'Đang xác nhận...' : 'Xác nhận'}
             </button>
 
-            <p style={{ textAlign: 'left', fontSize: 13, color: '#78716c', margin: '0 0 20px' }}>
+            <p style={{ textAlign: 'left', fontSize: 15, color: '#78716c', margin: '0 0 12px' }}>
               Không nhận được mã?{' '}
               {countdown > 0
                 ? <span style={{ color: '#007700', fontWeight: 700 }}>Gửi lại mã ({countdown}s)</span>
-                : <button type="button" onClick={handleResend} style={{ background: 'none', border: 'none', color: '#007700', fontWeight: 700, cursor: 'pointer', fontSize: 13, padding: 0 }}>Gửi lại mã</button>
+                : <button type="button" onClick={handleResend} style={{ background: 'none', border: 'none', color: '#007700', fontWeight: 700, cursor: 'pointer', fontSize: 15, padding: 0 }}>Gửi lại mã</button>
               }
             </p>
           </form>
 
-          <div style={{ borderTop: '1px solid #e7e5e4', paddingTop: 20, marginTop: 24, textAlign: 'left' }}>
-            <Link to="/login" style={{ fontSize: 13, color: '#78716c', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ borderTop: '1px solid #e7e5e4', paddingTop: 16, marginTop: 16, textAlign: 'left' }}>
+            <Link to="/login" style={{ fontSize: 15, color: '#78716c', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <span>← Quay lại</span>
               <span style={{ color: '#007700', fontWeight: 700 }}>Đăng nhập</span>
             </Link>
