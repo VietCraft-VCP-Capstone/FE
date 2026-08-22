@@ -10,16 +10,28 @@ export function useAuth() {
         const storedUser = localStorage.getItem('user');
         const token = localStorage.getItem('token');
         if (storedUser && token) {
-            try { setUser(JSON.parse(storedUser)); } catch { localStorage.clear(); }
+            try {
+                const parsed = JSON.parse(storedUser);
+                // Normalize role to lowercase if stored from old session
+                const normalized: User = {
+                    ...parsed,
+                    role: parsed.role?.toLowerCase?.() || parsed.role,
+                };
+                setUser(normalized);
+            } catch { localStorage.clear(); }
         }
         setLoading(false);
     }, []);
 
     const persistSession = (data: { token: string; user: User }) => {
+        const normalizedUser: User = {
+            ...data.user,
+            role: data.user.role?.toLowerCase?.() || data.user.role,
+        };
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setUser(data.user);
-        return data.user;
+        localStorage.setItem('user', JSON.stringify(normalizedUser));
+        setUser(normalizedUser);
+        return normalizedUser;
     };
 
     const login = async (credentials: any) => {

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import {
-  LayoutDashboard, Users, ClipboardCheck, Tag, Scale, Megaphone, Bell, Search
+  LayoutDashboard, Users, ClipboardCheck, Tag, Scale, Megaphone, Bell, Search, LogOut
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { to: '/admin/users', icon: Users, label: 'Người dùng' },
   { to: '/admin/moderation', icon: ClipboardCheck, label: 'Kiểm duyệt' },
   { to: '/admin/categories', icon: Tag, label: 'Danh mục' },
+  { to: '/admin/tags', icon: Tag, label: 'Thẻ' },
   { to: '/admin/disputes', icon: Scale, label: 'Tranh chấp' },
   { to: '/admin/marketing', icon: Megaphone, label: 'Marketing' },
 ];
@@ -24,7 +25,17 @@ export function AdminLayout({ children, user, onLogout }: AdminLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [search, setSearch] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
+
+  // đóng menu khi click ra ngoài
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocClick = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [menuOpen]);
 
   return (
     <div className="admin-layout">
@@ -51,9 +62,22 @@ export function AdminLayout({ children, user, onLogout }: AdminLayoutProps) {
           </div>
           <div className="admin-header-actions">
             <button className="admin-icon-btn"><Bell size={20} /></button>
-            <button className="admin-avatar" onClick={handleLogout} title="Đăng xuất">
-              {user?.name?.[0]?.toUpperCase() || 'A'}
-            </button>
+            <div className="admin-user-menu" ref={menuRef}>
+              <button className="admin-avatar" onClick={() => setMenuOpen(o => !o)} title="Tài khoản">
+                {user?.name?.[0]?.toUpperCase() || 'A'}
+              </button>
+              {menuOpen && (
+                <div className="admin-user-dropdown">
+                  <div className="admin-user-info">
+                    <div className="admin-user-name">{user?.name || 'Quản trị viên'}</div>
+                    {user?.email && <div className="admin-user-email">{user.email}</div>}
+                  </div>
+                  <button className="admin-user-logout" onClick={handleLogout}>
+                    <LogOut size={16} /><span>Đăng xuất</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
         <main className="admin-content">{children}</main>

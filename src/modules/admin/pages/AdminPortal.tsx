@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
+import { AdminModeration } from './AdminModeration';
+import { AdminCategories } from './AdminCategories';
+import { AdminTags } from './AdminTags';
 import { Search, Edit, Lock, Unlock } from 'lucide-react';
 import { authService } from '../../auth/services/authService';
 
@@ -133,12 +136,6 @@ function AdminUsers() {
   );
 }
 
-function AdminModeration() {
-  return <div><h2 className="admin-page-title">Kiểm duyệt</h2><p className="admin-page-desc">Kiểm duyệt sản phẩm, bình luận và nội dung người dùng.</p></div>;
-}
-function AdminCategories() {
-  return <div><h2 className="admin-page-title">Danh mục</h2><p className="admin-page-desc">Quản lý cây danh mục sản phẩm mỹ nghệ.</p></div>;
-}
 function AdminDisputes() {
   return <div><h2 className="admin-page-title">Tranh chấp</h2><p className="admin-page-desc">Xử lý và giải quyết các tranh chấp giữa người mua và người bán.</p></div>;
 }
@@ -159,6 +156,7 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="users" element={<AdminUsers />} />
         <Route path="moderation" element={<AdminModeration />} />
         <Route path="categories" element={<AdminCategories />} />
+        <Route path="tags" element={<AdminTags />} />
         <Route path="disputes" element={<AdminDisputes />} />
         <Route path="marketing" element={<AdminMarketing />} />
         <Route path="*" element={<Navigate to="users" replace />} />

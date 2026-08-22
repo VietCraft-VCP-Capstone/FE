@@ -24,5 +24,32 @@ export const productsService = {
     delete: async (id: string) => {
         const res = await api.delete(`/products/${id}`);
         return res.data;
+    },
+    getCategories: async () => {
+        const res = await api.get('/products/meta/categories');
+        return res.data;
+    },
+    getTags: async () => {
+        const res = await api.get('/products/meta/tags');
+        return res.data;
+    },
+    getBlanks: async () => {
+        const res = await api.get('/products/meta/blanks');
+        return res.data;
+    },
+    getMyDesigns: async () => {
+        const res = await api.get('/designs/mine');
+        return res.data;
+    },
+    uploadDesign: async (file: File, name?: string) => {
+        const form = new FormData();
+        form.append('file', file);
+        if (name) form.append('name', name);
+        const res = await api.post('/designs', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+        return res.data;
+    },
+    previewMockup: async (blankId: string, designPlacements: any[]) => {
+        const res = await api.post('/products/preview-mockup', { blankId, designPlacements });
+        return res.data.images as string[];
     }
 };
