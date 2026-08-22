@@ -1,5 +1,5 @@
 import { Search, Heart, ShoppingBag } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import '../../../shared/components/layouts.css';
 
@@ -10,9 +10,12 @@ interface BuyerHeaderProps {
 
 export function BuyerHeader({ user, cartCount = 0 }: BuyerHeaderProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [search, setSearch] = useState('');
 
   const name = user?.full_name || user?.name || 'Nhi';
+
+  const isActive = (path: string) => location.pathname.startsWith(path);
 
   return (
     <header className="buyer-header-nav">
@@ -21,18 +24,18 @@ export function BuyerHeader({ user, cartCount = 0 }: BuyerHeaderProps) {
           <span className="logo-green">Viet</span><span className="logo-purple">Craft</span>
         </div>
         <nav className="buyer-nav-menu">
-          <a onClick={() => navigate('/')}>Khám Phá</a>
-          <a onClick={() => navigate('/orders')}>Đơn hàng</a>
-          <a onClick={() => navigate('/profile')}>Hồ sơ</a>
+          <a onClick={() => navigate('/')} className={location.pathname === '/' ? 'nav-active' : ''}>Khám Phá</a>
+          <a onClick={() => navigate('/orders')} className={isActive('/orders') ? 'nav-active' : ''}>Đơn hàng</a>
+          <a onClick={() => navigate('/profile')} className={isActive('/profile') ? 'nav-active' : ''}>Hồ sơ</a>
           <a href="#duoi-100k">Dưới 100k</a>
         </nav>
         <div className="buyer-search-bar">
           <Search className="search-icon" size={16} />
-          <input 
-            type="text" 
-            placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..." 
-            value={search} 
-            onChange={(e) => setSearch(e.target.value)} 
+          <input
+            type="text"
+            placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="buyer-actions">

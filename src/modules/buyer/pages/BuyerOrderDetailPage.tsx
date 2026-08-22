@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
 import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
+import ReorderModal from '../components/profile/ReorderModal';
 
 export function BuyerOrderDetailPage() {
     const navigate = useNavigate();
@@ -10,6 +11,13 @@ export function BuyerOrderDetailPage() {
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [copySuccess, setCopySuccess] = useState(false);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
+
+    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     useEffect(() => {
         const fetchOrderDetails = async () => {
@@ -36,6 +44,11 @@ export function BuyerOrderDetailPage() {
 
     const handleReorder = () => {
         if (!order) return;
+        setIsReorderModalOpen(true);
+    };
+
+    const handleConfirmReorder = (selectedItems: any[]) => {
+        if (!order) return;
         const cartStr = localStorage.getItem('vietcraft_cart');
         let cartItems = [];
         if (cartStr) {
@@ -44,8 +57,8 @@ export function BuyerOrderDetailPage() {
             } catch (e) {}
         }
 
-        order.items.forEach((it: any) => {
-            const existing = cartItems.find((item: any) => item.productId === it.productId);
+        selectedItems.forEach((it: any) => {
+            const existing = cartItems.find((item: any) => item.productId === it.productId && item.variantId === it.variantId);
             if (existing) {
                 existing.quantity += it.quantity;
             } else {
@@ -66,8 +79,9 @@ export function BuyerOrderDetailPage() {
 
         localStorage.setItem('vietcraft_cart', JSON.stringify(cartItems));
         setCartCount(cartItems.reduce((acc: number, it: any) => acc + it.quantity, 0));
-        alert('Đã thêm sản phẩm vào giỏ hàng.');
-        navigate('/cart');
+        setIsReorderModalOpen(false);
+        showToast('Đã thêm sản phẩm vào giỏ hàng!');
+        setTimeout(() => navigate('/cart'), 1200);
     };
 
     if (loading) {
@@ -346,6 +360,26 @@ export function BuyerOrderDetailPage() {
                     </div>
                 </div>
             </div>
+            {/* Reorder Modal */}
+            {order && (
+                <ReorderModal
+                    isOpen={isReorderModalOpen}
+                    onClose={() => setIsReorderModalOpen(false)}
+                    shopName={order.shopName || 'VietCraft Shop'}
+                    items={order.items}
+                    onConfirm={handleConfirmReorder}
+                />
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed top-5 right-5 z-[9999] bg-white border border-gray-100 shadow-2xl rounded-2xl p-4 flex items-center gap-3 max-w-sm border-l-4 ${toast.type === 'success' ? 'border-l-emerald-500' : 'border-l-red-500'} transition-all duration-300`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+                        {toast.type === 'success' ? <Check size={18} /> : <span>⚠️</span>}
+                    </div>
+                    <p className="text-xs font-extrabold text-gray-900">{toast.message}</p>
+                </div>
+            )}
         </div>
     );
 }

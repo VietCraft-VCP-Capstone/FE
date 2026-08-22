@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck } from 'lucide-react';
+import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck, Check } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
+import ReorderModal from '../components/profile/ReorderModal';
 
 interface OrderItem {
     productId: string;
@@ -31,6 +32,13 @@ export function BuyerOrdersPage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled'>('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [reorderOrder, setReorderOrder] = useState<Order | null>(null);
+
+    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     const tabs = [
         { id: 'all', label: 'Tất cả' },
@@ -75,7 +83,11 @@ export function BuyerOrdersPage() {
     };
 
     const handleReorder = (order: Order) => {
-        // Re-add to cart
+        setReorderOrder(order);
+    };
+
+    const handleConfirmReorder = (selectedItems: OrderItem[]) => {
+        if (!reorderOrder) return;
         const cartStr = localStorage.getItem('vietcraft_cart');
         let cartItems = [];
         if (cartStr) {
@@ -84,8 +96,8 @@ export function BuyerOrdersPage() {
             } catch (e) {}
         }
 
-        order.items.forEach(it => {
-            const existing = cartItems.find((item: any) => item.productId === it.productId);
+        selectedItems.forEach(it => {
+            const existing = cartItems.find((item: any) => item.productId === it.productId && item.variantId === it.variantId);
             if (existing) {
                 existing.quantity += it.quantity;
             } else {
@@ -94,7 +106,7 @@ export function BuyerOrdersPage() {
                     productId: it.productId,
                     variantId: it.variantId,
                     title: it.title || 'Sản phẩm tái đặt',
-                    shopName: order.shopName,
+                    shopName: reorderOrder.shopName,
                     variantName: `${it.color || ''} ${it.size || ''}`.trim() || 'Mặc định',
                     price: it.price,
                     quantity: it.quantity,
@@ -106,8 +118,9 @@ export function BuyerOrdersPage() {
 
         localStorage.setItem('vietcraft_cart', JSON.stringify(cartItems));
         setCartCount(cartItems.reduce((acc: number, it: any) => acc + it.quantity, 0));
-        alert('Đã thêm các sản phẩm vào giỏ hàng.');
-        navigate('/cart');
+        setReorderOrder(null);
+        showToast('Đã thêm sản phẩm vào giỏ hàng!');
+        setTimeout(() => navigate('/cart'), 1200);
     };
 
     // Filter orders locally by search query as well
@@ -121,10 +134,8 @@ export function BuyerOrdersPage() {
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-            {/* Title and Search box */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h1 className="text-2xl font-black text-gray-900">Đơn hàng của tôi</h1>
-
+            {/* Search box */}
+            <div className="flex justify-end">
                 <div className="relative w-full sm:w-80">
                     <Search className="absolute inset-y-0 left-3 my-auto text-gray-400" size={16} />
                     <input
@@ -256,6 +267,26 @@ export function BuyerOrdersPage() {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+            {/* Reorder Modal */}
+            {reorderOrder && (
+                <ReorderModal
+                    isOpen={!!reorderOrder}
+                    onClose={() => setReorderOrder(null)}
+                    shopName={reorderOrder.shopName}
+                    items={reorderOrder.items}
+                    onConfirm={handleConfirmReorder}
+                />
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed top-5 right-5 z-[9999] bg-white border border-gray-100 shadow-2xl rounded-2xl p-4 flex items-center gap-3 max-w-sm border-l-4 ${toast.type === 'success' ? 'border-l-emerald-500' : 'border-l-red-500'} transition-all duration-300`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+                        {toast.type === 'success' ? <Check size={18} /> : <span>⚠️</span>}
+                    </div>
+                    <p className="text-xs font-extrabold text-gray-900">{toast.message}</p>
                 </div>
             )}
         </div>

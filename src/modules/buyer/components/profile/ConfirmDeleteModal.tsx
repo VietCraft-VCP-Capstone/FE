@@ -11,7 +11,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ isOpen, 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 animate-none">
+        <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4 animate-none">
             <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4 text-center">
                 <div className="w-12 h-12 rounded-full bg-red-50 text-red-655 flex items-center justify-center mx-auto">
                     <Trash2 size={24} />
