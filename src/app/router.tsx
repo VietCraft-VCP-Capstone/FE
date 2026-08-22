@@ -12,6 +12,7 @@ import { BuyerDashboard } from '../modules/buyer/pages/BuyerHomePage';
 import { BuyerCartPage } from '../modules/buyer/pages/BuyerCartPage';
 import { BuyerCheckoutPage } from '../modules/buyer/pages/BuyerCheckoutPage';
 import { BuyerProfilePage } from '../modules/buyer/pages/BuyerProfilePage';
+import { BuyerFavoritesPage } from '../modules/buyer/pages/BuyerFavoritesPage';
 import { BuyerOrdersPage } from '../modules/buyer/pages/BuyerOrdersPage';
 import { BuyerOrderDetailPage } from '../modules/buyer/pages/BuyerOrderDetailPage';
 import { useAuth } from '../modules/auth/hooks/useAuth';
@@ -62,6 +63,7 @@ export function AppRouter() {
         <Route path="/cart" element={<BuyerCartPage />} />
         <Route path="/checkout" element={<BuyerCheckoutPage />} />
         <Route path="/profile" element={<BuyerProfilePage onLogout={logout} />} />
+        <Route path="/favorites" element={<BuyerFavoritesPage />} />
         <Route path="/orders" element={<BuyerOrdersPage />} />
         <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
       </Route>

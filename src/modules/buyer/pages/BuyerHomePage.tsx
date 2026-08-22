@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { Heart, Star, ArrowRight } from 'lucide-react';
+import { Heart, Star, ArrowRight, CheckCircle2, Info } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { promotionService } from '../../promotion/services/promotionService';
+import { userService } from '../../user/services/userService';
 import '../../../shared/components/layouts.css';
 
 export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
@@ -20,12 +21,20 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
 
   const name = user?.full_name || user?.name || '';
 
-  // Load favorites and vouchers from localstorage on mount
+  // Load favorites from backend API (with localStorage fallback)
   useEffect(() => {
-    const favs = localStorage.getItem('vietcraft_favorites');
-    if (favs) {
-      try { setFavoritedProductIds(JSON.parse(favs)); } catch (e) {}
-    }
+    userService.getWishlist()
+      .then((ids) => {
+        setFavoritedProductIds(ids);
+        localStorage.setItem('vietcraft_favorites', JSON.stringify(ids));
+      })
+      .catch(() => {
+        // Fallback: try localStorage
+        try {
+          const stored = localStorage.getItem('vietcraft_favorites');
+          if (stored) setFavoritedProductIds(JSON.parse(stored));
+        } catch {}
+      });
     const vls = localStorage.getItem('vietcraft_saved_vouchers');
     if (vls) {
       try { setSavedVouchers(JSON.parse(vls)); } catch (e) {}
@@ -64,18 +73,23 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const toggleFavorite = (productId: string, title: string, e: React.MouseEvent) => {
+  const toggleFavorite = async (productId: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    let updated: string[];
-    if (favoritedProductIds.includes(productId)) {
-      updated = favoritedProductIds.filter(id => id !== productId);
-      triggerToast(`Đã xóa "${title}" khỏi danh sách yêu thích`, 'info');
-    } else {
-      updated = [...favoritedProductIds, productId];
-      triggerToast(`Đã thêm "${title}" vào danh sách yêu thích`, 'success');
+    try {
+      let updated: string[];
+      if (favoritedProductIds.includes(productId)) {
+        updated = await userService.removeFromWishlist(productId);
+        triggerToast(`Đã xóa "${title}" khỏi danh sách yêu thích`, 'info');
+      } else {
+        updated = await userService.addToWishlist(productId);
+        triggerToast(`Đã thêm "${title}" vào danh sách yêu thích`, 'success');
+      }
+      setFavoritedProductIds(updated);
+      localStorage.setItem('vietcraft_favorites', JSON.stringify(updated));
+    } catch (err) {
+      console.error('toggleFavorite failed', err);
+      triggerToast('Không thể cập nhật yêu thích, vui lòng thử lại.', 'info');
     }
-    setFavoritedProductIds(updated);
-    localStorage.setItem('vietcraft_favorites', JSON.stringify(updated));
   };
 
   const toggleVoucher = (voucherCode: string, e: React.MouseEvent) => {
@@ -217,7 +231,10 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
           zIndex: 9999,
           animation: 'slideUp 0.3s ease-out'
         }}>
-          <span style={{ fontSize: 18 }}>{toast.type === 'success' ? '✅' : 'ℹ️'}</span>
+          {toast.type === 'success'
+            ? <CheckCircle2 size={20} color="#008000" strokeWidth={2.5} />
+            : <Info size={20} color="#6366f1" strokeWidth={2.5} />
+          }
           <span style={{ fontSize: 14, fontWeight: 600, color: '#330033' }}>{toast.message}</span>
         </div>
       )}

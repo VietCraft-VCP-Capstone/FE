@@ -55,6 +55,21 @@ export const userService = {
     deleteAddress: async (addressId: string): Promise<Address[]> => {
         const res = await api.delete(`/users/profile/addresses/${addressId}`);
         return res.data;
+    },
+
+    // Wishlist
+    getWishlist: async (): Promise<string[]> => {
+        const res = await api.get('/users/wishlist');
+        // API returns ObjectId array; convert to strings
+        return (res.data || []).map((id: any) => id?.toString ? id.toString() : id);
+    },
+    addToWishlist: async (productId: string): Promise<string[]> => {
+        const res = await api.post(`/users/wishlist/${productId}`);
+        return (res.data || []).map((id: any) => id?.toString ? id.toString() : id);
+    },
+    removeFromWishlist: async (productId: string): Promise<string[]> => {
+        const res = await api.delete(`/users/wishlist/${productId}`);
+        return (res.data || []).map((id: any) => id?.toString ? id.toString() : id);
     }
 };
 

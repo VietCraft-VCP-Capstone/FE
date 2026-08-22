@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Search, Heart, ShoppingBag, MessageCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
@@ -12,10 +13,34 @@ interface BuyerHeaderProps {
 export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [favCount, setFavCount] = useState(0);
 
   const name = user?.full_name || user?.name || 'Nhi';
 
   const isActive = (path: string) => location.pathname.startsWith(path);
+
+  // Read favorites count from localStorage and update when changed
+  useEffect(() => {
+    const readFavCount = () => {
+      try {
+        const stored = localStorage.getItem('vietcraft_favorites');
+        const ids: string[] = stored ? JSON.parse(stored) : [];
+        setFavCount(ids.length);
+      } catch {
+        setFavCount(0);
+      }
+    };
+    readFavCount();
+
+    // Listen for storage events from other tabs
+    window.addEventListener('storage', readFavCount);
+    // Also poll every 1s to catch same-tab updates
+    const interval = setInterval(readFavCount, 1000);
+    return () => {
+      window.removeEventListener('storage', readFavCount);
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <header className="buyer-header-nav">
@@ -39,8 +64,20 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
           />
         </div>
         <div className="buyer-actions">
-          <button className="icon-btn" onClick={() => navigate('/orders')} title="Đơn hàng">
-            <Heart size={20} />
+          {/* Favorites icon with count badge */}
+          <button
+            type="button"
+            className={`icon-btn relative ${isActive('/favorites') ? 'active-icon' : ''}`}
+            onClick={() => navigate('/favorites')}
+            title="Yêu thích"
+            style={{ color: isActive('/favorites') ? '#e11d48' : undefined }}
+          >
+            <Heart size={20} fill={isActive('/favorites') ? '#e11d48' : 'none'} />
+            {favCount > 0 && (
+              <span className="badge" style={{ backgroundColor: '#e11d48' }}>
+                {favCount > 99 ? '99+' : favCount}
+              </span>
+            )}
           </button>
           <button className="icon-btn relative" onClick={() => navigate('/cart')} title="Giỏ hàng">
             <ShoppingBag size={20} />
