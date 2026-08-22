@@ -11,6 +11,7 @@ export function BuyerLayout({ user }: BuyerLayoutProps) {
   const location = useLocation();
   // Sync giỏ hàng từ localStorage
   const [cartCount, setCartCount] = useState(0);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     const cartStr = localStorage.getItem('vietcraft_cart');
@@ -27,15 +28,15 @@ export function BuyerLayout({ user }: BuyerLayoutProps) {
   return (
     <div className="buyer-dashboard-page">
       {/* Header */}
-      <BuyerHeader user={user} cartCount={cartCount} />
+      <BuyerHeader user={user} cartCount={cartCount} search={search} setSearch={setSearch} />
 
       {/* Main Content Area */}
       <main className="buyer-main-content">
-        <Outlet context={{ cartCount, setCartCount }} />
+        <Outlet context={{ cartCount, setCartCount, search }} />
       </main>
 
       {/* Footer */}
-      {location.pathname !== '/cart' && <BuyerFooter />}
+      {!location.pathname.startsWith('/cart') && !location.pathname.startsWith('/product') && <BuyerFooter />}
     </div>
   );
 }
