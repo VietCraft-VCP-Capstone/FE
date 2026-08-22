@@ -8,13 +8,19 @@ import { ResetPasswordPage } from '../modules/auth/pages/ResetPasswordPage';
 import { AdminPortal } from '../modules/admin/pages/AdminPortal';
 import { SellerPortal } from '../modules/seller/pages/SellerPortal';
 import { BuyerLayout } from '../modules/buyer/pages/BuyerLayout';
+import { BuyerDashboard } from '../modules/buyer/pages/BuyerDashboard';
+import { BuyerCartPage } from '../modules/buyer/pages/BuyerCartPage';
+import { BuyerCheckoutPage } from '../modules/buyer/pages/BuyerCheckoutPage';
+import { BuyerProfilePage } from '../modules/buyer/pages/BuyerProfilePage';
+import { BuyerOrdersPage } from '../modules/buyer/pages/BuyerOrdersPage';
+import { BuyerOrderDetailPage } from '../modules/buyer/pages/BuyerOrderDetailPage';
 import { useAuth } from '../modules/auth/hooks/useAuth';
 
 function RolePortal({ user, onLogout }: { user: any; onLogout: () => void }) {
   const role = user?.role?.toLowerCase();
   if (role === 'admin') return <AdminPortal user={user} onLogout={onLogout} />;
   if (role === 'seller') return <SellerPortal user={user} onLogout={onLogout} />;
-  return <BuyerLayout user={user} onLogout={onLogout} />;
+  return <BuyerLayout user={user} />;
 }
 
 export function AppRouter() {
@@ -35,6 +41,7 @@ export function AppRouter() {
 
   return (
     <Routes>
+      {/* Route Trang chủ hoặc Dashboard người mua */}
       <Route
         path="/"
         element={
@@ -44,13 +51,33 @@ export function AppRouter() {
             ) : role === 'seller' ? (
               <Navigate to="/seller" replace />
             ) : (
-              <BuyerLayout user={user} onLogout={logout} />
+              <BuyerLayout user={user} />
             )
           ) : (
             <LandingPage user={user} onLogout={logout} />
           )
         }
-      />
+      >
+        <Route index element={<BuyerDashboard user={user} onLogout={logout} />} />
+      </Route>
+
+      {/* Các route yêu cầu quyền Buyer */}
+      <Route
+        element={
+          user && role === 'buyer' ? (
+            <BuyerLayout user={user} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      >
+        <Route path="/cart" element={<BuyerCartPage />} />
+        <Route path="/checkout" element={<BuyerCheckoutPage />} />
+        <Route path="/profile" element={<BuyerProfilePage onLogout={logout} />} />
+        <Route path="/orders" element={<BuyerOrdersPage />} />
+        <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
+      </Route>
+
       <Route path="/login" element={<LoginPage onLogin={login} onGoogleLogin={googleLogin} user={user} />} />
       <Route path="/signup" element={<SignupPage onSignup={signup} onGoogleLogin={googleLogin} user={user} />} />
       <Route path="/verify" element={<OTPPage onVerified={() => { window.location.href = '/login'; }} />} />
@@ -83,3 +110,4 @@ export function AppRouter() {
     </Routes>
   );
 }
+export default AppRouter;

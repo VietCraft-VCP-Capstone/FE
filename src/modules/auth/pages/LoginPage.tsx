@@ -91,6 +91,11 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
       const errData = err?.response?.data;
       if (errData?.code === 'USER_NOT_FOUND') {
         setError(errData.error || 'Email hoặc mật khẩu không đúng.');
+      } else if (errData?.code === 'USER_NOT_VERIFIED') {
+        setError(errData.error || 'Tài khoản chưa được xác thực. Vui lòng xác thực bằng mã OTP.');
+        setTimeout(() => {
+          navigate('/verify', { state: { email: em }, replace: true });
+        }, 3000);
       } else {
         const attempts = (rl.attempts || 0) + 1;
         if (attempts >= MAX_ATTEMPTS) {
@@ -106,7 +111,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
 
   const pill: React.CSSProperties = {
     width: '100%', border: '1.5px solid #e2e0dd', borderRadius: 50,
-    padding: '10px 16px', fontSize: 13, boxSizing: 'border-box', outline: 'none',
+    padding: '10px 18px', fontSize: 15, boxSizing: 'border-box', outline: 'none',
     background: '#fff', color: '#1c1917',
   };
 
@@ -124,64 +129,64 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
       </div>
 
       {/* Right form */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '32px 40px', boxSizing: 'border-box', background: '#fff' }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
-          <div style={{ marginBottom: 20 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '32px 40px', boxSizing: 'border-box', background: '#fff', overflowY: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: 480, margin: 'auto' }}>
+          <div style={{ marginBottom: 12 }}>
             <Link to="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontSize: 20, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
+              <span style={{ fontSize: 30, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
             </Link>
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Chào mừng trở lại!</h1>
-          <p style={{ fontSize: 13, color: '#78716c', margin: '0 0 18px' }}>Đăng nhập để bắt đầu trải nghiệm mua sắm của bạn.</p>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Chào mừng trở lại!</h1>
+          <p style={{ fontSize: 15, color: '#78716c', margin: '0 0 12px' }}>Đăng nhập để bắt đầu trải nghiệm mua sắm của bạn.</p>
 
-          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 5 }}>Email</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Email</label>
               <input id="lg-email" type="email" autoComplete="email" placeholder="nhapemail@example.com"
                 value={email} onChange={e => setEmail(e.target.value)} required disabled={loading} style={pill} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 5 }}>Mật khẩu</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Mật khẩu</label>
               <div style={{ position: 'relative' }}>
                 <input id="lg-pw" type={showPw ? 'text' : 'password'} autoComplete="current-password" placeholder="••••••••"
                   value={password} onChange={e => setPassword(e.target.value)} required disabled={loading}
-                  style={{ ...pill, paddingRight: 48 }} />
+                  style={{ ...pill, paddingRight: 55 }} />
                 <button type="button" onClick={() => setShowPw(v => !v)}
                   style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', padding: 4, display: 'flex' }}>
-                  {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                  {showPw ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 0' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#57534e', cursor: 'pointer' }}>
-                <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} style={{ accentColor: '#007700', width: 16, height: 16 }} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, color: '#57534e', cursor: 'pointer' }}>
+                <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} style={{ accentColor: '#007700', width: 18, height: 18 }} />
                 Ghi nhớ tài khoản
               </label>
-              <Link to="/forgot-password" style={{ fontSize: 13, color: '#007700', fontWeight: 600, textDecoration: 'none' }}>Quên mật khẩu?</Link>
+              <Link to="/forgot-password" style={{ fontSize: 15, color: '#007700', fontWeight: 600, textDecoration: 'none' }}>Quên mật khẩu?</Link>
             </div>
             {error && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 14px' }}>
-                <AlertCircle size={15} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 13, color: '#dc2626' }}>{error}</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px' }}>
+                <AlertCircle size={17} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 15, color: '#dc2626' }}>{error}</span>
               </div>
             )}
             <button type="submit" disabled={loading}
-              style={{ background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '11px', fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              {loading && <Loader2 size={16} className="animate-spin" />}
+              style={{ background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '12px', fontSize: 16, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {loading && <Loader2 size={18} className="animate-spin" />}
               {loading ? 'Đang xác thực...' : 'Đăng nhập'}
             </button>
           </form>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '14px 0' }}>
-            <div style={{ flex: 1, height: 1, background: '#e7e5e4' }} /><span style={{ fontSize: 12, color: '#a8a29e' }}>Hoặc</span><div style={{ flex: 1, height: 1, background: '#e7e5e4' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '10px 0' }}>
+            <div style={{ flex: 1, height: 1, background: '#e7e5e4' }} /><span style={{ fontSize: 14, color: '#a8a29e' }}>Hoặc</span><div style={{ flex: 1, height: 1, background: '#e7e5e4' }} />
           </div>
 
           <button type="button" onClick={() => googleLogin()} disabled={loading}
-            style={{ width: '100%', background: '#fff', border: '1.5px solid #e2e0dd', borderRadius: 50, padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#1c1917', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            style={{ width: '100%', background: '#fff', border: '1.5px solid #e2e0dd', borderRadius: 50, padding: '10px 18px', fontSize: 15, fontWeight: 600, color: '#1c1917', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             <GoogleIcon /> Đăng nhập với Google
           </button>
 
-          <p style={{ textAlign: 'center', fontSize: 13, color: '#78716c', marginTop: 16 }}>
+          <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 12 }}>
             Chưa có tài khoản?{' '}<Link to="/signup" style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng ký</Link>
           </p>
         </div>

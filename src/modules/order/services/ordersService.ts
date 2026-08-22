@@ -5,8 +5,14 @@ export const ordersService = {
         const res = await api.post('/orders', orderData);
         return res.data;
     },
-    getByUser: async () => {
-        const res = await api.get('/orders');
+    getByUser: async (status?: string) => {
+        const res = await api.get('/orders', {
+            params: status && status !== 'all' ? { status } : undefined
+        });
+        return res.data;
+    },
+    getById: async (orderId: string) => {
+        const res = await api.get(`/orders/${orderId}`);
         return res.data;
     },
     triggerCallback: async (orderId: string, status: 'success' | 'fail') => {
@@ -14,3 +20,5 @@ export const ordersService = {
         return res.data;
     }
 };
+
+export default ordersService;
