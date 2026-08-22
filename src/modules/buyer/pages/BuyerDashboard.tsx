@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart, Star } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Star, MessageCircle } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import '../../../shared/components/layouts.css';
 
@@ -38,7 +38,32 @@ export function BuyerDashboard({ user }: { user: any; onLogout: () => void }) {
   ];
 
   return (
-    <div className="buyer-wrapper">
+    <div className="buyer-dashboard-page">
+      <header className="buyer-header-nav">
+        <div className="buyer-header-container">
+          <div className="buyer-logo">
+            <span className="logo-green">Viet</span><span className="logo-purple">Craft</span>
+          </div>
+          <nav className="buyer-nav-menu">
+            <a href="#kham-pha">Khám Phá</a>
+            <a href="#qua-tang">Quà Tặng</a>
+            <a href="#bo-suu-tap">Bộ Sưu Tập</a>
+            <a href="#duoi-100k">Dưới 100k</a>
+          </nav>
+          <div className="buyer-search-bar">
+            <Search className="search-icon" size={16} />
+            <input type="text" placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="buyer-actions">
+            <button className="icon-btn"><Heart size={20} /></button>
+            <button className="icon-btn relative"><ShoppingBag size={20} /><span className="badge">0</span></button>
+            <button className="icon-btn" title="Tin nhắn"><MessageCircle size={20} /></button>
+            <button className="buyer-avatar" onClick={onLogout} title="Đăng xuất">{name[0].toUpperCase()}</button>
+          </div>
+        </div>
+      </header>
+      <main className="buyer-main-content">
+        <div className="buyer-wrapper">
           <div className="buyer-intro-banner"><h1>Chào mừng trở lại, {name}!</h1></div>
           <div className="buyer-tab-pills">
             <button className="active">Đã quan tâm</button>
