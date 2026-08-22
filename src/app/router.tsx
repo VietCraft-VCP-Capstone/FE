@@ -8,8 +8,6 @@ import { ResetPasswordPage } from '../modules/auth/pages/ResetPasswordPage';
 import { AdminPortal } from '../modules/admin/pages/AdminPortal';
 import { SellerPortal } from '../modules/seller/pages/SellerPortal';
 import { BuyerLayout } from '../modules/buyer/pages/BuyerLayout';
-import { CartPage } from '../modules/buyer/pages/CartPage';
-import { FavoritesPage } from '../modules/buyer/pages/FavoritesPage';
 import { BuyerDashboard } from '../modules/buyer/pages/BuyerDashboard';
 import { BuyerCartPage } from '../modules/buyer/pages/BuyerCartPage';
 import { BuyerCheckoutPage } from '../modules/buyer/pages/BuyerCheckoutPage';
@@ -73,8 +71,6 @@ export function AppRouter() {
       <Route path="/verify" element={<OTPPage onVerified={() => { window.location.href = '/login'; }} />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/cart" element={<CartPage onBackToShop={() => window.location.href = '/'} />} />
-      <Route path="/favorites" element={<FavoritesPage />} />
 
       <Route
         path="/admin/*"

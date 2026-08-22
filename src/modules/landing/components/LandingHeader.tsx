@@ -1,7 +1,4 @@
-import { useState, useEffect } from 'react';
 import { Search, Heart, ShoppingCart } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { cartService } from '../../order/services/cartService';
 
 interface LandingHeaderProps {
   user: any;
@@ -24,30 +21,6 @@ export function LandingHeader({
   onHome,
   onDashboard,
 }: LandingHeaderProps) {
-  const [cartCount, setCartCount] = useState<number>(0);
-
-  useEffect(() => {
-    cartService.getCart()
-      .then((data) => {
-        if (data && Array.isArray(data.items)) {
-          const totalQty = data.items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
-          setCartCount(totalQty);
-        }
-      })
-      .catch(() => {});
-
-    const handleCartUpdate = (e: any) => {
-      if (e.detail && typeof e.detail.count === 'number') {
-        setCartCount(e.detail.count);
-      }
-    };
-
-    window.addEventListener('vietcraft-cart-updated', handleCartUpdate);
-    return () => {
-      window.removeEventListener('vietcraft-cart-updated', handleCartUpdate);
-    };
-  }, []);
-
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-100 px-6 py-4">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -82,17 +55,13 @@ export function LandingHeader({
 
         {/* Right Actions */}
         <div className="flex items-center gap-4">
-          <Link to="/favorites" className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all" title="Yêu thích">
+          <button className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all" title="Yêu thích">
             <Heart className="h-5.5 w-5.5" />
-          </Link>
-          <Link to="/cart" className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all relative" title="Giỏ hàng">
+          </button>
+          <button className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all relative" title="Giỏ hàng">
             <ShoppingCart className="h-5.5 w-5.5" />
-            {cartCount > 0 && (
-              <span className="absolute top-0 right-0 h-4 w-4 bg-[#007700] text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
-                {cartCount}
-              </span>
-            )}
-          </Link>
+            <span className="absolute top-0 right-0 h-4 w-4 bg-[#007700] text-white text-[9px] font-bold rounded-full flex items-center justify-center">0</span>
+          </button>
           
           {user ? (
             <div className="flex items-center gap-2">
