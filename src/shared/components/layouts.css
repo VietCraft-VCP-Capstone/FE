@@ -973,45 +973,44 @@
     position: sticky;
     top: 0;
     z-index: 300;
-    background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
-    padding: 16px 32px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #f0edf0;
+    padding: 14px 24px;
 }
 
 .buyer-header-container {
-    max-width: 1280px;
+    max-width: 1200px;
     margin: 0 auto;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 32px;
+    gap: 20px;
 }
 
 .buyer-logo {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 800;
-    letter-spacing: -0.3px;
 }
 
 .buyer-logo .logo-green {
-    color: #1a7e28;
+    color: #007700;
 }
 
 .buyer-logo .logo-purple {
-    color: #3b1d3d;
+    color: #330033;
 }
 
 .buyer-nav-menu {
     display: flex;
-    align-items: center;
-    gap: 28px;
+    gap: 20px;
 }
 
 .buyer-nav-menu a,
 .buyer-nav-menu span {
-    font-size: 14px;
-    font-weight: 600;
-    color: #374151;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4c4a4c;
     text-decoration: none;
     cursor: pointer;
     transition: color 0.15s;
@@ -1019,101 +1018,100 @@
 
 .buyer-nav-menu a:hover,
 .buyer-nav-menu span:hover {
-    color: #1a7e28;
+    color: #007700;
 }
 
 .buyer-nav-menu a.nav-active,
 .buyer-nav-menu span.nav-active {
-    color: #111827;
-    font-weight: 700;
+    color: #007700;
+    position: relative;
+}
+
+.buyer-nav-menu a.nav-active::after,
+.buyer-nav-menu span.nav-active::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #007700;
+    border-radius: 2px;
 }
 
 
 .buyer-search-bar {
     flex: 1;
-    max-width: 480px;
+    max-width: 440px;
     position: relative;
 }
 
 .buyer-search-bar .search-icon {
     position: absolute;
-    left: 16px;
+    left: 14px;
     top: 50%;
     transform: translateY(-50%);
-    color: #6b7280;
+    color: #7b787c;
 }
 
 .buyer-search-bar input {
     width: 100%;
-    padding: 10px 20px 10px 44px;
-    border: 1px solid #f3f4f6;
-    background: #f9fafb;
-    border-radius: 9999px;
-    font-size: 14px;
-    color: #111827;
+    padding: 8px 16px 8px 38px;
+    border: 1px solid #ebd0eb;
+    background: #fcfcfc;
+    border-radius: 40px;
+    font-size: 13px;
     outline: none;
     transition: all 0.2s;
 }
 
-.buyer-search-bar input::placeholder {
-    color: #9ca3af;
-}
-
 .buyer-search-bar input:focus {
-    border-color: #1a7e28;
+    border-color: #007700;
     background: #fff;
 }
 
 .buyer-actions {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
 }
 
 .buyer-actions .icon-btn {
     background: none;
     border: none;
     cursor: pointer;
-    color: #374151;
-    padding: 4px;
+    color: #4c4a4c;
+    padding: 6px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     transition: background 0.15s;
 }
 
 .buyer-actions .icon-btn:hover {
-    background: #f3f4f6;
+    background: #f3f0f3;
+    color: #007700;
 }
 
 .buyer-actions .icon-btn.relative .badge {
     position: absolute;
-    top: -4px;
-    right: -6px;
-    background: #15803d;
+    top: 0;
+    right: 0;
+    background: #007700;
     color: #fff;
-    font-size: 10px;
-    font-weight: 800;
-    min-width: 17px;
-    height: 17px;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 4px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 2px;
-    border: 2px solid #fff;
 }
 
 .buyer-avatar {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-    background: #15803d;
+    background: #007700;
     color: #fff;
     font-weight: 700;
-    font-size: 14px;
-    border: 1px solid #e5e7eb;
+    font-size: 13px;
+    border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1535,18 +1533,6 @@
 
 .brand-col .copyright {
     margin-top: 12px;
-    font-size: 11px;
-    color: #a498a4;
-}
-
-.footer-bottom-row {
-    max-width: 1200px;
-    margin: 40px auto 0;
-    padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     font-size: 11px;
     color: #a498a4;
 }
