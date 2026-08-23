@@ -1,286 +1,166 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Heart, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, ArrowLeft, ShoppingBag, XCircle, Search, SlidersHorizontal } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { userService } from '../../user/services/userService';
-import '../../../shared/components/layouts.css';
-
-type SortOption = 'default' | 'price-asc' | 'price-desc' | 'name-asc';
+import { cartService } from '../../order/services/cartService';
 
 export function BuyerFavoritesPage() {
   const navigate = useNavigate();
-  const [allProducts, setAllProducts] = useState<any[]>([]);
-  const [wishlistIds, setWishlistIds] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
-
-  // Filter & sort state
-  const [searchText, setSearchText] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('default');
-  const [maxPrice, setMaxPrice] = useState<number>(Infinity);
-  const [showFilters, setShowFilters] = useState(false);
-
-  const PRICE_FILTERS: { label: string; value: number }[] = [
-    { label: 'Tất cả', value: Infinity },
-    { label: 'Dưới 500K', value: 500000 },
-    { label: 'Dưới 1 triệu', value: 1000000 },
-    { label: 'Dưới 2 triệu', value: 2000000 },
-  ];
-
-  const SORT_OPTIONS: { label: string; value: SortOption }[] = [
-    { label: 'Mặc định', value: 'default' },
-    { label: 'Giá tăng dần', value: 'price-asc' },
-    { label: 'Giá giảm dần', value: 'price-desc' },
-    { label: 'Tên A→Z', value: 'name-asc' },
-  ];
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [products, ids] = await Promise.all([
-          productsService.getAll(),
-          userService.getWishlist()
-        ]);
-        setAllProducts(products || []);
-        setWishlistIds(ids);
-        localStorage.setItem('vietcraft_favorites', JSON.stringify(ids));
-      } catch (err) {
-        console.error('Failed to load wishlist or products', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
+    fetchFavorites();
   }, []);
 
-  const favoriteProducts = useMemo(() => {
-    let list = allProducts.filter((p: any) =>
-      wishlistIds.includes(p.id) || wishlistIds.includes(p._id?.toString())
-    );
-
-    // Text search
-    if (searchText.trim()) {
-      const q = searchText.toLowerCase();
-      list = list.filter((p: any) => (p.title || '').toLowerCase().includes(q));
-    }
-
-    // Price filter
-    if (maxPrice !== Infinity) {
-      list = list.filter((p: any) => (p.price || 0) <= maxPrice);
-    }
-
-    // Sort
-    if (sortBy === 'price-asc') list = [...list].sort((a, b) => (a.price || 0) - (b.price || 0));
-    else if (sortBy === 'price-desc') list = [...list].sort((a, b) => (b.price || 0) - (a.price || 0));
-    else if (sortBy === 'name-asc') list = [...list].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-
-    return list;
-  }, [allProducts, wishlistIds, searchText, maxPrice, sortBy]);
-
-  const removeFavorite = async (productId: string, title: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const fetchFavorites = async () => {
     try {
-      const updated = await userService.removeFromWishlist(productId);
-      setWishlistIds(updated);
-      localStorage.setItem('vietcraft_favorites', JSON.stringify(updated));
-      showToast(`Đã xóa "${title}" khỏi yêu thích`);
+      setLoading(true);
+      const [allProducts, wishlistIds] = await Promise.all([
+        productsService.getAll().catch(() => []),
+        userService.getWishlist().catch(() => [])
+      ]);
+      
+      let items: any[] = [];
+      if (Array.isArray(wishlistIds) && wishlistIds.length > 0 && Array.isArray(allProducts)) {
+        items = allProducts.filter((p: any) =>
+          wishlistIds.includes(p.id) || wishlistIds.includes(p._id?.toString())
+        );
+      }
+      setFavorites(items);
     } catch (err) {
-      console.error('removeFromWishlist failed', err);
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const totalFavCount = allProducts.filter((p: any) =>
-    wishlistIds.includes(p.id) || wishlistIds.includes(p._id?.toString())
-  ).length;
+  const handleRemoveFavorite = async (id: string) => {
+    try {
+      const updatedWishlist = await userService.removeFromWishlist(id);
+      localStorage.setItem('vietcraft_favorites', JSON.stringify(updatedWishlist || []));
+      setFavorites(prev => prev.filter(item => item._id !== id && item.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddToCart = async (product: any) => {
+    try {
+      await cartService.addToCart({ productId: product._id || product.id, quantity: 1 });
+      alert('Đã thêm sản phẩm vào giỏ hàng!');
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
-    <div className="buyer-wrapper" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', minHeight: '60vh' }}>
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24,
-          backgroundColor: '#fff', borderLeft: '4px solid #cc1111',
-          padding: '12px 20px', borderRadius: 8,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-          zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10
-        }}>
-          <XCircle size={20} color="#cc1111" strokeWidth={2.5} />
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#444' }}>{toast}</span>
-        </div>
-      )}
-
-      {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <button type="button" onClick={() => navigate('/')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', gap: 4, fontSize: 14 }}>
-          <ArrowLeft size={18} /> Quay lại
-        </button>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#330033', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Heart size={22} fill="#e11d48" color="#e11d48" /> Sản phẩm yêu thích
-        </h1>
-        <span style={{ fontSize: 14, color: '#888' }}>({totalFavCount} sản phẩm)</span>
-      </div>
-
-      {/* Filter Bar */}
-      <div style={{
-        background: '#fff', border: '1px solid #f0edf0', borderRadius: 12,
-        padding: '12px 16px', marginBottom: 24, display: 'flex',
-        alignItems: 'center', gap: 12, flexWrap: 'wrap'
-      }}>
-        {/* Search */}
-        <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 180 }}>
-          <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
-          <input
-            type="text"
-            placeholder="Tìm trong yêu thích..."
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            style={{
-              width: '100%', padding: '8px 12px 8px 32px',
-              border: '1px solid #ebd0eb', borderRadius: 50,
-              fontSize: 13, outline: 'none', background: '#fcfcfc',
-              boxSizing: 'border-box'
-            }}
-          />
-        </div>
-
-        {/* Price filter pills */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {PRICE_FILTERS.map(f => (
-            <button
-              key={f.label}
-              type="button"
-              onClick={() => setMaxPrice(f.value)}
-              style={{
-                padding: '6px 14px', borderRadius: 50, fontSize: 12, fontWeight: 700,
-                cursor: 'pointer', border: 'none',
-                backgroundColor: maxPrice === f.value ? '#008000' : '#f5f5f4',
-                color: maxPrice === f.value ? '#fff' : '#555',
-                transition: 'all 0.2s'
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Sort toggle button */}
-        <button
-          type="button"
-          onClick={() => setShowFilters(v => !v)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '7px 14px', borderRadius: 50, fontSize: 12, fontWeight: 700,
-            cursor: 'pointer', border: '1px solid #ebd0eb',
-            backgroundColor: showFilters ? '#330033' : '#fff', color: showFilters ? '#fff' : '#330033',
-            transition: 'all 0.2s'
-          }}
-        >
-          <SlidersHorizontal size={13} /> Sắp xếp
-        </button>
-
-        {/* Sort options (shown when expanded) */}
-        {showFilters && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: '100%' }}>
-            {SORT_OPTIONS.map(s => (
-              <button
-                key={s.value}
-                type="button"
-                onClick={() => { setSortBy(s.value); setShowFilters(false); }}
-                style={{
-                  padding: '6px 14px', borderRadius: 50, fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer', border: 'none',
-                  backgroundColor: sortBy === s.value ? '#330033' : '#f0edf0',
-                  color: sortBy === s.value ? '#fff' : '#555',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#888' }}>
-          <p style={{ fontSize: 16 }}>Đang tải sản phẩm yêu thích...</p>
-        </div>
-      ) : totalFavCount === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '80px 0',
-          border: '2px dashed #ebd0eb', borderRadius: 16, color: '#bbb'
-        }}>
-          <Heart size={48} style={{ marginBottom: 16, color: '#ebd0eb' }} />
-          <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Chưa có sản phẩm yêu thích</p>
-          <p style={{ fontSize: 14, marginBottom: 24 }}>Nhấn vào icon ❤️ trên sản phẩm để thêm vào danh sách yêu thích.</p>
-          <button type="button" onClick={() => navigate('/')}
-            style={{
-              backgroundColor: '#008000', color: '#fff', border: 'none',
-              borderRadius: 50, padding: '10px 28px', fontSize: 14, fontWeight: 700, cursor: 'pointer'
-            }}>
-            Khám phá sản phẩm
+    <div className="w-full bg-white text-gray-900 font-sans min-h-screen">
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        {/* Nút quay lại mua sắm */}
+        <div className="mb-4">
+          <button
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-[#15803d] transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" /> Tiếp tục mua sắm
           </button>
         </div>
-      ) : favoriteProducts.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#aaa' }}>
-          <Search size={40} style={{ marginBottom: 12, color: '#ddd' }} />
-          <p style={{ fontSize: 16, fontWeight: 600 }}>Không tìm thấy sản phẩm phù hợp</p>
-          <p style={{ fontSize: 13 }}>Thử thay đổi bộ lọc hoặc từ khoá tìm kiếm.</p>
+
+        {/* Header trang */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full border border-gray-200 overflow-hidden shrink-0 bg-gray-100 flex items-center justify-center">
+              <img
+                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"
+                alt="Avatar"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <h1 className="text-2xl font-bold text-[#331b3b]">
+              Sản phẩm yêu thích của bạn
+            </h1>
+          </div>
+
+          <div className="relative">
+            <button className="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors flex items-center gap-2">
+              Sắp xếp: Mới nhất <span className="text-xs">▾</span>
+            </button>
+          </div>
         </div>
-      ) : (
-        <>
-          <p style={{ fontSize: 13, color: '#999', marginBottom: 16 }}>
-            Hiển thị {favoriteProducts.length}/{totalFavCount} sản phẩm
-          </p>
-          <div className="buyer-grid-4">
-            {favoriteProducts.map((p: any) => (
-              <div
-                key={p.id || p._id}
-                className="buyer-card"
-                onClick={() => navigate(`/product/${p.id || p._id}`)}
-              >
-                <div className="card-media">
-                  <img
-                    src={p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400'}
-                    alt={p.title}
-                  />
-                  <button
-                    className="fav-overlay"
-                    type="button"
-                    onClick={(e) => removeFavorite(p.id || p._id, p.title, e)}
-                    title="Xóa khỏi yêu thích"
-                    style={{ color: '#e11d48' }}
-                  >
-                    <Heart size={14} fill="#e11d48" />
-                  </button>
-                </div>
-                <div className="card-info">
-                  <h3>{p.title}</h3>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                    <span className="new-price">{(p.price || 0).toLocaleString('vi-VN')}đ</span>
-                    <button type="button"
-                      onClick={(e) => { e.stopPropagation(); navigate('/cart'); }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        background: '#008000', color: '#fff', border: 'none',
-                        borderRadius: 50, padding: '4px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer'
-                      }}>
-                      <ShoppingBag size={12} /> Thêm giỏ
+
+        {/* Đường kẻ ngang ngăn cách mỏng */}
+        <hr className="border-t border-gray-200 my-6" />
+
+        {/* 5-Column Grid */}
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 animate-pulse">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <div key={n} className="h-80 bg-gray-100 rounded-[24px]"></div>
+            ))}
+          </div>
+        ) : favorites.length === 0 ? (
+          <div className="py-20 text-center text-gray-500">
+            Chưa có sản phẩm yêu thích nào.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            {favorites.map((item) => {
+              const product = item.product || item;
+              const prodId = product._id || product.id || item;
+              return (
+                <div key={prodId} className="group flex flex-col">
+                  {/* Image Container */}
+                  <div className="relative w-full aspect-square rounded-[24px] overflow-hidden bg-gray-100">
+                    <img
+                      src={
+                        product.image ||
+                        product.thumbnail ||
+                        product.images?.[0] ||
+                        'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400'
+                      }
+                      alt={product.title || product.name || 'Sản phẩm'}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {/* Heart Badge Button */}
+                    <button
+                      onClick={() => handleRemoveFavorite(prodId)}
+                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10"
+                    >
+                      <Heart className="fill-[#15803d] text-[#15803d] w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex flex-col flex-1">
+                    <h3 className="text-sm font-semibold text-gray-900 mt-3 line-clamp-1">
+                      {product.title || product.name || 'Cốc Sứ Thủ Công'}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {product.storeName || product.shopName || 'Gốm Mộc Studio'}
+                    </p>
+                    <p className="text-sm font-bold text-[#15803d] mt-1">
+                      {new Intl.NumberFormat('vi-VN').format(
+                        product.retail_price || product.price || 250000
+                      )}{' '}
+                      đ
+                    </p>
+
+                    {/* Pill Border Button */}
+                    <button
+                      onClick={() => handleAddToCart(product)}
+                      className="w-full mt-3 py-2 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold"
+                    >
+                      Thêm vào giỏ
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }
