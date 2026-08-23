@@ -38,7 +38,8 @@ export function BuyerFavoritesPage() {
 
   const handleRemoveFavorite = async (id: string) => {
     try {
-      await userService.removeFromWishlist(id);
+      const updatedWishlist = await userService.removeFromWishlist(id);
+      localStorage.setItem('vietcraft_favorites', JSON.stringify(updatedWishlist || []));
       setFavorites(prev => prev.filter(item => item._id !== id && item.id !== id));
     } catch (err) {
       console.error(err);
@@ -55,7 +56,7 @@ export function BuyerFavoritesPage() {
   };
 
   return (
-    <div className="w-full bg-white text-gray-900 font-sans">
+    <div className="w-full bg-white text-gray-900 font-sans min-h-screen">
       <div className="max-w-7xl mx-auto px-6 py-6">
         {/* Nút quay lại mua sắm */}
         <div className="mb-4">
