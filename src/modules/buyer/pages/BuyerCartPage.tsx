@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Trash2, Plus, Minus, Sparkles, Check } from 'lucide-react';
+import { Trash2, Plus, Minus, Sparkles, Check, ArrowLeft } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 
 interface CartItem {
@@ -143,6 +143,16 @@ export function BuyerCartPage() {
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
+            {/* Nút quay lại mua sắm */}
+            <div className="mb-4">
+                <button
+                    onClick={() => navigate('/')}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-[#15803d] transition-colors cursor-pointer"
+                >
+                    <ArrowLeft className="w-4 h-4" /> Tiếp tục mua sắm
+                </button>
+            </div>
+
             <h1 className="text-2xl font-bold text-gray-900 mb-6">Giỏ hàng của bạn</h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -289,6 +299,11 @@ export function BuyerCartPage() {
                     </div>
                 </div>
             )}
+
+            {/* Footer tối giản 1 dòng chuẩn Figma */}
+            <footer className="w-full py-8 text-center text-xs text-gray-400 bg-white border-t border-gray-100 mt-16">
+                © 2026 VietCraft. Đã đăng ký bản quyền.
+            </footer>
 
             {/* Toast Notification */}
             {toast && (
