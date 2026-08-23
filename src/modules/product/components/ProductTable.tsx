@@ -158,7 +158,7 @@ export function ProductTable({
                     if (input) input.indeterminate = isSomeSelected;
                   }}
                   onChange={(e) => onSelectAll(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#007700] border-stone-300 focus:ring-[#007700] cursor-pointer"
+                  className="w-4 h-4 rounded text-[#007700] accent-[#007700] border-stone-300 focus:ring-[#007700] cursor-pointer transition-all"
                 />
               </th>
               <th className="py-4 px-4 w-[36%]">THÔNG TIN CHI TIẾT</th>
@@ -180,8 +180,8 @@ export function ProductTable({
               return (
                 <tr
                   key={product.id}
-                  className={`h-20 transition-colors duration-150 group hover:bg-stone-50/80 ${
-                    isSelected ? 'bg-emerald-50/40' : ''
+                  className={`h-20 transition-colors duration-150 group ${
+                    isSelected ? 'bg-[#EAF0E2]/60 hover:bg-[#EAF0E2]/80' : 'hover:bg-stone-50/80'
                   }`}
                 >
                   {/* Checkbox */}
@@ -190,7 +190,7 @@ export function ProductTable({
                       type="checkbox"
                       checked={isSelected}
                       onChange={(e) => onSelectOne(product.id, e.target.checked)}
-                      className="w-4 h-4 rounded text-[#007700] border-stone-300 focus:ring-[#007700] cursor-pointer"
+                      className="w-4 h-4 rounded text-[#007700] accent-[#007700] border-stone-300 focus:ring-[#007700] cursor-pointer transition-all"
                     />
                   </td>
 
