@@ -8,7 +8,10 @@ export function BuyerDashboard({ user, onLogout }: { user: any; onLogout: () => 
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    productsService.getAll().then((data) => { setProducts(data.slice(0, 5)); });
+    productsService.getAll().then((data) => {
+      const items = Array.isArray(data) ? data : (data?.items || []);
+      setProducts(items.slice(0, 5));
+    });
   }, []);
 
   const name = user?.name || 'Nhi';
