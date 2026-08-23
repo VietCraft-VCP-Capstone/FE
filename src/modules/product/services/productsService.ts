@@ -24,7 +24,7 @@ export const productsService = {
     }
   },
 
-  getFeaturedShops: async () => {
+  getFeaturedShops: async (): Promise<any[]> => {
     try {
       const res = await api.get('/products/featured-shops');
       return Array.isArray(res.data) ? res.data : [];
@@ -33,17 +33,32 @@ export const productsService = {
     }
   },
 
-  getById: async (id: string): Promise<ProductItem | undefined> => {
+  getById: async (id: string): Promise<ProductItem | any> => {
     const res = await api.get(`/products/${id}`);
     return res.data;
   },
 
-  create: async (productData: ProductFormData): Promise<ProductItem> => {
+  getRelated: async (id: string): Promise<any[]> => {
+    try {
+      const res = await api.get(`/products/${id}/related`);
+      return Array.isArray(res.data) ? res.data : (res.data?.items || []);
+    } catch (err) {
+      try {
+        const res = await api.get('/products');
+        const items = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+        return items.filter((p: any) => p.id !== id && p._id !== id);
+      } catch {
+        return [];
+      }
+    }
+  },
+
+  create: async (productData: ProductFormData | any): Promise<ProductItem | any> => {
     const res = await api.post('/products', productData);
     return res.data;
   },
 
-  update: async (id: string, productData: Partial<ProductFormData>): Promise<ProductItem> => {
+  update: async (id: string, productData: Partial<ProductFormData> | any): Promise<ProductItem | any> => {
     const res = await api.put(`/products/${id}`, productData);
     return res.data;
   },
@@ -64,4 +79,5 @@ export const productsService = {
     return [];
   }
 };
+
 export default productsService;
