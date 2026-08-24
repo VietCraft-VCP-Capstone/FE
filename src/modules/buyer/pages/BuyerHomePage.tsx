@@ -44,11 +44,12 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     // Fetch products, shops, coupons in parallel
     setIsLoading(true);
     Promise.all([
-      productsService.getAll().catch((err) => { console.error('Failed to fetch products', err); return []; }),
+      productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
       productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
       promotionService.getAll().catch((err) => { console.error('Failed to fetch coupons', err); return []; }),
     ]).then(([products, shops, coupons]) => {
-      setAllProducts(products || []);
+      const productList = Array.isArray(products) ? products : (products as any)?.items || [];
+      setAllProducts(productList);
       setShopList(shops || []);
       setCouponList(coupons || []);
     }).finally(() => {
@@ -174,10 +175,10 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
         return favItems;
       case 'gan-day':
         // Mock recently viewed
-        return searchedProducts.slice(0, 5);
+        return searchedProducts;
       case 'theo-doi':
         // Shuffled or specific products from followed shops
-        return [...searchedProducts].reverse().slice(0, 5);
+        return [...searchedProducts].reverse();
       case 'khuyen-mai':
         // Show flashDeals mapped to standard product format
         return flashDeals.map(fd => ({
@@ -192,7 +193,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
           (p.title || '').toLowerCase().includes('gốm') ||
           (p.title || '').toLowerCase().includes('tranh')
         );
-        return matches.length > 0 ? matches : searchedProducts.slice(1, 5);
+        return matches.length > 0 ? matches : searchedProducts;
       default:
         return searchedProducts;
     }
