@@ -18,12 +18,12 @@ export function BuyerFavoritesPage() {
     try {
       setLoading(true);
       const [productsRes, wishlistIds] = await Promise.all([
-        productsService.getAll().catch(() => ({ items: [] })),
+        productsService.getAll({ pageSize: 100 }).catch(() => ({ items: [] })),
         userService.getWishlist().catch(() => [] as string[])
       ]);
 
       const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
-      const products = Array.isArray(allProducts) ? allProducts : [];
+      const products = Array.isArray(productsRes) ? productsRes : (productsRes?.items || []);
 
       // Tìm các sản phẩm khớp
       const matchedItems = products.filter((p: any) =>

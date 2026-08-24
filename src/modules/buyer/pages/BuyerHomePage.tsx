@@ -19,6 +19,12 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
   const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset page when tab or search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, search]);
 
   const name = user?.full_name || user?.name || '';
 
@@ -44,11 +50,12 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     // Fetch products, shops, coupons in parallel
     setIsLoading(true);
     Promise.all([
-      productsService.getAll().catch((err) => { console.error('Failed to fetch products', err); return []; }),
+      productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
       productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
       promotionService.getAll().catch((err) => { console.error('Failed to fetch coupons', err); return []; }),
     ]).then(([products, shops, coupons]) => {
-      setAllProducts(products || []);
+      const productList = Array.isArray(products) ? products : (products as any)?.items || [];
+      setAllProducts(productList);
       setShopList(shops || []);
       setCouponList(coupons || []);
     }).finally(() => {
@@ -174,10 +181,10 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
         return favItems;
       case 'gan-day':
         // Mock recently viewed
-        return searchedProducts.slice(0, 5);
+        return searchedProducts;
       case 'theo-doi':
         // Shuffled or specific products from followed shops
-        return [...searchedProducts].reverse().slice(0, 5);
+        return [...searchedProducts].reverse();
       case 'khuyen-mai':
         // Show flashDeals mapped to standard product format
         return flashDeals.map(fd => ({
@@ -192,13 +199,19 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
           (p.title || '').toLowerCase().includes('gốm') ||
           (p.title || '').toLowerCase().includes('tranh')
         );
-        return matches.length > 0 ? matches : searchedProducts.slice(1, 5);
+        return matches.length > 0 ? matches : searchedProducts;
       default:
         return searchedProducts;
     }
   };
 
   const displayProducts = getTabFilteredProducts();
+  const itemsPerPage = 5;
+  const totalPages = Math.ceil(displayProducts.length / itemsPerPage);
+  const paginatedProducts = displayProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="buyer-wrapper" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -339,31 +352,91 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
             <p style={{ fontWeight: 650 }}>Không tìm thấy sản phẩm phù hợp ở danh mục này.</p>
           </div>
         ) : (
-          <div className="buyer-grid-5">
-            {displayProducts.map((p: any) => {
-              const isFav = favoritedProductIds.includes(p.id);
-              return (
-                <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`)}>
-                  <div className="card-media">
-                    <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} />
-                    <button
-                      className="fav-overlay"
-                      onClick={(e) => toggleFavorite(p.id, p.title || p.name, e)}
-                      style={{ color: isFav ? '#e11d48' : '#888' }}
-                    >
-                      <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
-                    </button>
+          <>
+            <div className="buyer-grid-5">
+              {paginatedProducts.map((p: any) => {
+                const isFav = favoritedProductIds.includes(p.id);
+                return (
+                  <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`)}>
+                    <div className="card-media">
+                      <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} />
+                      <button
+                        className="fav-overlay"
+                        onClick={(e) => toggleFavorite(p.id, p.title || p.name, e)}
+                        style={{ color: isFav ? '#e11d48' : '#888' }}
+                      >
+                        <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
+                      </button>
+                    </div>
+                    <div className="card-info">
+                      <h3>{p.title || p.name}</h3>
+                      <p style={{ margin: 0, fontWeight: 700, color: '#007700' }}>
+                        {p.price.toLocaleString('vi-VN')}đ
+                      </p>
+                    </div>
                   </div>
-                  <div className="card-info">
-                    <h3>{p.title || p.name}</h3>
-                    <p style={{ margin: 0, fontWeight: 700, color: '#007700' }}>
-                      {p.price.toLocaleString('vi-VN')}đ
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 16,
+                marginTop: 28,
+                marginBottom: 12
+              }}>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    border: '1px solid #e7e5e4',
+                    backgroundColor: '#fff',
+                    color: currentPage === 1 ? '#a8a29e' : '#1c1917',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}
+                >
+                  &larr; Trước
+                </button>
+
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#44403c' }}>
+                  Trang {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    border: '1px solid #e7e5e4',
+                    backgroundColor: '#fff',
+                    color: currentPage === totalPages ? '#a8a29e' : '#1c1917',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}
+                >
+                  Sau &rarr;
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
 

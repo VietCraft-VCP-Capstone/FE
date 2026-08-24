@@ -46,7 +46,7 @@ export function ProductListingPage() {
 
   const [actionLoading, setActionLoading] = useState(false);
 
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<any>(null);
   const cacheRef = useRef<Map<string, { items: ProductItem[]; total: number; totalPages: number }>>(new Map());
 
   const getFilterKey = (f: ProductFilterState) => {
