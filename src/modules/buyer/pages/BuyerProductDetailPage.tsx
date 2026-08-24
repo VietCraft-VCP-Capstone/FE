@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Star, ShoppingCart, Zap,
   ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { userService } from '../../user/services/userService';
+import { cartService } from '../../order/services/cartService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Variant { id: string; name: string; color?: string; size?: string; material?: string; price: number; stock: number; mockupImage?: string; }
@@ -43,8 +44,7 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
 export function BuyerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const outletContext = useOutletContext<any>() || {};
-  const setCartCount = outletContext.setCartCount;
+
 
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<any[]>([]);
@@ -96,11 +96,15 @@ export function BuyerProductDetailPage() {
       }
     }).catch(() => {}).finally(() => setLoading(false));
 
-    // check favorites
-    try {
-      const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
-      setIsFav(favs.includes(id));
-    } catch {}
+    // check favorites from backend
+    userService.getWishlist()
+      .then((ids) => setIsFav(ids.includes(id!)))
+      .catch(() => {
+        try {
+          const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
+          setIsFav(favs.includes(id!));
+        } catch {}
+      });
   }, [id]);
 
   // Derive unique option sets from variants
@@ -127,28 +131,15 @@ export function BuyerProductDetailPage() {
   ];
 
   // ── Add to cart ──────────────────────────────────────────────────────────────
-  const addToCart = () => {
+  const addToCart = async () => {
     if (!product) return;
     try {
-      const cartStr = localStorage.getItem('vietcraft_cart');
-      const cart: any[] = cartStr ? JSON.parse(cartStr) : [];
-      const variantLabel = activeVariant?.name || 'Standard';
-      const existing = cart.find(item => item.id === product.id && item.variant === variantLabel);
-      if (existing) {
-        existing.quantity = (existing.quantity || 1) + qty;
-      } else {
-        cart.push({
-          id: product.id,
-          title: product.title,
-          price: displayPrice,
-          image: images[0],
-          variant: variantLabel,
-          quantity: qty,
-        });
-      }
-      localStorage.setItem('vietcraft_cart', JSON.stringify(cart));
-      const total = cart.reduce((s: number, i: any) => s + (i.quantity || 1), 0);
-      if (setCartCount) setCartCount(total);
+      await cartService.addToCart({
+        productId: product.id,
+        variantId: activeVariant?.id,
+        quantity: qty,
+        customNotes: customText || undefined
+      });
       triggerToast(`Đã thêm "${product.title}" vào giỏ hàng!`, 'success');
     } catch {
       triggerToast('Không thể thêm vào giỏ, vui lòng thử lại.', 'info');
@@ -170,7 +161,7 @@ export function BuyerProductDetailPage() {
         triggerToast(`Đã thêm vào yêu thích!`, 'success');
       }
       setIsFav(updated.includes(product.id));
-      localStorage.setItem('vietcraft_favorites', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch {
       // Fallback: toggle locally
       try {
@@ -178,6 +169,7 @@ export function BuyerProductDetailPage() {
         const next = isFav ? favs.filter(i => i !== product.id) : [...favs, product.id];
         localStorage.setItem('vietcraft_favorites', JSON.stringify(next));
         setIsFav(!isFav);
+        window.dispatchEvent(new CustomEvent('wishlist-updated'));
       } catch {}
     }
   };
