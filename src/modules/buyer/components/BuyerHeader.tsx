@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Heart, ShoppingBag, MessageCircle } from 'lucide-react';
+import { Search, Heart, Bell, ShoppingBag, MessageCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import { userService } from '../../user/services/userService';
@@ -65,6 +65,23 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
 
         {/* Action Icons */}
         <div className="buyer-actions">
+          {/* Notifications Icon */}
+          <button
+            type="button"
+            className="icon-btn relative"
+            onClick={() => navigate('/notifications')}
+            title="Thông báo"
+          >
+            <Bell
+              size={22}
+              className={
+                isActive('/notifications')
+                  ? 'text-gray-900 stroke-[2.5] transition-colors'
+                  : 'text-gray-600 stroke-[1.8] hover:text-gray-900 transition-colors'
+              }
+            />
+          </button>
+
           {/* Favorites Icon */}
           <button
             type="button"
