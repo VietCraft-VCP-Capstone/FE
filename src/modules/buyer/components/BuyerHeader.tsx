@@ -34,7 +34,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
     return () => window.removeEventListener('wishlist-updated', refreshFavCount);
   }, [location.pathname]);
 
-  const displayCartCount = cartCount > 0 ? cartCount : 3; // Default 3 if 0 for demo match
+  const displayCartCount = cartCount;
 
   return (
     <header className="buyer-header-nav">

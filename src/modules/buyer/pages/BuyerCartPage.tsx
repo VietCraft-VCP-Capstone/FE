@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, Sparkles, Check, ArrowLeft } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
+import { cartService } from '../../order/services/cartService';
 
 interface CartItem {
     id: string;
@@ -16,9 +17,76 @@ interface CartItem {
     checked: boolean;
 }
 
+const parseMongooseDecimal = (val: any): number => {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') return Number(val) || 0;
+    if (typeof val === 'object') {
+        if ('$numberDecimal' in val) {
+            return Number(val.$numberDecimal) || 0;
+        }
+        if ('value' in val) {
+            return Number(val.value) || 0;
+        }
+    }
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+};
+
+// Map Mongoose models structure from backend to frontend CartItem interface
+const mapBackendCart = (cartData: any): CartItem[] => {
+    if (!cartData || !Array.isArray(cartData.items)) {
+        return [];
+    }
+    return cartData.items.map((item: any) => {
+        const prod = item.product_id || {};
+        const variant = item.variant_id || {};
+        
+        // Shop Name
+        const shopName = prod.shop_id?.name || 'VietCraft Selection';
+        
+        // Variant Label/Name
+        let variantName = 'Mặc định';
+        if (variant.color || variant.size || variant.material) {
+            variantName = [variant.color, variant.size, variant.material].filter(Boolean).join(' - ');
+        } else if (variant.name) {
+            variantName = variant.name;
+        }
+
+        // Price: Variant price first, then product fallback
+        let price = 0;
+        if (variant.retail_price) {
+            price = parseMongooseDecimal(variant.retail_price);
+        } else if (variant.price) {
+            price = parseMongooseDecimal(variant.price);
+        } else if (prod.retail_price) {
+            price = parseMongooseDecimal(prod.retail_price);
+        } else if (prod.price) {
+            price = parseMongooseDecimal(prod.price);
+        } else {
+            price = 150000;
+        }
+
+        // Product image
+        const image = variant.mockup_image || prod.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=300';
+
+        return {
+            id: item._id, // Cart item DB MongoDB ObjectId
+            productId: prod._id || '',
+            variantId: variant._id || '',
+            title: prod.title || 'Sản phẩm VietCraft',
+            shopName,
+            variantName,
+            price,
+            quantity: item.quantity || 1,
+            image,
+            checked: item.is_selected !== undefined ? item.is_selected : true
+        };
+    });
+};
+
 export function BuyerCartPage() {
     const navigate = useNavigate();
-    const { setCartCount } = useOutletContext<{ setCartCount: (n: number) => void }>();
 
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -32,16 +100,40 @@ export function BuyerCartPage() {
     };
 
     useEffect(() => {
-        const stored = localStorage.getItem('vietcraft_cart');
-        if (stored) {
+        const syncAndFetchCart = async () => {
             try {
-                const parsed = JSON.parse(stored);
-                if (parsed && parsed.length > 0) {
-                    setCartItems(parsed);
+                // 1. Sync legacy localStorage cart to database
+                const stored = localStorage.getItem('vietcraft_cart');
+                if (stored) {
+                    try {
+                        const parsed = JSON.parse(stored);
+                        if (parsed && parsed.length > 0) {
+                            const promises = parsed.map((item: any) => 
+                                cartService.addToCart({
+                                    productId: item.productId || item.id,
+                                    variantId: item.variantId && item.variantId !== 'default' ? item.variantId : undefined,
+                                    quantity: item.quantity || 1
+                                }).catch(err => console.error("Error migrating cart item:", err))
+                            );
+                            await Promise.all(promises);
+                            localStorage.removeItem('vietcraft_cart');
+                        }
+                    } catch (e) {
+                        console.error("Local storage cart parsing error", e);
+                    }
                 }
-            } catch (e) {}
-        }
 
+                // 2. Fetch database cart items
+                const cartData = await cartService.getCart();
+                setCartItems(mapBackendCart(cartData));
+            } catch (err) {
+                console.error('Failed to load DB cart items', err);
+            }
+        };
+
+        syncAndFetchCart();
+
+        // 3. Fetch recommendation items
         const fetchRecs = async () => {
             try {
                 const list = await productsService.getAll();
@@ -59,77 +151,75 @@ export function BuyerCartPage() {
         fetchRecs();
     }, []);
 
-    // Save cart and update header count
-    const saveCart = (items: CartItem[]) => {
-        setCartItems(items);
-        localStorage.setItem('vietcraft_cart', JSON.stringify(items));
-        const totalQty = items.reduce((acc, it) => acc + it.quantity, 0);
-        setCartCount(totalQty);
-    };
-
-    const handleQtyChange = (id: string, delta: number) => {
-        const updated = cartItems.map(item => {
-            if (item.id === id) {
-                const newQty = Math.max(1, item.quantity + delta);
-                return { ...item, quantity: newQty };
-            }
-            return item;
-        });
-        saveCart(updated);
-    };
-
-    const handleToggleCheck = (id: string) => {
-        const updated = cartItems.map(item => {
-            if (item.id === id) {
-                return { ...item, checked: !item.checked };
-            }
-            return item;
-        });
-        saveCart(updated);
-    };
-
-    const handleToggleAll = () => {
-        const allChecked = cartItems.every(item => item.checked);
-        const updated = cartItems.map(item => ({ ...item, checked: !allChecked }));
-        saveCart(updated);
-    };
-
-    const handleDeleteItem = (id: string) => {
-        const updated = cartItems.filter(item => item.id !== id);
-        saveCart(updated);
-    };
-
-    const handleAddRecommendation = (rec: any) => {
-        // Add to cart
-        const existing = cartItems.find(item => item.productId === rec.id);
-        let updated;
-        if (existing) {
-            updated = cartItems.map(item =>
-                item.productId === rec.id ? { ...item, quantity: item.quantity + 1 } : item
-            );
-        } else {
-            const newItem: CartItem = {
-                id: `item_${Date.now()}`,
-                productId: rec.id,
-                variantId: `var_${rec.id}`,
-                title: rec.title,
-                shopName: 'VietCraft Selection',
-                variantName: 'Mặc định',
-                price: rec.price,
-                quantity: 1,
-                image: rec.image,
-                checked: true
-            };
-            updated = [...cartItems, newItem];
+    const handleQtyChange = async (id: string, delta: number) => {
+        const item = cartItems.find((it: CartItem) => it.id === id);
+        if (!item) return;
+        const newQty = Math.max(1, item.quantity + delta);
+        try {
+            const updated = await cartService.updateQuantity(id, newQty);
+            setCartItems(mapBackendCart(updated));
+        } catch (err) {
+            console.error(err);
+            showToast('Không thể cập nhật số lượng', 'error');
         }
-        saveCart(updated);
+    };
+
+    const handleToggleCheck = async (id: string) => {
+        const item = cartItems.find((it: CartItem) => it.id === id);
+        if (!item) return;
+        try {
+            const updated = await cartService.toggleSelect(id, !item.checked);
+            setCartItems(mapBackendCart(updated));
+        } catch (err) {
+            console.error(err);
+            showToast('Không thể cập nhật trạng thái chọn', 'error');
+        }
+    };
+
+    const handleToggleAll = async () => {
+        const allChecked = cartItems.every((item: CartItem) => item.checked);
+        try {
+            const promises = cartItems.map((item: CartItem) => cartService.toggleSelect(item.id, !allChecked));
+            const results = await Promise.all(promises);
+            if (results.length > 0) {
+                setCartItems(mapBackendCart(results[results.length - 1]));
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('Không thể cập nhật trạng thái chọn tất cả', 'error');
+        }
+    };
+
+    const handleDeleteItem = async (id: string) => {
+        try {
+            const updated = await cartService.removeItem(id);
+            setCartItems(mapBackendCart(updated));
+            showToast('Đã xóa sản phẩm khỏi giỏ hàng');
+        } catch (err) {
+            console.error(err);
+            showToast('Không thể xóa sản phẩm', 'error');
+        }
+    };
+
+    const handleAddRecommendation = async (rec: any) => {
+        try {
+            const updated = await cartService.addToCart({
+                productId: rec.id,
+                quantity: 1
+            });
+            setCartItems(mapBackendCart(updated));
+            showToast(`Đã thêm "${rec.title}" vào giỏ hàng!`);
+        } catch (err) {
+            console.error(err);
+            showToast('Không thể thêm sản phẩm gợi ý', 'error');
+        }
     };
 
     // Calculate totals
-    const checkedItems = cartItems.filter(item => item.checked);
-    const totalSelectedQty = checkedItems.reduce((acc, item) => acc + item.quantity, 0);
-    const totalPrice = checkedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    const allChecked = cartItems.length > 0 && cartItems.every(item => item.checked);
+    const checkedItems = cartItems.filter((item: CartItem) => item.checked);
+    const totalSelectedQty = checkedItems.reduce((acc: number, item: CartItem) => acc + item.quantity, 0);
+    const totalPrice = checkedItems.reduce((acc: number, item: CartItem) => acc + (item.price * item.quantity), 0);
+    const allChecked = cartItems.length > 0 && cartItems.every((item: CartItem) => item.checked);
 
     const handleCheckout = () => {
         if (checkedItems.length === 0) {
@@ -169,7 +259,7 @@ export function BuyerCartPage() {
                             </button>
                         </div>
                     ) : (
-                        cartItems.map((item) => (
+                        cartItems.map((item: CartItem) => (
                             <div key={item.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow">
                                 {/* Left Checkbox and Product Details */}
                                 <div className="flex items-center gap-4 flex-1">
@@ -238,7 +328,7 @@ export function BuyerCartPage() {
                         <Sparkles size={18} className="text-emerald-500" />
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {recommendations.map((rec) => (
+                        {recommendations.map((rec: any) => (
                             <div key={rec.id} className="bg-white rounded-2xl border border-gray-100 p-3 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
                                 <div className="space-y-2">
                                     <div className="aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
@@ -303,15 +393,14 @@ export function BuyerCartPage() {
             {/* Toast Notification */}
             {toast && (
                 <div className={`fixed top-5 right-5 z-[9999] bg-white border border-gray-150 shadow-2xl rounded-2xl p-4 flex items-center gap-3 max-w-sm border-l-4 ${toast.type === 'success' ? 'border-l-emerald-500' : 'border-l-red-500'} transform translate-y-0 transition-all duration-300`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-655'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
                         {toast.type === 'success' ? <Check size={18} /> : <span>⚠️</span>}
                     </div>
-                    <div>
-                        <p className="text-xs font-extrabold text-gray-900">{toast.message}</p>
-                    </div>
+                    <p className="text-xs font-extrabold text-gray-900">{toast.message}</p>
                 </div>
             )}
         </div>
     );
 }
+
 export default BuyerCartPage;
