@@ -3,8 +3,10 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { ArrowLeft, Tag, CreditCard, Wallet, Landmark, Truck, Check } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import { userService } from '../../user/services/userService';
+import { cartService } from '../../order/services/cartService';
 
 interface CheckoutItem {
+    id?: string;
     productId: string;
     variantId: string;
     title: string;
@@ -122,20 +124,21 @@ export function BuyerCheckoutPage() {
             // Clear checkout storage
             localStorage.removeItem('vietcraft_checkout');
 
-            // Remove purchased items from cart
-            const cartStr = localStorage.getItem('vietcraft_cart');
-            if (cartStr) {
-                try {
-                    const cartItems = JSON.parse(cartStr);
-                    const remainingCart = cartItems.filter((cartIt: any) =>
-                        !items.some(checkIt => checkIt.productId === cartIt.productId)
-                    );
-                    localStorage.setItem('vietcraft_cart', JSON.stringify(remainingCart));
-                    setCartCount(remainingCart.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0));
-                } catch (e) {
-                    setCartCount(0);
+            // Remove purchased items from database cart
+            const removePromises = items.map(item => {
+                if (item.id) {
+                    return cartService.removeItem(item.id).catch(err => console.error("Error removing from cart on checkout:", err));
                 }
-            } else {
+                return Promise.resolve();
+            });
+            await Promise.all(removePromises);
+
+            // Sync updated cart count to layout/header
+            try {
+                const updatedCart = await cartService.getCart();
+                const total = updatedCart?.items?.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0) || 0;
+                setCartCount(total);
+            } catch (e) {
                 setCartCount(0);
             }
 
