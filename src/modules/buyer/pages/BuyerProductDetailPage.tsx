@@ -96,11 +96,15 @@ export function BuyerProductDetailPage() {
       }
     }).catch(() => {}).finally(() => setLoading(false));
 
-    // check favorites
-    try {
-      const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
-      setIsFav(favs.includes(id));
-    } catch {}
+    // check favorites from backend
+    userService.getWishlist()
+      .then((ids) => setIsFav(ids.includes(id!)))
+      .catch(() => {
+        try {
+          const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
+          setIsFav(favs.includes(id!));
+        } catch {}
+      });
   }, [id]);
 
   // Derive unique option sets from variants
@@ -170,7 +174,7 @@ export function BuyerProductDetailPage() {
         triggerToast(`Đã thêm vào yêu thích!`, 'success');
       }
       setIsFav(updated.includes(product.id));
-      localStorage.setItem('vietcraft_favorites', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch {
       // Fallback: toggle locally
       try {
@@ -178,6 +182,7 @@ export function BuyerProductDetailPage() {
         const next = isFav ? favs.filter(i => i !== product.id) : [...favs, product.id];
         localStorage.setItem('vietcraft_favorites', JSON.stringify(next));
         setIsFav(!isFav);
+        window.dispatchEvent(new CustomEvent('wishlist-updated'));
       } catch {}
     }
   };

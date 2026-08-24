@@ -18,6 +18,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const name = user?.full_name || user?.name || '';
 
@@ -40,32 +41,19 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       try { setSavedVouchers(JSON.parse(vls)); } catch (e) {}
     }
 
-    // Fetch products
-    productsService.getAll()
-      .then((data) => {
-        setAllProducts(data || []);
-      })
-      .catch((err) => {
-        console.error('Failed to fetch products', err);
-      });
-
-    // Fetch shops
-    productsService.getFeaturedShops()
-      .then((data) => {
-        setShopList(data || []);
-      })
-      .catch((err) => {
-        console.error('Failed to fetch shops', err);
-      });
-
-    // Fetch coupons
-    promotionService.getAll()
-      .then((data) => {
-        setCouponList(data || []);
-      })
-      .catch((err) => {
-        console.error('Failed to fetch coupons', err);
-      });
+    // Fetch products, shops, coupons in parallel
+    setIsLoading(true);
+    Promise.all([
+      productsService.getAll().catch((err) => { console.error('Failed to fetch products', err); return []; }),
+      productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
+      promotionService.getAll().catch((err) => { console.error('Failed to fetch coupons', err); return []; }),
+    ]).then(([products, shops, coupons]) => {
+      setAllProducts(products || []);
+      setShopList(shops || []);
+      setCouponList(coupons || []);
+    }).finally(() => {
+      setIsLoading(false);
+    });
   }, []);
 
   const triggerToast = (message: string, type: 'success' | 'info' = 'success') => {
@@ -85,7 +73,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
         triggerToast(`Đã thêm "${title}" vào danh sách yêu thích`, 'success');
       }
       setFavoritedProductIds(updated);
-      localStorage.setItem('vietcraft_favorites', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch (err) {
       console.error('toggleFavorite failed', err);
       triggerToast('Không thể cập nhật yêu thích, vui lòng thử lại.', 'info');
@@ -342,7 +330,11 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
           </span>
         </div>
         
-        {displayProducts.length === 0 ? (
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
+            <p style={{ fontWeight: 650 }}>Đang tải sản phẩm...</p>
+          </div>
+        ) : displayProducts.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
             <p style={{ fontWeight: 650 }}>Không tìm thấy sản phẩm phù hợp ở danh mục này.</p>
           </div>
