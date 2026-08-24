@@ -136,8 +136,9 @@ export function BuyerCartPage() {
         // 3. Fetch recommendation items
         const fetchRecs = async () => {
             try {
-                const list = await productsService.getAll();
-                const mapped = (list || []).slice(0, 4).map((p: any) => ({
+                const res = await productsService.getAll();
+                const list = Array.isArray(res) ? res : ((res as any)?.items || []);
+                const mapped = list.slice(0, 4).map((p: any) => ({
                     id: p._id || p.id,
                     title: p.title || p.name || 'Sản phẩm VietCraft',
                     price: p.variants?.[0]?.retail_price ? Number(p.variants[0].retail_price.toString()) : 150000,

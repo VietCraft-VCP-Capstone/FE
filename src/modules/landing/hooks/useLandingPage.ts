@@ -31,7 +31,8 @@ export function useLandingPage() {
                         banner: s.banner || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=600',
                     }));
 
-                    const mappedProducts = prodData.map((p: any) => ({
+                    const productList = Array.isArray(prodData) ? prodData : (prodData?.items || []);
+                    const mappedProducts = productList.map((p: any) => ({
                         id: p.id,
                         title: p.title,
                         price: p.price,

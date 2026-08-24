@@ -81,9 +81,9 @@ export function BuyerProductDetailPage() {
     ]).then(([prod, rel, all]) => {
       setProduct(prod);
       setRelated(rel.slice(0, 4));
-      // suggestions = random products not in related
       const relIds = new Set(rel.map((r: any) => r.id));
-      const pool = (all as any[]).filter((p: any) => p.id !== id && !relIds.has(p.id));
+      const allList = Array.isArray(all) ? all : ((all as any)?.items || []);
+      const pool = allList.filter((p: any) => p.id !== id && !relIds.has(p.id));
       setSuggestions(pool.slice(0, 4));
 
       // pre-select first variant values
