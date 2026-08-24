@@ -106,10 +106,21 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
         <div className="p-3 border-t border-stone-100">
           <Link
             to="/seller/settings"
-            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors cursor-pointer"
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer ${
+              location.pathname.startsWith('/seller/settings') || location.pathname.startsWith('/seller/onboarding')
+                ? 'bg-[#EAF0E2] text-[#007700] shadow-2xs font-bold'
+                : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900 font-medium'
+            }`}
             title={collapsed ? 'Cài đặt cửa hàng' : undefined}
           >
-            <Settings size={19} className="text-stone-400" />
+            <Settings
+              size={19}
+              className={
+                location.pathname.startsWith('/seller/settings') || location.pathname.startsWith('/seller/onboarding')
+                  ? 'text-[#007700]'
+                  : 'text-stone-400'
+              }
+            />
             {!collapsed && <span className="font-jakarta">Cài đặt</span>}
           </Link>
         </div>
@@ -165,9 +176,9 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
               </div>
               <div className="hidden md:block">
                 <p className="text-xs font-bold text-stone-900 leading-tight font-jakarta">
-                  {user?.name || 'Chủ xưởng Bát Tràng'}
+                  {user?.name && !user.name.includes('Xưởng') ? user.name : 'VietCraft Creative Shop'}
                 </p>
-                <p className="text-[10px] text-stone-500">Kênh người bán</p>
+                <p className="text-[10px] text-stone-500">Kênh người bán sáng tạo</p>
               </div>
             </button>
           </div>

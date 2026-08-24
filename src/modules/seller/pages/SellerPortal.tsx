@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { SellerLayout } from './SellerLayout';
 import { ProductListingPage } from '../../product/pages/ProductListingPage';
+import { SellerSettingsPage } from './SellerSettingsPage';
+import { ShopOnboardingPage } from './ShopOnboardingPage';
 
 function SellerDashboard() {
   return (
@@ -35,15 +37,6 @@ function SellerDashboard() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function SellerStorefront() {
-  return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-2 animate-fade-in">
-      <h2 className="text-2xl font-extrabold text-stone-900 font-jakarta">Storefront</h2>
-      <p className="text-sm text-stone-500">Cấu hình hồ sơ và banner gian hàng thủ công độc bản của bạn.</p>
     </div>
   );
 }
@@ -87,7 +80,9 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
         <Route path="dashboard" element={<SellerDashboard />} />
         <Route path="products" element={<ProductListingPage />} />
         <Route path="product-listing" element={<ProductListingPage />} />
-        <Route path="storefront" element={<SellerStorefront />} />
+        <Route path="settings" element={<SellerSettingsPage />} />
+        <Route path="onboarding" element={<ShopOnboardingPage />} />
+        <Route path="storefront" element={<SellerSettingsPage />} />
         <Route path="orders" element={<SellerOrders />} />
         <Route path="analytics" element={<SellerAnalytics />} />
         <Route path="payouts" element={<SellerPayouts />} />

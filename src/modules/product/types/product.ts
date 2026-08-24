@@ -1,5 +1,15 @@
 export type ProductStatus = 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
 
+export const CATEGORIES_LIST = [
+  'Áo thun (T-Shirt)',
+  'Áo Hoodie & Nỉ',
+  'Áo Polo',
+  'Áo sơ mi & Tank top',
+  'Túi Tote & Canvas',
+  'Mũ & Nón thêu',
+  'Phụ kiện & Quà tặng'
+] as const;
+
 export interface ProductColorVariant {
   name: string;
   hex: string;

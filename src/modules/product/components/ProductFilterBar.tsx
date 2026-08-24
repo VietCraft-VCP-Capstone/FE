@@ -1,7 +1,6 @@
 import React from 'react';
 import { Search, X, ArrowUpDown, Filter, RotateCcw } from 'lucide-react';
-import { ProductFilterState, ProductStatus, ProductSortOption } from '../types/product';
-import { CATEGORIES_LIST } from '../services/mockProductsData';
+import { ProductFilterState, ProductStatus, ProductSortOption, CATEGORIES_LIST } from '../types/product';
 
 interface ProductFilterBarProps {
   filter: ProductFilterState;

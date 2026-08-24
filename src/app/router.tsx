@@ -84,7 +84,7 @@ export function AppRouter() {
 
       <Route
         path="/seller/*"
-        element={<SellerPortal user={user || { name: 'Chủ xưởng Bát Tràng', email: 'seller@vietcraft.vn', role: 'seller' }} onLogout={logout} />}
+        element={<SellerPortal user={user || { name: 'Chủ Gian Hàng VietCraft', email: 'seller@vietcraft.vn', role: 'seller' }} onLogout={logout} />}
       />
 
       <Route

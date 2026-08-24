@@ -17,9 +17,9 @@ export function BuyerFavoritesPage() {
   const fetchFavorites = async () => {
     try {
       setLoading(true);
-      const [allProducts, wishlistIds] = await Promise.all([
-        productsService.getAll().catch(() => []),
-        userService.getWishlist().catch(() => [])
+      const [productsRes, wishlistIds] = await Promise.all([
+        productsService.getAll().catch(() => ({ items: [] })),
+        userService.getWishlist().catch(() => [] as string[])
       ]);
 
       const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
