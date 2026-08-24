@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ProductItem, ProductFormData } from '../types/product';
-import { CATEGORIES_LIST } from '../services/mockProductsData';
+import { ProductItem, ProductFormData, CATEGORIES_LIST } from '../types/product';
 import { ProductFormImageManager } from './ProductFormImageManager';
 import { ProductFormColorManager } from './ProductFormColorManager';
 import {
