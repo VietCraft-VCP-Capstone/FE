@@ -1,5 +1,87 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Address } from '../../../user/services/userService';
+import { Search, MapPin, Loader2, X, ChevronDown, ChevronUp } from 'lucide-react';
+
+interface Option {
+    value: string;
+    label: string;
+}
+
+interface CustomSelectProps {
+    label: string;
+    value: string;
+    options: Option[];
+    onChange: (value: string) => void;
+    placeholder?: string;
+    disabled?: boolean;
+}
+
+const CustomSelect: React.FC<CustomSelectProps> = ({
+    label,
+    value,
+    options,
+    onChange,
+    placeholder = 'Chọn...',
+    disabled = false
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const selectedOption = options.find(opt => opt.value === value);
+    const displayText = selectedOption ? selectedOption.label : placeholder;
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div ref={containerRef} className="relative w-full">
+            <label className="block text-xs font-bold text-gray-900 mb-1">{label}</label>
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full flex items-center justify-between border border-gray-300 text-gray-900 font-semibold bg-white rounded-lg p-2.5 text-sm text-left focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer ${
+                    disabled ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
+                }`}
+            >
+                <span className="truncate">{displayText}</span>
+                <span className="text-gray-400 pointer-events-none transition-transform flex items-center">
+                    {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </span>
+            </button>
+
+            {isOpen && options.length > 0 && (
+                <ul className="absolute z-50 w-full min-w-full bg-white border border-gray-250 rounded-lg shadow-xl max-h-56 overflow-y-auto mt-1 divide-y divide-gray-100">
+                    {options.map((opt) => (
+                        <li key={opt.value}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onChange(opt.value);
+                                    setIsOpen(false);
+                                }}
+                                className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${
+                                    opt.value === value
+                                        ? 'bg-emerald-50 text-emerald-800 font-bold'
+                                        : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                {opt.label}
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+};
 
 interface AddressFormModalProps {
     isOpen: boolean;
@@ -19,6 +101,153 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     const [phone, setPhone] = useState('');
     const [addressDetail, setAddressDetail] = useState('');
     const [isDefault, setIsDefault] = useState(false);
+
+    // OpenStreetMap Autocomplete State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedDisplayName, setSelectedDisplayName] = useState('');
+    const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const searchRef = useRef<HTMLDivElement>(null);
+
+    // Close suggestions dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    // Debounce search query logic for OpenStreetMap
+    useEffect(() => {
+        if (!searchQuery || searchQuery.trim().length < 3 || searchQuery === selectedDisplayName) {
+            setSuggestions([]);
+            return;
+        }
+
+        const delayDebounceFn = setTimeout(async () => {
+            setSearchLoading(true);
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&addressdetails=1&limit=5&countrycodes=vn`;
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8'
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setSuggestions(data);
+                }
+            } catch (err) {
+                console.error('Error fetching address suggestions:', err);
+            } finally {
+                setSearchLoading(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery, selectedDisplayName]);
+
+    const handleSuggestionSelect = async (suggestion: any) => {
+        setSelectedDisplayName(suggestion.display_name);
+        setSearchQuery(suggestion.display_name);
+        setShowSuggestions(false);
+
+        const osmAddr = suggestion.address;
+        if (!osmAddr) return;
+
+        const clean = (s: string) => {
+            if (!s) return '';
+            return s
+                .toLowerCase()
+                .replace(/^(thành phố|tỉnh|quận|huyện|phường|xã|thị xã|thị trấn|đường)\s+/gi, '')
+                .trim();
+        };
+
+        // 1. Match Province
+        const stateName = osmAddr.state || osmAddr.city || osmAddr.province || '';
+        if (!stateName) return;
+
+        const targetStateClean = clean(stateName);
+        const matchedProvince = provinces.find(
+            p => clean(p.name) === targetStateClean ||
+                 clean(p.name).includes(targetStateClean) ||
+                 targetStateClean.includes(clean(p.name))
+        );
+
+        if (!matchedProvince) return;
+        const pId = matchedProvince.id;
+        setSelectedProvinceId(pId);
+
+        // 2. Load and match districts
+        try {
+            const resP = await fetch(`https://provinces.open-api.vn/api/p/${pId}?depth=2`);
+            if (!resP.ok) throw new Error();
+            const dataP = await resP.json();
+            const mappedDistricts = (dataP.districts || []).map((d: any) => ({
+                id: d.code.toString(),
+                name: d.name
+            }));
+            setDistricts(mappedDistricts);
+
+            const districtName = osmAddr.city_district || osmAddr.district || osmAddr.county || osmAddr.suburb || osmAddr.town || '';
+            const targetDistClean = clean(districtName);
+            let matchedDistrict = mappedDistricts.find(
+                (d: any) => clean(d.name) === targetDistClean ||
+                            clean(d.name).includes(targetDistClean) ||
+                            targetDistClean.includes(clean(d.name))
+            );
+
+            // If no match found, fallback to first district
+            const dId = matchedDistrict?.id || mappedDistricts[0]?.id || '';
+            setSelectedDistrictId(dId);
+
+            if (dId) {
+                // 3. Load and match wards
+                const resD = await fetch(`https://provinces.open-api.vn/api/d/${dId}?depth=2`);
+                if (!resD.ok) throw new Error();
+                const dataD = await resD.json();
+                const mappedWards = (dataD.wards || []).map((w: any) => ({
+                    code: w.code.toString(),
+                    name: w.name
+                }));
+                setWards(mappedWards);
+
+                // OSM labels ward under suburb, quarter, ward, village, commune
+                const wardName = osmAddr.ward || osmAddr.suburb || osmAddr.quarter || osmAddr.village || osmAddr.commune || '';
+                const targetWardClean = clean(wardName);
+                let matchedWard = mappedWards.find(
+                    (w: any) => clean(w.name) === targetWardClean ||
+                                clean(w.name).includes(targetWardClean) ||
+                                targetWardClean.includes(clean(w.name))
+                );
+
+                const wCode = matchedWard?.code || mappedWards[0]?.code || '';
+                setSelectedWardCode(wCode);
+            }
+
+            // 4. Fill Address Detail using road/house number
+            const road = osmAddr.road || '';
+            const houseNo = osmAddr.house_number || '';
+            let detail = [houseNo, road].filter(Boolean).join(' ');
+
+            if (!detail) {
+                const amenity = osmAddr.amenity || osmAddr.shop || osmAddr.office || osmAddr.tourism || osmAddr.building || '';
+                if (amenity) {
+                    detail = amenity;
+                }
+            }
+            setAddressDetail(detail);
+
+        } catch (err) {
+            console.error('Error auto-filling from suggestions', err);
+        }
+    };
 
     // Province/District/Ward dropdown list
     const [provinces, setProvinces] = useState<any[]>([]);
@@ -109,6 +338,11 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     useEffect(() => {
         if (!isOpen) return;
 
+        // Reset query when modal state changes
+        setSearchQuery('');
+        setSelectedDisplayName('');
+        setSuggestions([]);
+
         if (editingAddress) {
             setRecipientName(editingAddress.recipient_name);
             setPhone(editingAddress.phone);
@@ -169,6 +403,63 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
                     {editingAddress ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}
                 </h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* OpenStreetMap Address Search */}
+                    <div ref={searchRef} className="relative">
+                        <label className="block text-xs font-bold text-gray-900 mb-1">
+                            Tìm nhanh địa chỉ trên Bản đồ (OpenStreetMap)
+                        </label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Gõ để tìm kiếm địa chỉ nhanh..."
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    setShowSuggestions(true);
+                                }}
+                                className="w-full border border-gray-300 text-gray-900 font-semibold bg-white rounded-lg pl-9 pr-8 p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                            />
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                {searchLoading ? (
+                                    <Loader2 className="h-4 w-4 text-emerald-500 animate-spin" />
+                                ) : (
+                                    <Search className="h-4 w-4 text-gray-400" />
+                                )}
+                            </div>
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearchQuery('');
+                                        setSelectedDisplayName('');
+                                        setSuggestions([]);
+                                    }}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Suggestions List */}
+                        {showSuggestions && suggestions.length > 0 && (
+                            <ul className="absolute z-[60] w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 divide-y divide-gray-100">
+                                {suggestions.map((s, idx) => (
+                                    <li key={idx}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSuggestionSelect(s)}
+                                            className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs text-gray-700 font-medium flex items-start gap-2 transition-colors"
+                                        >
+                                            <MapPin className="h-3.5 w-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                                            <span>{s.display_name}</span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
                     {/* Grid row 1: Recipient Name & Phone */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -197,48 +488,32 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
 
                     {/* Grid row 2: Province & District */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-900 mb-1">Tỉnh / Thành phố</label>
-                            <select
-                                value={selectedProvinceId}
-                                onChange={(e) => handleProvinceChange(e.target.value)}
-                                className="w-full border border-gray-300 text-gray-900 font-semibold bg-white rounded-lg p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
-                            >
-                                {provinces.length === 0 && <option value="">Đang tải...</option>}
-                                {provinces.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-900 mb-1">Quận / Huyện</label>
-                            <select
-                                value={selectedDistrictId}
-                                onChange={(e) => handleDistrictChange(e.target.value)}
-                                className="w-full border border-gray-300 text-gray-900 font-semibold bg-white rounded-lg p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
-                            >
-                                {districts.length === 0 && <option value="">Chọn Quận / Huyện</option>}
-                                {districts.map(d => (
-                                    <option key={d.id} value={d.id}>{d.name}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <CustomSelect
+                            label="Tỉnh / Thành phố"
+                            value={selectedProvinceId}
+                            options={provinces.map(p => ({ value: p.id, label: p.name }))}
+                            onChange={handleProvinceChange}
+                            placeholder={provinces.length === 0 ? "Đang tải..." : "Chọn Tỉnh / Thành phố"}
+                        />
+                        <CustomSelect
+                            label="Quận / Huyện"
+                            value={selectedDistrictId}
+                            options={districts.map(d => ({ value: d.id, label: d.name }))}
+                            onChange={handleDistrictChange}
+                            placeholder="Chọn Quận / Huyện"
+                            disabled={provinces.length === 0}
+                        />
                     </div>
 
                     {/* Grid row 3: Ward */}
-                    <div>
-                        <label className="block text-xs font-bold text-gray-900 mb-1">Phường / Xã</label>
-                        <select
-                            value={selectedWardCode}
-                            onChange={(e) => setSelectedWardCode(e.target.value)}
-                            className="w-full border border-gray-300 text-gray-900 font-semibold bg-white rounded-lg p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
-                        >
-                            {wards.length === 0 && <option value="">Chọn Phường / Xã</option>}
-                            {wards.map(w => (
-                                <option key={w.code} value={w.code}>{w.name}</option>
-                            ))}
-                        </select>
-                    </div>
+                    <CustomSelect
+                        label="Phường / Xã"
+                        value={selectedWardCode}
+                        options={wards.map(w => ({ value: w.code, label: w.name }))}
+                        onChange={setSelectedWardCode}
+                        placeholder="Chọn Phường / Xã"
+                        disabled={districts.length === 0}
+                    />
 
                     {/* Grid row 4: Detailed Address */}
                     <div>

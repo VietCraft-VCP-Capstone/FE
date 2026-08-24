@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Search, Heart, ShoppingBag, MessageCircle } from 'lucide-react';
+import { Search, Heart, Bell, ShoppingBag, MessageCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
+import { userService } from '../../user/services/userService';
 
 interface BuyerHeaderProps {
   user: any;
@@ -15,33 +16,25 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
   const location = useLocation();
   const [favCount, setFavCount] = useState(0);
 
-  const name = user?.full_name || user?.name || 'Phương';
-  const initial = name.charAt(0).toUpperCase() || 'P';
+  const name = user?.full_name || user?.name || '';
+  const initial = name.charAt(0).toUpperCase() || '';
 
   const isActive = (path: string) => location.pathname.startsWith(path);
 
-  // Synchronize favorites count from localStorage
+  // Fetch favorites count from backend on route change and on wishlist-updated event
+  const refreshFavCount = () => {
+    userService.getWishlist()
+      .then((ids) => setFavCount(Array.isArray(ids) ? ids.length : 0))
+      .catch(() => setFavCount(0));
+  };
+
   useEffect(() => {
-    const readFavCount = () => {
-      try {
-        const stored = localStorage.getItem('vietcraft_favorites');
-        const ids: string[] = stored ? JSON.parse(stored) : [];
-        setFavCount(ids.length > 0 ? ids.length : 4); // Default to 4 if empty for demo match
-      } catch {
-        setFavCount(4);
-      }
-    };
-    readFavCount();
+    refreshFavCount();
+    window.addEventListener('wishlist-updated', refreshFavCount);
+    return () => window.removeEventListener('wishlist-updated', refreshFavCount);
+  }, [location.pathname]);
 
-    window.addEventListener('storage', readFavCount);
-    const interval = setInterval(readFavCount, 1000);
-    return () => {
-      window.removeEventListener('storage', readFavCount);
-      clearInterval(interval);
-    };
-  }, []);
-
-  const displayCartCount = cartCount > 0 ? cartCount : 3; // Default 3 if 0 for demo match
+  const displayCartCount = cartCount;
 
   return (
     <header className="buyer-header-nav">
@@ -72,6 +65,23 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
 
         {/* Action Icons */}
         <div className="buyer-actions">
+          {/* Notifications Icon */}
+          <button
+            type="button"
+            className="icon-btn relative"
+            onClick={() => navigate('/notifications')}
+            title="Thông báo"
+          >
+            <Bell
+              size={22}
+              className={
+                isActive('/notifications')
+                  ? 'text-gray-900 stroke-[2.5] transition-colors'
+                  : 'text-gray-600 stroke-[1.8] hover:text-gray-900 transition-colors'
+              }
+            />
+          </button>
+
           {/* Favorites Icon */}
           <button
             type="button"

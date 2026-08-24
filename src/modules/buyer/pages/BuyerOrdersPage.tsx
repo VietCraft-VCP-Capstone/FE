@@ -134,9 +134,28 @@ export function BuyerOrdersPage() {
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-            {/* Search box */}
-            <div className="flex justify-end">
-                <div className="relative w-full sm:w-80">
+            {/* Tabs and Search row */}
+            <div className="border-b border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 md:pb-0">
+                {/* Filter Tabs */}
+                <nav className="flex space-x-6 overflow-x-auto no-scrollbar scroll-smooth">
+                    {tabs.map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`pb-3 md:pb-4 font-semibold text-xs whitespace-nowrap transition-all border-b-2 -mb-[2px] ${
+                                    isActive ? 'text-emerald-600 border-emerald-600' : 'text-gray-500 border-transparent hover:text-gray-900'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        );
+                    })}
+                </nav>
+
+                {/* Search box */}
+                <div className="relative w-full md:w-80 md:mb-3">
                     <Search className="absolute inset-y-0 left-3 my-auto text-gray-400" size={16} />
                     <input
                         type="text"
@@ -146,26 +165,6 @@ export function BuyerOrdersPage() {
                         className="w-full bg-white border border-gray-200 rounded-lg py-2 pl-10 pr-4 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm"
                     />
                 </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="border-b border-gray-200">
-                <nav className="flex space-x-6 overflow-x-auto no-scrollbar scroll-smooth">
-                    {tabs.map((tab) => {
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`pb-3 font-semibold text-xs whitespace-nowrap transition-all border-b-2 ${
-                                    isActive ? 'text-emerald-600 border-emerald-600' : 'text-gray-500 border-transparent hover:text-gray-900'
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </nav>
             </div>
 
             {/* Order cards list */}

@@ -21,16 +21,24 @@ export function BuyerFavoritesPage() {
         productsService.getAll().catch(() => ({ items: [] })),
         userService.getWishlist().catch(() => [] as string[])
       ]);
-      
-      const allProducts = Array.isArray(productsRes) ? productsRes : ((productsRes as any)?.items || []);
-      let items: any[] = [];
-      const ids: string[] = Array.isArray(wishlistIds) ? wishlistIds : [];
-      if (ids.length > 0 && Array.isArray(allProducts)) {
-        items = allProducts.filter((p: any) =>
-          ids.includes(p.id) || ids.includes(p._id?.toString())
-        );
+
+      const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
+      const products = Array.isArray(allProducts) ? allProducts : [];
+
+      // Tìm các sản phẩm khớp
+      const matchedItems = products.filter((p: any) =>
+        ids.includes(p.id) || ids.includes(p._id?.toString())
+      );
+
+      // Tìm các ID "mồ côi" (không khớp sản phẩm nào) → xóa khỏi backend
+      const matchedIds = new Set(matchedItems.flatMap((p: any) => [p.id, p._id?.toString()].filter(Boolean)));
+      const staleIds = ids.filter((id: string) => !matchedIds.has(id));
+      if (staleIds.length > 0) {
+        await Promise.all(staleIds.map((id: string) => userService.removeFromWishlist(id).catch(() => {})));
+        window.dispatchEvent(new CustomEvent('wishlist-updated'));
       }
-      setFavorites(items);
+
+      setFavorites(matchedItems);
     } catch (err) {
       console.error(err);
     } finally {
@@ -40,9 +48,9 @@ export function BuyerFavoritesPage() {
 
   const handleRemoveFavorite = async (id: string) => {
     try {
-      const updatedWishlist = await userService.removeFromWishlist(id);
-      localStorage.setItem('vietcraft_favorites', JSON.stringify(updatedWishlist || []));
+      await userService.removeFromWishlist(id);
       setFavorites(prev => prev.filter(item => item._id !== id && item.id !== id));
+      window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch (err) {
       console.error(err);
     }

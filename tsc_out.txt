@@ -1,0 +1,2 @@
+﻿src/modules/buyer/pages/BuyerFavoritesPage.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/modules/buyer/pages/BuyerProfilePage.tsx(6,5): error TS6133: 'Package' is declared but its value is never read.
