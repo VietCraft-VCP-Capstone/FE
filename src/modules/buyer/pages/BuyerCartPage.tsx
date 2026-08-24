@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Trash2, Plus, Minus, Sparkles, Check } from 'lucide-react';
+import { Trash2, Plus, Minus, Sparkles, Check, ArrowLeft } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 
 interface CartItem {
@@ -143,7 +143,17 @@ export function BuyerCartPage() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28">
+            {/* Nút quay lại mua sắm */}
+            <div className="mb-4">
+                <button
+                    onClick={() => navigate('/')}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-[#15803d] transition-colors cursor-pointer"
+                >
+                    <ArrowLeft className="w-4 h-4" /> Tiếp tục mua sắm
+                </button>
+            </div>
+
             <h1 className="text-2xl font-bold text-gray-900 mb-6">Giỏ hàng của bạn</h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -254,9 +264,9 @@ export function BuyerCartPage() {
                 </div>
             </div>
 
-            {/* Bottom sticky bar */}
+            {/* Bottom bar */}
             {cartItems.length > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] py-4 z-40">
+                <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] py-4 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mt-8">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
                         {/* Select All */}
                         <div className="flex items-center gap-2">
