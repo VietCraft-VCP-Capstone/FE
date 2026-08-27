@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, X, ArrowUpDown, Filter, RotateCcw } from 'lucide-react';
-import { ProductFilterState, ProductStatus, ProductSortOption, CATEGORIES_LIST } from '../types/product';
+import { ProductFilterState, ProductStatus, ProductSortOption, CatalogOption } from '../types/product';
+import { productsService } from '../services/productsService';
 
 interface ProductFilterBarProps {
   filter: ProductFilterState;
@@ -10,6 +11,18 @@ interface ProductFilterBarProps {
 }
 
 export function ProductFilterBar({ filter, onChange, onReset, totalResults }: ProductFilterBarProps) {
+  // Lọc phải dùng đúng danh mục admin đang quản lý. Danh sách cứng trước đây không
+  // trùng mục nào trong DB nên chọn xong luôn ra 0 kết quả.
+  const [categories, setCategories] = useState<CatalogOption[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    productsService.getCategories()
+      .then((data) => { if (alive) setCategories(Array.isArray(data) ? data : []); })
+      .catch(() => { /* lọc theo danh mục hỏng không được làm gãy cả thanh công cụ */ });
+    return () => { alive = false; };
+  }, []);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange({ ...filter, search: e.target.value, page: 1 });
   };
@@ -75,8 +88,8 @@ export function ProductFilterBar({ filter, onChange, onReset, totalResults }: Pr
               className="bg-transparent text-sm text-stone-700 font-medium focus:outline-none cursor-pointer pr-1"
             >
               <option value="">Tất cả danh mục</option>
-              {CATEGORIES_LIST.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categories.map((cat) => (
+                <option key={cat._id} value={cat.name}>{cat.name}</option>
               ))}
             </select>
           </div>

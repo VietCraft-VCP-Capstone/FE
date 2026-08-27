@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ModalOverlay } from '../../../shared/components/ModalOverlay';
 import { ProductItem } from '../types/product';
 import { ProductImage } from './ProductImage';
 import {
@@ -71,7 +72,7 @@ export function ProductDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+    <ModalOverlay>
       <div className="bg-white rounded-2xl border border-stone-200 shadow-2xl w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden my-auto">
         {/* Modal Header Bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 bg-stone-50/90">
@@ -289,6 +290,6 @@ export function ProductDetailModal({
           </div>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

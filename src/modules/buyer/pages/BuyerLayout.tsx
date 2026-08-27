@@ -20,16 +20,9 @@ export function BuyerLayout({ user }: BuyerLayoutProps) {
         const total = cart?.items?.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0) || 0;
         setCartCount(total);
       })
-      .catch(() => {
-        // Fallback to local storage if API fails or user is unauthenticated
-        const cartStr = localStorage.getItem('vietcraft_cart');
-        if (cartStr) {
-          try {
-            const items = JSON.parse(cartStr);
-            setCartCount(items.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0));
-          } catch (e) {}
-        }
-      });
+      // cartService tự phân nhánh giỏ server / giỏ khách nên không còn nhánh dự phòng
+      // đọc thẳng localStorage ở đây nữa.
+      .catch(() => setCartCount(0));
 
     // 2. Listen to custom event cart updates
     const handleCartUpdate = (e: any) => {

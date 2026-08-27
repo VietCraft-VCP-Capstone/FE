@@ -12,10 +12,13 @@ interface ProductItem {
 
 interface LandingTrendingProps {
   products: ProductItem[];
-  onAction: () => void;
+  /** Bấm vào một sản phẩm -> mở trang chi tiết công khai /product/<id> */
+  onSelectProduct: (id: string) => void;
+  /** Bấm "xem tất cả" -> duyệt toàn bộ sản phẩm */
+  onViewAll?: () => void;
 }
 
-export function LandingTrending({ products, onAction }: LandingTrendingProps) {
+export function LandingTrending({ products, onSelectProduct, onViewAll }: LandingTrendingProps) {
   return (
     <section id="xu-huong" className="py-20 px-6">
       <div className="max-w-7xl mx-auto space-y-10">
@@ -26,7 +29,7 @@ export function LandingTrending({ products, onAction }: LandingTrendingProps) {
             Đang Thịnh Hành
           </h2>
           <span 
-            onClick={onAction}
+            onClick={() => onViewAll?.()}
             className="text-[#007700] font-bold text-sm tracking-wide flex items-center gap-1 cursor-pointer hover:underline"
           >
             xem tất cả +
@@ -38,7 +41,7 @@ export function LandingTrending({ products, onAction }: LandingTrendingProps) {
           {products.map((p) => (
             <div 
               key={p.id} 
-              onClick={onAction}
+              onClick={() => onSelectProduct(p.id)}
               className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-stone-100 hover:border-stone-200 hover:shadow-lg transition-all duration-300 flex flex-col h-full"
             >
               {/* Product Image Wrapper */}

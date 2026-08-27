@@ -1,19 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import '../../../shared/components/layouts.css';
+import { POD_CREATE_ENABLED, POD_CREATE_PATH } from '../featureFlags';
 import {
-  LayoutDashboard,
-  Package,
-  Truck,
-  Ticket,
-  TrendingUp,
-  Settings,
-  Bell,
-  Mail,
-  PanelLeftClose,
-  PanelLeftOpen,
-  ExternalLink,
-  ChevronDown,
-  Globe
+  LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Truck, Ticket,
+  Wallet, Banknote, BarChart2, TrendingUp, LineChart, Flame, Tag, PieChart, Rocket,
+  Settings, Bell, Mail, PanelLeft, ExternalLink, LogOut, ChevronDown
 } from 'lucide-react';
 
 interface SellerLayoutProps {
@@ -22,172 +14,101 @@ interface SellerLayoutProps {
   onLogout: () => void;
 }
 
+// Mỗi mục phải khớp một route khai báo trong SellerPortal.
 const NAV_ITEMS = [
-  { to: '/seller/dashboard', icon: LayoutDashboard, label: 'Tổng quan' },
-  { to: '/seller/products', icon: Package, label: 'Sản phẩm' },
-  { to: '/seller/orders', icon: Truck, label: 'Đơn hàng & Vận chuyển' },
-  { to: '/seller/vouchers', icon: Ticket, label: 'Khuyến mãi & Voucher' },
+  { to: '/seller/dashboard', icon: LayoutGrid, label: 'Trang chủ' },
+  { to: '/seller/catalog', icon: Archive, label: 'Danh mục sản phẩm' },
+  { to: '/seller/storefront', icon: Store, label: 'Thông tin cửa hàng' },
+  { to: '/seller/orders', icon: ShoppingCart, label: 'Đơn hàng' },
+  { to: '/seller/products', icon: Package, label: 'Quản lí sản phẩm' },
+  { to: '/seller/products/new', icon: PlusCircle, label: 'Tạo sản phẩm POD' },
+  { to: '/seller/shipping', icon: Truck, label: 'Vận chuyển' },
+  { to: '/seller/promotions', icon: Ticket, label: 'Khuyến mãi' },
+  { to: '/seller/revenue', icon: Wallet, label: 'Doanh thu cửa hàng' },
+  { to: '/seller/payouts', icon: Banknote, label: 'Đối soát & rút tiền' },
+  { to: '/seller/product-status', icon: BarChart2, label: 'Trạng thái sản phẩm' },
   { to: '/seller/analytics', icon: TrendingUp, label: 'Phân tích thị trường' },
+  { to: '/seller/forecast', icon: LineChart, label: 'Dự báo nhu cầu' },
+  { to: '/seller/golden-hour', icon: Flame, label: 'Danh mục & giờ vàng' },
+  { to: '/seller/price-optimize', icon: Tag, label: 'Tối ưu giá bán' },
+  { to: '/seller/market-share', icon: PieChart, label: 'Thị phần & đối thủ' },
+  { to: '/seller/onboarding', icon: Rocket, label: 'Thiết lập gian hàng' },
 ];
+
+// Giữ nguyên NAV_ITEMS làm danh sách đầy đủ, lọc ở một chỗ. Xoá thẳng mục khỏi
+// mảng thì lúc bật lại phải nhớ nó từng nằm ở vị trí nào giữa 16 mục khác.
+const VISIBLE_NAV_ITEMS = NAV_ITEMS.filter(item => POD_CREATE_ENABLED || item.to !== POD_CREATE_PATH);
 
 export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const handleLogout = () => { onLogout(); navigate('/login'); };
 
-  const handleLogout = () => {
-    onLogout();
-    navigate('/login');
-  };
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [menuOpen]);
+
+  // /seller/product-listing là alias của /seller/products nên sáng cùng mục nav.
+  const currentPath = location.pathname === '/seller/product-listing' ? '/seller/products' : location.pathname;
 
   return (
-    <div className="flex h-screen w-full bg-[#F9FAFB] text-stone-800 font-sans overflow-hidden">
-      {/* Left Sidebar */}
-      <aside
-        className={`bg-white border-r border-stone-200 flex flex-col justify-between transition-all duration-300 z-30 flex-shrink-0 ${
-          collapsed ? 'w-20' : 'w-60'
-        }`}
-      >
-        {/* Sidebar Top */}
-        <div>
-          <div className="h-16 flex items-center justify-between px-4 border-b border-stone-100">
-            {!collapsed ? (
-              <div className="flex items-center gap-2 select-none">
-                <span className="font-extrabold text-xl font-jakarta tracking-tight">
-                  <span className="text-[#007700]">Viet</span>
-                  <span className="text-[#330033]">Craft</span>
-                </span>
-                <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-[#EAF0E2] text-[#007700]">
-                  Người bán
-                </span>
-              </div>
-            ) : (
-              <div className="mx-auto font-extrabold text-lg text-[#007700]">VC</div>
-            )}
-
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
-              title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
-            >
-              {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-            </button>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="p-3 space-y-1.5">
-            {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
-              const isActive = location.pathname.startsWith(to);
-              return (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 group cursor-pointer ${
-                    isActive
-                      ? 'bg-[#EAF0E2] text-[#007700] shadow-2xs font-bold'
-                      : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
-                  }`}
-                  title={collapsed ? label : undefined}
-                >
-                  <Icon
-                    size={20}
-                    className={`flex-shrink-0 transition-colors ${
-                      isActive ? 'text-[#007700]' : 'text-stone-400 group-hover:text-stone-700'
-                    }`}
-                  />
-                  {!collapsed && <span className="truncate font-jakarta">{label}</span>}
-                </Link>
-              );
-            })}
-          </nav>
+    <div className="seller-layout">
+      <aside className={`seller-sidebar ${collapsed ? 'collapsed' : ''}`}>
+        <div className="seller-sidebar-top">
+          <button className="seller-collapse-btn" onClick={() => setCollapsed(!collapsed)} title={collapsed ? 'Mở rộng' : 'Thu gọn'}>
+            <PanelLeft size={18} />
+          </button>
         </div>
-
-        {/* Sidebar Footer */}
-        <div className="p-3 border-t border-stone-100">
-          <Link
-            to="/seller/settings"
-            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-colors cursor-pointer ${
-              location.pathname.startsWith('/seller/settings') || location.pathname.startsWith('/seller/onboarding')
-                ? 'bg-[#EAF0E2] text-[#007700] shadow-2xs font-bold'
-                : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900 font-medium'
-            }`}
-            title={collapsed ? 'Cài đặt cửa hàng' : undefined}
-          >
-            <Settings
-              size={19}
-              className={
-                location.pathname.startsWith('/seller/settings') || location.pathname.startsWith('/seller/onboarding')
-                  ? 'text-[#007700]'
-                  : 'text-stone-400'
-              }
-            />
-            {!collapsed && <span className="font-jakarta">Cài đặt</span>}
+        <nav className="seller-nav">
+          {VISIBLE_NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+            <Link key={to} to={to} className={`seller-nav-item ${currentPath === to ? 'active' : ''}`} title={collapsed ? label : undefined}>
+              <Icon size={19} />
+              {!collapsed && <span>{label}</span>}
+            </Link>
+          ))}
+        </nav>
+        <div className="seller-sidebar-footer">
+          <Link to="/seller/settings" className="seller-settings-btn" title="Cài đặt cửa hàng">
+            <Settings size={19} />
           </Link>
         </div>
       </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top App Bar (Header) */}
-        <header className="h-16 bg-white border-b border-stone-200 flex items-center justify-between px-6 lg:px-8 flex-shrink-0 z-20">
-          {/* Header Left */}
-          <div className="flex items-center gap-3">
-            <a
-              href="/seller/analytics"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#EAF0E2]/60 hover:bg-[#EAF0E2] text-[#007700] text-xs font-bold rounded-lg transition-colors cursor-pointer border border-[#BECAB6]/40 font-jakarta"
-            >
-              <span>Phân tích thị trường</span>
-              <ExternalLink size={13} />
-            </a>
+      <div className="seller-main">
+        <header className="seller-header">
+          <div className="seller-logo-area">
+            <span className="seller-logo-text select-none">
+              <span style={{ color: '#1a6b1a' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span>
+            </span>
           </div>
-
-          {/* Header Right */}
-          <div className="flex items-center gap-3.5">
-            <button
-              className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer relative"
-              title="Tin nhắn"
-            >
-              <Mail size={18} />
-            </button>
-
-            <button
-              className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer relative"
-              title="Thông báo"
-            >
-              <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#BA1A1A] ring-2 ring-white" />
-            </button>
-
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-bold text-stone-700 cursor-pointer hover:bg-stone-100 transition-colors">
-              <Globe size={14} className="text-stone-400" />
-              <span>VN</span>
-              <ChevronDown size={12} className="text-stone-400" />
+          <div className="seller-header-center">
+            <button className="seller-trending-btn">Xu hướng mua sắm<Flame size={16} className="seller-fire-icon" /></button>
+            <Link to="/seller/analytics" className="seller-market-btn">Phân tích thị trường<ExternalLink size={14} /></Link>
+          </div>
+          <div className="seller-header-actions">
+            <button className="seller-icon-btn"><Mail size={19} /></button>
+            <button className="seller-icon-btn seller-bell"><Bell size={19} /><span className="seller-bell-dot" /></button>
+            <button className="seller-lang-badge">VN <ChevronDown size={13} /></button>
+            <div className="seller-user-menu" ref={menuRef}>
+              <button className="seller-avatar" onClick={() => setMenuOpen(o => !o)} title="Tài khoản">{user?.name?.[0]?.toUpperCase() || 'S'}</button>
+              {menuOpen && (
+                <div className="seller-user-dropdown">
+                  <div className="seller-user-info">
+                    <div className="seller-user-name">{user?.name || 'Người bán'}</div>
+                    {user?.email && <div className="seller-user-email">{user.email}</div>}
+                  </div>
+                  <button className="seller-user-logout" onClick={handleLogout}><LogOut size={16} /><span>Đăng xuất</span></button>
+                </div>
+              )}
             </div>
-
-            <div className="w-px h-6 bg-stone-200" />
-
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-stone-100 transition-colors cursor-pointer text-left"
-              title="Đăng xuất"
-            >
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-[#007700] to-[#94FC7E] text-white flex items-center justify-center font-bold text-sm shadow-xs font-jakarta">
-                {user?.name?.[0]?.toUpperCase() || 'S'}
-              </div>
-              <div className="hidden md:block">
-                <p className="text-xs font-bold text-stone-900 leading-tight font-jakarta">
-                  {user?.name && !user.name.includes('Xưởng') ? user.name : 'VietCraft Creative Shop'}
-                </p>
-                <p className="text-[10px] text-stone-500">Kênh người bán sáng tạo</p>
-              </div>
-            </button>
           </div>
         </header>
-
-        {/* Scrollable Main Content */}
-        <main className="flex-1 overflow-y-auto bg-[#F9FAFB]">
-          {children}
-        </main>
+        <main className="seller-content">{children}</main>
       </div>
     </div>
   );

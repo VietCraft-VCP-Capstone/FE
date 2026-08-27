@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { cartService } from '../../order/services/cartService';
+import { useNavigate } from 'react-router-dom';
 import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck, Check } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
@@ -27,7 +29,8 @@ interface Order {
 
 export function BuyerOrdersPage() {
     const navigate = useNavigate();
-    const { setCartCount } = useOutletContext<{ setCartCount: (n: number) => void }>();
+    // Không còn tự set số lượng giỏ: cartService phát event 'vietcraft-cart-updated'
+    // sau mỗi thao tác, BuyerLayout nghe event đó và cập nhật badge.
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled'>('all');
@@ -55,9 +58,11 @@ export function BuyerOrdersPage() {
             try {
                 // Fetch orders from BE with active tab status
                 const res = await ordersService.getByUser(activeTab);
-                setOrders(res);
+                // BE trả mảng thuần; thủ sẵn trường hợp lỗi/đổi shape để không vỡ .filter/.map
+                setOrders(Array.isArray(res) ? (res as Order[]) : ((res as any)?.items || []));
             } catch (err) {
                 console.error('Failed to fetch orders', err);
+                setOrders([]);
             } finally {
                 setLoading(false);
             }
@@ -86,39 +91,28 @@ export function BuyerOrdersPage() {
         setReorderOrder(order);
     };
 
-    const handleConfirmReorder = (selectedItems: OrderItem[]) => {
+    const handleConfirmReorder = async (selectedItems: OrderItem[]) => {
         if (!reorderOrder) return;
-        const cartStr = localStorage.getItem('vietcraft_cart');
-        let cartItems = [];
-        if (cartStr) {
+        // Đi qua cartService thay vì tự ghi localStorage: service tự chọn giỏ server hay
+        // giỏ khách, và BE còn kiểm tồn kho / sản phẩm còn bán — ghi tay thì bỏ qua hết.
+        const failures: string[] = [];
+        for (const it of selectedItems) {
             try {
-                cartItems = JSON.parse(cartStr);
-            } catch (e) {}
+                await cartService.addToCart({
+                    productId: it.productId,
+                    variantId: it.variantId && it.variantId !== 'default' ? it.variantId : undefined,
+                    quantity: it.quantity,
+                });
+            } catch (err) {
+                failures.push(getApiErrorMessage(err));
+            }
         }
 
-        selectedItems.forEach(it => {
-            const existing = cartItems.find((item: any) => item.productId === it.productId && item.variantId === it.variantId);
-            if (existing) {
-                existing.quantity += it.quantity;
-            } else {
-                cartItems.push({
-                    id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                    productId: it.productId,
-                    variantId: it.variantId,
-                    title: it.title || 'Sản phẩm tái đặt',
-                    shopName: reorderOrder.shopName,
-                    variantName: `${it.color || ''} ${it.size || ''}`.trim() || 'Mặc định',
-                    price: it.price,
-                    quantity: it.quantity,
-                    image: it.image || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=200',
-                    checked: true
-                });
-            }
-        });
-
-        localStorage.setItem('vietcraft_cart', JSON.stringify(cartItems));
-        setCartCount(cartItems.reduce((acc: number, it: any) => acc + it.quantity, 0));
         setReorderOrder(null);
+        if (failures.length > 0) {
+            showToast(failures[0], 'error');
+            return;
+        }
         showToast('Đã thêm sản phẩm vào giỏ hàng!');
         setTimeout(() => navigate('/cart'), 1200);
     };
@@ -128,7 +122,7 @@ export function BuyerOrdersPage() {
         const query = searchQuery.toLowerCase();
         const matchesShop = o.shopName?.toLowerCase().includes(query);
         const matchesId = o.id?.toLowerCase().includes(query);
-        const matchesItem = o.items.some(it => it.title?.toLowerCase().includes(query));
+        const matchesItem = (o.items || []).some(it => it.title?.toLowerCase().includes(query));
         return matchesShop || matchesId || matchesItem;
     });
 

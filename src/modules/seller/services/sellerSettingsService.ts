@@ -76,6 +76,12 @@ export const INITIAL_SELLER_SETTINGS: SellerSettingsState = {
   updatedAt: new Date().toISOString()
 };
 
+/** 401 (chưa đăng nhập / token hỏng) và 403 (sai role) không được rơi về cache. */
+function isAuthError(err: any): boolean {
+  const status = err?.response?.status;
+  return status === 401 || status === 403;
+}
+
 function filterOutViettel(settings: SellerSettingsState): SellerSettingsState {
   if (!settings.shipping) {
     settings.shipping = { ...INITIAL_SELLER_SETTINGS.shipping };
@@ -129,6 +135,10 @@ export const sellerSettingsService = {
         return clean;
       }
     } catch (e) {
+      // GET /seller/settings nay bắt buộc đăng nhập + role seller/admin.
+      // 401/403 mà vẫn trả cache thì seller tưởng đang xem cài đặt thật của mình
+      // (và bấm Lưu sẽ luôn lỗi) — phải ném ra để trang hiển thị đúng lý do.
+      if (isAuthError(e)) throw e;
       console.warn('Could not load seller settings from backend, falling back to cache:', e);
     }
 

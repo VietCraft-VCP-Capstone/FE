@@ -4,6 +4,7 @@ import { Heart, Star, ArrowRight, CheckCircle2, Info } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { promotionService } from '../../promotion/services/promotionService';
 import { userService } from '../../user/services/userService';
+import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import '../../../shared/components/layouts.css';
 
 export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
@@ -30,18 +31,24 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
 
   // Load favorites from backend API (with localStorage fallback)
   useEffect(() => {
-    userService.getWishlist()
-      .then((ids) => {
-        setFavoritedProductIds(ids);
-        localStorage.setItem('vietcraft_favorites', JSON.stringify(ids));
-      })
-      .catch(() => {
-        // Fallback: try localStorage
-        try {
-          const stored = localStorage.getItem('vietcraft_favorites');
-          if (stored) setFavoritedProductIds(JSON.parse(stored));
-        } catch {}
-      });
+    // /users/wishlist cần token. Khách vãng lai KHÔNG gọi — interceptor 401 sẽ điều hướng
+    // sang /login trước cả khi .catch() chạy, biến trang công khai thành tường đăng nhập.
+    if (!isLoggedIn()) {
+      setFavoritedProductIds([]);
+    } else {
+      userService.getWishlist()
+        .then((ids) => {
+          setFavoritedProductIds(ids);
+          localStorage.setItem('vietcraft_favorites', JSON.stringify(ids));
+        })
+        .catch(() => {
+          // Fallback: try localStorage
+          try {
+            const stored = localStorage.getItem('vietcraft_favorites');
+            if (stored) setFavoritedProductIds(JSON.parse(stored));
+          } catch {}
+        });
+    }
     const vls = localStorage.getItem('vietcraft_saved_vouchers');
     if (vls) {
       try { setSavedVouchers(JSON.parse(vls)); } catch (e) {}
@@ -70,6 +77,11 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
 
   const toggleFavorite = async (productId: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Yêu thích cần tài khoản: đưa khách sang /login thay vì gọi API rồi dính 401.
+    if (!isLoggedIn()) {
+      navigate('/login');
+      return;
+    }
     try {
       let updated: string[];
       if (favoritedProductIds.includes(productId)) {
@@ -242,7 +254,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
 
       {/* Intro Banner */}
       <div className="buyer-intro-banner" style={{ background: 'transparent', textAlign: 'center', padding: '24px 0 12px' }}>
-        <h1 style={{ fontSize: 32, fontWeight: 900, color: '#330033' }}>Chào mừng trở lại, {name}!</h1>
+        <h1 style={{ fontSize: 32, fontWeight: 900, color: '#330033' }}>{name ? `Chào mừng trở lại, ${name}!` : 'Khám phá sản phẩm thủ công Việt'}</h1>
       </div>
 
       {/* Tab Pills */}

@@ -9,6 +9,7 @@ import {
 import { userService, UserProfile, Address } from '../../user/services/userService';
 import { ordersService } from '../../order/services/ordersService';
 import { productsService } from '../../product/services/productsService';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { EditProfileModal } from '../components/profile/EditProfileModal';
 import { AddressFormModal } from '../components/profile/AddressFormModal';
 import { ConfirmDeleteModal } from '../components/profile/ConfirmDeleteModal';
@@ -129,11 +130,14 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                 // Fetch real products for saved products section / wishlist
                 try {
                     const [allProducts, wishlistIds] = await Promise.all([
-                        productsService.getAll().catch(() => []),
+                        productsService.getAll(),
                         userService.getWishlist().catch(() => [])
                     ]);
                     const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
-                    const products = Array.isArray(allProducts) ? allProducts : [];
+                    // /products trả object phân trang { items, total, ... }, KHÔNG phải mảng thuần.
+                    const products: any[] = Array.isArray(allProducts)
+                        ? allProducts
+                        : (allProducts?.items || []);
                     
                     const matchedItems = products.filter((p: any) =>
                         ids.includes(p.id) || ids.includes(p._id?.toString())
@@ -175,7 +179,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             setProfile((prev: UserProfile | null) => prev ? { ...prev, full_name: updated.full_name, phone: updated.phone } : null);
             showToast('Cập nhật hồ sơ thành công!', 'success');
         } catch (e) {
-            showToast('Cập nhật hồ sơ thất bại.', 'error');
+            showToast(getApiErrorMessage(e, 'Cập nhật hồ sơ thất bại.'), 'error');
             throw e;
         }
     };
@@ -195,7 +199,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             setIsAddressModalOpen(false);
             setEditingAddress(null);
         } catch (e) {
-            showToast('Lưu địa chỉ thất bại.', 'error');
+            showToast(getApiErrorMessage(e, 'Lưu địa chỉ thất bại.'), 'error');
             throw e;
         }
     };
@@ -207,7 +211,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             setProfile({ ...profile, addresses: updatedAddresses });
             showToast('Đặt làm mặc định thành công!', 'success');
         } catch (e) {
-            showToast('Đặt làm mặc định thất bại.', 'error');
+            showToast(getApiErrorMessage(e, 'Đặt làm mặc định thất bại.'), 'error');
         }
     };
 
@@ -700,7 +704,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                         setProfile((prev: any) => prev ? { ...prev, addresses: updatedAddresses } : null);
                         showToast('Xóa địa chỉ thành công!', 'success');
                     } catch (e) {
-                        showToast('Xóa địa chỉ thất bại.', 'error');
+                        showToast(getApiErrorMessage(e, 'Xóa địa chỉ thất bại.'), 'error');
                     }
                 }}
             />

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 
@@ -40,8 +40,24 @@ function GoogleIcon() {
   );
 }
 
+
+/**
+ * Đường quay lại sau khi đăng nhập, lấy từ `?next=`.
+ * Khách bị chặn ở /checkout sẽ mang theo tham số này, đăng nhập xong quay lại đúng chỗ.
+ * Chỉ nhận đường dẫn nội bộ: '//evil.com' và 'http://evil.com' đều bị loại (open redirect).
+ */
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null;
+  let decoded: string;
+  try { decoded = decodeURIComponent(raw); } catch { return null; }
+  if (!decoded.startsWith('/') || decoded.startsWith('//')) return null;
+  return decoded;
+}
+
 export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextUrl = safeNext(searchParams.get('next'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -50,9 +66,10 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    const target = user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/';
-    navigate(target, { replace: true });
-    return null;
+    // Navigate thay cho navigate(): gọi điều hướng ngay trong thân render là side effect,
+    // React sẽ cảnh báo và có thể chạy hai lần ở StrictMode.
+    const target = nextUrl ?? (user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/');
+    return <Navigate to={target} replace />;
   }
 
   const googleLogin = useGoogleLogin({
@@ -60,7 +77,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
       setLoading(true); setError('');
       try {
         const loggedUser = await onGoogleLogin(res.access_token);
-        const target = loggedUser?.role === 'admin' ? '/admin' : loggedUser?.role === 'seller' ? '/seller' : '/';
+        const target = nextUrl ?? (loggedUser?.role === 'admin' ? '/admin' : loggedUser?.role === 'seller' ? '/seller' : '/');
         navigate(target, { replace: true });
       }
       catch { setError('Đăng nhập Google thất bại.'); }
@@ -85,7 +102,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
       await onLogin({ email: em, password: pw });
       setRateLimit(em, { attempts: 0 });
       const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
-      const target = storedUser?.role === 'admin' ? '/admin' : storedUser?.role === 'seller' ? '/seller' : '/';
+      const target = nextUrl ?? (storedUser?.role === 'admin' ? '/admin' : storedUser?.role === 'seller' ? '/seller' : '/');
       navigate(target, { replace: true });
     } catch (err: any) {
       const errData = err?.response?.data;
@@ -107,7 +124,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
         }
       }
     } finally { setLoading(false); }
-  }, [email, password, onLogin, navigate]);
+  }, [email, password, onLogin, navigate, nextUrl]);
 
   const pill: React.CSSProperties = {
     width: '100%', border: '1.5px solid #e2e0dd', borderRadius: 50,
@@ -187,7 +204,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
           </button>
 
           <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 12 }}>
-            Chưa có tài khoản?{' '}<Link to="/signup" style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng ký</Link>
+            Chưa có tài khoản?{' '}<Link to={nextUrl ? `/signup?next=${encodeURIComponent(nextUrl)}` : '/signup'} style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng ký</Link>
           </p>
         </div>
       </div>

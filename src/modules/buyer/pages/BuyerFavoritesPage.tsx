@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { productsService } from '../../product/services/productsService';
 import { userService } from '../../user/services/userService';
 import { cartService } from '../../order/services/cartService';
+import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 export function BuyerFavoritesPage() {
   const navigate = useNavigate();
@@ -15,27 +16,40 @@ export function BuyerFavoritesPage() {
   }, []);
 
   const fetchFavorites = async () => {
+    // Route đã chặn khách vãng lai, nhưng vẫn phòng trường hợp token vừa bị xoá:
+    // không gọi /users/wishlist khi chưa đăng nhập, chỉ hiển thị danh sách rỗng.
+    if (!isLoggedIn()) {
+      setFavorites([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const [productsRes, wishlistIds] = await Promise.all([
-        productsService.getAll({ pageSize: 100 }).catch(() => ({ items: [] })),
+        productsService.getAll({ pageSize: 100 }),
         userService.getWishlist().catch(() => [] as string[])
       ]);
 
       const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
-      const products = Array.isArray(productsRes) ? productsRes : (productsRes?.items || []);
+      const products = productsRes?.items || [];
 
       // Tìm các sản phẩm khớp
       const matchedItems = products.filter((p: any) =>
         ids.includes(p.id) || ids.includes(p._id?.toString())
       );
 
-      // Tìm các ID "mồ côi" (không khớp sản phẩm nào) → xóa khỏi backend
-      const matchedIds = new Set(matchedItems.flatMap((p: any) => [p.id, p._id?.toString()].filter(Boolean)));
-      const staleIds = ids.filter((id: string) => !matchedIds.has(id));
-      if (staleIds.length > 0) {
-        await Promise.all(staleIds.map((id: string) => userService.removeFromWishlist(id).catch(() => {})));
-        window.dispatchEvent(new CustomEvent('wishlist-updated'));
+      // Dọn ID "mồ côi" chỉ khi CHẮC CHẮN đã lấy được toàn bộ catalogue.
+      // /products trả về object phân trang: nếu fetch lỗi (items rỗng) hoặc còn trang sau
+      // mà vẫn xoá thì sẽ xoá nhầm sạch wishlist của người dùng.
+      const total = Number(productsRes?.total ?? 0);
+      const sawFullCatalogue = products.length > 0 && total <= products.length;
+      if (sawFullCatalogue) {
+        const matchedIds = new Set(matchedItems.flatMap((p: any) => [p.id, p._id?.toString()].filter(Boolean)));
+        const staleIds = ids.filter((id: string) => !matchedIds.has(id));
+        if (staleIds.length > 0) {
+          await Promise.all(staleIds.map((id: string) => userService.removeFromWishlist(id).catch(() => {})));
+          window.dispatchEvent(new CustomEvent('wishlist-updated'));
+        }
       }
 
       setFavorites(matchedItems);
@@ -46,13 +60,19 @@ export function BuyerFavoritesPage() {
     }
   };
 
+  // Nút tim ở trang này là "bỏ yêu thích" rõ ràng nên gọi thẳng remove,
+  // KHÔNG dùng toggle (bấm 2 lần sẽ tự thêm lại).
   const handleRemoveFavorite = async (id: string) => {
+    if (!isLoggedIn()) {
+      navigate('/login');
+      return;
+    }
     try {
       await userService.removeFromWishlist(id);
       setFavorites(prev => prev.filter(item => item._id !== id && item.id !== id));
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch (err) {
-      console.error(err);
+      alert(getApiErrorMessage(err, 'Không thể bỏ yêu thích sản phẩm này.'));
     }
   };
 
@@ -61,7 +81,8 @@ export function BuyerFavoritesPage() {
       await cartService.addToCart({ productId: product._id || product.id, quantity: 1 });
       alert('Đã thêm sản phẩm vào giỏ hàng!');
     } catch (err) {
-      console.error(err);
+      // BE nay từ chối sản phẩm ngừng bán / hết tồn kho kèm lý do cụ thể.
+      alert(getApiErrorMessage(err, 'Không thể thêm sản phẩm vào giỏ hàng.'));
     }
   };
 
@@ -148,7 +169,7 @@ export function BuyerFavoritesPage() {
                       {product.title || product.name || 'Cốc Sứ Thủ Công'}
                     </h3>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {product.storeName || product.shopName || 'Gốm Mộc Studio'}
+                      {product.shopInfo?.name || product.storeName || product.shopName || 'Gốm Mộc Studio'}
                     </p>
                     <p className="text-sm font-bold text-[#15803d] mt-1">
                       {new Intl.NumberFormat('vi-VN').format(

@@ -57,19 +57,27 @@ export const userService = {
         return res.data;
     },
 
-    // Wishlist
+    // ---------------------------------------------------------------------
+    // Wishlist — /users/wishlist/* và /api/favorites/* nay dùng CHUNG collection
+    // `wishlists` của BE, nên hai bên luôn đồng bộ.
+    // Cả 3 route đều trả về MẢNG product id (string[]) sau khi thao tác.
+    // ---------------------------------------------------------------------
+
+    /** Ép về string[]; BE lỗi có thể trả { error } nên không được .map thẳng. */
+    toIdList: (data: any): string[] =>
+        Array.isArray(data) ? data.map((id: any) => (id?.toString ? id.toString() : id)) : [],
+
     getWishlist: async (): Promise<string[]> => {
         const res = await api.get('/users/wishlist');
-        // API returns ObjectId array; convert to strings
-        return (res.data || []).map((id: any) => id?.toString ? id.toString() : id);
+        return userService.toIdList(res.data);
     },
     addToWishlist: async (productId: string): Promise<string[]> => {
         const res = await api.post(`/users/wishlist/${productId}`);
-        return (res.data || []).map((id: any) => id?.toString ? id.toString() : id);
+        return userService.toIdList(res.data);
     },
     removeFromWishlist: async (productId: string): Promise<string[]> => {
         const res = await api.delete(`/users/wishlist/${productId}`);
-        return (res.data || []).map((id: any) => id?.toString ? id.toString() : id);
+        return userService.toIdList(res.data);
     }
 };
 

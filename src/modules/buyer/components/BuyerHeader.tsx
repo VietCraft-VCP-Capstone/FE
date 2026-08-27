@@ -3,6 +3,7 @@ import { Search, Heart, Bell, ShoppingBag, MessageCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import { userService } from '../../user/services/userService';
+import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 interface BuyerHeaderProps {
   user: any;
@@ -23,6 +24,12 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
 
   // Fetch favorites count from backend on route change and on wishlist-updated event
   const refreshFavCount = () => {
+    // /users/wishlist cần token. Khách vãng lai KHÔNG gọi, nếu không interceptor 401
+    // sẽ đá thẳng về /login và biến trang công khai thành tường đăng nhập.
+    if (!isLoggedIn()) {
+      setFavCount(0);
+      return;
+    }
     userService.getWishlist()
       .then((ids) => setFavCount(Array.isArray(ids) ? ids.length : 0))
       .catch(() => setFavCount(0));

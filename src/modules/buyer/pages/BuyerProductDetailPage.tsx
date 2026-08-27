@@ -7,6 +7,7 @@ import {
 import { productsService } from '../../product/services/productsService';
 import { userService } from '../../user/services/userService';
 import { cartService } from '../../order/services/cartService';
+import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Variant { id: string; name: string; color?: string; size?: string; material?: string; price: number; stock: number; mockupImage?: string; }
@@ -96,15 +97,21 @@ export function BuyerProductDetailPage() {
       }
     }).catch(() => {}).finally(() => setLoading(false));
 
-    // check favorites from backend
-    userService.getWishlist()
-      .then((ids) => setIsFav(ids.includes(id!)))
-      .catch(() => {
-        try {
-          const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
-          setIsFav(favs.includes(id!));
-        } catch {}
-      });
+    // check favorites from backend — /users/wishlist cần token.
+    // Khách vãng lai bỏ qua hẳn: interceptor 401 sẽ đá về /login, mà trang chi tiết
+    // sản phẩm phải xem được khi chưa đăng nhập.
+    if (!isLoggedIn()) {
+      setIsFav(false);
+    } else {
+      userService.getWishlist()
+        .then((ids) => setIsFav(ids.includes(id!)))
+        .catch(() => {
+          try {
+            const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
+            setIsFav(favs.includes(id!));
+          } catch {}
+        });
+    }
   }, [id]);
 
   // Derive unique option sets from variants
@@ -131,8 +138,8 @@ export function BuyerProductDetailPage() {
   ];
 
   // ── Add to cart ──────────────────────────────────────────────────────────────
-  const addToCart = async () => {
-    if (!product) return;
+  const addToCart = async (): Promise<boolean> => {
+    if (!product) return false;
     try {
       await cartService.addToCart({
         productId: product.id,
@@ -141,16 +148,33 @@ export function BuyerProductDetailPage() {
         customNotes: customText || undefined
       });
       triggerToast(`Đã thêm "${product.title}" vào giỏ hàng!`, 'success');
-    } catch {
-      triggerToast('Không thể thêm vào giỏ, vui lòng thử lại.', 'info');
+      return true;
+    } catch (err) {
+      // BE nay từ chối sản phẩm ngừng bán / vượt tồn kho kèm lý do cụ thể.
+      triggerToast(getApiErrorMessage(err, 'Không thể thêm vào giỏ, vui lòng thử lại.'), 'info');
+      return false;
     }
   };
 
-  const buyNow = () => { addToCart(); navigate('/cart'); };
+  // Chỉ sang giỏ khi thêm THÀNH CÔNG, tránh đưa người dùng tới giỏ trống mà không rõ lý do.
+  const buyNow = async () => {
+    // "Mua ngay" dẫn thẳng tới luồng thanh toán → bắt đăng nhập tại đây.
+    if (!isLoggedIn()) {
+      navigate('/login');
+      return;
+    }
+    const ok = await addToCart();
+    if (ok) navigate('/cart');
+  };
 
   // ── Toggle favorite ──────────────────────────────────────────────────────────
   const toggleFav = async () => {
     if (!product) return;
+    // Yêu thích cần tài khoản: đưa khách sang /login thay vì gọi API rồi dính 401.
+    if (!isLoggedIn()) {
+      navigate('/login');
+      return;
+    }
     try {
       let updated: string[];
       if (isFav) {

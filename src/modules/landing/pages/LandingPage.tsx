@@ -19,6 +19,7 @@ export function LandingPage({ user, onLogout }: LandingPageProps) {
     handleSubscribe,
     handleNavigateToLogin, handleNavigateToSignup,
     handleNavigateToHome, handleNavigateToDashboard,
+    handleViewProduct, handleViewShop, handleExploreProducts, handleViewCollections,
     products, shops,
   } = useLandingPage();
 
@@ -34,11 +35,17 @@ export function LandingPage({ user, onLogout }: LandingPageProps) {
         onHome={handleNavigateToHome}
         onDashboard={handleNavigateToDashboard}
       />
-      <LandingHero onExplore={handleNavigateToLogin} />
+      {/* Khách vãng lai duyệt hàng thoải mái: các nút dưới đây dẫn tới nội dung thật,
+          KHÔNG còn gắn handleNavigateToLogin. Tường đăng nhập chỉ còn ở bước thanh toán. */}
+      <LandingHero onExplore={handleExploreProducts} />
       <LandingCategories />
-      <LandingTrending products={products} onAction={handleNavigateToLogin} />
-      <LandingCollections onAction={handleNavigateToLogin} />
-      <LandingShops shops={shops} onAction={handleNavigateToLogin} />
+      <LandingTrending
+        products={products}
+        onSelectProduct={handleViewProduct}
+        onViewAll={handleExploreProducts}
+      />
+      <LandingCollections onAction={handleViewCollections} />
+      <LandingShops shops={shops} onSelectShop={(shop) => handleViewShop(shop.id || '')} />
       <LandingFooter
         emailSubscription={emailSubscription}
         setEmailSubscription={setEmailSubscription}

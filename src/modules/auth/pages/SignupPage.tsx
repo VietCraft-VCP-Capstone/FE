@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 
 interface SignupPageProps {
@@ -22,8 +22,20 @@ const SC = ['#e5e7eb', '#f87171', '#fb923c', '#facc15', '#22c55e'];
 const SL = ['', 'Yếu', 'Trung bình', 'Khá', 'Mạnh'];
 
 
+
+/** Đường quay lại sau đăng ký, lấy từ `?next=`. Chỉ nhận path nội bộ (chặn open redirect). */
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null;
+  let decoded: string;
+  try { decoded = decodeURIComponent(raw); } catch { return null; }
+  if (!decoded.startsWith('/') || decoded.startsWith('//')) return null;
+  return decoded;
+}
+
 export function SignupPage({ onSignup, user }: SignupPageProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextUrl = safeNext(searchParams.get('next'));
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,9 +47,8 @@ export function SignupPage({ onSignup, user }: SignupPageProps) {
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    const target = user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/';
-    navigate(target, { replace: true });
-    return null;
+    const target = nextUrl ?? (user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/');
+    return <Navigate to={target} replace />;
   }
 
   const strength = pwStrength(password);
@@ -54,7 +65,7 @@ export function SignupPage({ onSignup, user }: SignupPageProps) {
     setLoading(true);
     try {
       await onSignup({ name: n, email: em, password: pw });
-      navigate('/verify', { state: { email: em }, replace: true });
+      navigate('/verify', { state: { email: em, next: nextUrl }, replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Đăng ký thất bại.');
     } finally { setLoading(false); }
@@ -147,7 +158,7 @@ export function SignupPage({ onSignup, user }: SignupPageProps) {
           </form>
 
           <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 12 }}>
-            Đã có tài khoản?{' '}<Link to="/login" style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng nhập</Link>
+            Đã có tài khoản?{' '}<Link to={nextUrl ? `/login?next=${encodeURIComponent(nextUrl)}` : '/login'} style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng nhập</Link>
           </p>
         </div>
       </div>

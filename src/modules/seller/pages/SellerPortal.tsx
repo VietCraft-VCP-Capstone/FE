@@ -3,52 +3,11 @@ import { SellerLayout } from './SellerLayout';
 import { ProductListingPage } from '../../product/pages/ProductListingPage';
 import { SellerSettingsPage } from './SellerSettingsPage';
 import { ShopOnboardingPage } from './ShopOnboardingPage';
-
-function SellerDashboard() {
-  return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <h2 className="text-2xl font-extrabold text-stone-900 font-jakarta">Dashboard</h2>
-        <p className="text-sm text-stone-500 mt-0.5">Thống kê doanh thu, đơn hàng và hiệu suất bán hàng của bạn.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="p-5 bg-white border border-stone-200 rounded-2xl shadow-xs space-y-2">
-          <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Doanh thu tháng</span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-stone-900 font-jakarta">45.200.000đ</span>
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">↗ +18.4%</span>
-          </div>
-        </div>
-
-        <div className="p-5 bg-white border border-stone-200 rounded-2xl shadow-xs space-y-2">
-          <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Đơn hàng mới</span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-stone-900 font-jakarta">86 đơn</span>
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">↗ +10.2%</span>
-          </div>
-        </div>
-
-        <div className="p-5 bg-white border border-stone-200 rounded-2xl shadow-xs space-y-2">
-          <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">Sản phẩm khả dụng</span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-[#007700] font-jakarta">12 sản phẩm</span>
-            <span className="text-xs font-medium text-stone-500">Hoạt động tốt</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SellerOrders() {
-  return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-2 animate-fade-in">
-      <h2 className="text-2xl font-extrabold text-stone-900 font-jakarta">Orders</h2>
-      <p className="text-sm text-stone-500">Danh sách đơn hàng cần đóng gói và chuyển qua đối tác vận chuyển GHN / GHTK.</p>
-    </div>
-  );
-}
+import { CreateProductPage } from './CreateProductPage';
+import { SellerCatalogPage } from './SellerCatalogPage';
+import { SellerDashboard } from './SellerDashboard';
+import { SellerOrdersPage } from './SellerOrdersPage';
+import { POD_CREATE_ENABLED } from '../featureFlags';
 
 function SellerAnalytics() {
   return (
@@ -74,19 +33,41 @@ interface SellerPortalProps {
 }
 
 export function SellerPortal({ user, onLogout }: SellerPortalProps) {
+  // Trang tạm cho các mục chưa có màn hình thật.
+  const Stub = ({ t, d }: { t: string; d: string }) => (
+    <div className="animate-fade-in"><h2 className="seller-products-title">{t}</h2><p className="seller-role-subtitle">{d}</p></div>
+  );
   return (
     <SellerLayout user={user} onLogout={onLogout}>
       <Routes>
         <Route path="dashboard" element={<SellerDashboard />} />
+        {/* Luồng POD: chọn phôi + đặt design. Đang tắt tạm — xem featureFlags.ts.
+            Vẫn khai báo route và đá về danh sách sản phẩm, thay vì bỏ hẳn: link cũ
+            hay bookmark sẽ rơi vào catch-all '*' và cũng bị điều hướng, nhưng để
+            route ở đây thì lúc bật lại chỉ là đổi một cờ. */}
+        <Route
+          path="products/new"
+          element={POD_CREATE_ENABLED ? <CreateProductPage /> : <Navigate to="/seller/products" replace />}
+        />
         <Route path="products" element={<ProductListingPage />} />
+        {/* Alias cũ của trang quản lí sản phẩm */}
         <Route path="product-listing" element={<ProductListingPage />} />
         <Route path="settings" element={<SellerSettingsPage />} />
         <Route path="onboarding" element={<ShopOnboardingPage />} />
         <Route path="storefront" element={<SellerSettingsPage />} />
-        <Route path="orders" element={<SellerOrders />} />
+        <Route path="orders" element={<SellerOrdersPage />} />
         <Route path="analytics" element={<SellerAnalytics />} />
         <Route path="payouts" element={<SellerPayouts />} />
-        <Route path="*" element={<Navigate to="products" replace />} />
+        <Route path="catalog" element={<SellerCatalogPage />} />
+        <Route path="shipping" element={<Stub t="Vận chuyển" d="Quản lý phương thức và trạng thái giao hàng." />} />
+        <Route path="promotions" element={<Stub t="Khuyến mãi" d="Tạo và quản lý chương trình khuyến mãi." />} />
+        <Route path="revenue" element={<Stub t="Doanh thu cửa hàng" d="Theo dõi doanh thu và dòng tiền." />} />
+        <Route path="product-status" element={<Stub t="Trạng thái sản phẩm" d="Tình trạng duyệt và hiển thị sản phẩm." />} />
+        <Route path="forecast" element={<Stub t="Dự báo nhu cầu" d="Dự báo nhu cầu thị trường từ AI." />} />
+        <Route path="golden-hour" element={<Stub t="Danh mục & giờ vàng" d="Khung giờ vàng để đẩy sản phẩm." />} />
+        <Route path="price-optimize" element={<Stub t="Tối ưu giá bán" d="Gợi ý giá bán tối ưu theo thị trường." />} />
+        <Route path="market-share" element={<Stub t="Thị phần & đối thủ" d="Phân tích thị phần và đối thủ cạnh tranh." />} />
+        <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Routes>
     </SellerLayout>
   );

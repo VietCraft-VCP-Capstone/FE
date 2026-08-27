@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ProductItem, ProductFormData, ProductFilterState } from '../types/product';
 import { productsService } from '../services/productsService';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { ProductFilterBar } from '../components/ProductFilterBar';
 import { ProductTable } from '../components/ProductTable';
 import { ProductFormModal } from '../components/ProductFormModal';
@@ -46,6 +48,24 @@ export function ProductListingPage() {
 
   const [actionLoading, setActionLoading] = useState(false);
 
+  /**
+   * Vào bằng /seller/products?new=1 thì mở sẵn hộp thoại tạo sản phẩm.
+   * Các nút "Tạo sản phẩm" ở Trang chủ gian hàng và Danh mục sản phẩm dẫn tới đây,
+   * nên người bán không phải bấm thêm một nhịp nữa sau khi trang tải xong.
+   *
+   * Xoá tham số ngay bằng replace: giữ lại thì F5 hay bấm Back sẽ bật lại hộp
+   * thoại lần nữa, kể cả khi người dùng vừa cố ý đóng nó.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setEditingProduct(null);
+    setIsFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const debounceTimerRef = useRef<any>(null);
   const cacheRef = useRef<Map<string, { items: ProductItem[]; total: number; totalPages: number }>>(new Map());
 
@@ -67,7 +87,10 @@ export function ProductListingPage() {
     }
 
     try {
-      const data = await productsService.getAll(currentFilter);
+      // Trang quản lý của seller: phải dùng getMine (GET /products/mine) chứ không phải
+      // getAll — getAll nay là marketplace công khai, trả hàng PUBLISHED của MỌI shop và
+      // giấu mất hàng DRAFT/UNPUBLISHED của chính seller.
+      const data = await productsService.getMine(currentFilter);
       cacheRef.current.set(key, {
         items: data.items,
         total: data.total,
@@ -83,7 +106,7 @@ export function ProductListingPage() {
         const nextFilter = { ...currentFilter, page: currentFilter.page + 1 };
         const nextKey = getFilterKey(nextFilter);
         if (!cacheRef.current.has(nextKey)) {
-          productsService.getAll(nextFilter).then((nextData) => {
+          productsService.getMine(nextFilter).then((nextData) => {
             cacheRef.current.set(nextKey, {
               items: nextData.items,
               total: nextData.total,
@@ -94,7 +117,7 @@ export function ProductListingPage() {
       }
     } catch (err: any) {
       if (!isSilent) {
-        showToast('Không thể tải danh sách sản phẩm: ' + err.message, 'error');
+        showToast(getApiErrorMessage(err, 'Không thể tải danh sách sản phẩm.'), 'error');
       }
     } finally {
       setLoading(false);

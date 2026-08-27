@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, Sparkles, Check, ArrowLeft } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { cartService } from '../../order/services/cartService';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 
 interface CartItem {
     id: string;
@@ -15,6 +16,8 @@ interface CartItem {
     quantity: number;
     image: string;
     checked: boolean;
+    /** POD_TEMPLATE = hàng in theo yêu cầu. Checkout dùng để chặn COD. */
+    productType?: string;
 }
 
 const parseMongooseDecimal = (val: any): number => {
@@ -42,8 +45,8 @@ const mapBackendCart = (cartData: any): CartItem[] => {
         const prod = item.product_id || {};
         const variant = item.variant_id || {};
         
-        // Shop Name
-        const shopName = prod.shop_id?.name || 'VietCraft Selection';
+        // Shop Name — document Shop thô chỉ có `shop_name`, KHÔNG có `name`
+        const shopName = prod.shop_id?.shop_name || 'VietCraft Selection';
         
         // Variant Label/Name
         let variantName = 'Mặc định';
@@ -80,7 +83,8 @@ const mapBackendCart = (cartData: any): CartItem[] => {
             price,
             quantity: item.quantity || 1,
             image,
-            checked: item.is_selected !== undefined ? item.is_selected : true
+            checked: item.is_selected !== undefined ? item.is_selected : true,
+            productType: prod.product_type
         };
     });
 };
@@ -102,32 +106,18 @@ export function BuyerCartPage() {
     useEffect(() => {
         const syncAndFetchCart = async () => {
             try {
-                // 1. Sync legacy localStorage cart to database
-                const stored = localStorage.getItem('vietcraft_cart');
-                if (stored) {
-                    try {
-                        const parsed = JSON.parse(stored);
-                        if (parsed && parsed.length > 0) {
-                            const promises = parsed.map((item: any) => 
-                                cartService.addToCart({
-                                    productId: item.productId || item.id,
-                                    variantId: item.variantId && item.variantId !== 'default' ? item.variantId : undefined,
-                                    quantity: item.quantity || 1
-                                }).catch(err => console.error("Error migrating cart item:", err))
-                            );
-                            await Promise.all(promises);
-                            localStorage.removeItem('vietcraft_cart');
-                        }
-                    } catch (e) {
-                        console.error("Local storage cart parsing error", e);
-                    }
+                // 1. Rút cạn giỏ localStorage đời cũ. Logic nằm trong cartService để chỉ
+                //    một chỗ duy nhất biết tới khoá cũ; ở đây chỉ hiện lỗi cho người dùng.
+                const migrationFailures = await cartService.migrateLegacyCart();
+                if (migrationFailures.length > 0) {
+                    showToast(migrationFailures[0], 'error');
                 }
 
                 // 2. Fetch database cart items
                 const cartData = await cartService.getCart();
                 setCartItems(mapBackendCart(cartData));
             } catch (err) {
-                console.error('Failed to load DB cart items', err);
+                showToast(getApiErrorMessage(err, 'Không tải được giỏ hàng'), 'error');
             }
         };
 
@@ -160,8 +150,7 @@ export function BuyerCartPage() {
             const updated = await cartService.updateQuantity(id, newQty);
             setCartItems(mapBackendCart(updated));
         } catch (err) {
-            console.error(err);
-            showToast('Không thể cập nhật số lượng', 'error');
+            showToast(getApiErrorMessage(err, 'Không thể cập nhật số lượng'), 'error');
         }
     };
 
@@ -172,8 +161,7 @@ export function BuyerCartPage() {
             const updated = await cartService.toggleSelect(id, !item.checked);
             setCartItems(mapBackendCart(updated));
         } catch (err) {
-            console.error(err);
-            showToast('Không thể cập nhật trạng thái chọn', 'error');
+            showToast(getApiErrorMessage(err, 'Không thể cập nhật trạng thái chọn'), 'error');
         }
     };
 
@@ -186,8 +174,7 @@ export function BuyerCartPage() {
                 setCartItems(mapBackendCart(results[results.length - 1]));
             }
         } catch (err) {
-            console.error(err);
-            showToast('Không thể cập nhật trạng thái chọn tất cả', 'error');
+            showToast(getApiErrorMessage(err, 'Không thể cập nhật trạng thái chọn tất cả'), 'error');
         }
     };
 
@@ -197,8 +184,7 @@ export function BuyerCartPage() {
             setCartItems(mapBackendCart(updated));
             showToast('Đã xóa sản phẩm khỏi giỏ hàng');
         } catch (err) {
-            console.error(err);
-            showToast('Không thể xóa sản phẩm', 'error');
+            showToast(getApiErrorMessage(err, 'Không thể xóa sản phẩm'), 'error');
         }
     };
 
@@ -211,8 +197,7 @@ export function BuyerCartPage() {
             setCartItems(mapBackendCart(updated));
             showToast(`Đã thêm "${rec.title}" vào giỏ hàng!`);
         } catch (err) {
-            console.error(err);
-            showToast('Không thể thêm sản phẩm gợi ý', 'error');
+            showToast(getApiErrorMessage(err, 'Không thể thêm sản phẩm gợi ý'), 'error');
         }
     };
 

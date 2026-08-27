@@ -34,7 +34,32 @@ export default {
                     'border-light': '#E5E7EB',
                     'bg-page': '#F9FAFB',
                     'danger': '#BA1A1A',
+                },
+                // Bảng màu trang quản trị. Trước đây là các biến CSS --ad-* trong
+                // layouts.css; đưa vào đây để JSX dùng Tailwind mà giữ nguyên diện mạo.
+                admin: {
+                    brand: '#1a6b1a',
+                    'brand-600': '#15801a',
+                    'brand-700': '#145c14',
+                    'brand-050': '#eef7ee',
+                    ink: '#16211a',
+                    body: '#384740',
+                    muted: '#64748b',
+                    line: '#e8ede8',
+                    'line-soft': '#f1f4f1',
+                    surface: '#ffffff',
+                    canvas: '#f8fafb',
+                    danger: '#dc2626',
+                    'danger-050': '#fef2f2',
                 }
+            },
+            boxShadow: {
+                'admin-sm': '0 1px 2px rgba(16, 33, 26, 0.04)',
+                'admin-md': '0 4px 16px rgba(16, 33, 26, 0.08)',
+                'admin-lg': '0 24px 60px rgba(16, 33, 26, 0.18)',
+            },
+            borderRadius: {
+                admin: '10px',
             },
             fontFamily: {
                 sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],

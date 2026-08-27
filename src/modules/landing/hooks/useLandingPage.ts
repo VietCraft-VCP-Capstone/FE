@@ -23,6 +23,8 @@ export function useLandingPage() {
 
                 if (isMounted) {
                     const mappedShops = shopData.map((s: any) => ({
+                        // Trước đây map bỏ mất _id nên nút "Xem Shop" không có gì để điều hướng.
+                        id: s._id,
                         name: s.shop_name,
                         location: s.description || 'Bespoke Artisan',
                         rating: s.average_rating || 5.0,
@@ -69,10 +71,32 @@ export function useLandingPage() {
         }
     };
 
+    // Chỉ dành cho nút "Đăng nhập" / "Đăng ký" trên header — KHÔNG gắn vào nút duyệt hàng.
     const handleNavigateToLogin = () => navigate('/login');
     const handleNavigateToSignup = () => navigate('/signup');
     const handleNavigateToHome = () => navigate('/');
-    const handleNavigateToDashboard = () => { navigate('/products'); };
+    // Chưa có trang duyệt hàng công khai riêng; đưa người dùng xuống lưới sản phẩm ngay trên trang.
+    const handleNavigateToDashboard = () => navigate('/');
+
+    const scrollToSection = (id: string) => {
+        const el = typeof document !== 'undefined' ? document.getElementById(id) : null;
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    // Trang chi tiết sản phẩm là route CÔNG KHAI — khách vãng lai xem được.
+    const handleViewProduct = (id: string) => {
+        if (!id) return;
+        navigate(`/product/${id}`);
+    };
+
+    // Hero "Khám Phá Ngay" + "xem tất cả" ở Trending: cuộn xuống lưới sản phẩm thật.
+    const handleViewShop = (shopId: string) => {
+        if (shopId) navigate(`/shop/${shopId}`);
+    };
+
+    const handleExploreProducts = () => scrollToSection('xu-huong');
+    // Bộ sưu tập chưa có trang riêng: đưa về lưới sản phẩm thay vì chặn đăng nhập.
+    const handleViewCollections = () => scrollToSection('xu-huong');
 
     return {
         searchQuery, setSearchQuery,
@@ -80,6 +104,7 @@ export function useLandingPage() {
         handleSubscribe,
         handleNavigateToLogin, handleNavigateToSignup,
         handleNavigateToHome, handleNavigateToDashboard,
+        handleViewProduct, handleViewShop, handleExploreProducts, handleViewCollections,
         products, shops, loading, error
     };
 }

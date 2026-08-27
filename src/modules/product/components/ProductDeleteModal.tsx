@@ -1,4 +1,5 @@
 import { ProductItem } from '../types/product';
+import { ModalOverlay } from '../../../shared/components/ModalOverlay';
 import { Trash2, X } from 'lucide-react';
 
 interface ProductDeleteModalProps {
@@ -19,7 +20,7 @@ export function ProductDeleteModal({
   if (!isOpen || !product) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <ModalOverlay>
       <div className="bg-white rounded-2xl border border-stone-200 shadow-2xl w-full max-w-md overflow-hidden animate-scale-up">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-2">
@@ -69,6 +70,6 @@ export function ProductDeleteModal({
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

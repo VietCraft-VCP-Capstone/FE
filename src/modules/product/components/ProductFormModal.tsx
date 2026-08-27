@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ProductItem, ProductFormData, CATEGORIES_LIST } from '../types/product';
+import { ModalOverlay } from '../../../shared/components/ModalOverlay';
+import { ProductItem, ProductFormData, CatalogOption } from '../types/product';
+import { productsService } from '../services/productsService';
 import { ProductFormImageManager } from './ProductFormImageManager';
 import { ProductFormColorManager } from './ProductFormColorManager';
 import {
@@ -29,9 +31,17 @@ export function ProductFormModal({
 }: ProductFormModalProps) {
   const isEdit = Boolean(product);
 
+  // Danh mục + thẻ do admin quản lý; nạp một lần khi mở modal.
+  const [categories, setCategories] = useState<CatalogOption[]>([]);
+  const [tags, setTags] = useState<CatalogOption[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+
   const [formData, setFormData] = useState<ProductFormData>({
     title: '',
-    category: CATEGORIES_LIST[0],
+    category: '',
+    categoryId: '',
+    tagIds: [],
     price: 0,
     stock: 10,
     sku: '',
@@ -47,10 +57,31 @@ export function ProductFormModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    if (!isOpen) return;
+    let alive = true;
+    setCatalogLoading(true);
+    setCatalogError('');
+    Promise.all([productsService.getCategories(), productsService.getTags()])
+      .then(([c, t]) => {
+        if (!alive) return;
+        setCategories(Array.isArray(c) ? c : []);
+        setTags(Array.isArray(t) ? t : []);
+      })
+      .catch(() => {
+        if (alive) setCatalogError('Không tải được danh mục và thẻ. Đóng modal rồi thử lại.');
+      })
+      .finally(() => { if (alive) setCatalogLoading(false); });
+    return () => { alive = false; };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (product) {
       setFormData({
         title: product.title || '',
-        category: product.category || CATEGORIES_LIST[0],
+        category: product.category || '',
+        // id được dò ngược từ tên ở effect bên dưới, sau khi catalog tải xong.
+        categoryId: '',
+        tagIds: [],
         price: product.price || 0,
         stock: product.stock !== undefined ? product.stock : 10,
         sku: product.sku || '',
@@ -65,7 +96,9 @@ export function ProductFormModal({
     } else {
       setFormData({
         title: '',
-        category: CATEGORIES_LIST[0],
+        category: '',
+        categoryId: '',
+        tagIds: [],
         price: 0,
         stock: 50,
         sku: '',
@@ -84,12 +117,38 @@ export function ProductFormModal({
     setErrors({});
   }, [product, isOpen]);
 
+  // ProductItem chỉ mang TÊN danh mục/thẻ (BE trả `categories[0]` và `tags[]`),
+  // nên khi sửa phải dò ngược sang id — và chỉ làm được sau khi catalog tải xong.
+  useEffect(() => {
+    if (!product || categories.length === 0) return;
+    const key = (x?: string) => (x || '').trim().toLowerCase();
+    const matchedCategory = categories.find(c => key(c.name) === key(product.category));
+    const matchedTagIds = (product.tags || [])
+      .map(name => tags.find(t => key(t.name) === key(name))?._id)
+      .filter((id): id is string => Boolean(id));
+    setFormData(prev => ({
+      ...prev,
+      categoryId: matchedCategory?._id || '',
+      tagIds: matchedTagIds,
+    }));
+  }, [product, categories, tags]);
+
+  const toggleTag = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tagIds: prev.tagIds.includes(id)
+        ? prev.tagIds.filter(t => t !== id)
+        : [...prev.tagIds, id],
+    }));
+  };
+
   if (!isOpen) return null;
 
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!formData.title.trim()) errs.title = 'Vui lòng nhập tên sản phẩm';
-    if (!formData.category) errs.category = 'Vui lòng chọn danh mục';
+    if (!formData.categoryId) errs.category = 'Vui lòng chọn danh mục';
+    if (formData.tagIds.length === 0) errs.tags = 'Vui lòng chọn ít nhất 1 thẻ';
     if (formData.price <= 0) errs.price = 'Giá bán phải lớn hơn 0';
     if (formData.stock < 0) errs.stock = 'Tồn kho không được âm';
     setErrors(errs);
@@ -115,7 +174,7 @@ export function ProductFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+    <ModalOverlay>
       <div className="bg-white rounded-2xl border border-stone-200 shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4.5 border-b border-stone-200 bg-stone-50/90">
@@ -138,6 +197,12 @@ export function ProductFormModal({
         {/* Modal Form Body */}
         <form id="product-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Section 1: Image Gallery & Upload */}
+          {catalogError && (
+            <div className="px-4 py-3 rounded-xl text-xs font-medium bg-rose-50 border border-rose-200 text-[#BA1A1A]">
+              {catalogError}
+            </div>
+          )}
+
           <ProductFormImageManager
             images={formData.images}
             thumbnail={formData.thumbnail}
@@ -169,14 +234,65 @@ export function ProductFormModal({
                 Danh mục <span className="text-rose-500">*</span>
               </label>
               <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] cursor-pointer font-medium"
+                value={formData.categoryId}
+                disabled={catalogLoading || categories.length === 0}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  // Giữ luôn tên để bảng/drawer hiển thị được ngay, không phải chờ tải lại.
+                  const picked = categories.find((c) => c._id === id);
+                  setFormData({ ...formData, categoryId: id, category: picked?.name || '' });
+                }}
+                className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] cursor-pointer font-medium disabled:opacity-60 disabled:cursor-not-allowed ${
+                  errors.category ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
+                }`}
               >
-                {CATEGORIES_LIST.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
+                <option value="">
+                  {catalogLoading ? 'Đang tải danh mục...' : '— Chọn danh mục —'}
+                </option>
+                {categories.map((cat) => (
+                  <option key={cat._id} value={cat._id}>{cat.name}</option>
                 ))}
               </select>
+              {errors.category && <p className="text-xs text-rose-500">{errors.category}</p>}
+            </div>
+
+            {/* Thẻ sản phẩm — bắt buộc ít nhất 1, chọn từ thẻ sàn đã duyệt */}
+            <div className="md:col-span-2 space-y-1.5">
+              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
+                Thẻ sản phẩm <span className="text-rose-500">*</span>
+                <span className="ml-2 font-medium normal-case tracking-normal text-stone-400">
+                  Đã chọn {formData.tagIds.length}
+                </span>
+              </label>
+              <div
+                className={`flex flex-wrap gap-2 p-3 bg-stone-50/80 border rounded-xl min-h-[52px] ${
+                  errors.tags ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
+                }`}
+              >
+                {catalogLoading && <span className="text-xs text-stone-400">Đang tải thẻ...</span>}
+                {!catalogLoading && tags.length === 0 && (
+                  <span className="text-xs text-stone-400">Sàn chưa duyệt thẻ nào.</span>
+                )}
+                {tags.map((tag) => {
+                  const picked = formData.tagIds.includes(tag._id);
+                  return (
+                    <button
+                      key={tag._id}
+                      type="button"
+                      onClick={() => toggleTag(tag._id)}
+                      className={`px-3 py-1.5 rounded-full text-xs border transition-all cursor-pointer ${
+                        picked
+                          ? 'font-bold text-white border-transparent shadow-xs'
+                          : 'font-medium text-stone-600 bg-white border-stone-200 hover:border-stone-400'
+                      }`}
+                      style={picked ? { backgroundColor: tag.color || '#007700' } : undefined}
+                    >
+                      {tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+              {errors.tags && <p className="text-xs text-rose-500">{errors.tags}</p>}
             </div>
 
             {/* Price */}
@@ -357,6 +473,6 @@ export function ProductFormModal({
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

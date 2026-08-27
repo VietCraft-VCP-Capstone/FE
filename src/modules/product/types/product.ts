@@ -25,6 +25,8 @@ export interface ProductItem {
   sku: string;
   title: string;
   category: string;
+  /** Tên các thẻ đang gắn — BE trả về từ product.tags. */
+  tags?: string[];
   price: number;
   originalPrice?: number;
   stock: number;
@@ -38,13 +40,32 @@ export interface ProductItem {
   colors: ProductColorVariant[];
   engagementTrend: number[]; // 5-7 data points for sparkline
   inventoryTrends: InventoryTrendPoint[]; // Timeline points for detail line chart
+  /** BE luôn trả kèm (xem BE product.dto.ts: ProductItemResponseDTO.shopInfo). */
+  shopInfo?: {
+    id: string;
+    name: string;
+    logo?: string;
+    rating: number;
+  };
+  sellerId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
+/** Danh mục / thẻ do admin quản lý, seller chỉ chọn chứ không tạo. */
+export interface CatalogOption {
+  _id: string;
+  name: string;
+  slug?: string;
+  color?: string;
+}
+
 export interface ProductFormData {
   title: string;
+  /** Tên danh mục — giữ để hiển thị; nguồn sự thật gửi lên BE là categoryId. */
   category: string;
+  categoryId: string;
+  tagIds: string[];
   price: number;
   stock: number;
   sku: string;
@@ -66,6 +87,8 @@ export type ProductSortOption =
   | 'rank_asc';
 
 export interface ProductFilterState {
+  /** Lọc theo gian hàng (BE: GET /products?shopId=). Chỉ trang shop dùng tới. */
+  shopId?: string;
   search: string;
   status: ProductStatus | 'ALL';
   category: string;
