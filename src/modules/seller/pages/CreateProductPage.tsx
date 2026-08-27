@@ -218,9 +218,9 @@ export function CreateProductPage() {
                 <button className="creator-back" onClick={() => navigate('/seller/products')}><ArrowLeft size={16} /> Sản phẩm</button>
                 <h1>Tạo sản phẩm POD</h1>
                 <div className="creator-page-head-actions">
-                    {step > 1 && <button className="admin-btn" onClick={() => setStep(step - 1)}><ArrowLeft size={15} /> Quay lại</button>}
-                    {step < 4 && <button className="admin-btn admin-btn-primary" disabled={!canNext()} onClick={() => setStep(step + 1)}>Tiếp <ArrowRight size={15} /></button>}
-                    {step === 4 && <button className="admin-btn admin-btn-primary" disabled={!canNext() || saving} onClick={submit}>{saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Tạo & Publish</button>}
+                    {step > 1 && <button className="inline-flex items-center justify-center gap-[7px] bg-admin-brand text-white border border-admin-brand px-4 py-[9px] text-[13.5px] font-semibold leading-none rounded-[9px] whitespace-nowrap transition-[background,box-shadow,transform] duration-150 hover:bg-admin-brand-700 hover:shadow-[0_4px_12px_rgba(26,107,26,0.24)] active:translate-y-px focus-visible:outline-2 focus-visible:outline-admin-brand focus-visible:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed" onClick={() => setStep(step - 1)}><ArrowLeft size={15} /> Quay lại</button>}
+                    {step < 4 && <button className="inline-flex items-center justify-center gap-[7px] bg-admin-brand text-white border border-admin-brand px-4 py-[9px] text-[13.5px] font-semibold leading-none rounded-[9px] whitespace-nowrap transition-[background,box-shadow,transform] duration-150 hover:bg-admin-brand-700 hover:shadow-[0_4px_12px_rgba(26,107,26,0.24)] active:translate-y-px focus-visible:outline-2 focus-visible:outline-admin-brand focus-visible:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed" disabled={!canNext()} onClick={() => setStep(step + 1)}>Tiếp <ArrowRight size={15} /></button>}
+                    {step === 4 && <button className="inline-flex items-center justify-center gap-[7px] bg-admin-brand text-white border border-admin-brand px-4 py-[9px] text-[13.5px] font-semibold leading-none rounded-[9px] whitespace-nowrap transition-[background,box-shadow,transform] duration-150 hover:bg-admin-brand-700 hover:shadow-[0_4px_12px_rgba(26,107,26,0.24)] active:translate-y-px focus-visible:outline-2 focus-visible:outline-admin-brand focus-visible:outline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed" disabled={!canNext() || saving} onClick={submit}>{saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Tạo & Publish</button>}
                 </div>
             </div>
 
@@ -232,8 +232,8 @@ export function CreateProductPage() {
                 ))}
             </div>
 
-            {loadErr && <div className="admin-alert admin-alert-error">{loadErr}</div>}
-            {error && <div className="admin-alert admin-alert-error">{error}</div>}
+            {loadErr && <div className="px-[15px] py-[11px] rounded-[9px] text-[13px] font-medium mb-4 bg-admin-danger-050 border border-[#f6caca] text-[#b91c1c]">{loadErr}</div>}
+            {error && <div className="px-[15px] py-[11px] rounded-[9px] text-[13px] font-medium mb-4 bg-admin-danger-050 border border-[#f6caca] text-[#b91c1c]">{error}</div>}
 
             <div className="creator-page-body">
                 {step === 1 && (
@@ -263,12 +263,12 @@ function Step1({ title, setTitle, description, setDescription, categories, categ
     return (
         <div className="creator-step1">
             <div className="creator-step1-form">
-                <div className="admin-form-group"><label>Tên sản phẩm *</label>
+                <div className="mb-[18px] last:mb-0"><label className="block text-[13px] font-semibold text-admin-ink mb-[7px]">Tên sản phẩm *</label>
                     <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Áo thun mèo cute..." /></div>
-                <div className="admin-form-group"><label>Mô tả * (≥10 ký tự)</label>
+                <div className="mb-[18px] last:mb-0"><label className="block text-[13px] font-semibold text-admin-ink mb-[7px]">Mô tả * (≥10 ký tự)</label>
                     <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} /></div>
-                <div className="admin-form-group"><label>Danh mục *</label>
-                    <select value={categoryId} onChange={e => setCategoryId(e.target.value)}>
+                <div className="mb-[18px] last:mb-0"><label className="block text-[13px] font-semibold text-admin-ink mb-[7px]">Danh mục *</label>
+                    <select className="w-full px-[13px] py-[10px] border border-[#d5ddd5] rounded-[9px] text-[13.5px] text-admin-ink bg-white outline-none box-border transition-[border-color,box-shadow] duration-150 focus:border-admin-brand focus:shadow-[0_0_0_3px_rgba(26,107,26,0.1)]" value={categoryId} onChange={e => setCategoryId(e.target.value)}>
                         <option value="">— Chọn danh mục —</option>
                         {categories.map((c: any) => <option key={c._id} value={c._id}>{c.name}</option>)}
                     </select></div>
@@ -288,7 +288,7 @@ function Step1({ title, setTitle, description, setDescription, categories, categ
                             </button>
                         );
                     })}
-                    {blanks.length === 0 && <p className="admin-muted">Chưa có phôi nào từ xưởng in.</p>}
+                    {blanks.length === 0 && <p className="text-admin-muted">Chưa có phôi nào từ xưởng in.</p>}
                 </div>
             </div>
         </div>
@@ -604,7 +604,7 @@ function PreviewStep({ blank, faces, toApiLayer, title, selectedVariants }: any)
 
     return (
         <div className="preview-step">
-            {err && <div className="admin-alert admin-alert-error">{err}</div>}
+            {err && <div className="px-[15px] py-[11px] rounded-[9px] text-[13px] font-medium mb-4 bg-admin-danger-050 border border-[#f6caca] text-[#b91c1c]">{err}</div>}
             {!images && !err && <div className="preview-loading"><Loader2 size={26} className="animate-spin" /><span>Đang tạo mockup thật...</span></div>}
             {images && (
                 <div className="preview-showcase">
@@ -657,8 +657,8 @@ function VariantStep({ blank, selectedVariants, setSelectedVariants }: any) {
     const setV = (sku: string, f: string, val: any) => setSelectedVariants((prev: any) => ({ ...prev, [sku]: { ...prev[sku], [f]: val } }));
     return (
         <div className="pod-variant-step">
-            <p className="admin-muted" style={{ marginBottom: 10 }}>Chọn biến thể muốn bán và đặt tiền lời (markup). Giá bán = tiền phôi + markup.</p>
-            <table className="admin-table pod-variant-table">
+            <p className="text-admin-muted mb-2.5">Chọn biến thể muốn bán và đặt tiền lời (markup). Giá bán = tiền phôi + markup.</p>
+            <table className="w-full border-collapse text-[13.5px] text-left [&_thead_th]:bg-[#fafcfa] [&_thead_th]:px-[18px] [&_thead_th]:py-3 [&_thead_th]:text-[11.5px] [&_thead_th]:font-bold [&_thead_th]:uppercase [&_thead_th]:tracking-[0.04em] [&_thead_th]:text-admin-muted [&_thead_th]:border-b [&_thead_th]:border-admin-line [&_thead_th]:whitespace-nowrap [&_tbody_td]:px-[18px] [&_tbody_td]:py-[14px] [&_tbody_td]:border-b [&_tbody_td]:border-admin-line-soft [&_tbody_td]:text-admin-body [&_tbody_td]:align-middle [&_tbody_tr:last-child_td]:border-b-0 [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-[#fafdfa] [&_td:last-child]:text-right pod-variant-table">
                 <thead><tr><th></th><th>Biến thể</th><th>Tiền phôi</th><th>Markup (đ)</th><th>Giá bán</th><th>Kho</th></tr></thead>
                 <tbody>
                     {blank.variations.map((v: any) => {
@@ -668,7 +668,7 @@ function VariantStep({ blank, selectedVariants, setSelectedVariants }: any) {
                             <tr key={v.sku} className={sv.on ? '' : 'row-off'}>
                                 <td><input type="checkbox" checked={sv.on} onChange={e => setV(v.sku, 'on', e.target.checked)} /></td>
                                 <td>{[v.color, v.size].filter(Boolean).join(' / ') || v.sku}</td>
-                                <td className="admin-muted">{v.base_cost.toLocaleString()}đ</td>
+                                <td className="text-admin-muted">{v.base_cost.toLocaleString()}đ</td>
                                 <td><input type="number" value={sv.markup} disabled={!sv.on} onChange={e => setV(v.sku, 'markup', e.target.value)} style={{ width: 90 }} /></td>
                                 <td className="pod-retail">{retail.toLocaleString()}đ</td>
                                 <td><input type="number" value={sv.stock} disabled={!sv.on} onChange={e => setV(v.sku, 'stock', e.target.value)} style={{ width: 70 }} /></td>

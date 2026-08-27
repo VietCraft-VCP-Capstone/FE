@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams, useOutletContext } from 'react-router-dom';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { cartService } from '../../order/services/cartService';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
@@ -7,7 +9,8 @@ import ReorderModal from '../components/profile/ReorderModal';
 export function BuyerOrderDetailPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
-    const { setCartCount } = useOutletContext<{ setCartCount: (n: number) => void }>();
+    // Không còn tự set số lượng giỏ: cartService phát event 'vietcraft-cart-updated'
+    // sau mỗi thao tác, BuyerLayout nghe event đó và cập nhật badge.
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [copySuccess, setCopySuccess] = useState(false);
@@ -47,39 +50,27 @@ export function BuyerOrderDetailPage() {
         setIsReorderModalOpen(true);
     };
 
-    const handleConfirmReorder = (selectedItems: any[]) => {
+    const handleConfirmReorder = async (selectedItems: any[]) => {
         if (!order) return;
-        const cartStr = localStorage.getItem('vietcraft_cart');
-        let cartItems = [];
-        if (cartStr) {
+        // Cùng lý do như trang danh sách đơn: mọi thao tác giỏ đi qua cartService.
+        const failures: string[] = [];
+        for (const it of selectedItems) {
             try {
-                cartItems = JSON.parse(cartStr);
-            } catch (e) {}
+                await cartService.addToCart({
+                    productId: it.productId,
+                    variantId: it.variantId && it.variantId !== 'default' ? it.variantId : undefined,
+                    quantity: it.quantity,
+                });
+            } catch (err) {
+                failures.push(getApiErrorMessage(err));
+            }
         }
 
-        selectedItems.forEach((it: any) => {
-            const existing = cartItems.find((item: any) => item.productId === it.productId && item.variantId === it.variantId);
-            if (existing) {
-                existing.quantity += it.quantity;
-            } else {
-                cartItems.push({
-                    id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                    productId: it.productId,
-                    variantId: it.variantId,
-                    title: it.title,
-                    shopName: order.shopName || 'VietCraft Shop',
-                    variantName: `${it.color || ''} ${it.size || ''}`.trim() || 'Mặc định',
-                    price: it.price,
-                    quantity: it.quantity,
-                    image: it.image,
-                    checked: true
-                });
-            }
-        });
-
-        localStorage.setItem('vietcraft_cart', JSON.stringify(cartItems));
-        setCartCount(cartItems.reduce((acc: number, it: any) => acc + it.quantity, 0));
         setIsReorderModalOpen(false);
+        if (failures.length > 0) {
+            showToast(failures[0], 'error');
+            return;
+        }
         showToast('Đã thêm sản phẩm vào giỏ hàng!');
         setTimeout(() => navigate('/cart'), 1200);
     };
@@ -175,8 +166,11 @@ export function BuyerOrderDetailPage() {
         }
     };
 
-    const subtotal = order.items.reduce((acc: number, it: any) => acc + (it.price * it.quantity), 0);
-    const shippingFee = order.shippingFee || 30000;
+    // items/shippingFee/totalAmount đều lấy từ response BE; thủ undefined để không vỡ trang.
+    const orderItems: any[] = Array.isArray(order.items) ? order.items : [];
+    const subtotal = orderItems.reduce((acc: number, it: any) => acc + ((it.price || 0) * (it.quantity || 0)), 0);
+    const shippingFee = Number(order.shippingFee ?? 0);
+    const totalAmount = Number(order.totalAmount ?? (subtotal + shippingFee));
 
     return (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -270,7 +264,7 @@ export function BuyerOrderDetailPage() {
 
                 {/* Items */}
                 <div className="divide-y divide-gray-50 p-4">
-                    {order.items.map((item: any, idx: number) => (
+                    {orderItems.map((item: any, idx: number) => (
                         <div key={idx} className="flex gap-4 py-3 first:pt-0 last:pb-0">
                             <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
                                 <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
@@ -322,7 +316,7 @@ export function BuyerOrderDetailPage() {
                         </div>
                         <div className="flex justify-between border-t border-gray-50 pt-2 font-black text-sm text-gray-900">
                             <span>Thành tiền</span>
-                            <span className="text-emerald-700 text-base">{order.totalAmount.toLocaleString('vi-VN')}đ</span>
+                            <span className="text-emerald-700 text-base">{totalAmount.toLocaleString('vi-VN')}đ</span>
                         </div>
                     </div>
                 </div>
@@ -366,7 +360,7 @@ export function BuyerOrderDetailPage() {
                     isOpen={isReorderModalOpen}
                     onClose={() => setIsReorderModalOpen(false)}
                     shopName={order.shopName || 'VietCraft Shop'}
-                    items={order.items}
+                    items={orderItems}
                     onConfirm={handleConfirmReorder}
                 />
             )}

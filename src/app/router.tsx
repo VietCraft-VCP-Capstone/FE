@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { LandingPage } from '../modules/landing/pages/LandingPage';
 import { LoginPage } from '../modules/auth/pages/LoginPage';
 import { SignupPage } from '../modules/auth/pages/SignupPage';
@@ -8,12 +8,15 @@ import { ResetPasswordPage } from '../modules/auth/pages/ResetPasswordPage';
 import { AdminPortal } from '../modules/admin/pages/AdminPortal';
 import { SellerPortal } from '../modules/seller/pages/SellerPortal';
 import { BuyerLayout } from '../modules/buyer/pages/BuyerLayout';
-import { BuyerDashboard } from '../modules/buyer/pages/BuyerDashboard';
+import { BuyerDashboard } from '../modules/buyer/pages/BuyerHomePage';
 import { BuyerCartPage } from '../modules/buyer/pages/BuyerCartPage';
 import { BuyerCheckoutPage } from '../modules/buyer/pages/BuyerCheckoutPage';
 import { BuyerProfilePage } from '../modules/buyer/pages/BuyerProfilePage';
+import { BuyerFavoritesPage } from '../modules/buyer/pages/BuyerFavoritesPage';
 import { BuyerOrdersPage } from '../modules/buyer/pages/BuyerOrdersPage';
 import { BuyerOrderDetailPage } from '../modules/buyer/pages/BuyerOrderDetailPage';
+import { BuyerProductDetailPage } from '../modules/buyer/pages/BuyerProductDetailPage';
+import { BuyerShopPage } from '../modules/buyer/pages/BuyerShopPage';
 import { useAuth } from '../modules/auth/hooks/useAuth';
 
 function RolePortal({ user, onLogout }: { user: any; onLogout: () => void }) {
@@ -21,6 +24,63 @@ function RolePortal({ user, onLogout }: { user: any; onLogout: () => void }) {
   if (role === 'admin') return <AdminPortal user={user} onLogout={onLogout} />;
   if (role === 'seller') return <SellerPortal user={user} onLogout={onLogout} />;
   return <BuyerLayout user={user} />;
+}
+
+/**
+ * Cổng theo vai trò cho /admin/* và /seller/*.
+ * Trước đây /seller/* KHÔNG kiểm tra gì và còn tiêm sẵn một user seller giả khi chưa đăng
+ * nhập, nên ai gõ /seller cũng vào được vỏ portal (API bên trong vẫn 401/403, nhưng không
+ * có lý do gì để dựng cả trang cho người không phải seller).
+ * Chưa đăng nhập -> /login kèm ?next=; đã đăng nhập nhưng sai vai -> về trang chủ.
+ */
+function RequireRole({ user, roles, children }: { user: any; roles: string[]; children: React.ReactNode }) {
+  const location = useLocation();
+  const role = user?.role?.toLowerCase();
+
+  if (!user) {
+    const next = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
+  if (!roles.includes(role)) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+/**
+ * Cổng đăng nhập cho các route riêng tư.
+ * Chưa đăng nhập -> /login?next=<đường dẫn hiện tại đã encode>.
+ * Dùng query param (KHÔNG dùng router state) vì interceptor 401 trong
+ * infrastructure/api/client.ts điều hướng bằng window.location.href = '/login'
+ * (full reload) làm mất sạch state của React Router; query param sống sót cả hai đường.
+ */
+function RequireAuth({ user }: { user: any }) {
+  const location = useLocation();
+
+  if (!user) {
+    const next = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
+
+  return <BuyerLayout user={user} />;
+}
+
+/**
+ * Giữ `next` qua chặng xác thực OTP.
+ * SignupPage chuyển sang /verify kèm state { email, next }; xác thực xong phải ghép `next`
+ * trở lại URL đăng nhập, nếu không khách đăng ký từ trang thanh toán sẽ mất đích quay lại.
+ * Giữ nguyên window.location.href (reload cứng) như trước — OTPPage đang dựa vào đó.
+ */
+function VerifyRoute() {
+  const location = useLocation();
+  const next = (location.state as any)?.next as string | undefined;
+  // Chỉ nhận đường dẫn nội bộ; chặn open redirect kiểu //evil.com
+  const target =
+    next && next.startsWith('/') && !next.startsWith('//')
+      ? `/login?next=${encodeURIComponent(next)}`
+      : '/login';
+
+  return <OTPPage onVerified={() => { window.location.href = target; }} />;
 }
 
 export function AppRouter() {
@@ -41,7 +101,7 @@ export function AppRouter() {
 
   return (
     <Routes>
-      {/* Route Trang chủ hoặc Dashboard người mua */}
+      {/* Trang chủ: khách vãng lai thấy LandingPage, đã đăng nhập thì theo role */}
       <Route
         path="/"
         element={
@@ -58,40 +118,49 @@ export function AppRouter() {
           )
         }
       >
+        {/* Chỉ dùng khi đã đăng nhập; LandingPage không có <Outlet /> nên khách không thấy */}
         <Route index element={<BuyerDashboard user={user} onLogout={logout} />} />
       </Route>
 
-      {/* Các route yêu cầu quyền Buyer */}
-      <Route
-        element={
-          user && role === 'buyer' ? (
-            <BuyerLayout user={user} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      >
+      {/* CÔNG KHAI — khách vãng lai duyệt hàng và bỏ vào giỏ được.
+          user có thể là null; BuyerLayout/BuyerHeader đọc bằng optional chaining nên an toàn. */}
+      <Route element={<BuyerLayout user={user ?? null} />}>
+        <Route path="/product/:id" element={<BuyerProductDetailPage />} />
         <Route path="/cart" element={<BuyerCartPage />} />
+        <Route path="/shop/:id" element={<BuyerShopPage />} />
+      </Route>
+
+      {/* CẦN ĐĂNG NHẬP — tường chắn duy nhất, bắt đầu từ bước thanh toán */}
+      <Route element={<RequireAuth user={user} />}>
         <Route path="/checkout" element={<BuyerCheckoutPage />} />
         <Route path="/profile" element={<BuyerProfilePage onLogout={logout} />} />
+        <Route path="/favorites" element={<BuyerFavoritesPage />} />
         <Route path="/orders" element={<BuyerOrdersPage />} />
         <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
       </Route>
 
       <Route path="/login" element={<LoginPage onLogin={login} onGoogleLogin={googleLogin} user={user} />} />
       <Route path="/signup" element={<SignupPage onSignup={signup} onGoogleLogin={googleLogin} user={user} />} />
-      <Route path="/verify" element={<OTPPage onVerified={() => { window.location.href = '/login'; }} />} />
+      <Route path="/verify" element={<VerifyRoute />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route
         path="/admin/*"
-        element={role === 'admin' ? <AdminPortal user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
+        element={
+          <RequireRole user={user} roles={['admin']}>
+            <AdminPortal user={user} onLogout={logout} />
+          </RequireRole>
+        }
       />
 
       <Route
         path="/seller/*"
-        element={role === 'seller' ? <SellerPortal user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
+        element={
+          <RequireRole user={user} roles={['seller', 'admin']}>
+            <SellerPortal user={user} onLogout={logout} />
+          </RequireRole>
+        }
       />
 
       <Route
@@ -99,12 +168,11 @@ export function AppRouter() {
         element={user ? <RolePortal user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
       />
 
+      {/* Đường lạ: khách về trang chủ (KHÔNG đá sang /login), đã đăng nhập thì về portal theo role */}
       <Route
         path="*"
         element={
-          user
-            ? <Navigate to={role === 'admin' ? '/admin' : role === 'seller' ? '/seller' : '/'} replace />
-            : <Navigate to="/login" replace />
+          <Navigate to={role === 'admin' ? '/admin' : role === 'seller' ? '/seller' : '/'} replace />
         }
       />
     </Routes>

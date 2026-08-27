@@ -1,6 +1,7 @@
 import { Star } from 'lucide-react';
 
 interface ShopItem {
+  id?: string;
   name: string;
   location: string;
   rating: number;
@@ -11,10 +12,11 @@ interface ShopItem {
 
 interface LandingShopsProps {
   shops: ShopItem[];
-  onAction: () => void;
+  /** Mở trang gian hàng /shop/:id. */
+  onSelectShop?: (shop: ShopItem) => void;
 }
 
-export function LandingShops({ shops, onAction }: LandingShopsProps) {
+export function LandingShops({ shops, onSelectShop }: LandingShopsProps) {
   return (
     <section id="shop-noi-bat" className="py-20 px-6">
       <div className="max-w-7xl mx-auto space-y-10">
@@ -58,7 +60,7 @@ export function LandingShops({ shops, onAction }: LandingShopsProps) {
                 </div>
 
                 <button 
-                  onClick={onAction}
+                  onClick={() => onSelectShop?.(shop)}
                   className="w-full bg-white hover:bg-stone-50 text-stone-700 font-bold py-2.5 rounded-xl border border-stone-200 transition-colors text-sm hover:border-[#007700] hover:text-[#007700]"
                 >
                   Xem Shop

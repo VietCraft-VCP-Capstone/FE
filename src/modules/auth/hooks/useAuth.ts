@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { authService } from '../services/authService';
+import { cartService } from '../../order/services/cartService';
 import { User } from '../types';
 
 export function useAuth() {
@@ -23,7 +24,7 @@ export function useAuth() {
         setLoading(false);
     }, []);
 
-    const persistSession = (data: { token: string; user: User }) => {
+    const persistSession = async (data: { token: string; user: User }) => {
         const normalizedUser: User = {
             ...data.user,
             role: data.user.role?.toLowerCase?.() || data.user.role,
@@ -31,6 +32,18 @@ export function useAuth() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(normalizedUser));
         setUser(normalizedUser);
+
+        // Gộp giỏ khách vãng lai (localStorage) vào giỏ server.
+        // BẮT BUỘC chạy SAU khi token đã nằm trong localStorage: mergeGuestCart gọi
+        // POST /cart/items và cần Bearer token, thiếu token sẽ dính 401 rồi bị
+        // interceptor đá về /login ngay giữa lúc đang đăng nhập.
+        // Gộp hỏng thì chỉ log — KHÔNG được làm hỏng việc đăng nhập.
+        try {
+            await cartService.mergeGuestCart();
+        } catch (err) {
+            console.error('Không gộp được giỏ hàng khách vào tài khoản', err);
+        }
+
         return normalizedUser;
     };
 

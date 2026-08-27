@@ -1,12 +1,56 @@
 import api from '../../../infrastructure/api/client';
 import type {
   Category,
+  CategoryOption,
+  CategoryStats,
+  CategoryStatusFilter,
+  CategoryTreePage,
+  Paginated,
   Tag,
+  TagSortKey,
+  TagStats,
   ModerateProduct,
   ModerationAction,
   ModerationStats,
   PendingProductsResponse,
 } from '../types';
+
+/** Tham số phân trang chung. Bỏ trống thì dùng mặc định của BE. */
+export interface ListParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface CategoryListParams extends ListParams {
+  search?: string;
+  status?: CategoryStatusFilter;
+}
+
+export interface TagListParams extends ListParams {
+  search?: string;
+  sort?: TagSortKey;
+}
+
+/**
+ * Phong bì phân trang phòng thủ.
+ *
+ * Nếu BE lỡ trả về mảng trần (endpoint cũ, proxy cache, bản deploy lệch), FE vẫn
+ * dựng được một trang hợp lệ thay vì ném lỗi `undefined.map` giữa màn hình.
+ */
+function asPage<T>(raw: any, fallbackLimit = 20): Paginated<T> {
+  if (Array.isArray(raw)) {
+    return { items: raw, total: raw.length, page: 1, limit: raw.length || fallbackLimit, totalPages: 1 };
+  }
+  const items: T[] = Array.isArray(raw?.items) ? raw.items : [];
+  const limit = Number(raw?.limit) || fallbackLimit;
+  return {
+    items,
+    total: Number(raw?.total) || items.length,
+    page: Number(raw?.page) || 1,
+    limit,
+    totalPages: Number(raw?.totalPages) || 1,
+  };
+}
 
 const ADMIN_BASE = '/admin';
 const authHeader = () => ({
@@ -22,18 +66,36 @@ const resolveImages = (p: any) => (p && Array.isArray(p.images) ? { ...p, images
 export const adminService = {
   // ==================== CATEGORIES ====================
 
-  async getCategories(filter?: string): Promise<Category[]> {
+  /** Danh sách phẳng, đã cắt trang. */
+  async getCategories(params: CategoryListParams = {}): Promise<Paginated<Category>> {
     const { data } = await api.get(`${ADMIN_BASE}/categories`, {
-      params: filter ? { filter } : undefined,
+      params,
       headers: authHeader(),
     });
-    return data.data;
+    return asPage<Category>(data.data);
   },
 
-  async getCategoryTree(): Promise<Category[]> {
+  /**
+   * Cây danh mục đã cắt trang theo nút GỐC — mỗi gốc luôn kèm đủ nhánh con.
+   * BE trả về cây lồng sẵn; FE không dựng lại cây từ danh sách phẳng nữa.
+   */
+  async getCategoryTree(params: CategoryListParams = {}): Promise<CategoryTreePage> {
     const { data } = await api.get(`${ADMIN_BASE}/categories/tree`, {
+      params,
       headers: authHeader(),
     });
+    const page = asPage<Category>(data.data, 15);
+    return { ...page, totalNodes: Number(data.data?.totalNodes) || page.total };
+  },
+
+  /** Không cắt trang: ô chọn danh mục cha phải thấy mọi mục, kể cả ngoài trang hiện tại. */
+  async getCategoryOptions(): Promise<CategoryOption[]> {
+    const { data } = await api.get(`${ADMIN_BASE}/categories/options`, { headers: authHeader() });
+    return Array.isArray(data.data) ? data.data : [];
+  },
+
+  async getCategoryStats(): Promise<CategoryStats> {
+    const { data } = await api.get(`${ADMIN_BASE}/categories/stats`, { headers: authHeader() });
     return data.data;
   },
 
@@ -66,15 +128,25 @@ export const adminService = {
 
   // ==================== TAGS ====================
 
-  async getTags(): Promise<Tag[]> {
+  /** Chỉ thẻ ĐÃ DUYỆT, đã cắt trang. Thẻ chờ duyệt có lối đọc riêng bên dưới. */
+  async getTags(params: TagListParams = {}): Promise<Paginated<Tag>> {
     const { data } = await api.get(`${ADMIN_BASE}/tags`, {
+      params,
       headers: authHeader(),
     });
-    return data.data;
+    return asPage<Tag>(data.data);
   },
 
-  async getPendingTags(): Promise<Tag[]> {
-    const { data } = await api.get(`${ADMIN_BASE}/tags/pending`, { headers: authHeader() });
+  async getPendingTags(params: ListParams = {}): Promise<Paginated<Tag>> {
+    const { data } = await api.get(`${ADMIN_BASE}/tags/pending`, {
+      params,
+      headers: authHeader(),
+    });
+    return asPage<Tag>(data.data, 8);
+  },
+
+  async getTagStats(): Promise<TagStats> {
+    const { data } = await api.get(`${ADMIN_BASE}/tags/stats`, { headers: authHeader() });
     return data.data;
   },
 
@@ -133,8 +205,8 @@ export const adminService = {
       params: { status, page, limit },
       headers: authHeader(),
     });
-    const d = data.data;
-    return Array.isArray(d?.products) ? { ...d, products: d.products.map(resolveImages) } : d;
+    const d = asPage<ModerateProduct>(data.data, limit);
+    return { ...d, items: d.items.map(resolveImages) };
   },
 
   async unpublishProduct(productId: string, reason?: string): Promise<ModerateProduct> {
@@ -146,13 +218,17 @@ export const adminService = {
     return data.data;
   },
 
-  async republishProduct(productId: string, notes?: string): Promise<ModerateProduct> {
+  /**
+   * `warnings` là những chỗ tin đăng chưa đạt chuẩn — sản phẩm VẪN được khôi phục.
+   * Không phải lỗi, nên đừng ném; nhưng cũng đừng nuốt, admin cần biết để nhắc người bán.
+   */
+  async republishProduct(productId: string, notes?: string): Promise<{ product: ModerateProduct; warnings: string[] }> {
     const { data } = await api.post(
       `${ADMIN_BASE}/moderation/${productId}/republish`,
       { notes },
       { headers: authHeader() }
     );
-    return data.data;
+    return { product: data.data, warnings: Array.isArray(data.warnings) ? data.warnings : [] };
   },
 
   async getModerationHistory(productId: string): Promise<ModerationAction[]> {

@@ -55,6 +55,29 @@ export const userService = {
     deleteAddress: async (addressId: string): Promise<Address[]> => {
         const res = await api.delete(`/users/profile/addresses/${addressId}`);
         return res.data;
+    },
+
+    // ---------------------------------------------------------------------
+    // Wishlist — /users/wishlist/* và /api/favorites/* nay dùng CHUNG collection
+    // `wishlists` của BE, nên hai bên luôn đồng bộ.
+    // Cả 3 route đều trả về MẢNG product id (string[]) sau khi thao tác.
+    // ---------------------------------------------------------------------
+
+    /** Ép về string[]; BE lỗi có thể trả { error } nên không được .map thẳng. */
+    toIdList: (data: any): string[] =>
+        Array.isArray(data) ? data.map((id: any) => (id?.toString ? id.toString() : id)) : [],
+
+    getWishlist: async (): Promise<string[]> => {
+        const res = await api.get('/users/wishlist');
+        return userService.toIdList(res.data);
+    },
+    addToWishlist: async (productId: string): Promise<string[]> => {
+        const res = await api.post(`/users/wishlist/${productId}`);
+        return userService.toIdList(res.data);
+    },
+    removeFromWishlist: async (productId: string): Promise<string[]> => {
+        const res = await api.delete(`/users/wishlist/${productId}`);
+        return userService.toIdList(res.data);
     }
 };
 

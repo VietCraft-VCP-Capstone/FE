@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { cartService } from '../../order/services/cartService';
+import { useNavigate } from 'react-router-dom';
 import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck, Check } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
@@ -27,7 +29,8 @@ interface Order {
 
 export function BuyerOrdersPage() {
     const navigate = useNavigate();
-    const { setCartCount } = useOutletContext<{ setCartCount: (n: number) => void }>();
+    // Không còn tự set số lượng giỏ: cartService phát event 'vietcraft-cart-updated'
+    // sau mỗi thao tác, BuyerLayout nghe event đó và cập nhật badge.
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled'>('all');
@@ -55,9 +58,11 @@ export function BuyerOrdersPage() {
             try {
                 // Fetch orders from BE with active tab status
                 const res = await ordersService.getByUser(activeTab);
-                setOrders(res);
+                // BE trả mảng thuần; thủ sẵn trường hợp lỗi/đổi shape để không vỡ .filter/.map
+                setOrders(Array.isArray(res) ? (res as Order[]) : ((res as any)?.items || []));
             } catch (err) {
                 console.error('Failed to fetch orders', err);
+                setOrders([]);
             } finally {
                 setLoading(false);
             }
@@ -86,39 +91,28 @@ export function BuyerOrdersPage() {
         setReorderOrder(order);
     };
 
-    const handleConfirmReorder = (selectedItems: OrderItem[]) => {
+    const handleConfirmReorder = async (selectedItems: OrderItem[]) => {
         if (!reorderOrder) return;
-        const cartStr = localStorage.getItem('vietcraft_cart');
-        let cartItems = [];
-        if (cartStr) {
+        // Đi qua cartService thay vì tự ghi localStorage: service tự chọn giỏ server hay
+        // giỏ khách, và BE còn kiểm tồn kho / sản phẩm còn bán — ghi tay thì bỏ qua hết.
+        const failures: string[] = [];
+        for (const it of selectedItems) {
             try {
-                cartItems = JSON.parse(cartStr);
-            } catch (e) {}
+                await cartService.addToCart({
+                    productId: it.productId,
+                    variantId: it.variantId && it.variantId !== 'default' ? it.variantId : undefined,
+                    quantity: it.quantity,
+                });
+            } catch (err) {
+                failures.push(getApiErrorMessage(err));
+            }
         }
 
-        selectedItems.forEach(it => {
-            const existing = cartItems.find((item: any) => item.productId === it.productId && item.variantId === it.variantId);
-            if (existing) {
-                existing.quantity += it.quantity;
-            } else {
-                cartItems.push({
-                    id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                    productId: it.productId,
-                    variantId: it.variantId,
-                    title: it.title || 'Sản phẩm tái đặt',
-                    shopName: reorderOrder.shopName,
-                    variantName: `${it.color || ''} ${it.size || ''}`.trim() || 'Mặc định',
-                    price: it.price,
-                    quantity: it.quantity,
-                    image: it.image || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=200',
-                    checked: true
-                });
-            }
-        });
-
-        localStorage.setItem('vietcraft_cart', JSON.stringify(cartItems));
-        setCartCount(cartItems.reduce((acc: number, it: any) => acc + it.quantity, 0));
         setReorderOrder(null);
+        if (failures.length > 0) {
+            showToast(failures[0], 'error');
+            return;
+        }
         showToast('Đã thêm sản phẩm vào giỏ hàng!');
         setTimeout(() => navigate('/cart'), 1200);
     };
@@ -128,15 +122,34 @@ export function BuyerOrdersPage() {
         const query = searchQuery.toLowerCase();
         const matchesShop = o.shopName?.toLowerCase().includes(query);
         const matchesId = o.id?.toLowerCase().includes(query);
-        const matchesItem = o.items.some(it => it.title?.toLowerCase().includes(query));
+        const matchesItem = (o.items || []).some(it => it.title?.toLowerCase().includes(query));
         return matchesShop || matchesId || matchesItem;
     });
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-            {/* Search box */}
-            <div className="flex justify-end">
-                <div className="relative w-full sm:w-80">
+            {/* Tabs and Search row */}
+            <div className="border-b border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 md:pb-0">
+                {/* Filter Tabs */}
+                <nav className="flex space-x-6 overflow-x-auto no-scrollbar scroll-smooth">
+                    {tabs.map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`pb-3 md:pb-4 font-semibold text-xs whitespace-nowrap transition-all border-b-2 -mb-[2px] ${
+                                    isActive ? 'text-emerald-600 border-emerald-600' : 'text-gray-500 border-transparent hover:text-gray-900'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        );
+                    })}
+                </nav>
+
+                {/* Search box */}
+                <div className="relative w-full md:w-80 md:mb-3">
                     <Search className="absolute inset-y-0 left-3 my-auto text-gray-400" size={16} />
                     <input
                         type="text"
@@ -146,26 +159,6 @@ export function BuyerOrdersPage() {
                         className="w-full bg-white border border-gray-200 rounded-lg py-2 pl-10 pr-4 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm"
                     />
                 </div>
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="border-b border-gray-200">
-                <nav className="flex space-x-6 overflow-x-auto no-scrollbar scroll-smooth">
-                    {tabs.map((tab) => {
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`pb-3 font-semibold text-xs whitespace-nowrap transition-all border-b-2 ${
-                                    isActive ? 'text-emerald-600 border-emerald-600' : 'text-gray-500 border-transparent hover:text-gray-900'
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </nav>
             </div>
 
             {/* Order cards list */}

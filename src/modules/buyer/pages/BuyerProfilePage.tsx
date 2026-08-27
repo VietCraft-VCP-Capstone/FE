@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
     ShoppingBag, FolderHeart, UserCheck, MapPin,
     CreditCard, Settings, LogOut, ChevronRight, Check,
-    Package, Truck, Home, Plus, Trash2, Edit2, Camera, Loader2
+    Truck, Home, Plus, Trash2, Edit2, Camera, Loader2,
+    Calendar, Eye, Heart, Store
 } from 'lucide-react';
 import { userService, UserProfile, Address } from '../../user/services/userService';
 import { ordersService } from '../../order/services/ordersService';
 import { productsService } from '../../product/services/productsService';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { EditProfileModal } from '../components/profile/EditProfileModal';
 import { AddressFormModal } from '../components/profile/AddressFormModal';
 import { ConfirmDeleteModal } from '../components/profile/ConfirmDeleteModal';
@@ -125,14 +127,36 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                     setLastOrder(orders[0]);
                 }
 
-                // Fetch real products for saved products section
+                // Fetch real products for saved products section / wishlist
                 try {
-                    const list = await productsService.getAll();
-                    const mapped = (list || []).slice(0, 3).map((p: any) => ({
+                    const [allProducts, wishlistIds] = await Promise.all([
+                        productsService.getAll(),
+                        userService.getWishlist().catch(() => [])
+                    ]);
+                    const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
+                    // /products trả object phân trang { items, total, ... }, KHÔNG phải mảng thuần.
+                    const products: any[] = Array.isArray(allProducts)
+                        ? allProducts
+                        : (allProducts?.items || []);
+                    
+                    const matchedItems = products.filter((p: any) =>
+                        ids.includes(p.id) || ids.includes(p._id?.toString())
+                    );
+                    
+                    const mapped = matchedItems.slice(0, 3).map((p: any) => ({
                         title: p.title || p.name || 'Sản phẩm sáng tạo',
-                        image: p.images?.[0] || p.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
+                        image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
                     }));
-                    setSavedProducts(mapped);
+
+                    if (mapped.length === 0) {
+                        const fallbackMapped = products.slice(0, 3).map((p: any) => ({
+                            title: p.title || p.name || 'Sản phẩm sáng tạo',
+                            image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
+                        }));
+                        setSavedProducts(fallbackMapped);
+                    } else {
+                        setSavedProducts(mapped);
+                    }
                 } catch (prodErr) {
                     console.error('Failed to load real products for profile page', prodErr);
                 }
@@ -155,7 +179,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             setProfile((prev: UserProfile | null) => prev ? { ...prev, full_name: updated.full_name, phone: updated.phone } : null);
             showToast('Cập nhật hồ sơ thành công!', 'success');
         } catch (e) {
-            showToast('Cập nhật hồ sơ thất bại.', 'error');
+            showToast(getApiErrorMessage(e, 'Cập nhật hồ sơ thất bại.'), 'error');
             throw e;
         }
     };
@@ -175,7 +199,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             setIsAddressModalOpen(false);
             setEditingAddress(null);
         } catch (e) {
-            showToast('Lưu địa chỉ thất bại.', 'error');
+            showToast(getApiErrorMessage(e, 'Lưu địa chỉ thất bại.'), 'error');
             throw e;
         }
     };
@@ -187,7 +211,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             setProfile({ ...profile, addresses: updatedAddresses });
             showToast('Đặt làm mặc định thành công!', 'success');
         } catch (e) {
-            showToast('Đặt làm mặc định thất bại.', 'error');
+            showToast(getApiErrorMessage(e, 'Đặt làm mặc định thất bại.'), 'error');
         }
     };
 
@@ -221,8 +245,8 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
             {/* Profile Banner Card - Always Visible */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col md:flex-row items-center gap-6 shadow-sm">
-                <div className="relative group w-24 h-24 rounded-full overflow-hidden border-2 border-gray-100 flex-shrink-0 cursor-pointer">
+            <div className="bg-white rounded-[24px] border border-gray-200 p-6 flex flex-row items-center gap-6">
+                <div className="relative group w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border border-gray-150 flex-shrink-0 cursor-pointer">
                     <img 
                         src={profile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150'} 
                         alt={profile.full_name} 
@@ -230,13 +254,13 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                     />
                     {/* Hover Overlay */}
                     <div className="absolute inset-0 bg-black/45 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <Camera size={20} className="text-white mb-1" />
-                        <span className="text-[10px] font-bold text-white uppercase tracking-wider">Thay đổi</span>
+                        <Camera size={18} className="text-white mb-1" />
+                        <span className="text-[9px] font-bold text-white uppercase tracking-wider">Thay đổi</span>
                     </div>
                     {/* Loading Overlay */}
                     {uploadingAvatar && (
                         <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                            <Loader2 className="w-6 h-6 text-white animate-spin" />
+                            <Loader2 className="w-5 h-5 text-white animate-spin" />
                         </div>
                     )}
                     {/* Hidden File Input */}
@@ -249,23 +273,24 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                         title="Thay đổi ảnh đại diện"
                     />
                 </div>
-                <div className="flex-1 text-center md:text-left space-y-2">
-                    <div className="flex flex-col md:flex-row md:items-center gap-2">
-                        <h1 className="text-2xl font-black text-gray-900">{profile.full_name}</h1>
-                        <div className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-bold border border-emerald-100 mx-auto md:mx-0 w-fit">
+                <div className="flex-1 space-y-2">
+                    <div>
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">{profile.full_name}</h1>
+                        <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{profile.email}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="inline-flex items-center gap-1 bg-emerald-50/50 text-[#008000] text-xs px-3 py-1.5 rounded-full font-bold border border-emerald-250">
                             <UserCheck size={12} />
                             <span>{profile.rank || 'Thành viên Bạc'}</span>
                         </div>
+                        <button
+                            onClick={() => setIsEditModalOpen(true)}
+                            className="bg-[#008000] hover:bg-emerald-700 text-white rounded-full py-1.5 px-5 text-xs font-bold transition-all shadow-sm active:scale-95 flex-shrink-0"
+                        >
+                            Chỉnh sửa hồ sơ
+                        </button>
                     </div>
-                    <p className="text-sm text-gray-500">{profile.email}</p>
-                    {profile.phone && <p className="text-xs text-gray-400">SĐT: {profile.phone}</p>}
                 </div>
-                <button
-                    onClick={() => setIsEditModalOpen(true)}
-                    className="bg-[#008000] hover:bg-emerald-700 text-white rounded-full py-2 px-6 text-sm font-bold transition-all shadow-sm active:scale-95 flex-shrink-0"
-                >
-                    Chỉnh sửa hồ sơ
-                </button>
             </div>
 
             {/* Main Layout Grid - Always Visible */}
@@ -273,35 +298,36 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                 {/* Left Column (Activities & Menu options) */}
                 <div className="space-y-6">
                     {/* Stats */}
-                    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
+                    <div className="bg-white rounded-[24px] border border-gray-200 p-6 shadow-sm space-y-4">
                         <h3 className="font-bold text-gray-900 text-sm">Hoạt động</h3>
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100 cursor-pointer hover:bg-gray-100/50 transition-colors" onClick={() => navigate('/orders')}>
-                                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-2">
+                            <div className="border border-gray-200 rounded-[30px] p-4 text-center cursor-pointer hover:bg-gray-50/50 transition-colors flex flex-col items-center justify-center aspect-[1.15/1]" onClick={() => navigate('/orders')}>
+                                <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#008000] flex items-center justify-center mb-2">
                                     <ShoppingBag size={18} />
                                 </div>
-                                <span className="block font-black text-gray-900 text-lg">{profile.stats?.ordersCount || 12}</span>
+                                <span className="block font-black text-gray-900 text-lg leading-none mb-1">{profile.stats?.ordersCount ?? 0}</span>
                                 <span className="text-[10px] text-gray-500 font-bold">Đơn hàng</span>
                             </div>
-                            <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100 cursor-pointer hover:bg-gray-100/50 transition-colors">
-                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-2">
+                            <div className="border border-gray-200 rounded-[30px] p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors flex flex-col items-center justify-center aspect-[1.15/1]" onClick={() => navigate('/favorites')}>
+                                <div className="w-8 h-8 rounded-full bg-purple-50 text-[#a855f7] flex items-center justify-center mb-2">
                                     <FolderHeart size={18} />
                                 </div>
-                                <span className="block font-black text-gray-900 text-lg">{profile.stats?.collectionsCount || 5}</span>
+                                <span className="block font-black text-gray-900 text-lg leading-none mb-1">{profile.stats?.collectionsCount ?? 0}</span>
                                 <span className="text-[10px] text-gray-500 font-bold">Bộ sưu tập</span>
                             </div>
                         </div>
-                        <button className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors mt-2">
-                            <span className="flex items-center gap-1">
-                                <span>👁️</span> {profile.stats?.followingCount || 24} Đang theo dõi
+                        <button className="w-full flex items-center justify-between px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors mt-2">
+                            <span className="flex items-center gap-2">
+                                <Eye size={14} className="text-gray-400" />
+                                <span>{profile.stats?.followingCount ?? 0} Đang theo dõi</span>
                             </span>
                             <ChevronRight size={14} className="text-gray-400" />
                         </button>
                     </div>
 
                     {/* Menu links */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <ul className="divide-y divide-gray-100">
+                    <div className="bg-white rounded-[20px] border border-gray-200 shadow-sm overflow-hidden">
+                        <ul className="divide-y divide-gray-150">
                             <li>
                                 <button 
                                     onClick={() => setActiveTab(activeTab === 'addresses' ? 'overview' : 'addresses')} 
@@ -345,19 +371,23 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                     </div>
 
                     {/* Earn Money Promo */}
-                    <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 text-white rounded-2xl p-6 shadow-sm space-y-4 relative overflow-hidden">
-                        <div className="absolute -right-4 -bottom-4 opacity-10 text-white">
-                            <ShoppingBag size={120} />
+                    <div className="bg-white rounded-[20px] border border-gray-200 p-6 shadow-sm space-y-4 relative overflow-hidden">
+                        <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#008000] flex items-center justify-center flex-shrink-0 mt-0.5 border border-emerald-100">
+                                <Store size={20} />
+                            </div>
+                            <div>
+                                <h3 className="font-extrabold text-gray-900 text-sm">
+                                    Kiếm tiền từ sáng tạo của bạn
+                                </h3>
+                                <p className="text-xs text-gray-600 leading-relaxed font-semibold mt-1">
+                                    Mở gian hàng trên VietCraft để chia sẻ sản phẩm độc đáo của bạn.
+                                </p>
+                            </div>
                         </div>
-                        <h3 className="font-extrabold text-base flex items-center gap-1.5">
-                            <span className="text-lg">🏪</span> Kiếm tiền từ sáng tạo của bạn
-                        </h3>
-                        <p className="text-xs text-emerald-100/80 leading-relaxed font-medium">
-                            Mở gian hàng trên VietCraft để chia sẻ sản phẩm độc đáo của bạn.
-                        </p>
                         <button
                             onClick={() => navigate('/seller/register')}
-                            className="w-full bg-[#008000] hover:bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs transition-colors shadow-sm"
+                            className="w-full bg-[#008000] hover:bg-emerald-700 text-white font-bold py-2.5 rounded-full text-xs transition-colors shadow-sm cursor-pointer mt-2"
                         >
                             Đăng ký ngay
                         </button>
@@ -370,24 +400,24 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                         <>
                             {/* Latest Order Stepper Tracker */}
                             {lastOrder && (
-                                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-6">
+                                <div className="bg-white rounded-[24px] border border-gray-200 p-6 shadow-sm space-y-6">
                                     <div className="flex items-center justify-between">
                                         <h3 className="font-bold text-gray-900 text-sm">Đơn hàng gần nhất</h3>
-                                        <button onClick={() => navigate('/orders')} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700">
+                                        <button onClick={() => navigate('/orders')} className="text-xs font-bold text-[#008000] hover:text-emerald-700">
                                             Xem tất cả
                                         </button>
                                     </div>
 
                                     {/* Stepper Progress Bar */}
-                                    <div className="relative flex justify-between items-center max-w-md mx-auto py-2">
+                                    <div className="relative flex justify-between items-center w-full py-2 z-0 scale-95 sm:scale-100">
                                         {/* Connector line */}
-                                        <div className="absolute left-4 right-4 h-0.5 bg-gray-200 top-1/2 -translate-y-1/2 z-0">
+                                        <div className="absolute left-6 right-6 h-[3px] bg-gray-250 top-[16px] -translate-y-1/2 z-0 rounded-full">
                                             <div
-                                                className="h-full bg-emerald-600 transition-all duration-500"
+                                                className="h-full bg-[#008000] transition-all duration-500 rounded-full"
                                                 style={{
                                                     width:
                                                         lastOrder.status === 'completed'
-                                                            ? '100%'
+                                                            ? '105%'
                                                             : lastOrder.status === 'shipping'
                                                                 ? '75%'
                                                                 : lastOrder.status === 'processing'
@@ -400,78 +430,126 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                         </div>
 
                                         {/* Step 1: Ordered */}
-                                        <div className="relative z-10 flex flex-col items-center">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${checkStep('ordered') === 'completed' || checkStep('ordered') === 'active'
-                                                ? 'bg-emerald-600 border-emerald-600 text-white'
-                                                : 'bg-white border-gray-300 text-gray-500'
-                                                }`}>
-                                                <Check size={14} />
+                                        <div className="relative z-10 flex flex-col items-center flex-1">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border-2 transition-all duration-300 ${
+                                                checkStep('ordered') === 'completed' || checkStep('ordered') === 'active'
+                                                    ? 'bg-[#008000] border-[#008000] text-white shadow-sm'
+                                                    : 'bg-white border-gray-300 text-gray-400'
+                                            }`}>
+                                                <Check size={14} className="stroke-[3]" />
                                             </div>
-                                            <span className="text-[10px] font-bold text-gray-500 mt-2">Đã đặt</span>
+                                            <span className={`text-[10px] font-bold mt-2 text-center transition-all ${
+                                                checkStep('ordered') === 'active'
+                                                    ? 'text-[#008000] font-black'
+                                                    : checkStep('ordered') === 'completed'
+                                                        ? 'text-gray-800'
+                                                        : 'text-gray-400 font-semibold'
+                                            }`}>Đã đặt</span>
                                         </div>
 
                                         {/* Step 2: Paid (Approved) */}
-                                        <div className="relative z-10 flex flex-col items-center">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${checkStep('paid') === 'completed' || checkStep('paid') === 'active'
-                                                ? 'bg-emerald-600 border-emerald-600 text-white'
-                                                : 'bg-white border-gray-300 text-gray-500'
-                                                }`}>
-                                                <Check size={14} />
+                                        <div className="relative z-10 flex flex-col items-center flex-1">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border-2 transition-all duration-300 ${
+                                                checkStep('paid') === 'completed' || checkStep('paid') === 'active'
+                                                    ? 'bg-[#008000] border-[#008000] text-white shadow-sm'
+                                                    : 'bg-white border-gray-300 text-gray-400'
+                                            }`}>
+                                                <Check size={14} className="stroke-[3]" />
                                             </div>
-                                            <span className="text-[10px] font-bold text-gray-500 mt-2">Đã duyệt</span>
+                                            <span className={`text-[10px] font-bold mt-2 text-center transition-all ${
+                                                checkStep('paid') === 'active'
+                                                    ? 'text-[#008000] font-black'
+                                                    : checkStep('paid') === 'completed'
+                                                        ? 'text-gray-800'
+                                                        : 'text-gray-400 font-semibold'
+                                            }`}>Đã duyệt</span>
                                         </div>
 
-                                        {/* Step 3: Processing (Preparing) */}
-                                        <div className="relative z-10 flex flex-col items-center">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${checkStep('processing') === 'active'
-                                                ? 'bg-emerald-50 border-emerald-600 text-emerald-600 ring-2 ring-emerald-600 ring-offset-2'
-                                                : checkStep('processing') === 'completed'
-                                                    ? 'bg-emerald-600 border-emerald-600 text-white'
-                                                    : 'bg-white border-gray-300 text-gray-500'
-                                                }`}>
-                                                <Package size={14} />
+                                        {/* Step 3: Preparing */}
+                                        <div className="relative z-10 flex flex-col items-center flex-1">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border-2 transition-all duration-300 ${
+                                                checkStep('processing') === 'active'
+                                                    ? 'bg-white border-[#008000] text-[#008000] ring-1 ring-[#008000] ring-offset-2'
+                                                    : checkStep('processing') === 'completed'
+                                                        ? 'bg-[#008000] border-[#008000] text-white shadow-sm'
+                                                        : 'bg-white border-gray-300 text-gray-400'
+                                            }`}>
+                                                {checkStep('processing') === 'completed' ? (
+                                                    <Check size={14} className="stroke-[3]" />
+                                                ) : (
+                                                    <Store size={14} className={checkStep('processing') === 'active' ? 'stroke-[2.5]' : ''} />
+                                                )}
                                             </div>
-                                            <span className={`text-[10px] font-bold mt-2 ${checkStep('processing') === 'active' ? 'text-emerald-700' : 'text-gray-500'}`}>Chuẩn bị hàng</span>
+                                            <span className={`text-[10px] font-bold mt-2 text-center transition-all ${
+                                                checkStep('processing') === 'active'
+                                                    ? 'text-[#008000] font-black'
+                                                    : checkStep('processing') === 'completed'
+                                                        ? 'text-gray-850'
+                                                        : 'text-gray-400 font-semibold'
+                                            }`}>Chuẩn bị hàng</span>
                                         </div>
 
                                         {/* Step 4: Shipping */}
-                                        <div className="relative z-10 flex flex-col items-center">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${checkStep('shipping') === 'active'
-                                                ? 'bg-emerald-50 border-emerald-600 text-emerald-600 ring-2 ring-emerald-600 ring-offset-2'
-                                                : checkStep('shipping') === 'completed'
-                                                    ? 'bg-emerald-600 border-emerald-600 text-white'
-                                                    : 'bg-white border-gray-300 text-gray-500'
-                                                }`}>
-                                                <Truck size={14} />
+                                        <div className="relative z-10 flex flex-col items-center flex-1">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border-2 transition-all duration-300 ${
+                                                checkStep('shipping') === 'active'
+                                                    ? 'bg-white border-[#008000] text-[#008000] ring-1 ring-[#008000] ring-offset-2'
+                                                    : checkStep('shipping') === 'completed'
+                                                        ? 'bg-[#008000] border-[#008000] text-white shadow-sm'
+                                                        : 'bg-white border-gray-300 text-gray-400'
+                                            }`}>
+                                                {checkStep('shipping') === 'completed' ? (
+                                                    <Check size={14} className="stroke-[3]" />
+                                                ) : (
+                                                    <Truck size={14} className={checkStep('shipping') === 'active' ? 'stroke-[2.5]' : ''} />
+                                                )}
                                             </div>
-                                            <span className="text-[10px] font-bold text-gray-500 mt-2">Đang giao</span>
+                                            <span className={`text-[10px] font-bold mt-2 text-center transition-all ${
+                                                checkStep('shipping') === 'active'
+                                                    ? 'text-[#008000] font-black'
+                                                    : checkStep('shipping') === 'completed'
+                                                        ? 'text-gray-850'
+                                                        : 'text-gray-400 font-semibold'
+                                            }`}>Đang giao</span>
                                         </div>
 
                                         {/* Step 5: Completed */}
-                                        <div className="relative z-10 flex flex-col items-center">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${checkStep('completed') === 'completed' || checkStep('completed') === 'active'
-                                                ? 'bg-emerald-600 border-emerald-600 text-white'
-                                                : 'bg-white border-gray-300 text-gray-500'
-                                                }`}>
-                                                <Home size={14} />
+                                        <div className="relative z-10 flex flex-col items-center flex-1">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border-2 transition-all duration-300 ${
+                                                checkStep('completed') === 'completed' || checkStep('completed') === 'active'
+                                                    ? 'bg-[#008000] border-[#008000] text-white shadow-sm'
+                                                    : 'bg-white border-gray-300 text-gray-400'
+                                            }`}>
+                                                {checkStep('completed') === 'completed' || checkStep('completed') === 'active' ? (
+                                                    <Check size={14} className="stroke-[3]" />
+                                                ) : (
+                                                    <Home size={14} />
+                                                )}
                                             </div>
-                                            <span className="text-[10px] font-bold text-gray-500 mt-2">Đã nhận</span>
+                                            <span className={`text-[10px] font-bold mt-2 text-center transition-all ${
+                                                checkStep('completed') === 'active'
+                                                    ? 'text-[#008000] font-black'
+                                                    : checkStep('completed') === 'completed'
+                                                        ? 'text-gray-850'
+                                                        : 'text-gray-400 font-semibold'
+                                            }`}>Đã nhận</span>
                                         </div>
                                     </div>
 
                                     {/* Order item info */}
                                     <div
                                         onClick={() => navigate(`/orders/${lastOrder.id}`)}
-                                        className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-all cursor-pointer shadow-sm mt-4"
+                                        className="flex items-center justify-between p-4 rounded-[20px] border border-gray-200 hover:bg-gray-50 transition-all cursor-pointer mt-4"
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
+                                            <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
                                                 <img src={lastOrder.items[0]?.image} alt={lastOrder.items[0]?.title} className="w-full h-full object-cover" />
                                             </div>
                                             <div>
                                                 <p className="text-[10px] font-bold text-gray-400">Mã đơn: #{lastOrder.id}</p>
                                                 <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-1">{lastOrder.items[0]?.title}</h4>
-                                                <p className="text-xs text-emerald-600 font-bold mt-1">
+                                                <p className="text-xs text-[#008000] font-semibold mt-1 flex items-center gap-1.5">
+                                                    <Calendar size={13} className="stroke-[2.5]" />
                                                     {lastOrder.status === 'shipping'
                                                         ? 'Dự kiến giao: 12 Thg 10, 2024'
                                                         : lastOrder.status === 'completed'
@@ -480,33 +558,37 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                                 </p>
                                             </div>
                                         </div>
-                                        <ChevronRight size={20} className="text-gray-400" />
+                                        <div className="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-450 hover:bg-gray-100 hover:text-gray-700 transition-colors">
+                                            <ChevronRight size={16} />
+                                        </div>
                                     </div>
                                 </div>
                             )}
 
                             {/* Saved / Favorites */}
-                            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-4">
-                                <div className="flex items-center gap-1.5 text-[#e11d48]">
-                                    <span>💚</span>
+                            <div className="bg-white rounded-[24px] border border-gray-200 p-6 shadow-sm space-y-4">
+                                <div className="flex items-center gap-2 text-[#008000]">
+                                    <Heart size={16} className="fill-[#008000] text-[#008000]" />
                                     <h3 className="font-bold text-gray-900 text-sm">Sản phẩm đã lưu & Yêu thích</h3>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-2">
                                     {savedProducts.map((p, i) => (
-                                        <div key={i} className="bg-white rounded-xl border border-gray-100 p-2 flex flex-col justify-between hover:shadow-md transition-shadow">
-                                            <div className="aspect-square rounded-lg overflow-hidden bg-gray-50 border border-gray-50">
+                                        <div key={i} className="flex flex-col items-center">
+                                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-50 border border-gray-150 aspect-square cursor-pointer hover:scale-105 transition-all">
                                                 <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
                                             </div>
-                                            <h4 className="text-[10px] font-bold text-gray-800 line-clamp-1 mt-2 text-center">{p.title}</h4>
+                                            <h4 className="text-[10px] font-bold text-gray-700 line-clamp-1 mt-2.5 text-center px-1 leading-normal w-full">{p.title}</h4>
                                         </div>
                                     ))}
                                     {/* Explore more */}
-                                    <div
-                                        onClick={() => navigate('/')}
-                                        className="border-2 border-dashed border-gray-200 rounded-xl p-2 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors aspect-square"
-                                    >
-                                        <Plus size={24} className="text-gray-400 mb-2" />
-                                        <span className="text-[10px] font-bold text-gray-400">Khám phá thêm</span>
+                                    <div className="flex flex-col items-center">
+                                        <div
+                                            onClick={() => navigate('/')}
+                                            className="w-20 h-20 sm:w-24 sm:h-24 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center cursor-pointer hover:bg-emerald-50/20 hover:border-[#008000] hover:text-[#008000] transition-colors aspect-square text-gray-400 font-sans"
+                                        >
+                                            <Plus size={24} className="stroke-[2.5]" />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-[#008000] hover:text-emerald-700 text-center mt-2.5 cursor-pointer leading-normal">Khám phá thêm</span>
                                     </div>
                                 </div>
                             </div>
@@ -622,7 +704,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                         setProfile((prev: any) => prev ? { ...prev, addresses: updatedAddresses } : null);
                         showToast('Xóa địa chỉ thành công!', 'success');
                     } catch (e) {
-                        showToast('Xóa địa chỉ thất bại.', 'error');
+                        showToast(getApiErrorMessage(e, 'Xóa địa chỉ thất bại.'), 'error');
                     }
                 }}
             />
