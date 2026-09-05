@@ -1,10 +1,12 @@
 import { Sparkles, ArrowRight } from 'lucide-react';
 
 interface LandingCollectionsProps {
-  onAction: () => void;
+  /** Mở nội dung bộ sưu tập. Chưa có trang bộ sưu tập riêng nên tạm dẫn về lưới sản phẩm. */
+  onAction?: () => void;
 }
 
 export function LandingCollections({ onAction }: LandingCollectionsProps) {
+  const handleAction = () => onAction?.();
   return (
     <section className="py-20 px-6 bg-stone-50/40 border-t border-stone-100">
       <div className="max-w-7xl mx-auto space-y-10">
@@ -18,7 +20,7 @@ export function LandingCollections({ onAction }: LandingCollectionsProps) {
           
           {/* Left Big Collection Card */}
           <div 
-            onClick={onAction}
+            onClick={handleAction}
             className="lg:col-span-8 relative rounded-3xl overflow-hidden aspect-[16/9] lg:aspect-auto lg:h-[480px] shadow-md hover:shadow-lg transition-shadow group cursor-pointer"
           >
             <img 
@@ -40,7 +42,7 @@ export function LandingCollections({ onAction }: LandingCollectionsProps) {
             
             {/* Top Mini Card */}
             <div 
-              onClick={onAction}
+              onClick={handleAction}
               className="relative rounded-3xl overflow-hidden h-[228px] shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
             >
               <img 
@@ -69,7 +71,7 @@ export function LandingCollections({ onAction }: LandingCollectionsProps) {
               </div>
 
               <button 
-                onClick={onAction}
+                onClick={handleAction}
                 className="bg-white hover:bg-stone-100 text-[#330033] text-xs font-bold py-2.5 px-5 rounded-full self-start transition-all flex items-center gap-1 active:scale-95 group-hover:shadow"
               >
                 <span>Start Creating</span>

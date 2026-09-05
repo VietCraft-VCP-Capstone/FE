@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
-import { useGoogleLogin } from '@react-oauth/google';
 
 interface SignupPageProps {
   onSignup: (data: { name: string; email: string; password: string }) => Promise<any>;
@@ -22,48 +21,48 @@ function pwStrength(pw: string) {
 const SC = ['#e5e7eb', '#f87171', '#fb923c', '#facc15', '#22c55e'];
 const SL = ['', 'Yếu', 'Trung bình', 'Khá', 'Mạnh'];
 
-function GoogleIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 48 48" style={{ flexShrink: 0 }}>
-      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-    </svg>
-  );
+
+
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null;
+  let decoded: string;
+  try { decoded = decodeURIComponent(raw); } catch { return null; }
+  if (!decoded.startsWith('/') || decoded.startsWith('//')) return null;
+  return decoded;
 }
 
-export function SignupPage({ onSignup, onGoogleLogin, user }: SignupPageProps) {
+function getRedirectTarget(u: any, nextUrl: string | null): string {
+  const role = u?.role?.toLowerCase();
+  if (role === 'admin') {
+    return (nextUrl && nextUrl.startsWith('/admin')) ? nextUrl : '/admin';
+  }
+  if (role === 'seller') {
+    return (nextUrl && nextUrl.startsWith('/seller')) ? nextUrl : '/seller';
+  }
+  return nextUrl ?? '/';
+}
+
+export function SignupPage({ onSignup, user }: SignupPageProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextUrl = safeNext(searchParams.get('next'));
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [terms, setTerms] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    const target = user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/';
-    navigate(target, { replace: true });
-    return null;
+    const target = getRedirectTarget(user, nextUrl);
+    return <Navigate to={target} replace />;
   }
 
   const strength = pwStrength(password);
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (res) => {
-      setLoading(true); setError('');
-      try {
-        const loggedUser = await onGoogleLogin(res.access_token);
-        const target = loggedUser?.role === 'admin' ? '/admin' : loggedUser?.role === 'seller' ? '/seller' : '/';
-        navigate(target, { replace: true });
-      }
-      catch { setError('Đăng ký Google thất bại.'); }
-      finally { setLoading(false); }
-    },
-    onError: () => setError('Đăng ký Google thất bại.'),
-  });
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
@@ -71,19 +70,20 @@ export function SignupPage({ onSignup, onGoogleLogin, user }: SignupPageProps) {
     if (n.length < 2) { setError('Họ tên phải có ít nhất 2 ký tự.'); return; }
     if (!isValidEmail(em)) { setError('Email không hợp lệ.'); return; }
     if (pw.length < 8) { setError('Mật khẩu phải có ít nhất 8 ký tự.'); return; }
+    if (pw !== confirmPassword) { setError('Mật khẩu xác nhận không khớp.'); return; }
     if (!terms) { setError('Bạn cần đồng ý với điều khoản.'); return; }
     setLoading(true);
     try {
       await onSignup({ name: n, email: em, password: pw });
-      navigate('/verify', { state: { email: em }, replace: true });
+      navigate('/verify', { state: { email: em, next: nextUrl }, replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Đăng ký thất bại.');
     } finally { setLoading(false); }
-  }, [name, email, password, terms, onSignup, navigate]);
+  }, [name, email, password, confirmPassword, terms, onSignup, navigate]);
 
   const pill: React.CSSProperties = {
     width: '100%', border: '1.5px solid #e2e0dd', borderRadius: 50,
-    padding: '10px 16px', fontSize: 13, boxSizing: 'border-box', outline: 'none', background: '#fff', color: '#1c1917',
+    padding: '10px 18px', fontSize: 15, boxSizing: 'border-box', outline: 'none', background: '#fff', color: '#1c1917',
   };
 
   return (
@@ -100,42 +100,34 @@ export function SignupPage({ onSignup, onGoogleLogin, user }: SignupPageProps) {
       </div>
 
       {/* Right form */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '30px 40px', boxSizing: 'border-box', background: '#fff' }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
-          <div style={{ marginBottom: 18 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '30px 40px', boxSizing: 'border-box', background: '#fff', overflowY: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: 480, margin: 'auto' }}>
+          <div style={{ marginBottom: 12 }}>
             <Link to="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontSize: 20, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
+              <span style={{ fontSize: 30, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
             </Link>
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Tạo tài khoản</h1>
-          <p style={{ fontSize: 13, color: '#78716c', margin: '0 0 16px' }}>Đăng ký miễn phí để bắt đầu trải nghiệm mua sắm tuyệt vời.</p>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Tạo tài khoản</h1>
+          <p style={{ fontSize: 14, color: '#78716c', margin: '0 0 12px' }}>Đăng ký miễn phí để bắt đầu trải nghiệm mua sắm tuyệt vời.</p>
 
-          <button type="button" onClick={() => googleLogin()} disabled={loading}
-            style={{ width: '100%', background: '#fff', border: '1.5px solid #e2e0dd', borderRadius: 50, padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#1c1917', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 }}>
-            <GoogleIcon /> Đăng ký với Google
-          </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <div style={{ flex: 1, height: 1, background: '#e7e5e4' }} /><span style={{ fontSize: 12, color: '#a8a29e' }}>Hoặc đăng ký bằng email</span><div style={{ flex: 1, height: 1, background: '#e7e5e4' }} />
-          </div>
-
-          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 4 }}>Họ và tên</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Họ và tên</label>
               <input type="text" autoComplete="name" placeholder="Nguyễn Văn A" value={name} onChange={e => setName(e.target.value)} required disabled={loading} style={pill} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 4 }}>Email</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Email</label>
               <input type="email" autoComplete="email" placeholder="nhapemail@example.com" value={email} onChange={e => setEmail(e.target.value)} required disabled={loading} style={pill} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 4 }}>Mật khẩu</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Mật khẩu</label>
               <div style={{ position: 'relative' }}>
                 <input type={showPw ? 'text' : 'password'} autoComplete="new-password" placeholder="Tạo mật khẩu (ít nhất 8 ký tự)"
-                  value={password} onChange={e => setPassword(e.target.value)} required disabled={loading} style={{ ...pill, paddingRight: 48 }} />
+                  value={password} onChange={e => setPassword(e.target.value)} required disabled={loading} style={{ ...pill, paddingRight: 55 }} />
                 <button type="button" onClick={() => setShowPw(v => !v)}
-                  style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', display: 'flex' }}>
-                  {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                  style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', display: 'flex', padding: 4 }}>
+                  {showPw ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
               {password.length > 0 && (
@@ -143,29 +135,40 @@ export function SignupPage({ onSignup, onGoogleLogin, user }: SignupPageProps) {
                   <div style={{ display: 'flex', gap: 4, marginBottom: 2 }}>
                     {[1,2,3,4].map(l => <div key={l} style={{ flex: 1, height: 4, borderRadius: 4, background: strength >= l ? SC[strength] : '#e5e7eb', transition: 'background 0.3s' }} />)}
                   </div>
-                  <span style={{ fontSize: 12, color: '#78716c' }}>Độ mạnh: <b>{SL[strength]}</b></span>
+                  <span style={{ fontSize: 14, color: '#78716c' }}>Độ mạnh: <b>{SL[strength]}</b></span>
                 </div>
               )}
             </div>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: '#57534e', cursor: 'pointer' }}>
-              <input type="checkbox" checked={terms} onChange={e => setTerms(e.target.checked)} disabled={loading} style={{ accentColor: '#007700', width: 16, height: 16, flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Xác nhận mật khẩu</label>
+              <div style={{ position: 'relative' }}>
+                <input type={showConfirmPw ? 'text' : 'password'} placeholder="••••••••"
+                  value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required disabled={loading} style={{ ...pill, paddingRight: 55 }} />
+                <button type="button" onClick={() => setShowConfirmPw(v => !v)}
+                  style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', display: 'flex', padding: 4 }}>
+                  {showConfirmPw ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 15, color: '#57534e', cursor: 'pointer' }}>
+              <input type="checkbox" checked={terms} onChange={e => setTerms(e.target.checked)} disabled={loading} style={{ accentColor: '#007700', width: 18, height: 18, flexShrink: 0, marginTop: 1 }} />
               <span>Tôi đồng ý với <strong style={{ color: '#330033' }}>Điều khoản dịch vụ</strong> và <strong style={{ color: '#007700' }}>Chính sách bảo mật</strong> của VietCraft.</span>
             </label>
             {error && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 14px' }}>
-                <AlertCircle size={15} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 13, color: '#dc2626' }}>{error}</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px' }}>
+                <AlertCircle size={17} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 15, color: '#dc2626' }}>{error}</span>
               </div>
             )}
             <button type="submit" disabled={loading}
-              style={{ background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '11px', fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              {loading && <Loader2 size={16} className="animate-spin" />}
+              style={{ background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '12px', fontSize: 16, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {loading && <Loader2 size={18} className="animate-spin" />}
               {loading ? 'Đang đăng ký...' : 'Đăng ký tài khoản'}
             </button>
           </form>
 
-          <p style={{ textAlign: 'center', fontSize: 13, color: '#78716c', marginTop: 12 }}>
-            Đã có tài khoản?{' '}<Link to="/login" style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng nhập</Link>
+          <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 12 }}>
+            Đã có tài khoản?{' '}<Link to={nextUrl ? `/login?next=${encodeURIComponent(nextUrl)}` : '/login'} style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng nhập</Link>
           </p>
         </div>
       </div>

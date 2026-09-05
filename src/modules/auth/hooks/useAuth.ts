@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { authService } from '../services/authService';
+import { cartService } from '../../order/services/cartService';
 import { User } from '../types';
 
 export function useAuth() {
@@ -10,16 +11,34 @@ export function useAuth() {
         const storedUser = localStorage.getItem('user');
         const token = localStorage.getItem('token');
         if (storedUser && token) {
-            try { setUser(JSON.parse(storedUser)); } catch { localStorage.clear(); }
+            try {
+                const parsed = JSON.parse(storedUser);
+                const normalized: User = {
+                    ...parsed,
+                    role: parsed.role?.toLowerCase?.() || parsed.role,
+                };
+                setUser(normalized);
+            } catch { localStorage.clear(); }
         }
         setLoading(false);
     }, []);
 
-    const persistSession = (data: { token: string; user: User }) => {
+    const persistSession = async (data: { token: string; user: User }) => {
+        const normalizedUser: User = {
+            ...data.user,
+            role: data.user.role?.toLowerCase?.() || data.user.role,
+        };
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setUser(data.user);
-        return data.user;
+        localStorage.setItem('user', JSON.stringify(normalizedUser));
+        setUser(normalizedUser);
+
+        try {
+            await cartService.mergeGuestCart();
+        } catch (err) {
+            console.error('Không gộp được giỏ hàng khách vào tài khoản', err);
+        }
+
+        return normalizedUser;
     };
 
     const login = async (credentials: any) => {

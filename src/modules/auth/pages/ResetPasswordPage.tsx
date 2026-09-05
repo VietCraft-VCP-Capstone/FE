@@ -1,41 +1,43 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Loader2, AlertCircle, Check, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Loader2, AlertCircle, Eye, EyeOff, Check } from 'lucide-react';
 import { authService } from '../services/authService';
 
-export function ResetPasswordPage() {
-  const location = useLocation();
+export const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
-
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const passedEmail = (location.state as any)?.email;
-    if (passedEmail) {
-      setEmail(passedEmail);
-    }
-  }, [location]);
+  const sanitizedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
+  const sanitizedCode = useMemo(() => code.trim(), [code]);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const handleSubmit = React.useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
 
-    const sanitizedEmail = email.trim();
-    const sanitizedCode = code.trim();
-
-    if (!sanitizedEmail) { setError('Vui lòng nhập email.'); return; }
-    if (!sanitizedCode || sanitizedCode.length < 6) { setError('Mã OTP không hợp lệ (yêu cầu đầy đủ 6 số).'); return; }
-    if (newPassword.length < 6) { setError('Mật khẩu mới phải ngắn nhất 6 ký tự.'); return; }
-    if (newPassword !== confirmPassword) { setError('Mật khẩu xác nhận không khớp.'); return; }
+    if (!sanitizedEmail || !sanitizedCode || !newPassword || !confirmPassword) {
+      setError('Vui lòng điền đầy đủ tất cả các trường.');
+      return;
+    }
+    if (sanitizedCode.length !== 6) {
+      setError('Mã OTP phải có đúng 6 chữ số.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('Mật khẩu mới phải có ít nhất 8 ký tự.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -52,7 +54,7 @@ export function ResetPasswordPage() {
 
   const pill: React.CSSProperties = {
     width: '100%', border: '1.5px solid #e2e0dd', borderRadius: 50,
-    padding: '10px 16px', fontSize: 13, boxSizing: 'border-box', outline: 'none',
+    padding: '10px 18px', fontSize: 15, boxSizing: 'border-box', outline: 'none',
     background: '#fff', color: '#1c1917',
   };
 
@@ -94,75 +96,75 @@ export function ResetPasswordPage() {
       </div>
 
       {/* Right form */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '32px 40px', boxSizing: 'border-box', background: '#fff' }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
-          <div style={{ marginBottom: 20 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '32px 40px', boxSizing: 'border-box', background: '#fff', overflowY: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: 480, margin: 'auto' }}>
+          <div style={{ marginBottom: 12 }}>
             <Link to="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontSize: 20, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
+              <span style={{ fontSize: 30, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
             </Link>
           </div>
 
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Đặt lại mật khẩu</h1>
-          <p style={{ fontSize: 13, color: '#78716c', margin: '0 0 18px' }}>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Đặt lại mật khẩu</h1>
+          <p style={{ fontSize: 14, color: '#78716c', margin: '0 0 12px' }}>
             Điền mã OTP đã gửi đến email và thiết lập mật khẩu mới của bạn.
           </p>
 
-          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 5 }}>Email</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Email</label>
               <input type="email" placeholder="nhapemail@example.com" value={email} onChange={e => setEmail(e.target.value)} disabled={loading}
                 style={pill} />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 5 }}>Mã OTP (6 số)</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Mã OTP (6 số)</label>
               <input type="text" placeholder="------" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} disabled={loading}
                 style={{ ...pill, letterSpacing: 2, textAlign: 'center', fontWeight: 'bold' }} />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 5 }}>Mật khẩu mới</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Mật khẩu mới</label>
               <div style={{ position: 'relative' }}>
                 <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={newPassword} onChange={e => setNewPassword(e.target.value)} disabled={loading}
-                  style={{ ...pill, paddingRight: 48 }} />
+                  style={{ ...pill, paddingRight: 55 }} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', padding: 4, display: 'flex' }}>
-                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#44403c', marginBottom: 5 }}>Xác nhận mật khẩu</label>
+              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Xác nhận mật khẩu</label>
               <div style={{ position: 'relative' }}>
                 <input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} disabled={loading}
-                  style={{ ...pill, paddingRight: 48 }} />
+                  style={{ ...pill, paddingRight: 55 }} />
                 <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', padding: 4, display: 'flex' }}>
-                  {showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 14px' }}>
-                <AlertCircle size={15} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 13, color: '#dc2626' }}>{error}</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px' }}>
+                <AlertCircle size={17} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 15, color: '#dc2626' }}>{error}</span>
               </div>
             )}
 
             <button type="submit" disabled={loading}
               style={{
-                background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '11px', fontSize: 14, fontWeight: 700,
+                background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '12px', fontSize: 16, fontWeight: 700,
                 cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '8px 0 0'
               }}>
-              {loading && <Loader2 size={16} className="animate-spin" />}
+              {loading && <Loader2 size={18} className="animate-spin" />}
               {loading ? 'Đang cập nhật...' : 'Đặt lại mật khẩu'}
             </button>
           </form>
 
-          <p style={{ textAlign: 'center', fontSize: 13, color: '#78716c', marginTop: 16 }}>
+          <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 12 }}>
             Hủy và quay lại{' '}<Link to="/login" style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng nhập</Link>
           </p>
         </div>
@@ -171,4 +173,4 @@ export function ResetPasswordPage() {
   );
 }
 
-export default ResetPasswordPage;
+

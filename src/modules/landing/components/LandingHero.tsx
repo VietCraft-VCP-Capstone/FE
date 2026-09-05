@@ -1,4 +1,5 @@
 interface LandingHeroProps {
+  /** Đưa khách tới nội dung thật (lưới sản phẩm), KHÔNG chặn đăng nhập */
   onExplore: () => void;
 }
 

@@ -11,9 +11,11 @@
     "dependencies": {
         "@react-oauth/google": "^0.13.5",
         "axios": "^1.5.0",
+        "konva": "^9.3.22",
         "lucide-react": "^0.279.0",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
+        "react-konva": "^18.2.16",
         "react-router-dom": "^6.16.0",
         "recharts": "^2.8.0",
         "socket.io-client": "^4.7.2"
