@@ -11,10 +11,7 @@ import { useToast } from '../../../shared/components/Toast';
 import { PRODUCT_CREATE_PATH } from '../featureFlags';
 
 const money = (n: number) => `${(n || 0).toLocaleString('vi-VN')}đ`;
-
-/** Khoá gộp danh mục: so tên không phân biệt hoa thường và khoảng trắng thừa. */
 const norm = (s: string) => (s || '').trim().toLowerCase();
-
 const EMPTY: CatalogData = { categories: [], tags: [], products: [], totalProducts: 0, truncated: false };
 
 export function SellerCatalogPage() {
@@ -41,7 +38,6 @@ export function SellerCatalogPage() {
 
     useEffect(() => { load(); }, [load]);
 
-    // Gom hàng của seller theo TÊN danh mục — product lưu tên chứ không lưu id.
     const productsByCategory = useMemo(() => {
         const map = new Map<string, CatalogProduct[]>();
         for (const p of data.products) {
@@ -60,11 +56,6 @@ export function SellerCatalogPage() {
             .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name, 'vi'));
     }, [data.categories, productsByCategory, search]);
 
-    /**
-     * Hàng mang tên danh mục KHÔNG có trong danh mục admin đang mở.
-     * Chúng không lọc được, không thống kê được, và người mua duyệt theo danh mục
-     * sẽ không bao giờ nhìn thấy — nên phải nêu rõ thay vì im lặng bỏ qua.
-     */
     const orphans = useMemo(() => {
         const known = new Set(data.categories.map(c => norm(c.name)));
         const map = new Map<string, CatalogProduct[]>();
@@ -78,7 +69,6 @@ export function SellerCatalogPage() {
         return [...map.entries()].sort((a, b) => b[1].length - a[1].length);
     }, [data.categories, data.products]);
 
-    // Số hàng của seller đang dùng mỗi thẻ.
     const tagUsage = useMemo(() => {
         const count = new Map<string, number>();
         for (const p of data.products) {
@@ -142,7 +132,7 @@ export function SellerCatalogPage() {
                 </div>
             )}
 
-            {/* Danh mục lạ — hậu quả trực tiếp của việc đăng bán bằng danh mục không thuộc sàn */}
+            {/* Orphan Categories Section */}
             {orphans.length > 0 && (
                 <div className="bg-white rounded-2xl border border-rose-200 shadow-xs overflow-hidden">
                     <div className="flex items-start gap-2.5 px-5 py-4 bg-rose-50/70 border-b border-rose-100">
@@ -172,7 +162,7 @@ export function SellerCatalogPage() {
                 </div>
             )}
 
-            {/* Bảng danh mục */}
+            {/* Categories Table Section */}
             <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-stone-200 bg-stone-50/60">
                     <h3 className="text-sm font-bold text-stone-900 font-jakarta flex items-center gap-2">
@@ -213,7 +203,6 @@ export function SellerCatalogPage() {
                                             {cat.slug && <span className="ml-2 text-[11px] text-stone-400 font-mono">/{cat.slug}</span>}
                                         </div>
 
-                                        {/* Thanh tỉ lệ so với danh mục nhiều hàng nhất */}
                                         <div className="hidden md:block w-32 h-1.5 bg-stone-100 rounded-full overflow-hidden shrink-0">
                                             <div
                                                 className="h-full bg-[#007700] rounded-full transition-all"
@@ -269,7 +258,7 @@ export function SellerCatalogPage() {
                 )}
             </div>
 
-            {/* Thẻ */}
+            {/* Approved Tags Section */}
             <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
                 <div className="px-5 py-4 border-b border-stone-200 bg-stone-50/60">
                     <h3 className="text-sm font-bold text-stone-900 font-jakarta flex items-center gap-2">

@@ -96,13 +96,11 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     editingAddress,
     onSaveAddress
 }) => {
-    // Address Form State
     const [recipientName, setRecipientName] = useState('');
     const [phone, setPhone] = useState('');
     const [addressDetail, setAddressDetail] = useState('');
     const [isDefault, setIsDefault] = useState(false);
 
-    // OpenStreetMap Autocomplete State
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDisplayName, setSelectedDisplayName] = useState('');
     const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -110,7 +108,6 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     const [showSuggestions, setShowSuggestions] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
 
-    // Close suggestions dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -123,7 +120,6 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
         };
     }, []);
 
-    // Debounce search query logic for OpenStreetMap
     useEffect(() => {
         if (!searchQuery || searchQuery.trim().length < 3 || searchQuery === selectedDisplayName) {
             setSuggestions([]);
@@ -169,7 +165,6 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
                 .trim();
         };
 
-        // 1. Match Province
         const stateName = osmAddr.state || osmAddr.city || osmAddr.province || '';
         if (!stateName) return;
 
@@ -184,7 +179,6 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
         const pId = matchedProvince.id;
         setSelectedProvinceId(pId);
 
-        // 2. Load and match districts
         try {
             const resP = await fetch(`https://provinces.open-api.vn/api/p/${pId}?depth=2`);
             if (!resP.ok) throw new Error();
@@ -203,12 +197,10 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
                             targetDistClean.includes(clean(d.name))
             );
 
-            // If no match found, fallback to first district
             const dId = matchedDistrict?.id || mappedDistricts[0]?.id || '';
             setSelectedDistrictId(dId);
 
             if (dId) {
-                // 3. Load and match wards
                 const resD = await fetch(`https://provinces.open-api.vn/api/d/${dId}?depth=2`);
                 if (!resD.ok) throw new Error();
                 const dataD = await resD.json();
@@ -218,7 +210,6 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
                 }));
                 setWards(mappedWards);
 
-                // OSM labels ward under suburb, quarter, ward, village, commune
                 const wardName = osmAddr.ward || osmAddr.suburb || osmAddr.quarter || osmAddr.village || osmAddr.commune || '';
                 const targetWardClean = clean(wardName);
                 let matchedWard = mappedWards.find(
@@ -231,7 +222,6 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
                 setSelectedWardCode(wCode);
             }
 
-            // 4. Fill Address Detail using road/house number
             const road = osmAddr.road || '';
             const houseNo = osmAddr.house_number || '';
             let detail = [houseNo, road].filter(Boolean).join(' ');
@@ -249,17 +239,14 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
         }
     };
 
-    // Province/District/Ward dropdown list
     const [provinces, setProvinces] = useState<any[]>([]);
     const [districts, setDistricts] = useState<any[]>([]);
     const [wards, setWards] = useState<any[]>([]);
 
-    // Selected values
-    const [selectedProvinceId, setSelectedProvinceId] = useState('79'); // Default HCMC
-    const [selectedDistrictId, setSelectedDistrictId] = useState('760'); // Default Dist 1
-    const [selectedWardCode, setSelectedWardCode] = useState('26734'); // Default Ward Ben Nghe
+    const [selectedProvinceId, setSelectedProvinceId] = useState('79');
+    const [selectedDistrictId, setSelectedDistrictId] = useState('760');
+    const [selectedWardCode, setSelectedWardCode] = useState('26734');
 
-    // Helpers
     const loadWards = async (dId: string, targetWCode?: string) => {
         try {
             const res = await fetch(`https://provinces.open-api.vn/api/d/${dId}?depth=2`);
@@ -313,7 +300,6 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
         loadWards(districtId);
     };
 
-    // Load provinces list on open
     useEffect(() => {
         const fetchProvinces = async () => {
             try {
@@ -334,11 +320,9 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
         }
     }, [isOpen]);
 
-    // Initialize editing address
     useEffect(() => {
         if (!isOpen) return;
 
-        // Reset query when modal state changes
         setSearchQuery('');
         setSelectedDisplayName('');
         setSuggestions([]);
@@ -370,7 +354,6 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Build full address text from names
         const selectedProvName = provinces.find(p => p.id === selectedProvinceId)?.name || '';
         const selectedDistName = districts.find(d => d.id === selectedDistrictId)?.name || '';
         const selectedWardName = wards.find(w => w.code === selectedWardCode)?.name || '';

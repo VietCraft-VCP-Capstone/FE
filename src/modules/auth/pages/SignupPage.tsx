@@ -23,13 +23,23 @@ const SL = ['', 'Yếu', 'Trung bình', 'Khá', 'Mạnh'];
 
 
 
-/** Đường quay lại sau đăng ký, lấy từ `?next=`. Chỉ nhận path nội bộ (chặn open redirect). */
 function safeNext(raw: string | null): string | null {
   if (!raw) return null;
   let decoded: string;
   try { decoded = decodeURIComponent(raw); } catch { return null; }
   if (!decoded.startsWith('/') || decoded.startsWith('//')) return null;
   return decoded;
+}
+
+function getRedirectTarget(u: any, nextUrl: string | null): string {
+  const role = u?.role?.toLowerCase();
+  if (role === 'admin') {
+    return (nextUrl && nextUrl.startsWith('/admin')) ? nextUrl : '/admin';
+  }
+  if (role === 'seller') {
+    return (nextUrl && nextUrl.startsWith('/seller')) ? nextUrl : '/seller';
+  }
+  return nextUrl ?? '/';
 }
 
 export function SignupPage({ onSignup, user }: SignupPageProps) {
@@ -47,7 +57,7 @@ export function SignupPage({ onSignup, user }: SignupPageProps) {
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    const target = nextUrl ?? (user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/');
+    const target = getRedirectTarget(user, nextUrl);
     return <Navigate to={target} replace />;
   }
 

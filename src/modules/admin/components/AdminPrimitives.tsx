@@ -1,11 +1,3 @@
-/**
- * Các khối giao diện dùng chung của khu quản trị.
- *
- * Mục tiêu: trang nghiệp vụ (Danh mục, Thẻ, …) chỉ mô tả *dữ liệu và hành vi*,
- * còn phần trình bày — tiêu đề trang, dải số liệu, ô tìm kiếm, trạng thái rỗng,
- * khung xương khi tải, hộp thoại — nằm trọn ở đây.
- */
-
 import React, { useCallback, useEffect, useId, useRef } from 'react';
 import { AlertCircle, Check, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Search, X } from 'lucide-react';
 import {
@@ -22,7 +14,6 @@ import {
   cx,
 } from './adminUi';
 
-/* ===================================================== tiêu đề trang ===== */
 
 export function PageHeader({
   title,
@@ -46,20 +37,13 @@ export function PageHeader({
   );
 }
 
-/* ====================================================== dải số liệu ====== */
-
 export interface StatItem {
   label: string;
   value: React.ReactNode;
-  /** Chấm màu đứng trước số — dùng để phân biệt trạng thái, không phải để trang trí. */
   dot?: string;
   hint?: string;
 }
 
-/**
- * Số liệu tổng quan hiển thị thành một dải liền mạch chứ không phải 4 thẻ nổi
- * rời rạc — mật độ dữ liệu cao thì đường kẻ phân tách đọc tốt hơn đổ bóng.
- */
 export function StatStrip({ items, loading = false }: { items: StatItem[]; loading?: boolean }) {
   return (
     <div className={cx(CARD, 'mb-4 grid grid-cols-2 divide-admin-line md:grid-cols-4 md:divide-x')}>
@@ -90,8 +74,6 @@ export function StatStrip({ items, loading = false }: { items: StatItem[]; loadi
   );
 }
 
-/* ======================================================= ô tìm kiếm ====== */
-
 export function SearchField({
   value,
   onChange,
@@ -101,7 +83,6 @@ export function SearchField({
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
-  /** Nhãn cho trình đọc màn hình — ô tìm kiếm không có nhãn hiển thị. */
   label: string;
 }) {
   const id = useId();
@@ -133,8 +114,6 @@ export function SearchField({
     </div>
   );
 }
-
-/* ================================================== bộ lọc phân đoạn ===== */
 
 export function SegmentedControl<T extends string>({
   value,
@@ -177,8 +156,6 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-/* ==================================================== nhãn trạng thái ==== */
-
 const PILL_TONES = {
   brand: 'bg-admin-brand-050 text-admin-brand-600',
   neutral: 'bg-admin-line-soft text-[#7c8a83]',
@@ -205,13 +182,9 @@ export function StatusPill({
   );
 }
 
-/* =========================================================== cảnh báo ==== */
-
 const ALERT_TONES = {
   danger: { cls: 'border-[#f6caca] bg-admin-danger-050 text-[#b91c1c]', icon: AlertCircle, role: 'alert' },
   warn: { cls: 'border-[#fdba74] bg-[#fff7ed] text-[#9a3412]', icon: AlertCircle, role: 'alert' },
-  // Báo thành công phải khác báo lỗi cả về màu lẫn biểu tượng; dùng role="status"
-  // để trình đọc màn hình không cắt lời người dùng như khi gặp role="alert".
   success: { cls: 'border-[#b7e0b7] bg-admin-brand-050 text-admin-brand-700', icon: CheckCircle2, role: 'status' },
 } as const;
 
@@ -246,15 +219,12 @@ export function Alert({
   );
 }
 
-/* ======================================================= trạng thái rỗng = */
-
 export function EmptyState({
   icon: Icon,
   title,
   description,
   action,
 }: {
-  /** Biểu tượng Lucide, ví dụ `FolderTree`. */
   icon: React.ElementType;
   title: string;
   description?: string;
@@ -272,7 +242,7 @@ export function EmptyState({
   );
 }
 
-/* ========================================================== phân trang ==== */
+/* phân trang =*/
 
 const PAGE_BTN =
   'inline-flex h-9 min-w-[36px] cursor-pointer items-center justify-center rounded-lg border px-2 ' +
@@ -283,12 +253,6 @@ const PAGE_BTN_IDLE =
   'border-[#dde4dd] bg-white text-admin-body hover:border-admin-brand hover:bg-admin-brand-050 hover:text-admin-brand';
 const PAGE_BTN_ACTIVE = 'border-admin-brand bg-admin-brand text-white';
 
-/**
- * Cửa sổ số trang: luôn giữ trang đầu, trang cuối và vùng quanh trang hiện tại.
- *
- * Đổ hết số trang ra màn hình thì tới trang thứ 40 thanh phân trang dài hơn cả
- * bảng dữ liệu. Trang đầu/cuối luôn hiện vì đó là hai đích nhảy hay dùng nhất.
- */
 export function pageWindow(page: number, totalPages: number, edge = 1): (number | 'gap')[] {
   if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
 
@@ -303,13 +267,6 @@ export function pageWindow(page: number, totalPages: number, edge = 1): (number 
   return out;
 }
 
-/**
- * Thanh phân trang dùng chung cho mọi bảng quản trị.
- *
- * Luôn nói rõ đang xem khoảng nào trên tổng bao nhiêu — con số tổng là thứ duy
- * nhất cho biết bộ lọc vừa gõ có thu hẹp kết quả hay không. Các nút số trang ẩn
- * trên màn hẹp, chỉ còn lùi/tiến kèm "Trang x/y" để không xuống dòng lởm chởm.
- */
 export function Pagination({
   page,
   totalPages,
@@ -326,9 +283,7 @@ export function Pagination({
   total: number;
   limit: number;
   onPageChange: (page: number) => void;
-  /** Danh từ đếm được, ví dụ 'sản phẩm' → "1–15 trên 42 sản phẩm". */
   itemLabel?: string;
-  /** Bỏ trống thì không hiện ô chọn số dòng mỗi trang. */
   limitOptions?: number[];
   onLimitChange?: (limit: number) => void;
   disabled?: boolean;
@@ -378,7 +333,6 @@ export function Pagination({
               <ChevronLeft size={16} aria-hidden />
             </button>
 
-            {/* Màn hẹp: bỏ dãy số, giữ lại vị trí hiện tại dưới dạng chữ. */}
             <span className="px-1 text-[12.5px] tabular-nums text-admin-muted sm:hidden">
               Trang {page}/{totalPages}
             </span>
@@ -419,12 +373,6 @@ export function Pagination({
   );
 }
 
-/* ======================================================== khung xương ==== */
-
-/**
- * Khung xương phải khớp hình dạng nội dung thật, nếu không màn hình sẽ nhảy khi
- * dữ liệu về. Mỗi dòng mô phỏng đúng chiều cao một hàng danh sách/bảng.
- */
 export function SkeletonRows({ rows = 6, columns }: { rows?: number; columns: string[] }) {
   return (
     <div aria-hidden className="divide-y divide-admin-line-soft">
@@ -446,9 +394,6 @@ export function SkeletonRows({ rows = 6, columns }: { rows?: number; columns: st
   );
 }
 
-/* =========================================================== hộp thoại === */
-
-/** Khoá cuộn nền + đóng bằng Escape + trả tiêu điểm về nơi vừa rời đi. */
 function useDialogBehaviour(open: boolean, onClose: () => void) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -458,8 +403,6 @@ function useDialogBehaviour(open: boolean, onClose: () => void) {
     const restoreTo = document.activeElement as HTMLElement | null;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
-    // Ưu tiên ô nhập đầu tiên; nếu không có thì đưa tiêu điểm vào chính hộp thoại.
     const focusTarget =
       panelRef.current?.querySelector<HTMLElement>(
         'input:not([type="hidden"]):not([readonly]), textarea, select, button[data-autofocus]'
@@ -472,7 +415,6 @@ function useDialogBehaviour(open: boolean, onClose: () => void) {
         onClose();
         return;
       }
-      // Giữ tiêu điểm quẩn quanh trong hộp thoại.
       if (e.key !== 'Tab' || !panelRef.current) return;
       const focusable = Array.from(
         panelRef.current.querySelectorAll<HTMLElement>(
@@ -564,10 +506,6 @@ export function Modal({
   );
 }
 
-/**
- * Thay cho window.confirm: giữ nguyên ngôn ngữ thiết kế, nêu rõ hậu quả, và
- * nút phá huỷ được đánh dấu bằng màu đỏ thay vì trông giống nút "OK" của trình duyệt.
- */
 export function ConfirmDialog({
   open,
   title,
@@ -622,7 +560,6 @@ export function ConfirmDialog({
   );
 }
 
-/* ============================================================ công tắc === */
 
 export function Toggle({
   checked,

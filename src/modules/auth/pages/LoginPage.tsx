@@ -41,17 +41,23 @@ function GoogleIcon() {
 }
 
 
-/**
- * Đường quay lại sau khi đăng nhập, lấy từ `?next=`.
- * Khách bị chặn ở /checkout sẽ mang theo tham số này, đăng nhập xong quay lại đúng chỗ.
- * Chỉ nhận đường dẫn nội bộ: '//evil.com' và 'http://evil.com' đều bị loại (open redirect).
- */
 function safeNext(raw: string | null): string | null {
   if (!raw) return null;
   let decoded: string;
   try { decoded = decodeURIComponent(raw); } catch { return null; }
   if (!decoded.startsWith('/') || decoded.startsWith('//')) return null;
   return decoded;
+}
+
+function getRedirectTarget(u: any, nextUrl: string | null): string {
+  const role = u?.role?.toLowerCase();
+  if (role === 'admin') {
+    return (nextUrl && nextUrl.startsWith('/admin')) ? nextUrl : '/admin';
+  }
+  if (role === 'seller') {
+    return (nextUrl && nextUrl.startsWith('/seller')) ? nextUrl : '/seller';
+  }
+  return nextUrl ?? '/';
 }
 
 export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
@@ -66,9 +72,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    // Navigate thay cho navigate(): gọi điều hướng ngay trong thân render là side effect,
-    // React sẽ cảnh báo và có thể chạy hai lần ở StrictMode.
-    const target = nextUrl ?? (user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/');
+    const target = getRedirectTarget(user, nextUrl);
     return <Navigate to={target} replace />;
   }
 
@@ -77,7 +81,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
       setLoading(true); setError('');
       try {
         const loggedUser = await onGoogleLogin(res.access_token);
-        const target = nextUrl ?? (loggedUser?.role === 'admin' ? '/admin' : loggedUser?.role === 'seller' ? '/seller' : '/');
+        const target = getRedirectTarget(loggedUser, nextUrl);
         navigate(target, { replace: true });
       }
       catch { setError('Đăng nhập Google thất bại.'); }
@@ -102,7 +106,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
       await onLogin({ email: em, password: pw });
       setRateLimit(em, { attempts: 0 });
       const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
-      const target = nextUrl ?? (storedUser?.role === 'admin' ? '/admin' : storedUser?.role === 'seller' ? '/seller' : '/');
+      const target = getRedirectTarget(storedUser, nextUrl);
       navigate(target, { replace: true });
     } catch (err: any) {
       const errData = err?.response?.data;

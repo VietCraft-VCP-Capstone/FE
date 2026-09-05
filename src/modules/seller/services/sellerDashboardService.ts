@@ -1,28 +1,12 @@
-/**
- * Gom dữ liệu cho trang chủ (Dashboard) của người bán.
- *
- * Trang này dựng trên hai nguồn:
- *   - GET /products/mine     : toàn bộ sản phẩm của shop (kể cả nháp/đã gỡ)
- *   - GET /seller/settings   : hồ sơ gian hàng, để chấm mức độ hoàn thiện
- *
- * Cố ý CHƯA lấy đơn hàng vào đây, dù `GET /seller/orders` nay đã có (xem
- * sellerOrdersService.ts): phần doanh thu / số đơn của dashboard là một việc riêng,
- * chưa làm. Lưu ý khi làm tiếp — phải gọi `/seller/orders` chứ không phải `/orders`,
- * vì `/orders` lọc theo buyerId nên với tài khoản seller nó trả về đơn họ ĐI MUA.
- */
-
 import { productsService } from '../../product/services/productsService';
 import { sellerSettingsService } from './sellerSettingsService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import type { ProductItem } from '../../product/types/product';
 import type { SellerSettingsState } from '../types/settings';
 
-/** Số sản phẩm lấy mỗi lượt. BE không kẹp trần cho /products/mine. */
 const PAGE_SIZE = 200;
-/** Trần an toàn: 2 lượt gọi là đủ cho quy mô một gian hàng. */
 const MAX_PAGES = 2;
 
-/** Dưới ngưỡng này coi là sắp hết hàng và cần nhập thêm. */
 export const LOW_STOCK_THRESHOLD = 5;
 
 export interface SellerOverviewData {
@@ -30,7 +14,6 @@ export interface SellerOverviewData {
   productsLoaded: number;
   productsTotal: number;
   settings: SellerSettingsState | null;
-  /** Lỗi từng nguồn, hiện nguyên văn cho người bán. */
   failures: string[];
 }
 
@@ -75,12 +58,9 @@ async function loadAllMyProducts(): Promise<{ items: ProductItem[]; total: numbe
   return { items, total };
 }
 
-/* ------------------------------------------------------------- suy diễn ---- */
-
 export interface CategoryValue {
   category: string;
   count: number;
-  /** Tổng giá bán × tồn kho của các sản phẩm trong danh mục. */
   value: number;
 }
 
@@ -89,12 +69,9 @@ export interface SellerMetrics {
   active: number;
   inactive: number;
   outOfStock: number;
-  /** Vốn đang nằm trong kho, theo giá bán. */
   inventoryValue: number;
-  /** Còn hàng nhưng dưới ngưỡng cảnh báo — sắp phải nhập thêm. */
   lowStock: ProductItem[];
   outOfStockItems: ProductItem[];
-  /** Thiếu ảnh: người mua gần như chắc chắn lướt qua. */
   missingImages: ProductItem[];
   byCategory: CategoryValue[];
 }
@@ -110,8 +87,6 @@ export function deriveSellerMetrics(products: ProductItem[]): SellerMetrics {
     .filter(p => Number(p.stock) > 0 && Number(p.stock) <= LOW_STOCK_THRESHOLD)
     .sort((a, b) => Number(a.stock) - Number(b.stock));
 
-  // BE thay ảnh trống bằng một ảnh Unsplash mặc định, nên "không có ảnh" phải
-  // nhận diện qua đường dẫn ngoài miền chứ không phải qua mảng rỗng.
   const missingImages = products.filter(p => {
     const first = p.thumbnail || p.images?.[0] || '';
     return !first || first.includes('images.unsplash.com');
@@ -139,30 +114,21 @@ export function deriveSellerMetrics(products: ProductItem[]): SellerMetrics {
   };
 }
 
-/* ----------------------------------------------------------- phân bố giá --- */
-
 export interface PriceBucket {
-  /** Cận dưới của khoảng, đã bao gồm. */
   from: number;
-  /** Cận trên của khoảng, KHÔNG bao gồm. */
   to: number;
   count: number;
 }
 
 export interface PriceStats {
-  /** Số sản phẩm thực sự có giá (> 0). Hàng chưa đặt giá bị loại khỏi mọi phép tính. */
   priced: number;
   min: number;
-  /** Trung vị — một nửa số sản phẩm rẻ hơn mức này. Chọn trung vị thay vì trung
-   *  bình cộng vì một món giá cao bất thường sẽ kéo lệch hẳn số trung bình. */
   median: number;
   max: number;
-  /** Bề rộng mỗi khoảng giá. */
   step: number;
   buckets: PriceBucket[];
 }
 
-/** Làm tròn bước chia lên số "đẹp" (1 / 2 / 2,5 / 5 × 10^k) để nhãn trục dễ đọc. */
 function niceStep(raw: number): number {
   if (!Number.isFinite(raw) || raw <= 0) return 1;
   const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -171,18 +137,9 @@ function niceStep(raw: number): number {
   return factor * magnitude;
 }
 
-/** Số cột mong muốn. Chỉ là mục tiêu — bước chia làm tròn "đẹp" nên số cột thực tế xê dịch. */
 const TARGET_BUCKETS = 6;
-/** Trần cứng: quá số này thì nhãn trục chồng nhau và mỗi cột còn quá ít hàng. */
 const MAX_BUCKETS = 8;
 
-/**
- * Phân bố sản phẩm theo khoảng giá.
- *
- * Cố tình KHÔNG đụng tới `originalPrice`: khi sản phẩm không có giá gốc thật, BE
- * tự bịa ra `price * 1.1` (xem mapToProductItemResponse), nên mọi con số "đang
- * giảm giá" dựng trên field đó đều là số ảo.
- */
 export function derivePriceStats(products: ProductItem[]): PriceStats | null {
   const prices = products
     .map(p => Number(p.price) || 0)
@@ -196,7 +153,6 @@ export function derivePriceStats(products: ProductItem[]): PriceStats | null {
   const mid = Math.floor(prices.length / 2);
   const median = prices.length % 2 === 0 ? Math.round((prices[mid - 1] + prices[mid]) / 2) : prices[mid];
 
-  // Mọi sản phẩm cùng một giá: một cột duy nhất, không có gì để chia khoảng.
   if (max === min) {
     return { priced: prices.length, min, median, max, step: 0, buckets: [{ from: min, to: min, count: prices.length }] };
   }
@@ -212,7 +168,6 @@ export function derivePriceStats(products: ProductItem[]): PriceStats | null {
   }));
 
   for (const price of prices) {
-    // Kẹp về cột cuối: giá đúng bằng cận trên của cột cuối vẫn phải được đếm.
     const index = Math.min(bucketCount - 1, Math.floor((price - start) / step));
     buckets[index].count++;
   }
@@ -220,21 +175,13 @@ export function derivePriceStats(products: ProductItem[]): PriceStats | null {
   return { priced: prices.length, min, median, max, step, buckets };
 }
 
-/* ------------------------------------------- mức độ hoàn thiện gian hàng --- */
-
 export interface SetupTask {
   key: string;
   label: string;
   done: boolean;
-  /** Màn hình cần mở để hoàn thành mục này. */
   to: string;
 }
 
-/**
- * Danh sách việc thiết lập gian hàng, chấm từ dữ liệu cài đặt thật.
- * Chỉ đưa vào những mục ẢNH HƯỞNG TRỰC TIẾP tới việc bán được hàng — không phải
- * mọi ô trống trong biểu mẫu đều đáng để hối thúc người bán.
- */
 export function deriveSetupTasks(settings: SellerSettingsState | null): SetupTask[] {
   const brand = settings?.brand;
   const shipping = settings?.shipping;

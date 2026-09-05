@@ -1,20 +1,13 @@
 import api from '../../../infrastructure/api/interceptors';
 import { ProductItem, ProductFormData, ProductFilterState, PaginatedProductsResult } from '../types/product';
 
-// ponytail: mockup lưu path tương đối /uploads/... trên BE (8080), FE chạy 3000.
-// Ghép origin ngay tại API boundary → mọi nơi đọc p.images (bảng, drawer) hiển thị đúng.
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
-// Chỉ path gốc-tương-đối ('/uploads/...') mới cần ghép origin. Điều kiện cũ là
-// `!startsWith('http')`, nên nó ghép origin vào cả 'data:image/...;base64,' và 'blob:'
-// -> 'http://localhost:8080data:image/...' -> ảnh chết. Ảnh chọn từ máy ở form thêm
-// sản phẩm được lưu dạng data URL, nên chúng biến mất hết ở bảng và drawer.
 const absImg = (u: any) => (typeof u === 'string' && u.startsWith('/') ? ORIGIN + u : u);
 const resolveImages = (p: any) =>
   p && Array.isArray(p.images)
     ? { ...p, images: p.images.map(absImg), thumbnail: absImg(p.thumbnail) }
     : p;
 
-/** BE luôn trả {items,total,page,limit,totalPages}; chuẩn hoá phòng khi nhận mảng thuần. */
 const toPaginated = (data: any): PaginatedProductsResult => {
   if (data && Array.isArray(data.items)) {
     return { ...data, items: data.items.map(resolveImages) };
@@ -32,7 +25,6 @@ const toPaginated = (data: any): PaginatedProductsResult => {
 };
 
 export const productsService = {
-  /** Marketplace công khai — chỉ hàng đã PUBLISHED của mọi shop. */
   getAll: async (filter?: Partial<ProductFilterState>): Promise<PaginatedProductsResult> => {
     try {
       const res = await api.get('/products', { params: filter });
@@ -43,11 +35,6 @@ export const productsService = {
     }
   },
 
-  /**
-   * Hàng của chính seller đang đăng nhập (BE: GET /products/mine, cần token + role seller).
-   * Cố tình KHÔNG nuốt lỗi: 401/403 mà trả về danh sách rỗng thì seller sẽ tưởng mình
-   * chưa có sản phẩm nào, trong khi thực ra là chưa đăng nhập / sai quyền.
-   */
   getMine: async (filter?: Partial<ProductFilterState>): Promise<PaginatedProductsResult> => {
     const res = await api.get('/products/mine', { params: filter });
     return toPaginated(res.data);
@@ -104,8 +91,6 @@ export const productsService = {
   updateStatus: async (ids: string[], status: ProductItem['status']): Promise<void> => {
     await api.patch('/products/batch-status', { ids, status });
   },
-
-  // ===== Luồng POD: chọn phôi, tải design, xem trước mockup =====
 
   getCategories: async () => {
     const res = await api.get('/products/meta/categories');

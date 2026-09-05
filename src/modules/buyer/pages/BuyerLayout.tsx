@@ -14,17 +14,13 @@ export function BuyerLayout({ user }: BuyerLayoutProps) {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    // 1. Fetch initial cart count from backend DB
     cartService.getCart()
       .then(cart => {
         const total = cart?.items?.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0) || 0;
         setCartCount(total);
       })
-      // cartService tự phân nhánh giỏ server / giỏ khách nên không còn nhánh dự phòng
-      // đọc thẳng localStorage ở đây nữa.
       .catch(() => setCartCount(0));
 
-    // 2. Listen to custom event cart updates
     const handleCartUpdate = (e: any) => {
       setCartCount(e.detail.count || 0);
     };

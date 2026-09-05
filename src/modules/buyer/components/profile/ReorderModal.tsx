@@ -27,7 +27,6 @@ export const ReorderModal: React.FC<ReorderModalProps> = ({
     items,
     onConfirm
 }) => {
-    // Local state to manage selections and quantities
     const [editableItems, setEditableItems] = useState<(OrderItem & { selected: boolean })[]>([]);
 
     useEffect(() => {
@@ -35,7 +34,7 @@ export const ReorderModal: React.FC<ReorderModalProps> = ({
             setEditableItems(
                 items.map(item => ({
                     ...item,
-                    selected: true // default all selected
+                    selected: true
                 }))
             );
         }
@@ -69,7 +68,6 @@ export const ReorderModal: React.FC<ReorderModalProps> = ({
             alert('Vui lòng chọn ít nhất một sản phẩm để mua lại.');
             return;
         }
-        // Map back to OrderItem format
         const finalItems = selected.map(({ selected, ...rest }) => rest);
         onConfirm(finalItems);
     };

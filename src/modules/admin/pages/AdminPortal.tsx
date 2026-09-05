@@ -14,8 +14,6 @@ function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
-  // BE nay chặn /auth/users bằng requireRole(['admin']). Nuốt lỗi ở đây sẽ cho ra
-  // bảng rỗng trông y hệt "hệ thống chưa có người dùng" — phải hiện lý do thật.
   const [error, setError] = useState<string | null>(null);
 
   const toggleLock = (userId: string) => {
@@ -48,6 +46,7 @@ function AdminUsers() {
 
   return (
     <div className="rounded-xl border border-admin-line bg-admin-surface p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+      {/* Users Header & Stats */}
       <h2 className="mt-0 mb-1 text-[20px] font-bold text-[#330033]">Quản lý Người dùng</h2>
       <p className="mt-0 mb-5 text-[13px] text-[#666]">Quản lý thông tin, phân quyền và trạng thái hoạt động của tài khoản trên hệ thống.</p>
       {error && (
@@ -67,6 +66,8 @@ function AdminUsers() {
           <div className="flex items-baseline justify-between"><span className="text-[24px] font-extrabold text-stone-900">{sellerCount}</span><span className="rounded bg-[#e8f5e8] px-1.5 py-0.5 text-[12px] font-semibold text-admin-brand">↗ Hoạt động</span></div>
         </div>
       </div>
+
+      {/* Search & Filter Toolbar */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="relative flex max-w-[320px] flex-1 items-center">
           <Search size={14} className="absolute left-3 text-[#999]" />
@@ -78,6 +79,8 @@ function AdminUsers() {
           <button className={`ml-1.5 cursor-pointer rounded-[20px] border px-4 py-1.5 text-[13px] font-semibold transition-all duration-150 ${filter === 'Seller' ? 'border-admin-brand bg-admin-brand text-white' : 'border-[#ddd] bg-transparent text-[#555]'}`} onClick={() => setFilter('Seller')}>Người bán</button>
         </div>
       </div>
+
+      {/* Users Table */}
       <div className="mb-4 overflow-hidden rounded-lg border border-admin-line">
         {loading ? (
           <div className="p-8 text-center text-stone-500">Đang tải danh sách người dùng...</div>
@@ -135,9 +138,12 @@ function AdminUsers() {
   );
 }
 
+/* ------------------------------------------------------------- Admin Disputes Page */
 function AdminDisputes() {
   return <div><h2 className="m-0 text-[24px] font-extrabold tracking-[-0.02em] text-admin-ink">Tranh chấp</h2><p className="mt-1.5 mb-0 text-[13.5px] leading-normal text-admin-muted">Xử lý và giải quyết các tranh chấp giữa người mua và người bán.</p></div>;
 }
+
+/* ------------------------------------------------------------- Admin Marketing Page */
 function AdminMarketing() {
   return <div><h2 className="m-0 text-[24px] font-extrabold tracking-[-0.02em] text-admin-ink">Marketing</h2><p className="mt-1.5 mb-0 text-[13.5px] leading-normal text-admin-muted">Quản lý các chiến dịch khuyến mãi và tiếp thị.</p></div>;
 }
@@ -147,6 +153,7 @@ interface AdminPortalProps {
   onLogout: () => void;
 }
 
+/* ------------------------------------------------------------- Admin Router Portal */
 export function AdminPortal({ user, onLogout }: AdminPortalProps) {
   return (
     <AdminLayout user={user} onLogout={onLogout}>

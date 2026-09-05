@@ -3,8 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Star, Store, ArrowLeft, PackageSearch } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 
-/** Thông tin gian hàng suy ra từ `shopInfo` mà mỗi sản phẩm đã mang sẵn.
- *  BE chưa có endpoint GET /shops/:id, nên đọc từ đây thay vì thêm API mới. */
 interface ShopHeader {
   name: string;
   logo?: string;
@@ -22,7 +20,6 @@ export function BuyerShopPage() {
     if (!id) return;
     let alive = true;
     setLoading(true);
-    // /products?shopId= là endpoint CÔNG KHAI — khách vãng lai xem được gian hàng.
     productsService
       .getAll({ shopId: id, pageSize: 60 } as any)
       .then((data) => {

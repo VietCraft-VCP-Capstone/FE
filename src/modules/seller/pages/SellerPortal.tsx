@@ -33,24 +33,19 @@ interface SellerPortalProps {
 }
 
 export function SellerPortal({ user, onLogout }: SellerPortalProps) {
-  // Trang tạm cho các mục chưa có màn hình thật.
   const Stub = ({ t, d }: { t: string; d: string }) => (
     <div className="animate-fade-in"><h2 className="seller-products-title">{t}</h2><p className="seller-role-subtitle">{d}</p></div>
   );
   return (
     <SellerLayout user={user} onLogout={onLogout}>
+      {/* Seller Routes */}
       <Routes>
         <Route path="dashboard" element={<SellerDashboard />} />
-        {/* Luồng POD: chọn phôi + đặt design. Đang tắt tạm — xem featureFlags.ts.
-            Vẫn khai báo route và đá về danh sách sản phẩm, thay vì bỏ hẳn: link cũ
-            hay bookmark sẽ rơi vào catch-all '*' và cũng bị điều hướng, nhưng để
-            route ở đây thì lúc bật lại chỉ là đổi một cờ. */}
         <Route
           path="products/new"
           element={POD_CREATE_ENABLED ? <CreateProductPage /> : <Navigate to="/seller/products" replace />}
         />
         <Route path="products" element={<ProductListingPage />} />
-        {/* Alias cũ của trang quản lí sản phẩm */}
         <Route path="product-listing" element={<ProductListingPage />} />
         <Route path="settings" element={<SellerSettingsPage />} />
         <Route path="onboarding" element={<ShopOnboardingPage />} />

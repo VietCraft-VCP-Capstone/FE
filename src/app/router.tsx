@@ -26,13 +26,6 @@ function RolePortal({ user, onLogout }: { user: any; onLogout: () => void }) {
   return <BuyerLayout user={user} />;
 }
 
-/**
- * Cổng theo vai trò cho /admin/* và /seller/*.
- * Trước đây /seller/* KHÔNG kiểm tra gì và còn tiêm sẵn một user seller giả khi chưa đăng
- * nhập, nên ai gõ /seller cũng vào được vỏ portal (API bên trong vẫn 401/403, nhưng không
- * có lý do gì để dựng cả trang cho người không phải seller).
- * Chưa đăng nhập -> /login kèm ?next=; đã đăng nhập nhưng sai vai -> về trang chủ.
- */
 function RequireRole({ user, roles, children }: { user: any; roles: string[]; children: React.ReactNode }) {
   const location = useLocation();
   const role = user?.role?.toLowerCase();
@@ -47,13 +40,6 @@ function RequireRole({ user, roles, children }: { user: any; roles: string[]; ch
   return <>{children}</>;
 }
 
-/**
- * Cổng đăng nhập cho các route riêng tư.
- * Chưa đăng nhập -> /login?next=<đường dẫn hiện tại đã encode>.
- * Dùng query param (KHÔNG dùng router state) vì interceptor 401 trong
- * infrastructure/api/client.ts điều hướng bằng window.location.href = '/login'
- * (full reload) làm mất sạch state của React Router; query param sống sót cả hai đường.
- */
 function RequireAuth({ user }: { user: any }) {
   const location = useLocation();
 
@@ -65,16 +51,9 @@ function RequireAuth({ user }: { user: any }) {
   return <BuyerLayout user={user} />;
 }
 
-/**
- * Giữ `next` qua chặng xác thực OTP.
- * SignupPage chuyển sang /verify kèm state { email, next }; xác thực xong phải ghép `next`
- * trở lại URL đăng nhập, nếu không khách đăng ký từ trang thanh toán sẽ mất đích quay lại.
- * Giữ nguyên window.location.href (reload cứng) như trước — OTPPage đang dựa vào đó.
- */
 function VerifyRoute() {
   const location = useLocation();
   const next = (location.state as any)?.next as string | undefined;
-  // Chỉ nhận đường dẫn nội bộ; chặn open redirect kiểu //evil.com
   const target =
     next && next.startsWith('/') && !next.startsWith('//')
       ? `/login?next=${encodeURIComponent(next)}`
@@ -87,7 +66,6 @@ export function AppRouter() {
   const { user, loading, login, signup, googleLogin, logout } = useAuth();
   const role = user?.role?.toLowerCase();
 
-  // Prevent flash-of-login during auth restore
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -118,12 +96,8 @@ export function AppRouter() {
           )
         }
       >
-        {/* Chỉ dùng khi đã đăng nhập; LandingPage không có <Outlet /> nên khách không thấy */}
         <Route index element={<BuyerDashboard user={user} onLogout={logout} />} />
       </Route>
-
-      {/* CÔNG KHAI — khách vãng lai duyệt hàng và bỏ vào giỏ được.
-          user có thể là null; BuyerLayout/BuyerHeader đọc bằng optional chaining nên an toàn. */}
       <Route element={<BuyerLayout user={user ?? null} />}>
         <Route path="/product/:id" element={<BuyerProductDetailPage />} />
         <Route path="/cart" element={<BuyerCartPage />} />
@@ -168,7 +142,6 @@ export function AppRouter() {
         element={user ? <RolePortal user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
       />
 
-      {/* Đường lạ: khách về trang chủ (KHÔNG đá sang /login), đã đăng nhập thì về portal theo role */}
       <Route
         path="*"
         element={

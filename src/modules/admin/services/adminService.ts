@@ -15,7 +15,6 @@ import type {
   PendingProductsResponse,
 } from '../types';
 
-/** Tham số phân trang chung. Bỏ trống thì dùng mặc định của BE. */
 export interface ListParams {
   page?: number;
   limit?: number;
@@ -31,12 +30,6 @@ export interface TagListParams extends ListParams {
   sort?: TagSortKey;
 }
 
-/**
- * Phong bì phân trang phòng thủ.
- *
- * Nếu BE lỡ trả về mảng trần (endpoint cũ, proxy cache, bản deploy lệch), FE vẫn
- * dựng được một trang hợp lệ thay vì ném lỗi `undefined.map` giữa màn hình.
- */
 function asPage<T>(raw: any, fallbackLimit = 20): Paginated<T> {
   if (Array.isArray(raw)) {
     return { items: raw, total: raw.length, page: 1, limit: raw.length || fallbackLimit, totalPages: 1 };
@@ -57,16 +50,11 @@ const authHeader = () => ({
   Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
 });
 
-// ponytail: mockup lưu path tương đối /uploads/... trên BE (8080), FE chạy 3000.
-// Ghép origin tại API boundary để ảnh POD hiển thị đúng ở trang kiểm duyệt.
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
 const absImg = (u: any) => (typeof u === 'string' && u && !u.startsWith('http') ? ORIGIN + u : u);
 const resolveImages = (p: any) => (p && Array.isArray(p.images) ? { ...p, images: p.images.map(absImg) } : p);
 
 export const adminService = {
-  // ==================== CATEGORIES ====================
-
-  /** Danh sách phẳng, đã cắt trang. */
   async getCategories(params: CategoryListParams = {}): Promise<Paginated<Category>> {
     const { data } = await api.get(`${ADMIN_BASE}/categories`, {
       params,
@@ -75,10 +63,6 @@ export const adminService = {
     return asPage<Category>(data.data);
   },
 
-  /**
-   * Cây danh mục đã cắt trang theo nút GỐC — mỗi gốc luôn kèm đủ nhánh con.
-   * BE trả về cây lồng sẵn; FE không dựng lại cây từ danh sách phẳng nữa.
-   */
   async getCategoryTree(params: CategoryListParams = {}): Promise<CategoryTreePage> {
     const { data } = await api.get(`${ADMIN_BASE}/categories/tree`, {
       params,
@@ -88,7 +72,6 @@ export const adminService = {
     return { ...page, totalNodes: Number(data.data?.totalNodes) || page.total };
   },
 
-  /** Không cắt trang: ô chọn danh mục cha phải thấy mọi mục, kể cả ngoài trang hiện tại. */
   async getCategoryOptions(): Promise<CategoryOption[]> {
     const { data } = await api.get(`${ADMIN_BASE}/categories/options`, { headers: authHeader() });
     return Array.isArray(data.data) ? data.data : [];
@@ -126,9 +109,6 @@ export const adminService = {
     });
   },
 
-  // ==================== TAGS ====================
-
-  /** Chỉ thẻ ĐÃ DUYỆT, đã cắt trang. Thẻ chờ duyệt có lối đọc riêng bên dưới. */
   async getTags(params: TagListParams = {}): Promise<Paginated<Tag>> {
     const { data } = await api.get(`${ADMIN_BASE}/tags`, {
       params,
@@ -198,8 +178,6 @@ export const adminService = {
     });
   },
 
-  // ==================== MODERATION ====================
-
   async getProducts(status?: string, page: number = 1, limit: number = 20): Promise<PendingProductsResponse> {
     const { data } = await api.get(`${ADMIN_BASE}/moderation/products`, {
       params: { status, page, limit },
@@ -218,10 +196,6 @@ export const adminService = {
     return data.data;
   },
 
-  /**
-   * `warnings` là những chỗ tin đăng chưa đạt chuẩn — sản phẩm VẪN được khôi phục.
-   * Không phải lỗi, nên đừng ném; nhưng cũng đừng nuốt, admin cần biết để nhắc người bán.
-   */
   async republishProduct(productId: string, notes?: string): Promise<{ product: ModerateProduct; warnings: string[] }> {
     const { data } = await api.post(
       `${ADMIN_BASE}/moderation/${productId}/republish`,

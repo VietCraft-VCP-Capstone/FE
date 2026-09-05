@@ -16,7 +16,6 @@ interface CartItem {
     quantity: number;
     image: string;
     checked: boolean;
-    /** POD_TEMPLATE = hàng in theo yêu cầu. Checkout dùng để chặn COD. */
     productType?: string;
 }
 
@@ -36,7 +35,6 @@ const parseMongooseDecimal = (val: any): number => {
     return isNaN(num) ? 0 : num;
 };
 
-// Map Mongoose models structure from backend to frontend CartItem interface
 const mapBackendCart = (cartData: any): CartItem[] => {
     if (!cartData || !Array.isArray(cartData.items)) {
         return [];
@@ -45,10 +43,8 @@ const mapBackendCart = (cartData: any): CartItem[] => {
         const prod = item.product_id || {};
         const variant = item.variant_id || {};
         
-        // Shop Name — document Shop thô chỉ có `shop_name`, KHÔNG có `name`
         const shopName = prod.shop_id?.shop_name || 'VietCraft Selection';
         
-        // Variant Label/Name
         let variantName = 'Mặc định';
         if (variant.color || variant.size || variant.material) {
             variantName = [variant.color, variant.size, variant.material].filter(Boolean).join(' - ');
@@ -56,7 +52,6 @@ const mapBackendCart = (cartData: any): CartItem[] => {
             variantName = variant.name;
         }
 
-        // Price: Variant price first, then product fallback
         let price = 0;
         if (variant.retail_price) {
             price = parseMongooseDecimal(variant.retail_price);
@@ -70,7 +65,6 @@ const mapBackendCart = (cartData: any): CartItem[] => {
             price = 150000;
         }
 
-        // Product image
         const image = variant.mockup_image || prod.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=300';
 
         return {
@@ -106,14 +100,11 @@ export function BuyerCartPage() {
     useEffect(() => {
         const syncAndFetchCart = async () => {
             try {
-                // 1. Rút cạn giỏ localStorage đời cũ. Logic nằm trong cartService để chỉ
-                //    một chỗ duy nhất biết tới khoá cũ; ở đây chỉ hiện lỗi cho người dùng.
                 const migrationFailures = await cartService.migrateLegacyCart();
                 if (migrationFailures.length > 0) {
                     showToast(migrationFailures[0], 'error');
                 }
 
-                // 2. Fetch database cart items
                 const cartData = await cartService.getCart();
                 setCartItems(mapBackendCart(cartData));
             } catch (err) {
@@ -123,7 +114,6 @@ export function BuyerCartPage() {
 
         syncAndFetchCart();
 
-        // 3. Fetch recommendation items
         const fetchRecs = async () => {
             try {
                 const res = await productsService.getAll();
@@ -201,7 +191,6 @@ export function BuyerCartPage() {
         }
     };
 
-    // Calculate totals
     const checkedItems = cartItems.filter((item: CartItem) => item.checked);
     const totalSelectedQty = checkedItems.reduce((acc: number, item: CartItem) => acc + item.quantity, 0);
     const totalPrice = checkedItems.reduce((acc: number, item: CartItem) => acc + (item.price * item.quantity), 0);
@@ -212,7 +201,6 @@ export function BuyerCartPage() {
             showToast('Vui lòng chọn ít nhất một sản phẩm để thanh toán.', 'error');
             return;
         }
-        // Store selected items for checkout
         localStorage.setItem('vietcraft_checkout', JSON.stringify(checkedItems));
         navigate('/checkout');
     };

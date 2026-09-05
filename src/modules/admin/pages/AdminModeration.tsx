@@ -29,8 +29,6 @@ import {
 
 type Filter = 'ALL' | 'PUBLISHED' | 'UNPUBLISHED' | 'DRAFT';
 
-/* Ba trạng thái phải phân biệt được bằng mắt: gộp UNPUBLISHED với DRAFT vào cùng
-   một màu xám sẽ khiến "bị admin gỡ" và "người bán chưa đăng" nhìn y hệt nhau. */
 const STATUS_TONE: Record<ModerateProduct['status'], { label: string; tone: 'brand' | 'danger' | 'neutral' }> = {
   PUBLISHED: { label: 'Đang bán', tone: 'brand' },
   UNPUBLISHED: { label: 'Đã gỡ', tone: 'danger' },
@@ -60,7 +58,6 @@ const formatDate = (value?: string) => {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
-/** Khung xương khớp đúng hình dạng hàng thật — đỡ nhảy layout so với spinner giữa màn hình. */
 function RowSkeleton({ rows = 8 }: { rows?: number }) {
   return (
     <div className="divide-y divide-admin-line-soft" aria-hidden>
@@ -112,8 +109,6 @@ export function AdminModeration() {
       setProducts(productsData.items);
       setTotal(productsData.total);
       setTotalPages(productsData.totalPages);
-      // BE ghim trang về khoảng hợp lệ (gỡ nốt sản phẩm cuối của trang 3 thì
-      // trang 3 không còn tồn tại). Bám theo trang thật nó trả về.
       if (productsData.page !== page) setPage(productsData.page);
       setStats(statsData);
     } catch (err: any) {
@@ -149,8 +144,6 @@ export function AdminModeration() {
     try {
       const { warnings } = await adminService.republishProduct(product.id);
       setError('');
-      // Tin đăng thiếu sót không còn chặn việc khôi phục, nhưng vẫn phải nói ra:
-      // im lặng thì admin tưởng sản phẩm đã hoàn chỉnh và không nhắc người bán.
       if (warnings.length > 0) {
         setSuccess('');
         setWarning(`Đã khôi phục "${product.title}", nhưng tin đăng còn thiếu: ${warnings.join('; ')}`);
@@ -167,7 +160,6 @@ export function AdminModeration() {
     }
   };
 
-  // Số thứ tự hàng phải chạy tiếp theo trang, không quay về 1 ở mỗi trang.
   const rangeFrom = total === 0 ? 0 : (page - 1) * limit + 1;
   const countFor = (key: Filter) =>
     key === 'ALL' ? stats.total : key === 'PUBLISHED' ? stats.published : key === 'UNPUBLISHED' ? stats.unpublished : stats.draft;
@@ -176,6 +168,7 @@ export function AdminModeration() {
 
   return (
     <div className={PAGE}>
+      {/* Header Section */}
       <PageHeader
         title="Kiểm duyệt sản phẩm"
         description="Sản phẩm được đăng bán ngay, không chờ duyệt trước. Ở đây bạn gỡ sản phẩm vi phạm và khôi phục khi người bán đã sửa."
@@ -185,9 +178,7 @@ export function AdminModeration() {
       {success && <Alert tone="success" onDismiss={() => setSuccess('')}>{success}</Alert>}
       {warning && <Alert tone="warn" onDismiss={() => setWarning('')}>{warning}</Alert>}
 
-      {/* Bộ lọc kiêm luôn số liệu: ba thẻ thống kê rồi lại ba nút lọc cùng con số là
-          nói một chuyện hai lần. Đặt dạng phân đoạn co theo nội dung — kéo giãn hết
-          bề ngang màn hình chỉ tạo bốn nút to bằng cả thanh công cụ. */}
+      {/* Filter Toolbar Section */}
       <div className={TOOLBAR}>
         <SegmentedControl
           label="Lọc theo trạng thái"
@@ -197,6 +188,7 @@ export function AdminModeration() {
         />
       </div>
 
+      {/* Product Moderation Table Section */}
       <div className={CARD}>
         {loading ? (
           <RowSkeleton />
@@ -204,8 +196,6 @@ export function AdminModeration() {
           <EmptyState icon={Inbox} title={empty.title} description={empty.desc} />
         ) : (
           <>
-            {/* Bảng rộng cuộn ngang trong khung của nó, không đẩy vỡ cả trang.
-                table-fixed để cột mô tả bị cắt gọn thay vì tự bành ra đẩy các cột khác. */}
             <div className="overflow-x-auto">
               <table className={cx(TABLE, 'min-w-[940px] table-fixed')}>
                 <caption className="sr-only">Danh sách sản phẩm theo trạng thái kiểm duyệt</caption>
@@ -251,8 +241,6 @@ export function AdminModeration() {
                         <td>
                           <div className="flex flex-col items-start gap-1">
                             <StatusPill tone={badge.tone}>{badge.label}</StatusPill>
-                            {/* Lý do gỡ là thông tin quan trọng nhất của hàng đợi kiểm duyệt;
-                                BE vẫn trả về nhưng giao diện cũ không hiện ở đâu cả. */}
                             {product.status === 'UNPUBLISHED' && product.unpublish_reason && (
                               <span
                                 className="max-w-full truncate text-[11.5px] leading-[1.4] text-admin-muted"
@@ -313,6 +301,8 @@ export function AdminModeration() {
           </>
         )}
       </div>
+
+      {/* Unpublish Reason Modal Section */}
 
       <Modal
         open={reasonFor !== null}

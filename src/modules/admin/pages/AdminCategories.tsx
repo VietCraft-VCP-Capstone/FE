@@ -51,7 +51,7 @@ import {
   Toggle,
 } from '../components/AdminPrimitives';
 
-/* ============================================================ tiện ích ==== */
+/* --------------------------------------------------------------- Utilities */
 
 function generateSlug(text: string): string {
   return text
@@ -65,12 +65,6 @@ function generateSlug(text: string): string {
     .replace(/-+/g, '-');
 }
 
-/**
- * BE trả về cây đã lồng sẵn và đã lọc (giữ nguyên tổ tiên của nút khớp), nên FE
- * không dựng lại cây từ danh sách phẳng nữa. Bản cũ gọi buildCategoryTree lên
- * chính mảng gốc đã lồng — mọi nhánh con bị ghi đè thành [] và biến mất khỏi
- * màn hình quản trị. Ở đây chỉ còn việc duyệt cây có sẵn.
- */
 function collectIds(nodes: Category[], out: string[] = []): string[] {
   for (const n of nodes) {
     out.push(n._id);
@@ -79,7 +73,6 @@ function collectIds(nodes: Category[], out: string[] = []): string[] {
   return out;
 }
 
-/** Tô sáng đoạn khớp từ khoá để mắt bắt được kết quả ngay trong danh sách dài. */
 function Highlight({ text, query }: { text: string; query: string }) {
   const q = query.trim();
   if (!q) return <>{text}</>;
@@ -94,24 +87,14 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
-/* =============================================================== hàng ==== */
+/* ----------------------------------------------------------- Category Item */
 
-/**
- * Bề rộng các cột bên phải của một hàng danh mục.
- *
- * Trên màn rộng, hàng chỉ có tên ở mép trái và nút ở mép phải sẽ để lại một
- * khoảng trống dài giữa hai đầu, mắt phải tự bắc cầu qua. Tách đường dẫn và số
- * danh mục con thành cột riêng để khoảng giữa đó mang dữ liệu thật.
- *
- * Hai cột phụ chỉ bật từ xl: dưới mốc đó chúng ăn hết chỗ của tên danh mục,
- * nên khi hẹp chúng lùi về thành dòng phụ ngay dưới tên.
- */
 const COL_SLUG = 'hidden w-[220px] shrink-0 xl:block';
 const COL_KIDS = 'hidden w-[124px] shrink-0 xl:block';
 const COL_STATUS = 'shrink-0 xl:w-[104px]';
 const COL_ACTIONS = 'shrink-0 md:w-[120px]';
-/** 14px lề gốc + chevron 24 + icon 30 + hai khoảng cách 10 = 88px. */
 const COL_NAME_OFFSET = 'pl-[88px]';
+
 
 function CategoryNode({
   node,
@@ -180,7 +163,6 @@ function CategoryNode({
           >
             <Highlight text={node.name} query={query} />
           </span>
-          {/* Dòng phụ khi màn hẹp — từ xl trở lên hai mẩu này có cột riêng bên phải. */}
           <span className="flex min-w-0 items-baseline gap-x-2.5 text-[12.5px] text-admin-muted xl:hidden">
             <span className={cx('truncate', MONO)}>/{node.slug}</span>
             {hasChildren && (
@@ -199,7 +181,6 @@ function CategoryNode({
             <StatusPill tone={node.is_active ? 'brand' : 'neutral'}>{node.is_active ? 'Hoạt động' : 'Đang ẩn'}</StatusPill>
           </span>
 
-          {/* Nút thao tác luôn có mặt trong luồng tab; chỉ giảm độ nổi khi con trỏ ở nơi khác. */}
           <div className={cx(COL_ACTIONS, 'flex items-center justify-end gap-1.5 opacity-70 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none')}>
           <button
             type="button"
@@ -241,8 +222,6 @@ function CategoryNode({
 
       {hasChildren && isOpen && (
         <ul className="relative list-none p-0">
-          {/* Đường dẫn hướng thẳng hàng với chevron của nút cha — thụt lề đơn thuần
-              không đủ để mắt nối cấp 3 về đúng cấp 2 của nó. */}
           <span
             aria-hidden
             className="absolute bottom-0 top-0 z-[1] w-px bg-admin-line"
@@ -268,7 +247,7 @@ function CategoryNode({
   );
 }
 
-/* =============================================================== trang === */
+/* ----------------------------------------------------------- Admin Categories Page */
 
 const EMPTY_FORM = { name: '', slug: '', description: '', icon: '', parent_id: '', sort_order: 0, is_active: true };
 const EMPTY_STATS: CategoryStats = { total: 0, active: 0, hidden: 0, roots: 0 };
@@ -474,15 +453,15 @@ export function AdminCategories() {
     }
   };
 
-  /* ------------------------------------------------------------------ view */
+  /* ------------------------------------------------------------------ UI Render */
 
-  // Đếm trên danh sách đầy đủ, không phải trang đang xem: con của nó có thể nằm ở trang khác.
   const deleteChildCount = pendingDelete
     ? options.filter(c => (c.parent_id ?? null) === pendingDelete._id).length
     : 0;
 
   return (
     <div className={PAGE}>
+      {/* Header Section */}
       <PageHeader
         title="Danh mục"
         description="Cây danh mục sản phẩm của sàn. Danh mục ẩn vẫn giữ nguyên sản phẩm nhưng không hiển thị cho người mua."
@@ -495,8 +474,7 @@ export function AdminCategories() {
 
       {error && <Alert onDismiss={() => setError('')}>{error}</Alert>}
 
-      {/* Số liệu lấy từ máy chủ, không cộng dồn trang đang xem — nếu tính từ trang
-          thì "Tổng danh mục" sẽ tụt xuống 15 ngay khi cây được cắt trang. */}
+      {/* Stat Strip Section */}
       <StatStrip
         loading={loading}
         items={[
@@ -507,6 +485,7 @@ export function AdminCategories() {
         ]}
       />
 
+      {/* Toolbar Section */}
       <div className={TOOLBAR}>
         <SearchField
           label="Tìm kiếm danh mục"
@@ -526,6 +505,7 @@ export function AdminCategories() {
         />
       </div>
 
+      {/* Category Tree Table Section */}
       <div className={CARD}>
         <div className={CARD_HEADER}>
           <span className="text-[12.5px] font-semibold text-admin-muted">
@@ -543,8 +523,6 @@ export function AdminCategories() {
           </button>
         </div>
 
-        {/* Tiêu đề cột chỉ xuất hiện cùng lúc với các cột phụ; dưới xl chúng không
-            tồn tại nên một hàng nhãn trống rỗng chỉ tổ gây nhiễu. */}
         {!loading && tree.items.length > 0 && (
           <div
             className={cx(
@@ -619,9 +597,6 @@ export function AdminCategories() {
               ))}
             </ul>
 
-            {/* Một trang = một số danh mục GỐC kèm đủ nhánh con của chúng. Cắt trang
-                trên danh sách phẳng sẽ đẩy nhánh con sang trang sau, thành mục mồ côi
-                không rõ thuộc về ai. */}
             <Pagination
               page={tree.page}
               totalPages={tree.totalPages}
@@ -639,6 +614,8 @@ export function AdminCategories() {
           </>
         )}
       </div>
+
+      {/* Category Modal Form Section */}
 
       <Modal
         open={showModal}
@@ -768,6 +745,7 @@ export function AdminCategories() {
         </form>
       </Modal>
 
+      {/* Delete Confirmation Dialog Section */}
       <ConfirmDialog
         open={pendingDelete !== null}
         busy={deleting}

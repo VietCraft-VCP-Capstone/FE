@@ -45,9 +45,6 @@ import {
   StatusPill,
 } from '../components/AdminPrimitives';
 
-/* ============================================================ tiện ích ==== */
-
-/** 12 màu đã kiểm tra tương phản với chữ trắng hoặc chữ đen tương ứng. */
 const PRESET_COLORS = [
   '#1a6b1a', '#2563eb', '#dc2626', '#9333ea',
   '#ea580c', '#ca8a04', '#0891b2', '#64748b',
@@ -56,10 +53,6 @@ const PRESET_COLORS = [
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-/**
- * Chọn màu chữ đọc được trên nền màu thẻ. Không thể để quản trị viên chọn màu
- * vàng rồi thẻ hiện chữ trắng trên nền vàng ở trang người mua.
- */
 function readableTextOn(hex: string): string {
   if (!HEX_RE.test(hex)) return '#ffffff';
   const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
@@ -80,8 +73,6 @@ function slugify(text: string): string {
     .replace(/-+/g, '-');
 }
 
-/* ====================================================== chip xem trước ==== */
-
 function TagChip({ name, color }: { name: string; color: string }) {
   const safe = HEX_RE.test(color) ? color : '#64748b';
   return (
@@ -94,13 +85,10 @@ function TagChip({ name, color }: { name: string; color: string }) {
   );
 }
 
-/* ======================================================= bộ chọn màu ===== */
-
 function TagColorPicker({ color, onChange }: { color: string; onChange: (c: string) => void }) {
   const [draft, setDraft] = useState(color);
   const valid = HEX_RE.test(draft);
 
-  // Đồng bộ khi màu được đổi từ nơi khác (bảng màu sẵn, mở lại hộp thoại).
   useEffect(() => setDraft(color), [color]);
 
   const commit = (v: string) => {
@@ -121,7 +109,6 @@ function TagColorPicker({ color, onChange }: { color: string; onChange: (c: stri
               onClick={() => onChange(c)}
               aria-label={`Chọn màu ${c}`}
               aria-pressed={active}
-              // Đổi viền thay vì phóng to: phóng to làm cả hàng nhảy chỗ.
               className={cx(
                 'h-7 w-7 cursor-pointer rounded-lg border-2 p-0 transition-[border-color,box-shadow] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-admin-brand motion-reduce:transition-none',
                 active
@@ -166,17 +153,13 @@ const EMPTY_STATS: TagStats = { total: 0, pending: 0, tagged: 0, unused: 0 };
 const emptyPage = (limit: number): Paginated<Tag> => ({ items: [], total: 0, page: 1, limit, totalPages: 1 });
 
 export function AdminTags() {
-  /* Yêu cầu gửi lên máy chủ. Tách khỏi kết quả trả về vì BE có quyền ghim trang:
-     xoá nốt thẻ cuối của trang 3 thì trang 3 không còn tồn tại nữa. */
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [pendingPageNo, setPendingPageNo] = useState(1);
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('products');
-  // Lọc đã chuyển xuống máy chủ, nên phải chờ người dùng gõ xong mới gọi.
   const debouncedSearch = useDebouncedValue(search, 300);
 
-  /* Kết quả từ máy chủ. */
   const [result, setResult] = useState<Paginated<Tag>>(emptyPage(20));
   const [pending, setPending] = useState<Paginated<Tag>>(emptyPage(8));
   const [stats, setStats] = useState<TagStats>(EMPTY_STATS);
@@ -191,9 +174,6 @@ export function AdminTags() {
   const [dialogBusy, setDialogBusy] = useState(false);
   const [queueBusyId, setQueueBusyId] = useState<string | null>(null);
 
-  // `loading` chỉ dành cho lần tải đầu. Các lần sau dùng `refreshing` để giữ
-  // nguyên bảng cũ và làm mờ đi — nhấp nháy khung xương sau mỗi ký tự gõ vào ô
-  // tìm kiếm còn khó đọc hơn là chờ.
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -227,7 +207,6 @@ export function AdminTags() {
     try {
       setStats(await adminService.getTagStats());
     } catch {
-      // Số liệu tổng quan hỏng thì dải thống kê về 0, bảng vẫn dùng được bình thường.
       setStats(EMPTY_STATS);
     }
   }, []);
@@ -236,15 +215,11 @@ export function AdminTags() {
   useEffect(() => { loadPending(); }, [loadPending]);
   useEffect(() => { loadStats(); }, [loadStats]);
 
-  // Đổi từ khoá hay cách sắp xếp thì tập kết quả khác hẳn — ở lại trang 7 là vô nghĩa.
   useEffect(() => { setPage(1); }, [debouncedSearch, sortKey]);
 
-  /** Mọi thao tác ghi đều đổi số liệu tổng quan lẫn nội dung trang đang xem. */
   const reloadAll = useCallback(async () => {
     await Promise.all([loadList(), loadPending(), loadStats()]);
   }, [loadList, loadPending, loadStats]);
-
-  /* ------------------------------------------------------------ hàng chờ */
 
   const handleApproveTag = async (tag: Tag) => {
     setQueueBusyId(tag._id);
@@ -274,8 +249,6 @@ export function AdminTags() {
       setDialogBusy(false);
     }
   };
-
-  /* ------------------------------------------------------------ biểu mẫu */
 
   const openCreateModal = () => {
     setEditingTag(null);
@@ -331,15 +304,13 @@ export function AdminTags() {
     }
   };
 
-  /* ------------------------------------------------------------------ view */
-
   const filtering = debouncedSearch.trim() !== '';
   const previewSlug = formData.slug || slugify(formData.name);
-  // Số thứ tự phải chạy tiếp theo trang chứ không quay về 1 ở đầu mỗi trang.
   const rowOffset = (result.page - 1) * result.limit;
 
   return (
     <div className={PAGE}>
+      {/* Page Header Section */}
       <PageHeader
         title="Thẻ"
         description="Thẻ mô tả chất liệu, kỹ thuật và phong cách sản phẩm. Người bán có thể đề xuất thẻ mới — thẻ chỉ công khai sau khi được duyệt."
@@ -352,8 +323,7 @@ export function AdminTags() {
 
       {error && <Alert onDismiss={() => setError('')}>{error}</Alert>}
 
-      {/* Số liệu lấy từ máy chủ, không cộng dồn trang đang xem — nếu tính từ trang
-          thì "Tổng số thẻ" sẽ tụt xuống 20 ngay khi bảng được cắt trang. */}
+      {/* Tag Statistics Section */}
       <StatStrip
         loading={loading}
         items={[
@@ -364,7 +334,7 @@ export function AdminTags() {
         ]}
       />
 
-      {/* Hàng chờ duyệt đứng trên bảng vì đây là việc cần làm, không phải dữ liệu để tra cứu. */}
+      {/* Pending Tags Queue Section */}
       {pending.total > 0 && (
         <section className={cx(CARD, 'mb-4 border-[#fdba74]')} aria-labelledby="pending-heading">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#fed7aa] bg-[#fff7ed] px-[18px] py-3">
@@ -426,6 +396,7 @@ export function AdminTags() {
         </section>
       )}
 
+      {/* Search and Sort Toolbar Section */}
       <div className={TOOLBAR}>
         <SearchField label="Tìm kiếm thẻ" placeholder="Tìm theo tên hoặc slug..." value={search} onChange={setSearch} />
         <button
@@ -439,6 +410,7 @@ export function AdminTags() {
         </button>
       </div>
 
+      {/* Approved Tags Table Section */}
       <div className={CARD}>
         <div className={CARD_HEADER}>
           <span className="text-[12.5px] font-semibold text-admin-muted">
@@ -474,7 +446,6 @@ export function AdminTags() {
           )
         ) : (
           <>
-            {/* Bảng dữ liệu tràn ngang trên màn hình hẹp thay vì làm vỡ bố cục trang. */}
             <div className={cx('overflow-x-auto transition-opacity duration-150 motion-reduce:transition-none', refreshing && 'opacity-55')}>
               <table className={cx(TABLE, 'min-w-[860px] table-fixed')} aria-busy={refreshing}>
                 <caption className="sr-only">Danh sách thẻ đã duyệt</caption>
@@ -504,7 +475,6 @@ export function AdminTags() {
                       <td className={cx('truncate text-[12.5px] text-admin-muted', MONO)} title={tag.slug}>
                         {tag.slug}
                       </td>
-                      {/* Chỉ mã hex: ô chip bên trái đã là mẫu màu thật, thêm ô vuông màu nữa là thừa. */}
                       <td className={cx('text-[12.5px] uppercase text-admin-muted', MONO)}>{tag.color}</td>
                       <td className="text-right">
                         {tag.product_count ? (
@@ -559,6 +529,7 @@ export function AdminTags() {
         )}
       </div>
 
+      {/* Tag Edit/Create Modal Section */}
       <Modal
         open={showModal}
         onClose={() => !saving && setShowModal(false)}
@@ -621,7 +592,6 @@ export function AdminTags() {
             <TagColorPicker color={formData.color} onChange={c => setFormData({ ...formData, color: c })} />
           </div>
 
-          {/* Xem trước đúng cách thẻ hiển thị ở trang người mua, kèm màu chữ đã tính tương phản. */}
           <div className={cx(FIELD_GROUP, 'rounded-admin border border-admin-line bg-[#fafcfa] px-[13px] py-3')}>
             <span className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.04em] text-admin-muted">
               Xem trước
@@ -631,6 +601,7 @@ export function AdminTags() {
         </form>
       </Modal>
 
+      {/* Delete Tag Confirmation Dialog */}
       <ConfirmDialog
         open={pendingDelete !== null}
         busy={dialogBusy}
@@ -650,6 +621,7 @@ export function AdminTags() {
         onCancel={() => setPendingDelete(null)}
       />
 
+      {/* Reject Pending Tag Confirmation Dialog */}
       <ConfirmDialog
         open={pendingReject !== null}
         busy={dialogBusy}
