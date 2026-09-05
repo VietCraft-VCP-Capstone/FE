@@ -29,7 +29,6 @@ export function AdminLayout({ children, user, onLogout }: AdminLayoutProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
 
-  // đóng menu khi click ra ngoài
   useEffect(() => {
     if (!menuOpen) return;
     const onDocClick = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
@@ -39,6 +38,7 @@ export function AdminLayout({ children, user, onLogout }: AdminLayoutProps) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-admin-canvas font-[system-ui,-apple-system,sans-serif]">
+      {/* Sidebar Navigation */}
       <aside className="flex w-[200px] flex-shrink-0 flex-col border-r border-admin-line bg-admin-surface py-6">
         <div className="px-5 pb-6">
           <span className="select-none font-bold text-2xl tracking-[-0.5px]">
@@ -59,9 +59,7 @@ export function AdminLayout({ children, user, onLogout }: AdminLayoutProps) {
         </nav>
       </aside>
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Ba dải header / main / footer dùng CHUNG một đệm ngang và cùng một trần
-            nội dung, nhờ vậy ô tìm kiếm, mép bảng và dòng bản quyền thẳng hàng
-            nhau theo chiều dọc thay vì mỗi tầng lệch một kiểu. */}
+        {/* Header */}
         <header className="flex h-[60px] flex-shrink-0 items-center border-b border-admin-line bg-admin-surface px-5 xl:px-8">
           <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4">
           <div className="relative flex max-w-[400px] flex-1 items-center">
@@ -96,7 +94,11 @@ export function AdminLayout({ children, user, onLogout }: AdminLayoutProps) {
           </div>
           </div>
         </header>
+
+        {/* Main Content */}
         <main className="flex-1 overflow-y-auto px-5 py-6 xl:px-8 xl:py-7">{children}</main>
+
+        {/* Footer */}
         <footer className="flex h-12 flex-shrink-0 items-center border-t border-admin-line bg-admin-surface px-5 text-[12px] text-[#888] xl:px-8">
           <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4">
           <span>© 2026 VietCraft.</span>

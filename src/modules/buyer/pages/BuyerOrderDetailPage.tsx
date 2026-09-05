@@ -9,8 +9,6 @@ import ReorderModal from '../components/profile/ReorderModal';
 export function BuyerOrderDetailPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
-    // Không còn tự set số lượng giỏ: cartService phát event 'vietcraft-cart-updated'
-    // sau mỗi thao tác, BuyerLayout nghe event đó và cập nhật badge.
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [copySuccess, setCopySuccess] = useState(false);
@@ -52,7 +50,6 @@ export function BuyerOrderDetailPage() {
 
     const handleConfirmReorder = async (selectedItems: any[]) => {
         if (!order) return;
-        // Cùng lý do như trang danh sách đơn: mọi thao tác giỏ đi qua cartService.
         const failures: string[] = [];
         for (const it of selectedItems) {
             try {
@@ -166,7 +163,6 @@ export function BuyerOrderDetailPage() {
         }
     };
 
-    // items/shippingFee/totalAmount đều lấy từ response BE; thủ undefined để không vỡ trang.
     const orderItems: any[] = Array.isArray(order.items) ? order.items : [];
     const subtotal = orderItems.reduce((acc: number, it: any) => acc + ((it.price || 0) * (it.quantity || 0)), 0);
     const shippingFee = Number(order.shippingFee ?? 0);

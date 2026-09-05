@@ -28,7 +28,6 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     const [lastOrder, setLastOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
-    // Toast and Confirm State
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -39,7 +38,6 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
         }, 3000);
     };
 
-    // Modal Visibility States
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
@@ -117,24 +115,20 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     useEffect(() => {
         const loadData = async () => {
             try {
-                // Fetch profile
                 const prof = await userService.getProfile();
                 setProfile(prof);
 
-                // Fetch latest order
                 const orders = await ordersService.getByUser();
                 if (orders && orders.length > 0) {
                     setLastOrder(orders[0]);
                 }
 
-                // Fetch real products for saved products section / wishlist
                 try {
                     const [allProducts, wishlistIds] = await Promise.all([
                         productsService.getAll(),
                         userService.getWishlist().catch(() => [])
                     ]);
                     const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
-                    // /products trả object phân trang { items, total, ... }, KHÔNG phải mảng thuần.
                     const products: any[] = Array.isArray(allProducts)
                         ? allProducts
                         : (allProducts?.items || []);
@@ -228,7 +222,6 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
         );
     }
 
-    // Stepper mapping helper
     const getStepStatus = (status: string) => {
         const steps = ['ordered', 'paid', 'processing', 'shipping', 'completed'];
         const currentIdx = steps.indexOf(status?.toLowerCase());

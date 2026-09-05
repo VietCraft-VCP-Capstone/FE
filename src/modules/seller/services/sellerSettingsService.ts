@@ -76,7 +76,6 @@ export const INITIAL_SELLER_SETTINGS: SellerSettingsState = {
   updatedAt: new Date().toISOString()
 };
 
-/** 401 (chưa đăng nhập / token hỏng) và 403 (sai role) không được rơi về cache. */
 function isAuthError(err: any): boolean {
   const status = err?.response?.status;
   return status === 401 || status === 403;
@@ -135,9 +134,6 @@ export const sellerSettingsService = {
         return clean;
       }
     } catch (e) {
-      // GET /seller/settings nay bắt buộc đăng nhập + role seller/admin.
-      // 401/403 mà vẫn trả cache thì seller tưởng đang xem cài đặt thật của mình
-      // (và bấm Lưu sẽ luôn lỗi) — phải ném ra để trang hiển thị đúng lý do.
       if (isAuthError(e)) throw e;
       console.warn('Could not load seller settings from backend, falling back to cache:', e);
     }
@@ -147,9 +143,7 @@ export const sellerSettingsService = {
       if (stored) {
         return filterOutViettel(JSON.parse(stored));
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) { }
 
     return INITIAL_SELLER_SETTINGS;
   },
@@ -160,9 +154,7 @@ export const sellerSettingsService = {
       if (stored) {
         return filterOutViettel(JSON.parse(stored));
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) { }
     return INITIAL_SELLER_SETTINGS;
   },
 
@@ -244,7 +236,6 @@ export const sellerSettingsService = {
     return sellerSettingsService.updateSettings(INITIAL_SELLER_SETTINGS);
   },
 
-  // Onboarding helpers
   getOnboardingState: (): OnboardingState => {
     try {
       const stored = localStorage.getItem(ONBOARDING_STORAGE_KEY);

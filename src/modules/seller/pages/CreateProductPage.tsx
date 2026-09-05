@@ -12,7 +12,6 @@ const abs = (u: string) => (u?.startsWith('http') ? u : `${API_ORIGIN}${u}`);
 const CANVAS = 460;
 const genId = () => Math.random().toString(36).slice(2, 9);
 
-// Google Fonts thật — POD seller hay dùng. Load động, chờ ready rồi vẽ lại Konva.
 const FONTS = ['Poppins', 'Montserrat', 'Oswald', 'Bebas Neue', 'Lobster', 'Pacifico', 'Anton', 'Dancing Script', 'Playfair Display', 'Roboto Slab', 'Caveat', 'Permanent Marker'];
 const FONT_WEIGHTS = '400;700';
 let fontsInjected = false;
@@ -25,10 +24,8 @@ function ensureFontsLoaded(onReady: () => void) {
         link.href = `https://fonts.googleapis.com/css2?${fam}&display=swap`;
         document.head.appendChild(link);
     }
-    // Khi tất cả font sẵn sàng, gọi callback để Konva vẽ lại (nếu không chữ giữ font mặc định).
     if ((document as any).fonts?.ready) {
         (document as any).fonts.ready.then(() => onReady());
-        // ép nạp từng font (một số trình duyệt lười tải tới khi dùng)
         FONTS.forEach(f => { (document as any).fonts.load(`700 40px "${f}"`).then(() => onReady()).catch(() => {}); });
     } else { setTimeout(onReady, 800); }
 }
@@ -37,7 +34,7 @@ const SHAPES = [
     { key: 'rect', label: 'Chữ nhật' }, { key: 'circle', label: 'Tròn' },
     { key: 'triangle', label: 'Tam giác' }, { key: 'star', label: 'Sao' }, { key: 'heart', label: 'Tim' },
 ];
-const HEART_PATH = 'M16 29 C16 29 2 20 2 11 C2 6 6 3 10 3 C13 3 15 5 16 7 C17 5 19 3 22 3 C26 3 30 6 30 11 C30 20 16 29 16 29 Z';
+const HEART_PATH = 'M16 29 C16 29 2 20 2 11 C2 6 6 3 10 3 C13 3 15 5 16 7 C17 5 19 3 22 3 C30 20 16 29 16 29 Z';
 
 interface L {
     id: string; type: 'image' | 'text' | 'shape';
@@ -71,7 +68,7 @@ export function CreateProductPage() {
     const [description, setDescription] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [blank, setBlank] = useState<any | null>(null);
-    const [faces, setFaces] = useState<Record<string, L[]>>({});     // key → layers[]
+    const [faces, setFaces] = useState<Record<string, L[]>>({});
     const [activeFace, setActiveFace] = useState<string>('front');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedVariants, setSelectedVariants] = useState<Record<string, { on: boolean; markup: string; stock: string }>>({});
@@ -87,7 +84,6 @@ export function CreateProductPage() {
     }, []);
 
     const areaOf = (key: string) => (blank?.print_areas || []).find((a: any) => a.key === key) || blank?.print_areas?.[0];
-    // Không gian thiết kế của 1 mặt: wrap → dùng dieline phẳng (0,0,template); flat → ô in trên ảnh phôi.
     const spaceOf = (a: any) => a?.surface === 'wrap'
         ? { x: 0, y: 0, width: a.template_w || 2475, height: a.template_h || 1155 }
         : { x: a.x, y: a.y, width: a.width, height: a.height };
@@ -133,8 +129,7 @@ export function CreateProductPage() {
     const applyTemplate = (tpl: string) => {
         const a = spaceOf(areaOf(activeFace)); const cx = a.x + a.width / 2, cy = a.y + a.height / 2;
         const base = { scale: 1, rotation: 0 };
-        const dim = Math.min(a.width, a.height);   // cỡ tham chiếu (dieline wrap rất rộng → dùng cạnh nhỏ)
-        // Tạo text đã CĂN GIỮA ngang quanh cx (ước lượng bề rộng chữ như hitbox).
+        const dim = Math.min(a.width, a.height);
         const centeredText = (text: string, fontSize: number, opts: Partial<L>): L => {
             const w = fontSize * text.length * 0.62;
             return { id: genId(), type: 'text', text, fontSize, fontWeight: 'bold', color: '#1a1a1a', x: cx - w / 2, ...base, ...opts } as L;
@@ -214,6 +209,7 @@ export function CreateProductPage() {
 
     return (
         <div className="creator-page animate-fade-in">
+            {/* Header */}
             <div className="creator-page-head">
                 <button className="creator-back" onClick={() => navigate('/seller/products')}><ArrowLeft size={16} /> Sản phẩm</button>
                 <h1>Tạo sản phẩm POD</h1>
@@ -224,6 +220,7 @@ export function CreateProductPage() {
                 </div>
             </div>
 
+            {/* Stepper Navigation */}
             <div className="pod-steps creator-page-steps">
                 {STEPS.map((label, i) => (
                     <div key={i} className={`pod-step ${step === i + 1 ? 'active' : ''} ${step > i + 1 ? 'done' : ''}`}>
@@ -235,6 +232,7 @@ export function CreateProductPage() {
             {loadErr && <div className="px-[15px] py-[11px] rounded-[9px] text-[13px] font-medium mb-4 bg-admin-danger-050 border border-[#f6caca] text-[#b91c1c]">{loadErr}</div>}
             {error && <div className="px-[15px] py-[11px] rounded-[9px] text-[13px] font-medium mb-4 bg-admin-danger-050 border border-[#f6caca] text-[#b91c1c]">{error}</div>}
 
+            {/* Step Body */}
             <div className="creator-page-body">
                 {step === 1 && (
                     <Step1 title={title} setTitle={setTitle} description={description} setDescription={setDescription}
@@ -258,7 +256,7 @@ export function CreateProductPage() {
     );
 }
 
-// ---- Step 1 ----
+// Step 1 Component
 function Step1({ title, setTitle, description, setDescription, categories, categoryId, setCategoryId, blanks, blank, chooseBlank }: any) {
     return (
         <div className="creator-step1">
@@ -295,7 +293,7 @@ function Step1({ title, setTitle, description, setDescription, categories, categ
     );
 }
 
-// ---- Konva node cho 1 layer ----
+// Konva Layer Node
 function LayerNode({ layer, ratio, offX, offY, onSelect, onChange, nodeRef }: any) {
     const ref = useRef<any>(null);
     useEffect(() => { if (ref.current) nodeRef(layer.id, ref.current); }, [layer.id, layer.type]);
@@ -315,7 +313,7 @@ function LayerNode({ layer, ratio, offX, offY, onSelect, onChange, nodeRef }: an
     };
 
     let child = null;
-    let hitW = 0, hitH = 0;   // bounding box để phủ hitbox trong suốt (kéo cả vùng trống)
+    let hitW = 0, hitH = 0;
     if (layer.type === 'image') { child = designImg ? <KImage image={designImg} width={layer.baseW} height={layer.baseH} /> : null; hitW = layer.baseW || 0; hitH = layer.baseH || 0; }
     else if (layer.type === 'text') {
         child = <KText text={layer.text} fontFamily={layer.fontFamily} fontSize={layer.fontSize} fontStyle={layer.fontWeight === 'bold' ? 'bold' : 'normal'} fill={layer.color} />;
@@ -332,33 +330,29 @@ function LayerNode({ layer, ratio, offX, offY, onSelect, onChange, nodeRef }: an
     }
     return (
         <Group {...groupProps}>
-            {/* hitbox trong suốt: kéo được toàn vùng, kể cả khoảng trống giữa nét chữ / trong hình rỗng */}
             <Rect width={hitW} height={hitH} fill="rgba(0,0,0,0.001)" />
             {child}
         </Group>
     );
 }
 
-// ---- Step 2: layer editor ----
+// Step 2 Component: Design Editor
 function DesignStep({ blank, designs, faces, activeFace, setActiveFace, layers, selected, selectedId, setSelectedId,
     updateLayer, removeLayer, reorderLayer, addText, addShape, addImageDesign, applyTemplate, uploading, onUpload, fileRef, areaOf, spaceOf }: any) {
     const areas = blank.print_areas || [];
     const area = areaOf(activeFace);
     const isWrap = area?.surface === 'wrap';
-    const sp = spaceOf(area);   // không gian thiết kế (dieline nếu wrap)
+    const sp = spaceOf(area);
     const [leftTab, setLeftTab] = useState<'add' | 'uploads' | 'templates' | 'clipart'>('add');
 
-    // Flat: nền = ảnh phôi. Wrap: nền = dieline phẳng trắng (tỉ lệ template).
     const blankImg = useHTMLImage(isWrap ? undefined : (area?.image || blank.default_image));
     const trRef = useRef<any>(null);
     const nodeMap = useRef<Record<string, any>>({});
     const registerNode = (id: string, node: any) => { nodeMap.current[id] = node; };
     const [, setFontTick] = useState(0);
 
-    // Nạp Google Fonts; mỗi lần 1 font sẵn sàng → ép Konva vẽ lại để chữ đổi font thật.
     useEffect(() => { ensureFontsLoaded(() => setFontTick(t => t + 1)); }, []);
 
-    // Kích thước "khung nền" để scale canvas: wrap → dieline; flat → ảnh phôi.
     const natW = isWrap ? sp.width : (blankImg?.naturalWidth || 800);
     const natH = isWrap ? sp.height : (blankImg?.naturalHeight || 800);
     const ratio = CANVAS / Math.max(natW, natH);
@@ -371,7 +365,6 @@ function DesignStep({ blank, designs, faces, activeFace, setActiveFace, layers, 
         tr.nodes(node ? [node] : []); tr.getLayer()?.batchDraw();
     }, [selectedId, layers, activeFace]);
 
-    // cảnh báo tràn vùng in (kiểm tra bbox thô của layer đang chọn) — dùng không gian sp.
     let outOfBounds = false;
     if (selected && sp) {
         const w = (selected.type === 'image' ? (selected.baseW || 100) : selected.type === 'shape' ? (selected.w || 100) : (selected.fontSize || 40) * (selected.text?.length || 4) * 0.6) * selected.scale;
@@ -381,7 +374,7 @@ function DesignStep({ blank, designs, faces, activeFace, setActiveFace, layers, 
 
     return (
         <div className="creator">
-            {/* Rail dọc icon (Printify-style) */}
+            {/* Tool Rail Navigation */}
             <nav className="creator-rail">
                 {[
                     { k: 'add', icon: <Shapes size={19} />, label: 'Thêm' },
@@ -395,7 +388,7 @@ function DesignStep({ blank, designs, faces, activeFace, setActiveFace, layers, 
                 ))}
             </nav>
 
-            {/* Flyout nội dung công cụ */}
+            {/* Tool Flyout Panel */}
             <aside className="creator-flyout">
                 {leftTab === 'add' && (
                     <div className="creator-tool-body">
@@ -445,7 +438,7 @@ function DesignStep({ blank, designs, faces, activeFace, setActiveFace, layers, 
                 )}
             </aside>
 
-            {/* Canvas giữa */}
+            {/* Central Stage Canvas */}
             <div className="creator-canvas-wrap">
                 {isWrap && <div className="creator-wrap-hint"><LayoutTemplate size={13} /> Bề mặt cuộn — thiết kế trải phẳng toàn thân, tràn viền để phủ kín khi cuộn quanh cốc.</div>}
                 <div className="creator-stage-shell">
@@ -467,7 +460,6 @@ function DesignStep({ blank, designs, faces, activeFace, setActiveFace, layers, 
                     {layers.length === 0 && <div className="creator-canvas-hint"><Shapes size={30} /><p>Thêm chữ, hình khối, mẫu hoặc ảnh để bắt đầu</p></div>}
                 </div>
 
-                {/* Tab chọn mặt — pill căn giữa DƯỚI canvas (Printify-style) */}
                 {areas.length > 1 && (
                     <div className="creator-face-pills">
                         {areas.map((a: any) => (
@@ -477,11 +469,10 @@ function DesignStep({ blank, designs, faces, activeFace, setActiveFace, layers, 
                         ))}
                     </div>
                 )}
-                {/* Zoom indicator góc dưới trái */}
                 <div className="creator-zoombar"><span>{Math.round(ratio * 100 / (CANVAS / Math.max(natW, natH)))}%</span> · Vùng in {Math.round(sp.width)}×{Math.round(sp.height)}px</div>
             </div>
 
-            {/* Panel phải: Variants & layers (Printify-style) */}
+            {/* Properties & Layers Panel */}
             <aside className="creator-props">
                 <div className="creator-props-head">{blank.title}<span className="creator-props-area">Đang chỉnh: {area?.label || area?.key}</span></div>
 
@@ -509,7 +500,6 @@ function DesignStep({ blank, designs, faces, activeFace, setActiveFace, layers, 
     );
 }
 
-// Thumbnail nhỏ cho từng lớp trong danh sách (Printify hiện icon/ảnh).
 function LayerThumb({ layer }: { layer: L }) {
     if (layer.type === 'image') return <img src={abs(layer.design?.file_url)} alt="" />;
     if (layer.type === 'text') return <Type size={14} />;
@@ -580,7 +570,7 @@ function ColorField({ label, value, onChange, allowNone }: any) {
     );
 }
 
-// ---- Step 3: Preview (render thật từ BE, gồm wrap cốc) ----
+// Step 3 Component: Product Preview
 function PreviewStep({ blank, faces, toApiLayer, title, selectedVariants }: any) {
     const areas = (blank.print_areas || []).filter((a: any) => (faces[a.key] || []).length > 0);
     const [images, setImages] = useState<string[] | null>(null);
@@ -595,7 +585,6 @@ function PreviewStep({ blank, faces, toApiLayer, title, selectedVariants }: any)
             .catch((e: any) => setErr(e.response?.data?.error || 'Không tạo được xem trước'));
     }, [blank._id]);
 
-    // giá thấp nhất trong các variant đã chọn (base_cost + markup); nếu chưa chọn → base thấp nhất.
     const chosen = Object.entries(selectedVariants || {}).filter(([, v]: any) => v.on);
     const prices = (chosen.length ? chosen : blank.variations.map((v: any) => [v.sku, { markup: '0' }]))
         .map(([sku, v]: any) => { const bv = blank.variations.find((x: any) => x.sku === sku); return bv ? bv.base_cost + (Number(v.markup) || 0) : 0; })
@@ -608,7 +597,7 @@ function PreviewStep({ blank, faces, toApiLayer, title, selectedVariants }: any)
             {!images && !err && <div className="preview-loading"><Loader2 size={26} className="animate-spin" /><span>Đang tạo mockup thật...</span></div>}
             {images && (
                 <div className="preview-showcase">
-                    {/* Gallery trái */}
+                    {/* Gallery View */}
                     <div className="preview-gallery">
                         <div className="preview-hero">
                             <img src={abs(images[active] || images[0])} alt="mockup" />
@@ -624,7 +613,7 @@ function PreviewStep({ blank, faces, toApiLayer, title, selectedVariants }: any)
                             </div>
                         )}
                     </div>
-                    {/* Thông tin phải */}
+                    {/* Details Panel */}
                     <div className="preview-info">
                         <div className="preview-info-badge"><Check size={13} /> Xem trước như khách hàng thấy</div>
                         <h2 className="preview-info-title">{title || 'Sản phẩm POD'}</h2>
@@ -652,7 +641,7 @@ function PreviewStep({ blank, faces, toApiLayer, title, selectedVariants }: any)
     );
 }
 
-// ---- Step 4 ----
+// Step 4 Component: Pricing & Variants
 function VariantStep({ blank, selectedVariants, setSelectedVariants }: any) {
     const setV = (sku: string, f: string, val: any) => setSelectedVariants((prev: any) => ({ ...prev, [sku]: { ...prev[sku], [f]: val } }));
     return (

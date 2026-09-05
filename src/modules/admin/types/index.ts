@@ -1,7 +1,3 @@
-/**
- * Phong bì chung của mọi endpoint có phân trang.
- * BE trả đúng hình dạng này ở /admin/categories, /admin/tags và /admin/moderation/products.
- */
 export interface Paginated<T> {
   items: T[];
   total: number;
@@ -21,11 +17,9 @@ export interface Category {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  /** BE dựng sẵn cây; FE không dựng lại nữa. Vắng mặt ở lối đọc phẳng. */
   children?: Category[];
 }
 
-/** Mục rút gọn cho ô chọn danh mục cha — luôn đủ mọi danh mục, không cắt trang. */
 export interface CategoryOption {
   _id: string;
   name: string;
@@ -34,10 +28,7 @@ export interface CategoryOption {
   is_active: boolean;
 }
 
-/**
- * Cây đã cắt trang. `total` đếm nút GỐC vì một trang là một tập cây gốc;
- * `totalNodes` đếm mọi cấp, dùng cho dòng "N danh mục".
- */
+
 export interface CategoryTreePage extends Paginated<Category> {
   totalNodes: number;
 }
@@ -50,7 +41,6 @@ export interface CategoryStats {
 }
 
 export interface TagStats {
-  /** Thẻ đã duyệt. Thẻ chờ duyệt đếm riêng ở `pending`. */
   total: number;
   pending: number;
   tagged: number;
@@ -103,5 +93,4 @@ export interface ModerationStats {
   total: number;
 }
 
-/** Giữ tên cũ cho quen mắt, nhưng nay dùng chung phong bì với các endpoint khác. */
 export type PendingProductsResponse = Paginated<ModerateProduct>;

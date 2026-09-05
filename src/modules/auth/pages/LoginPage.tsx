@@ -41,11 +41,6 @@ function GoogleIcon() {
 }
 
 
-/**
- * Đường quay lại sau khi đăng nhập, lấy từ `?next=`.
- * Khách bị chặn ở /checkout sẽ mang theo tham số này, đăng nhập xong quay lại đúng chỗ.
- * Chỉ nhận đường dẫn nội bộ: '//evil.com' và 'http://evil.com' đều bị loại (open redirect).
- */
 function safeNext(raw: string | null): string | null {
   if (!raw) return null;
   let decoded: string;
@@ -66,8 +61,6 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    // Navigate thay cho navigate(): gọi điều hướng ngay trong thân render là side effect,
-    // React sẽ cảnh báo và có thể chạy hai lần ở StrictMode.
     const target = nextUrl ?? (user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/');
     return <Navigate to={target} replace />;
   }

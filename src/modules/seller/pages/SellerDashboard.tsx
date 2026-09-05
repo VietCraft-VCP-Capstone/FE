@@ -1,12 +1,3 @@
-/**
- * Trang chủ gian hàng — màn hình đầu tiên người bán nhìn thấy.
- *
- * Trang này là bảng điều khiển KHO HÀNG, không phải bảng doanh thu: mọi số liệu ở
- * đây đều tính từ sản phẩm và cài đặt thật của chính gian hàng. Phần đơn hàng và
- * doanh thu nằm ở trang riêng /seller/orders — chưa gộp vào đây (xem ghi chú đầu
- * sellerDashboardService.ts).
- */
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -52,7 +43,6 @@ const RANGE_OPTIONS: { value: RangeKey; label: string }[] = [
   { value: '90', label: '90 ngày' },
 ];
 
-/** Số danh mục hiển thị trước khi gộp phần đuôi vào "Khác". */
 const CATEGORY_ROWS = 6;
 
 const EMPTY_DATA: SellerOverviewData = {
@@ -64,7 +54,6 @@ const EMPTY_DATA: SellerOverviewData = {
 };
 
 function Thumb({ product }: { product: ProductItem }) {
-  // Xem ghi chú ở AdminDashboard: ảnh chết rơi về ô giữ chỗ, không để ảnh vỡ.
   const [broken, setBroken] = useState(false);
   const src = product.thumbnail || product.images?.[0];
 
@@ -86,7 +75,6 @@ function Thumb({ product }: { product: ProductItem }) {
   );
 }
 
-/** Một dòng số liệu trong thẻ phân bố giá. */
 function PriceStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div>
@@ -128,8 +116,6 @@ export function SellerDashboard() {
 
   const priceColumns = useMemo(() => {
     if (!priceStats) return [];
-    // Nhãn dưới cột là RANH GIỚI dưới của khoảng, không phải giá của một sản phẩm
-    // cụ thể — nên mốc 0 ghi trần là "0", ghi "0đ" sẽ bị đọc thành "hàng giá 0đ".
     const boundary = (v: number) => (v === 0 ? '0' : compactMoney(v));
     return priceStats.buckets.map(b => ({
       label: boundary(b.from),
@@ -149,7 +135,6 @@ export function SellerDashboard() {
     [data.products, days]
   );
 
-  /** Hết hàng trước, rồi tới sắp hết — cùng một việc cần làm: nhập thêm hàng. */
   const restockList = useMemo(
     () => [...metrics.outOfStockItems, ...metrics.lowStock].slice(0, 6),
     [metrics.outOfStockItems, metrics.lowStock]
@@ -174,6 +159,7 @@ export function SellerDashboard() {
 
   return (
     <div className="mx-auto w-full max-w-[1600px]">
+      {/* Page Header */}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="m-0 text-2xl font-extrabold tracking-tight text-stone-900 font-jakarta">
@@ -207,7 +193,7 @@ export function SellerDashboard() {
         </div>
       </div>
 
-      {/* Một hàng bộ lọc duy nhất, đứng trên mọi thẻ mà nó chi phối. */}
+      {/* Time Range Filter Bar */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <RangeTabs value={range} onChange={setRange} options={RANGE_OPTIONS} label="Khoảng thời gian thống kê" />
         {loadedAt && <span className="text-xs text-stone-500">Số liệu lúc {timeAgo(loadedAt)}</span>}
@@ -224,6 +210,7 @@ export function SellerDashboard() {
         </div>
       ))}
 
+      {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           loading={loading}
@@ -253,7 +240,7 @@ export function SellerDashboard() {
         />
       </div>
 
-      {/* Giữ nguyên nội dung cũ và làm mờ khi tải lại, thay vì thay bằng khung xương. */}
+      {/* Main Charts & Analytics Section */}
       <div className={refreshing ? 'opacity-60 transition-opacity duration-200' : undefined}>
         <div className="mt-4 grid gap-4 xl:grid-cols-3">
           <SellerCard
@@ -270,8 +257,6 @@ export function SellerDashboard() {
               {loading ? (
                 <div className="h-[260px] animate-pulse rounded-xl bg-stone-100 motion-reduce:animate-none" />
               ) : (
-                /* Một chuỗi duy nhất nên không cần ô chú giải — tiêu đề thẻ đã nói
-                   rõ đang vẽ cái gì, thêm ô chú giải chỉ lặp lại và tốn chỗ. */
                 <TrendChart
                   ariaLabel={`Số sản phẩm tạo mới mỗi ngày trong ${days} ngày gần nhất`}
                   data={trend}
@@ -318,6 +303,7 @@ export function SellerDashboard() {
           </SellerCard>
         </div>
 
+        {/* Price Distribution & Onboarding Tasks */}
         <div className="mt-4 grid gap-4 xl:grid-cols-3">
           <SellerCard
             className="xl:col-span-2"
@@ -399,6 +385,7 @@ export function SellerDashboard() {
           </SellerCard>
         </div>
 
+        {/* Inventory Restock & Category Breakdown */}
         <div className="mt-4 grid gap-4 xl:grid-cols-2">
           <SellerCard
             title="Cần nhập thêm hàng"
@@ -493,9 +480,6 @@ export function SellerDashboard() {
                         </span>
                       </div>
                       <div className="mt-2 h-1.5 w-full rounded-full bg-stone-100">
-                        {/* Danh mục không có thứ tự tự nhiên nên mọi thanh dùng CHUNG
-                            một màu; tô đậm nhạt theo giá trị chỉ là vẽ lại đúng cái
-                            chiều dài thanh đã nói. */}
                         <div
                           className="h-1.5 rounded-full"
                           style={{
@@ -512,7 +496,7 @@ export function SellerDashboard() {
           </SellerCard>
         </div>
 
-        {/* Hai cảnh báo phụ, chỉ hiện khi thực sự có vấn đề. */}
+        {/* Warning Banners */}
         {!loading && (metrics.missingImages.length > 0 || metrics.inactive > 0) && (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {metrics.missingImages.length > 0 && (

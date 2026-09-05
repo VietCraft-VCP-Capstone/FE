@@ -18,18 +18,14 @@ interface CheckoutItem {
     image: string;
     color?: string;
     size?: string;
-    /** POD_TEMPLATE = hàng in theo yêu cầu, bắt buộc trả trước. */
     productType?: string;
 }
 
 export function BuyerCheckoutPage() {
     const navigate = useNavigate();
-    // Layout luôn cung cấp context, nhưng đọc phòng thủ để trang không vỡ nếu render ngoài BuyerLayout.
     const outletContext = useOutletContext<{ setCartCount?: (n: number) => void }>() || {};
     const setCartCount = outletContext.setCartCount ?? (() => {});
     const [items, setItems] = useState<CheckoutItem[]>([]);
-    // Chốt chặn cuối: thanh toán là bước DUY NHẤT bắt buộc đăng nhập.
-    // Router đã chặn, đây là lớp thứ hai phòng khi vào thẳng URL hoặc token hết hạn.
     const authed = isLoggedIn();
 
     const [paymentMethod, setPaymentMethod] = useState<'momo' | 'card' | 'bank' | 'cod'>('momo');
@@ -76,9 +72,6 @@ export function BuyerCheckoutPage() {
 
 
 
-    // Hàng POD chỉ sản xuất sau khi tiền về, nên COD không áp dụng được.
-    // BE mới là chốt chặn thật (OrdersService.createOrder); đây chỉ để người mua
-    // không chọn một phương thức chắc chắn bị từ chối ở bước cuối.
     const hasPodItem = items.some(it => it.productType === 'POD_TEMPLATE');
     const codDisabled = hasPodItem;
 
@@ -114,9 +107,6 @@ export function BuyerCheckoutPage() {
 
         setLoading(true);
         try {
-            // BE lấy giá / phí ship / shop TỪ DB theo productId+variantId và BỎ QUA
-            // price, totalAmount, shippingFee, discount FE gửi lên. Giữ lại các field này
-            // cho tương thích, nhưng số tiền hiển thị sau khi đặt phải lấy từ response.
             const subtotal = items.reduce((acc, it) => acc + (it.price * it.quantity), 0);
             const shippingFee = 30000;
             const totalAmount = subtotal + shippingFee - discount;
@@ -148,21 +138,14 @@ export function BuyerCheckoutPage() {
             };
 
             const createdOrder = await ordersService.create(orderPayload);
-            // Hiển thị TỔNG TIỀN BE TRẢ VỀ, không dùng lại con số FE tự tính:
-            // BE tính theo giá trong DB nên hai số có thể lệch nhau.
             const serverTotal = Number(createdOrder?.totalAmount ?? 0);
             showToast(
                 `Đặt hàng thành công! Mã đơn hàng: ${createdOrder?.id || ''} — Tổng thanh toán: ${serverTotal.toLocaleString('vi-VN')}đ`,
                 'success'
             );
 
-            // Clear checkout storage
             localStorage.removeItem('vietcraft_checkout');
 
-            // Remove purchased items from database cart
-            // Xoá theo productId/variantId, KHÔNG theo item.id: snapshot checkout có thể
-            // được tạo lúc còn là khách vãng lai, sau khi đăng nhập giỏ tạm đã được gộp lên
-            // server với id mới nên id cũ không còn trúng dòng nào.
             const removePromises = items.map(item => {
                 if (item.productId) {
                     return cartService.removeByProduct(item.productId, item.variantId)
@@ -172,7 +155,6 @@ export function BuyerCheckoutPage() {
             });
             await Promise.all(removePromises);
 
-            // Sync updated cart count to layout/header
             try {
                 const updatedCart = await cartService.getCart();
                 const total = updatedCart?.items?.reduce((acc: number, it: any) => acc + (it.quantity || 1), 0) || 0;
@@ -181,12 +163,10 @@ export function BuyerCheckoutPage() {
                 setCartCount(0);
             }
 
-            // Redirect to order details or list
             setTimeout(() => {
                 navigate(createdOrder?.id ? `/orders/${createdOrder.id}` : '/orders');
             }, 1500);
         } catch (error: any) {
-            // BE trả 400 kèm lý do cụ thể (hết hàng, ngừng bán, đơn nhiều shop...) — hiện đúng lý do đó.
             showToast(getApiErrorMessage(error, 'Có lỗi xảy ra trong quá trình đặt hàng. Vui lòng thử lại.'), 'error');
         } finally {
             setLoading(false);

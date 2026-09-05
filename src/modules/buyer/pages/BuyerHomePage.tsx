@@ -22,17 +22,13 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Reset page when tab or search query changes
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, search]);
 
   const name = user?.full_name || user?.name || '';
 
-  // Load favorites from backend API (with localStorage fallback)
   useEffect(() => {
-    // /users/wishlist cần token. Khách vãng lai KHÔNG gọi — interceptor 401 sẽ điều hướng
-    // sang /login trước cả khi .catch() chạy, biến trang công khai thành tường đăng nhập.
     if (!isLoggedIn()) {
       setFavoritedProductIds([]);
     } else {
@@ -42,7 +38,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
           localStorage.setItem('vietcraft_favorites', JSON.stringify(ids));
         })
         .catch(() => {
-          // Fallback: try localStorage
           try {
             const stored = localStorage.getItem('vietcraft_favorites');
             if (stored) setFavoritedProductIds(JSON.parse(stored));
@@ -54,7 +49,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       try { setSavedVouchers(JSON.parse(vls)); } catch (e) {}
     }
 
-    // Fetch products, shops, coupons in parallel
     setIsLoading(true);
     Promise.all([
       productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
@@ -77,7 +71,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
 
   const toggleFavorite = async (productId: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    // Yêu thích cần tài khoản: đưa khách sang /login thay vì gọi API rồi dính 401.
     if (!isLoggedIn()) {
       navigate('/login');
       return;
@@ -113,7 +106,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
   };
 
-  // Map vouchers from Backend Coupon documents
   const vouchers = couponList.map((v: any) => {
     const val = v.discount_value?.$numberDecimal ? parseFloat(v.discount_value.$numberDecimal) : parseFloat(v.discount_value || 0);
     const minVal = v.min_order_value?.$numberDecimal ? parseFloat(v.min_order_value.$numberDecimal) : parseFloat(v.min_order_value || 0);
@@ -140,7 +132,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     };
   });
 
-  // Dynamic products for Flash Deals and AI Suggestions
   const flashDeals = allProducts.slice(0, 5).map((p: any, idx: number) => {
     const discountPct = 10 * (idx + 2); // e.g. -20%, -30%, -40%...
     const oldPrice = Math.round(p.price / (1 - discountPct / 100));
@@ -178,27 +169,21 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     };
   }) : [];
 
-  // Filter based on Search query
   const searchedProducts = allProducts.filter((p: any) =>
     (p.title || p.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (p.category || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  // Filter based on Active Tab selector
   const getTabFilteredProducts = () => {
     switch (activeTab) {
       case 'quan-tam':
-        // Filter by favorites
         const favItems = searchedProducts.filter((p: any) => favoritedProductIds.includes(p.id));
         return favItems;
       case 'gan-day':
-        // Mock recently viewed
         return searchedProducts;
       case 'theo-doi':
-        // Shuffled or specific products from followed shops
         return [...searchedProducts].reverse();
       case 'khuyen-mai':
-        // Show flashDeals mapped to standard product format
         return flashDeals.map(fd => ({
           id: fd.id,
           title: fd.title,

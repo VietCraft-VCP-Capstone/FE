@@ -1,14 +1,3 @@
-/**
- * Tổng quan hệ thống — màn hình đầu tiên quản trị viên nhìn thấy.
- *
- * Trang trả lời đúng hai câu hỏi, theo thứ tự đó:
- *   1. Sàn có đang lớn lên không?  -> dải số liệu + biểu đồ tăng trưởng
- *   2. Việc gì đang chờ tôi?       -> khối "Cần xử lý" và hai bảng bên dưới
- *
- * MỌI con số đều lấy từ bản ghi thật qua các endpoint quản trị hiện có; phần nào
- * BE chưa có thì để trống kèm lý do. Không có số mô phỏng trên màn hình này.
- */
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -64,7 +53,7 @@ const EMPTY_DATA: AdminOverviewData = {
   failures: [],
 };
 
-/* ------------------------------------------------------------- khối thẻ --- */
+/* ------------------------------------------------------------- Section Card */
 
 function SectionCard({
   title,
@@ -93,7 +82,7 @@ function SectionCard({
   );
 }
 
-/* ------------------------------------------------------- hàng việc cần làm */
+/* ------------------------------------------------------------- Queue Row */
 
 function QueueRow({
   icon: Icon,
@@ -139,11 +128,9 @@ function QueueRow({
   );
 }
 
-/* ------------------------------------------------------------- ảnh nhỏ ---- */
+/* ------------------------------------------------------------- Thumbnail */
 
 function Thumb({ src, alt }: { src?: string; alt: string }) {
-  // Ảnh chết (file bị xoá, link hỏng) phải rơi về ô giữ chỗ thay vì để trình
-  // duyệt vẽ biểu tượng ảnh vỡ giữa bảng.
   const [broken, setBroken] = useState(false);
 
   if (!src || broken) {
@@ -170,7 +157,7 @@ const STATUS_LABEL: Record<string, { text: string; tone: 'brand' | 'warn' | 'dan
   UNPUBLISHED: { text: 'Đã gỡ', tone: 'danger' },
 };
 
-/* ================================================================ trang === */
+/* ------------------------------------------------------------- Admin Dashboard Page */
 
 export function AdminDashboard() {
   const [data, setData] = useState<AdminOverviewData>(EMPTY_DATA);
@@ -197,8 +184,6 @@ export function AdminDashboard() {
 
   const days = Number(range);
 
-  /* Đổi khoảng thời gian chỉ tính lại trên dữ liệu ĐÃ tải — không gọi lại API,
-     nên không có cảnh nhấp nháy khung xương giữa hai lần chọn. */
   const derived = useMemo(() => {
     const { users, products, stats } = data;
 
@@ -219,8 +204,6 @@ export function AdminDashboard() {
     const buyers = users.filter(u => normalizeRole(u.role) === 'buyer').length;
     const locked = users.filter(u => !!u.is_locked).length;
 
-    /* Không có /moderation/stats thì đếm tạm trên mẫu đã tải và nói rõ ở phần
-       mô tả — thà số ít mà đúng nguồn còn hơn ô trống không giải thích. */
     const fromSample = {
       published: products.filter(p => p.status === 'PUBLISHED').length,
       unpublished: products.filter(p => p.status === 'UNPUBLISHED').length,
@@ -246,11 +229,9 @@ export function AdminDashboard() {
     };
   }, [data, days]);
 
-  const pendingCount = data.pendingTagCount;
+    const pendingCount = data.pendingTagCount;
   const actionTotal = pendingCount + derived.productStats.draft + derived.productStats.unpublished + derived.locked;
 
-  /* Mẫu sản phẩm bị phân trang chặn: phải nói rõ để không ai đọc biểu đồ như
-     thể nó phủ toàn bộ kho hàng. */
   const productSampleNote =
     data.productsTotal > data.productsLoaded
       ? `Đường "sản phẩm mới" tính trên ${fmtCount(data.productsLoaded)} sản phẩm mới nhất (tổng ${fmtCount(
@@ -260,6 +241,7 @@ export function AdminDashboard() {
 
   return (
     <div className={PAGE}>
+      {/* Header Section */}
       <PageHeader
         title="Tổng quan hệ thống"
         description="Sức khoẻ của sàn và những việc đang chờ xử lý, tổng hợp từ dữ liệu thật của hệ thống."
@@ -280,7 +262,7 @@ export function AdminDashboard() {
         }
       />
 
-      {/* Một hàng bộ lọc duy nhất, đặt trên mọi thẻ mà nó chi phối. */}
+      {/* Filter / Range Selector Section */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <SegmentedControl
           value={range}
@@ -299,6 +281,7 @@ export function AdminDashboard() {
         </Alert>
       ))}
 
+      {/* Stat Strip Section */}
       <StatStrip
         loading={loading}
         items={[
@@ -327,8 +310,7 @@ export function AdminDashboard() {
         ]}
       />
 
-      {/* Dữ liệu cũ được giữ nguyên và làm mờ khi đang tải lại — không thay bằng
-          khung xương, tránh cảnh cả trang nhảy dựng lên rồi sập xuống. */}
+      {/* Growth Chart & Composition Section */}
       <div className={refreshing ? 'opacity-60 transition-opacity duration-200' : undefined}>
         <div className="grid gap-4 xl:grid-cols-3">
           <SectionCard
@@ -419,6 +401,7 @@ export function AdminDashboard() {
           </SectionCard>
         </div>
 
+        {/* Action Queue & Recent Products Section */}
         <div className="mt-4 grid gap-4 xl:grid-cols-3">
           <SectionCard title="Cần xử lý" description="Bấm vào từng dòng để sang màn hình tương ứng.">
             {loading ? (
@@ -508,6 +491,7 @@ export function AdminDashboard() {
           </SectionCard>
         </div>
 
+        {/* Recent Users & Top Shops Section */}
         <div className="mt-4 grid gap-4 xl:grid-cols-2">
           <SectionCard
             title="Người dùng mới"

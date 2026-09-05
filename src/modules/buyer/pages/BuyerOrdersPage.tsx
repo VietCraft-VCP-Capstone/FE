@@ -29,8 +29,6 @@ interface Order {
 
 export function BuyerOrdersPage() {
     const navigate = useNavigate();
-    // Không còn tự set số lượng giỏ: cartService phát event 'vietcraft-cart-updated'
-    // sau mỗi thao tác, BuyerLayout nghe event đó và cập nhật badge.
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled'>('all');
@@ -56,9 +54,7 @@ export function BuyerOrdersPage() {
         const fetchOrders = async () => {
             setLoading(true);
             try {
-                // Fetch orders from BE with active tab status
                 const res = await ordersService.getByUser(activeTab);
-                // BE trả mảng thuần; thủ sẵn trường hợp lỗi/đổi shape để không vỡ .filter/.map
                 setOrders(Array.isArray(res) ? (res as Order[]) : ((res as any)?.items || []));
             } catch (err) {
                 console.error('Failed to fetch orders', err);
@@ -93,8 +89,6 @@ export function BuyerOrdersPage() {
 
     const handleConfirmReorder = async (selectedItems: OrderItem[]) => {
         if (!reorderOrder) return;
-        // Đi qua cartService thay vì tự ghi localStorage: service tự chọn giỏ server hay
-        // giỏ khách, và BE còn kiểm tồn kho / sản phẩm còn bán — ghi tay thì bỏ qua hết.
         const failures: string[] = [];
         for (const it of selectedItems) {
             try {
@@ -117,7 +111,6 @@ export function BuyerOrdersPage() {
         setTimeout(() => navigate('/cart'), 1200);
     };
 
-    // Filter orders locally by search query as well
     const filteredOrders = orders.filter(o => {
         const query = searchQuery.toLowerCase();
         const matchesShop = o.shopName?.toLowerCase().includes(query);

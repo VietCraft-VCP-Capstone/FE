@@ -23,7 +23,6 @@ const SL = ['', 'Yếu', 'Trung bình', 'Khá', 'Mạnh'];
 
 
 
-/** Đường quay lại sau đăng ký, lấy từ `?next=`. Chỉ nhận path nội bộ (chặn open redirect). */
 function safeNext(raw: string | null): string | null {
   if (!raw) return null;
   let decoded: string;

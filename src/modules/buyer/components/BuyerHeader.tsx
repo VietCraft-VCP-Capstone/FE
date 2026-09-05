@@ -22,10 +22,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
 
   const isActive = (path: string) => location.pathname.startsWith(path);
 
-  // Fetch favorites count from backend on route change and on wishlist-updated event
   const refreshFavCount = () => {
-    // /users/wishlist cần token. Khách vãng lai KHÔNG gọi, nếu không interceptor 401
-    // sẽ đá thẳng về /login và biến trang công khai thành tường đăng nhập.
     if (!isLoggedIn()) {
       setFavCount(0);
       return;
