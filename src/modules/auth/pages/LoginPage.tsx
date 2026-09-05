@@ -49,6 +49,17 @@ function safeNext(raw: string | null): string | null {
   return decoded;
 }
 
+function getRedirectTarget(u: any, nextUrl: string | null): string {
+  const role = u?.role?.toLowerCase();
+  if (role === 'admin') {
+    return (nextUrl && nextUrl.startsWith('/admin')) ? nextUrl : '/admin';
+  }
+  if (role === 'seller') {
+    return (nextUrl && nextUrl.startsWith('/seller')) ? nextUrl : '/seller';
+  }
+  return nextUrl ?? '/';
+}
+
 export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -61,7 +72,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    const target = nextUrl ?? (user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/');
+    const target = getRedirectTarget(user, nextUrl);
     return <Navigate to={target} replace />;
   }
 
@@ -70,7 +81,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
       setLoading(true); setError('');
       try {
         const loggedUser = await onGoogleLogin(res.access_token);
-        const target = nextUrl ?? (loggedUser?.role === 'admin' ? '/admin' : loggedUser?.role === 'seller' ? '/seller' : '/');
+        const target = getRedirectTarget(loggedUser, nextUrl);
         navigate(target, { replace: true });
       }
       catch { setError('Đăng nhập Google thất bại.'); }
@@ -95,7 +106,7 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
       await onLogin({ email: em, password: pw });
       setRateLimit(em, { attempts: 0 });
       const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
-      const target = nextUrl ?? (storedUser?.role === 'admin' ? '/admin' : storedUser?.role === 'seller' ? '/seller' : '/');
+      const target = getRedirectTarget(storedUser, nextUrl);
       navigate(target, { replace: true });
     } catch (err: any) {
       const errData = err?.response?.data;

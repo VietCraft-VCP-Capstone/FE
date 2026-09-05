@@ -31,6 +31,17 @@ function safeNext(raw: string | null): string | null {
   return decoded;
 }
 
+function getRedirectTarget(u: any, nextUrl: string | null): string {
+  const role = u?.role?.toLowerCase();
+  if (role === 'admin') {
+    return (nextUrl && nextUrl.startsWith('/admin')) ? nextUrl : '/admin';
+  }
+  if (role === 'seller') {
+    return (nextUrl && nextUrl.startsWith('/seller')) ? nextUrl : '/seller';
+  }
+  return nextUrl ?? '/';
+}
+
 export function SignupPage({ onSignup, user }: SignupPageProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -46,7 +57,7 @@ export function SignupPage({ onSignup, user }: SignupPageProps) {
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    const target = nextUrl ?? (user.role === 'admin' ? '/admin' : user.role === 'seller' ? '/seller' : '/');
+    const target = getRedirectTarget(user, nextUrl);
     return <Navigate to={target} replace />;
   }
 
