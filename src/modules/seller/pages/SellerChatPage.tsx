@@ -1,20 +1,62 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Search, Send, MessageSquare, CheckCheck, User as UserIcon,
-  ExternalLink, Package, Info
+  Search, Send, RotateCcw, Tag, Paperclip, Image as ImageIcon,
+  Bold, Italic, List, CheckCheck, MessageSquare
 } from 'lucide-react';
 import { chatService } from '../../chat/services/chatService';
-import { useChatSocket } from '../../chat/hooks/useChatSocket';
-import { ChatMessage, ConversationItem } from '../../chat/types/chatTypes';
+import { useSocket } from '../../../infrastructure/websocket/useSocket';
+import { ChatMessage, ConversationItem, ProductWidget } from '../../chat/types/chatTypes';
 
-const QUICK_REPLIES = [
-  'Chào bạn! Shop có thể hỗ trợ gì cho bạn về sản phẩm này ạ?',
-  'Sản phẩm này hiện đang có sẵn trong kho, giao hàng từ 2 - 3 ngày bạn nhé!',
-  'Shop có nhận in và thiết kế theo yêu cầu từ 1 sản phẩm ạ!',
-  'Cảm ơn bạn đã tin tưởng ủng hộ gian hàng của shop!'
-];
+const getInitials = (name: string) => {
+  if (!name) return 'KH';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const formatConvTime = (dateStr?: string) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  }
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) {
+    return 'Hôm qua';
+  }
+  const daysDiff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysDiff < 7) {
+    const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    return dayNames[d.getDay()];
+  }
+  return `${d.getDate()}/${d.getMonth() + 1}`;
+};
+
+const formatDatePill = (dateStr?: string) => {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const now = new Date();
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  if (d.toDateString() === now.toDateString()) {
+    return `Hôm nay, ${day} Tháng ${month}`;
+  }
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) {
+    return `Hôm qua, ${day} Tháng ${month}`;
+  }
+  return `${day} Tháng ${month}, ${d.getFullYear()}`;
+};
 
 export function SellerChatPage() {
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeConv, setActiveConv] = useState<ConversationItem | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -22,19 +64,20 @@ export function SellerChatPage() {
   const [loadingConv, setLoadingConv] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterTab, setFilterTab] = useState<'ALL' | 'UNREAD'>('ALL');
-  const [showCustomerInfo, setShowCustomerInfo] = useState(true);
+  const [filterTab, setFilterTab] = useState<'ALL' | 'UNREAD' | 'ORDER'>('ALL');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const currentRoomId = activeConv?.conversation_id;
 
-  const { isConnected, isTypingPartner, sendMessage, sendTyping, markRead } = useChatSocket(currentRoomId);
+  const { isTypingPartner, sendMessage, sendTyping, markRead } = useSocket(currentRoomId);
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
-  // Tải danh sách hội thoại
+  // Tải danh sách hội thoại từ Backend
   const fetchConversations = useCallback(async () => {
     try {
       const list = await chatService.getConversations();
@@ -56,7 +99,7 @@ export function SellerChatPage() {
       const history = await chatService.getMessages(convId);
       setMessages(history);
       markRead(convId);
-      setTimeout(() => scrollToBottom('auto'), 80);
+      setTimeout(() => scrollToBottom('auto'), 60);
     } catch (err) {
       console.error('Lỗi tải tin nhắn seller:', err);
     } finally {
@@ -64,7 +107,7 @@ export function SellerChatPage() {
     }
   }, [markRead]);
 
-  // Khởi tạo
+  // Lắng nghe các event realtime
   useEffect(() => {
     fetchConversations();
 
@@ -138,425 +181,458 @@ export function SellerChatPage() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputText(e.target.value);
     if (activeConv) {
       sendTyping(activeConv.conversation_id, e.target.value.length > 0);
     }
   };
 
+  // Các nút công cụ soạn thảo tin nhắn
+  const applyFormatting = (prefix: string, suffix: string) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = inputText.substring(start, end);
+    const replacement = prefix + (selected || 'văn bản') + suffix;
+    const newText = inputText.substring(0, start) + replacement + inputText.substring(end);
+    setInputText(newText);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + prefix.length, start + prefix.length + (selected ? selected.length : 7));
+    }, 10);
+  };
+
+  const handleInsertVoucher = () => {
+    setInputText((prev) => (prev ? prev + ' [Mã giảm giá: VIETCRAFT10 - Giảm 10%]' : 'Gửi bạn mã giảm giá: VIETCRAFT10 (Giảm 10% cho đơn hàng này) nhé!'));
+    textareaRef.current?.focus();
+  };
+
+  // Trích xuất thông tin sản phẩm đính kèm từ hội thoại/tin nhắn (nếu có)
+  const attachedProduct: ProductWidget | undefined = messages.slice().reverse().find((m) => m.product_widget)?.product_widget;
+
+  // Lọc danh sách hội thoại
   const filteredList = conversations.filter((c) => {
     const matchesSearch = c.partner.full_name.toLowerCase().includes(searchQuery.toLowerCase());
     if (filterTab === 'UNREAD') {
       return matchesSearch && c.unread_count > 0;
     }
+    if (filterTab === 'ORDER') {
+      return matchesSearch; // Sẽ lọc theo đơn hàng khi có trường orderId
+    }
     return matchesSearch;
   });
 
-  const totalUnreadCount = conversations.reduce((acc, it) => acc + (it.unread_count || 0), 0);
-
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-4 animate-fade-in font-sans">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-stone-200">
-        <div>
-          <h1 className="text-2xl font-black text-stone-900 flex items-center gap-2.5 font-jakarta">
-            <MessageSquare className="text-[#15803d]" size={26} />
-            Tin nhắn khách hàng
-            {totalUnreadCount > 0 && (
-              <span className="px-2.5 py-0.5 text-xs font-extrabold bg-red-500 text-white rounded-full">
-                {totalUnreadCount} chưa đọc
-              </span>
-            )}
-          </h1>
-          <p className="text-xs text-stone-500 mt-1">
-            Tư vấn sản phẩm, giải đáp thắc mắc và chăm sóc khách hàng theo thời gian thực.
-          </p>
+    <div className="w-full h-full flex flex-row overflow-hidden bg-white font-sans select-none">
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* CỘT TRÁI: DANH SÁCH CUỘC TRÒ CHUYỆN (WIDTH: ~340px)       */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <div className="w-80 lg:w-[340px] flex flex-col shrink-0 border-r border-stone-200 bg-white">
+        {/* Tiêu đề "Tin nhắn" */}
+        <div className="px-5 pt-4 pb-2">
+          <h1 className="text-xl font-extrabold text-stone-900 tracking-tight">Tin nhắn</h1>
         </div>
 
-        <div className="flex items-center gap-2 text-xs">
-          <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-[#15803d] font-semibold rounded-full border border-emerald-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Hệ thống Realtime: {isConnected ? 'Sẵn sàng' : 'Đang kết nối...'}
-          </span>
-        </div>
-      </div>
-
-      {/* Main Chat Interface */}
-      <div className="h-[700px] bg-white rounded-2xl border border-stone-200 shadow-sm flex overflow-hidden">
-        {/* ── CỘT 1: Danh sách cuộc trò chuyện (Left Column) ── */}
-        <div className="w-80 border-r border-stone-200 flex flex-col shrink-0 bg-stone-50/50">
-          {/* Search bar & Tabs */}
-          <div className="p-3 border-b border-stone-200 bg-white space-y-2.5">
-            <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-              <input
-                type="text"
-                placeholder="Tìm tên khách hàng..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-stone-100 border border-transparent rounded-xl focus:bg-white focus:border-[#15803d] outline-none transition-all"
-              />
-            </div>
-
-            <div className="flex gap-1.5 p-1 bg-stone-100 rounded-xl text-xs font-semibold">
-              <button
-                onClick={() => setFilterTab('ALL')}
-                className={`flex-1 py-1 rounded-lg transition-colors ${
-                  filterTab === 'ALL' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
-                }`}
-              >
-                Tất cả ({conversations.length})
-              </button>
-              <button
-                onClick={() => setFilterTab('UNREAD')}
-                className={`flex-1 py-1 rounded-lg transition-colors flex items-center justify-center gap-1 ${
-                  filterTab === 'UNREAD' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
-                }`}
-              >
-                Chưa đọc
-                {totalUnreadCount > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold">
-                    {totalUnreadCount}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Conversation List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-stone-100">
-            {loadingConv ? (
-              <div className="p-6 text-center text-xs text-stone-400">
-                <div className="w-6 h-6 border-2 border-[#15803d] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                Đang tải danh sách khách hàng...
-              </div>
-            ) : filteredList.length === 0 ? (
-              <div className="p-8 text-center text-stone-400">
-                <UserIcon size={36} className="mx-auto mb-2 opacity-30 text-stone-400" />
-                <p className="text-xs font-semibold text-stone-600">Không tìm thấy hội thoại</p>
-                <p className="text-[11px] text-stone-400 mt-1">Khi người mua gửi tin nhắn, hội thoại sẽ xuất hiện tại đây.</p>
-              </div>
-            ) : (
-              filteredList.map((c) => {
-                const isSelected = activeConv?.conversation_id === c.conversation_id;
-                const timeStr = c.last_message?.created_at
-                  ? new Date(c.last_message.created_at).toLocaleTimeString('vi-VN', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })
-                  : '';
-
-                return (
-                  <button
-                    key={c.conversation_id}
-                    onClick={() => handleSelectConv(c)}
-                    className={`w-full p-3.5 flex items-start gap-3 text-left transition-colors relative ${
-                      isSelected
-                        ? 'bg-emerald-50/70 border-r-4 border-r-[#15803d]'
-                        : 'hover:bg-stone-100/70 bg-white'
-                    }`}
-                  >
-                    <div className="relative shrink-0 mt-0.5">
-                      {c.partner.avatar ? (
-                        <img
-                          src={c.partner.avatar}
-                          alt=""
-                          className="w-10 h-10 rounded-full object-cover border border-stone-200"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-emerald-100 text-[#15803d] flex items-center justify-center font-bold text-sm uppercase">
-                          {c.partner.full_name.charAt(0)}
-                        </div>
-                      )}
-                      {c.unread_count > 0 && (
-                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
-                          {c.unread_count}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="font-bold text-xs text-stone-900 truncate">
-                          {c.partner.full_name}
-                        </span>
-                        <span className="text-[10px] text-stone-400 shrink-0">{timeStr}</span>
-                      </div>
-                      <p
-                        className={`text-xs truncate ${
-                          c.unread_count > 0 ? 'font-bold text-stone-900' : 'text-stone-500'
-                        }`}
-                      >
-                        {c.last_message?.text || 'Bắt đầu cuộc trò chuyện'}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })
-            )}
+        {/* Ô Tìm kiếm tin nhắn */}
+        <div className="px-4 pb-3">
+          <div className="relative flex items-center">
+            <Search size={15} className="absolute left-3.5 text-stone-400" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm tin nhắn..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs bg-[#f4f7f4] border border-stone-200/90 rounded-lg outline-none focus:bg-white focus:border-[#0a5c15] text-stone-800 placeholder-stone-400 transition-all"
+            />
           </div>
         </div>
 
-        {/* ── CỘT 2: Khung Chat Chính (Center Column) ── */}
-        <div className="flex-1 flex flex-col min-w-0 bg-stone-50/30">
-          {activeConv ? (
-            <>
-              {/* Header đối tác */}
-              <div className="p-3.5 bg-white border-b border-stone-200 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative">
-                    {activeConv.partner.avatar ? (
+        {/* Các tab: Tất cả | Chưa đọc | Đơn hàng */}
+        <div className="flex border-b border-stone-200 px-5 text-xs font-semibold gap-6">
+          <button
+            onClick={() => setFilterTab('ALL')}
+            className={`pb-2.5 transition-colors relative cursor-pointer ${
+              filterTab === 'ALL'
+                ? 'text-[#0a5c15] font-bold border-b-2 border-[#0a5c15]'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            Tất cả
+          </button>
+          <button
+            onClick={() => setFilterTab('UNREAD')}
+            className={`pb-2.5 transition-colors relative cursor-pointer ${
+              filterTab === 'UNREAD'
+                ? 'text-[#0a5c15] font-bold border-b-2 border-[#0a5c15]'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            Chưa đọc
+          </button>
+          <button
+            onClick={() => setFilterTab('ORDER')}
+            className={`pb-2.5 transition-colors relative cursor-pointer ${
+              filterTab === 'ORDER'
+                ? 'text-[#0a5c15] font-bold border-b-2 border-[#0a5c15]'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+          >
+            Đơn hàng
+          </button>
+        </div>
+
+        {/* Danh sách các cuộc trò chuyện */}
+        <div className="flex-1 overflow-y-auto divide-y divide-stone-100">
+          {loadingConv ? (
+            <div className="p-8 text-center text-xs text-stone-400">
+              <div className="w-5 h-5 border-2 border-[#0a5c15] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              Đang tải tin nhắn...
+            </div>
+          ) : filteredList.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-stone-400">
+              <MessageSquare size={36} className="opacity-20 text-stone-400 mb-2" />
+              <p className="text-xs font-semibold text-stone-600">Chưa có tin nhắn</p>
+              <p className="text-[11px] text-stone-400 mt-1 max-w-[200px]">
+                Khi người mua gửi tin nhắn, cuộc hội thoại sẽ xuất hiện ở đây.
+              </p>
+            </div>
+          ) : (
+            filteredList.map((c) => {
+              const isSelected = activeConv?.conversation_id === c.conversation_id;
+              const timeStr = formatConvTime(c.last_message?.created_at);
+
+              return (
+                <button
+                  key={c.conversation_id}
+                  onClick={() => handleSelectConv(c)}
+                  className={`w-full p-3.5 px-4 flex items-start gap-3 text-left transition-colors relative cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#f4f9f4] border-l-4 border-l-[#0a5c15]'
+                      : 'hover:bg-stone-50 bg-white'
+                  }`}
+                >
+                  {/* Avatar + chấm online */}
+                  <div className="relative shrink-0 mt-0.5">
+                    {c.partner.avatar ? (
                       <img
-                        src={activeConv.partner.avatar}
+                        src={c.partner.avatar}
                         alt=""
                         className="w-10 h-10 rounded-full object-cover border border-stone-200"
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 text-[#15803d] flex items-center justify-center font-bold text-sm uppercase">
-                        {activeConv.partner.full_name.charAt(0)}
+                      <div className="w-10 h-10 rounded-full bg-[#0a5c15] text-white flex items-center justify-center font-bold text-xs uppercase">
+                        {getInitials(c.partner.full_name)}
                       </div>
                     )}
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border border-white rounded-full" />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-purple-600 border-2 border-white rounded-full" />
                   </div>
+
+                  {/* Nội dung tóm tắt */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <span className="font-bold text-xs text-stone-900 truncate">
+                        {c.partner.full_name}
+                      </span>
+                      <span className="text-[10px] text-stone-400 shrink-0">{timeStr}</span>
+                    </div>
+                    <p className="text-xs text-stone-500 truncate mb-1">
+                      {c.last_message?.text || 'Bắt đầu cuộc trò chuyện'}
+                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      {/* Badge #POD mã đơn/sản phẩm */}
+                      <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 bg-stone-100 border border-stone-200 text-stone-600 rounded">
+                        #POD-{c.conversation_id.substring(c.conversation_id.length - 4).toUpperCase()}
+                      </span>
+                      {c.unread_count > 0 && (
+                        <span className="w-4 h-4 rounded-full bg-[#e11d48] text-white text-[10px] font-bold flex items-center justify-center ml-auto">
+                          {c.unread_count}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* CỘT PHẢI: KHUNG CHAT CHÍNH (FULL CHIỀU RỘNG CÒN LẠI)      */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 h-full bg-white">
+        {activeConv ? (
+          <>
+            {/* Header thanh trên: Thông tin khách hàng & nút "Xem lịch sử đơn hàng" */}
+            <div className="p-3.5 px-6 bg-white border-b border-stone-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative">
+                  {activeConv.partner.avatar ? (
+                    <img
+                      src={activeConv.partner.avatar}
+                      alt=""
+                      className="w-10 h-10 rounded-full object-cover border border-stone-200"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-[#0a5c15] text-white flex items-center justify-center font-bold text-xs uppercase">
+                      {getInitials(activeConv.partner.full_name)}
+                    </div>
+                  )}
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-purple-600 border-2 border-white rounded-full" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm text-stone-900 truncate">
+                    {activeConv.partner.full_name}
+                  </h3>
+                  <p className="text-[11px] text-stone-500 flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-purple-600 inline-block" />
+                    <span>{isTypingPartner ? 'Đang soạn tin...' : 'Trực tuyến'}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Nút Xem lịch sử đơn hàng */}
+              <button
+                type="button"
+                onClick={() => navigate('/seller/orders')}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-stone-700 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors cursor-pointer shadow-none"
+              >
+                <RotateCcw size={13} />
+                <span>Xem lịch sử đơn hàng</span>
+              </button>
+            </div>
+
+            {/* Banner ngữ cảnh sản phẩm / đơn hàng (pinned dưới header) */}
+            {attachedProduct && (
+              <div className="bg-[#edf7ed] border-b border-emerald-200/70 p-3 px-6 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={attachedProduct.image}
+                    alt=""
+                    className="w-12 h-12 rounded-md object-cover border border-stone-200 bg-white shrink-0"
+                  />
                   <div className="min-w-0">
-                    <h3 className="font-extrabold text-sm text-stone-900 truncate">
-                      {activeConv.partner.full_name}
-                    </h3>
-                    <p className="text-[11px] text-stone-500 flex items-center gap-1.5">
-                      <span className="text-emerald-600 font-semibold">Khách hàng</span>
-                      <span>•</span>
-                      <span>{isTypingPartner ? 'Đang soạn tin...' : 'Trực tuyến'}</span>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 bg-stone-200/80 text-stone-700 rounded">
+                        #POD-{attachedProduct.product_id.substring(attachedProduct.product_id.length - 4).toUpperCase()}
+                      </span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 bg-red-100 text-red-600 rounded">
+                        Cần xử lý
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-xs text-[#0a5c15] truncate">
+                      {attachedProduct.title}
+                    </h4>
+                    <p className="text-[11px] text-stone-500">
+                      Sản phẩm • {attachedProduct.price.toLocaleString('vi-VN')}₫
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowCustomerInfo(!showCustomerInfo)}
-                    className={`p-2 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 ${
-                      showCustomerInfo
-                        ? 'bg-emerald-50 text-[#15803d] border-emerald-200'
-                        : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-50'
-                    }`}
-                    title="Thông tin khách hàng"
-                  >
-                    <Info size={15} />
-                    <span className="hidden sm:inline">Hồ sơ khách</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Message history */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-                {loadingMessages ? (
-                  <div className="flex items-center justify-center h-full text-xs text-stone-400">
-                    <div className="w-5 h-5 border-2 border-[#15803d] border-t-transparent rounded-full animate-spin mr-2" />
-                    Đang tải nội dung tin nhắn...
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="text-center py-16 text-stone-400">
-                    <MessageSquare size={36} className="mx-auto mb-2 opacity-30 text-stone-400" />
-                    <p className="text-xs font-semibold text-stone-600">Chưa có tin nhắn nào</p>
-                    <p className="text-[11px] text-stone-400 mt-1">Hãy gửi lời chào hoặc phản hồi cho khách hàng!</p>
-                  </div>
-                ) : (
-                  messages.map((m) => {
-                    const isMe = m.sender_id !== activeConv.partner.id;
-                    const timeStr = new Date(m.created_at).toLocaleTimeString('vi-VN', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    });
-
-                    return (
-                      <div
-                        key={m.id || m._id}
-                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                      >
-                        {/* Thẻ sản phẩm kèm trong tin nhắn */}
-                        {m.product_widget && (
-                          <div
-                            className={`mb-1 p-2.5 max-w-[320px] rounded-xl border flex items-center gap-3 shadow-xs ${
-                              isMe ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-stone-200'
-                            }`}
-                          >
-                            <img
-                              src={m.product_widget.image}
-                              alt=""
-                              className="w-12 h-12 rounded-lg object-cover border border-stone-100 shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-bold text-stone-900 truncate">
-                                {m.product_widget.title}
-                              </p>
-                              <p className="text-xs font-bold text-[#15803d]">
-                                {m.product_widget.price.toLocaleString('vi-VN')}đ
-                              </p>
-                            </div>
-                            <a
-                              href={`/product/${m.product_widget.product_id}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-stone-400 hover:text-[#15803d] p-1.5 rounded-md hover:bg-white"
-                              title="Xem trang sản phẩm"
-                            >
-                              <ExternalLink size={15} />
-                            </a>
-                          </div>
-                        )}
-
-                        {/* Thẻ báo giá */}
-                        {m.custom_quotation && (
-                          <div className="mb-1 p-3.5 max-w-[300px] rounded-xl bg-amber-50 border border-amber-200 shadow-xs">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-1">
-                              <Package size={15} /> Đề xuất báo giá tùy chỉnh
-                            </div>
-                            <p className="text-base font-black text-amber-700">
-                              {m.custom_quotation.amount.toLocaleString('vi-VN')}đ
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Text bubble */}
-                        {m.message_text && (
-                          <div
-                            className={`px-4 py-2.5 max-w-[75%] rounded-2xl text-xs leading-relaxed break-words shadow-xs ${
-                              isMe
-                                ? 'bg-[#15803d] text-white rounded-br-none'
-                                : 'bg-white text-stone-800 border border-stone-200 rounded-bl-none'
-                            }`}
-                          >
-                            {m.message_text}
-                          </div>
-                        )}
-
-                        {/* Meta info */}
-                        <div
-                          className={`flex items-center gap-1 mt-0.5 text-[10px] text-stone-400 ${
-                            isMe ? 'mr-1' : 'ml-1'
-                          }`}
-                        >
-                          <span>{timeStr}</span>
-                          {isMe && (
-                            <span title={m.is_read ? 'Đã xem' : 'Đã gửi'}>
-                              <CheckCheck
-                                size={13}
-                                className={m.is_read ? 'text-emerald-500' : 'text-stone-400'}
-                              />
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-
-                {isTypingPartner && (
-                  <div className="flex items-center gap-1 text-xs text-stone-500 italic bg-white px-3 py-1.5 rounded-full w-fit border border-stone-200 animate-pulse">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                    Khách hàng đang soạn tin...
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Quick Replies Bar */}
-              <div className="px-3.5 py-2 bg-stone-50 border-t border-stone-200 flex items-center gap-2 overflow-x-auto no-scrollbar">
-                <span className="text-[11px] font-bold text-stone-400 shrink-0 flex items-center gap-1">
-                  Mẫu nhanh:
-                </span>
-                {QUICK_REPLIES.map((reply, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSend(reply)}
-                    className="text-[11px] whitespace-nowrap px-3 py-1 bg-white border border-stone-200 hover:border-[#15803d] hover:text-[#15803d] rounded-full transition-colors text-stone-600 shrink-0"
-                  >
-                    {reply}
-                  </button>
-                ))}
-              </div>
-
-              {/* Input Area */}
-              <div className="p-3 bg-white border-t border-stone-200 flex items-center gap-2.5">
-                <input
-                  type="text"
-                  placeholder="Nhập câu trả lời cho khách hàng... (Enter để gửi)"
-                  value={inputText}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  className="flex-1 text-xs px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:border-[#15803d] focus:bg-white transition-all text-stone-800"
-                />
                 <button
-                  onClick={() => handleSend()}
-                  disabled={!inputText.trim()}
-                  className="px-4 py-2.5 bg-[#15803d] text-white rounded-xl hover:bg-[#166534] disabled:opacity-40 disabled:hover:bg-[#15803d] transition-colors flex items-center gap-1.5 text-xs font-bold shadow-xs shrink-0"
+                  type="button"
+                  onClick={handleInsertVoucher}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#0a5c15] hover:bg-[#074710] rounded-lg shadow-xs transition-colors shrink-0 cursor-pointer ml-4"
                 >
-                  <Send size={15} />
-                  <span>Gửi</span>
+                  <Tag size={13} />
+                  <span>Gửi Voucher ưu đãi</span>
                 </button>
               </div>
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-stone-400 p-8">
-              <MessageSquare size={48} className="text-stone-300 mb-3" />
-              <p className="text-sm font-bold text-stone-700">Chưa chọn cuộc trò chuyện</p>
-              <p className="text-xs text-stone-400 mt-1 max-w-sm text-center">
-                Chọn một khách hàng ở danh sách bên trái để xem nội dung và bắt đầu hỗ trợ.
-              </p>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* ── CỘT 3: Thông tin chi tiết khách hàng (Right Column) ── */}
-        {showCustomerInfo && activeConv && (
-          <div className="w-72 border-l border-stone-200 bg-white p-5 flex flex-col shrink-0 overflow-y-auto">
-            <div className="text-center pb-5 border-b border-stone-100">
-              <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 text-[#15803d] flex items-center justify-center font-extrabold text-xl uppercase mb-2 border-2 border-emerald-200">
-                {activeConv.partner.avatar ? (
-                  <img
-                    src={activeConv.partner.avatar}
-                    alt=""
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  activeConv.partner.full_name.charAt(0)
-                )}
-              </div>
-              <h4 className="font-extrabold text-sm text-stone-900">{activeConv.partner.full_name}</h4>
-              <p className="text-xs text-stone-400 mt-0.5">{activeConv.partner.email || 'Khách hàng VietCraft'}</p>
-            </div>
-
-            <div className="py-4 space-y-3.5 border-b border-stone-100 text-xs">
-              <h5 className="font-bold text-stone-800 uppercase text-[10px] tracking-wider text-stone-400">
-                Thông tin tài khoản
-              </h5>
-              <div className="flex justify-between text-stone-600">
-                <span>Vai trò:</span>
-                <span className="font-semibold text-stone-900">{activeConv.partner.role}</span>
-              </div>
-              <div className="flex justify-between text-stone-600">
-                <span>ID Khách hàng:</span>
-                <span className="font-mono text-[10px] text-stone-500">
-                  {activeConv.partner.id.substring(0, 10)}...
+            {/* Dòng thời gian tin nhắn (Canvas cuộn) */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
+              {/* Badge ngày tháng ở giữa */}
+              <div className="flex justify-center my-2">
+                <span className="text-xs text-stone-500 bg-[#eef2ee] border border-stone-200/70 px-3.5 py-1 rounded-full font-medium">
+                  {formatDatePill(messages[0]?.created_at)}
                 </span>
               </div>
+
+              {loadingMessages ? (
+                <div className="flex items-center justify-center h-40 text-xs text-stone-400">
+                  <div className="w-5 h-5 border-2 border-[#0a5c15] border-t-transparent rounded-full animate-spin mr-2" />
+                  Đang tải nội dung...
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="text-center py-16 text-stone-400">
+                  <MessageSquare size={36} className="mx-auto mb-2 opacity-30 text-stone-400" />
+                  <p className="text-xs font-semibold text-stone-600">Chưa có tin nhắn nào</p>
+                  <p className="text-[11px] text-stone-400 mt-1">Hãy gửi phản hồi cho khách hàng!</p>
+                </div>
+              ) : (
+                messages.map((m) => {
+                  const isMe = m.sender_id !== activeConv.partner.id;
+                  const timeStr = new Date(m.created_at).toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+
+                  return (
+                    <div
+                      key={m.id || m._id}
+                      className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                    >
+                      {!isMe ? (
+                        /* Tin nhắn từ người mua (Bên trái: Avatar + Bong bóng trắng viền xám) */
+                        <div className="flex items-start gap-2.5 max-w-[70%]">
+                          {activeConv.partner.avatar ? (
+                            <img
+                              src={activeConv.partner.avatar}
+                              alt=""
+                              className="w-8 h-8 rounded-full object-cover shrink-0 mt-0.5 border border-stone-200"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-stone-200 text-stone-700 flex items-center justify-center font-bold text-xs uppercase shrink-0 mt-0.5">
+                              {activeConv.partner.full_name.substring(0, 1)}
+                            </div>
+                          )}
+
+                          <div>
+                            <div className="bg-white border border-stone-200 text-stone-800 rounded-2xl rounded-tl-xs p-3.5 px-4 text-xs sm:text-sm leading-relaxed shadow-xs">
+                              {m.message_text}
+                            </div>
+                            <span className="text-[10px] text-stone-400 mt-1 ml-1 block">
+                              {timeStr}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Tin nhắn từ người bán (Bên phải: Bong bóng xanh lá đậm #0a5c15) */
+                        <div className="flex flex-col items-end max-w-[70%]">
+                          <div className="bg-[#0a5c15] text-white rounded-2xl rounded-tr-xs p-3.5 px-4 text-xs sm:text-sm leading-relaxed shadow-xs">
+                            {m.message_text}
+                          </div>
+                          <div className="flex items-center gap-1 mt-1 mr-1 text-[10px] text-stone-400">
+                            <span>{timeStr}</span>
+                            <CheckCheck
+                              size={12}
+                              className={m.is_read ? 'text-emerald-500' : 'text-stone-400'}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Chỉ báo khách hàng đang soạn tin */}
+              {isTypingPartner && (
+                <div className="flex items-center gap-1.5 text-xs text-stone-500 italic bg-stone-50 px-3.5 py-1.5 rounded-full w-fit border border-stone-200 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-ping" />
+                  {activeConv.partner.full_name} đang soạn tin...
+                </div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
 
-            <div className="pt-4 space-y-2 text-xs">
-              <h5 className="font-bold text-stone-800 uppercase text-[10px] tracking-wider text-stone-400">
-                Mẹo bán hàng
-              </h5>
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px] leading-relaxed">
-                💡 Phản hồi khách hàng trong vòng <strong>5 phút</strong> giúp tăng tỷ lệ chốt đơn lên đến <strong>70%</strong>!
+            {/* Khung Soạn Thảo Tin Nhắn Chuẩn Mẫu (Rich Input Box) */}
+            <div className="m-5 mt-2 border border-stone-300 rounded-xl bg-white shadow-xs overflow-hidden flex flex-col shrink-0">
+              {/* Thanh công cụ định dạng (B, I, List, Thêm mã giảm giá) */}
+              <div className="px-3.5 py-2 border-b border-stone-200 flex items-center gap-3 bg-white text-stone-600">
+                <button
+                  type="button"
+                  onClick={() => applyFormatting('**', '**')}
+                  className="font-bold text-xs px-1.5 py-0.5 hover:bg-stone-100 rounded text-stone-700 cursor-pointer"
+                  title="In đậm"
+                >
+                  <Bold size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyFormatting('*', '*')}
+                  className="italic text-xs px-1.5 py-0.5 hover:bg-stone-100 rounded text-stone-700 cursor-pointer"
+                  title="In nghiêng"
+                >
+                  <Italic size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyFormatting('\n- ', '')}
+                  className="px-1.5 py-0.5 hover:bg-stone-100 rounded text-stone-700 cursor-pointer"
+                  title="Danh sách gạch đầu dòng"
+                >
+                  <List size={14} />
+                </button>
+                <span className="h-4 w-px bg-stone-200" />
+                <button
+                  type="button"
+                  onClick={handleInsertVoucher}
+                  className="flex items-center gap-1.5 text-xs text-stone-600 hover:text-[#0a5c15] font-medium cursor-pointer"
+                >
+                  <Tag size={13} />
+                  <span>Thêm mã giảm giá</span>
+                </button>
+              </div>
+
+              {/* Ô Nhập văn bản */}
+              <textarea
+                ref={textareaRef}
+                rows={3}
+                placeholder="Nhập tin nhắn..."
+                value={inputText}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                className="w-full px-3.5 py-2.5 text-xs sm:text-sm outline-none resize-none border-none text-stone-800 placeholder-stone-400"
+              />
+
+              {/* Thanh hành động dưới cùng: Đính kèm file, ảnh và nút Gửi */}
+              <div className="px-3.5 py-2 flex items-center justify-between border-t border-stone-100 bg-white">
+                <div className="flex items-center gap-1 text-stone-500">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-1.5 hover:text-stone-800 hover:bg-stone-50 rounded transition-colors cursor-pointer"
+                    title="Đính kèm tệp"
+                  >
+                    <Paperclip size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-1.5 hover:text-stone-800 hover:bg-stone-50 rounded transition-colors cursor-pointer ml-1"
+                    title="Đính kèm hình ảnh"
+                  >
+                    <ImageIcon size={17} />
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={() => {}}
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSend()}
+                  disabled={!inputText.trim()}
+                  className="flex items-center gap-1.5 px-5 py-2 bg-[#0b6417] hover:bg-[#094d12] disabled:opacity-50 text-white rounded-lg font-bold text-xs sm:text-sm transition-colors cursor-pointer shadow-xs"
+                >
+                  <span>Gửi</span>
+                  <Send size={12} className="fill-current" />
+                </button>
               </div>
             </div>
+          </>
+        ) : (
+          /* Khi chưa chọn cuộc trò chuyện */
+          <div className="flex-1 flex flex-col items-center justify-center text-stone-400 p-8">
+            <MessageSquare size={48} className="text-stone-300 mb-3" />
+            <p className="text-sm font-bold text-stone-700">Chưa chọn cuộc trò chuyện</p>
+            <p className="text-xs text-stone-400 mt-1 max-w-sm text-center">
+              Chọn một khách hàng ở danh sách bên trái để xem nội dung và bắt đầu hỗ trợ.
+            </p>
           </div>
         )}
       </div>

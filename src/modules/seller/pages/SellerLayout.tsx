@@ -143,7 +143,9 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
         </header>
 
         {/* Main Body */}
-        <main className="seller-content">{children}</main>
+        <main className={`seller-content ${location.pathname.startsWith('/seller/chat') ? 'seller-chat-content' : ''}`}>
+          {children}
+        </main>
       </div>
     </div>
   );

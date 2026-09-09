@@ -303,6 +303,15 @@
     padding: 24px 32px;
 }
 
+.seller-content.seller-chat-content {
+    padding: 0 !important;
+    overflow: hidden !important;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 72px);
+    max-width: none !important;
+}
+
 .seller-page-title {
     font-size: 20px;
     font-weight: 700;

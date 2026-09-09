@@ -155,7 +155,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
             type="button"
             className="icon-btn relative"
             title="Tin nhắn"
-            onClick={() => window.dispatchEvent(new CustomEvent('vietcraft-open-chat'))}
+            onClick={() => window.dispatchEvent(new CustomEvent('vietcraft-open-chat', { detail: { toggle: true } }))}
           >
             <MessageCircle size={22} className="text-gray-600 hover:text-gray-900 transition-colors" />
             {unreadChatCount > 0 && (

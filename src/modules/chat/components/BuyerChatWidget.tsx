@@ -21,7 +21,6 @@ export function BuyerChatWidget({ user }: BuyerChatWidgetProps) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeProductWidget, setActiveProductWidget] = useState<ProductWidget | null>(null);
-  const [totalUnread, setTotalUnread] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentRoomId = activeConv?.conversation_id;
@@ -33,14 +32,12 @@ export function BuyerChatWidget({ user }: BuyerChatWidgetProps) {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
-  // Tải danh sách hội thoại & tổng số tin chưa đọc
+  // Tải danh sách hội thoại
   const fetchConversations = useCallback(async () => {
     if (!user) return;
     try {
       const list = await chatService.getConversations();
       setConversations(list);
-      const unread = list.reduce((sum, item) => sum + (item.unread_count || 0), 0);
-      setTotalUnread(unread);
     } catch {
       // Ignored if offline
     }
@@ -77,17 +74,24 @@ export function BuyerChatWidget({ user }: BuyerChatWidgetProps) {
       fetchConversations();
     };
 
-    const onUnreadUpdated = (e: any) => {
-      const { unreadCount } = e.detail || {};
-      if (typeof unreadCount === 'number') {
-        setTotalUnread(unreadCount);
-      }
+    const onUnreadUpdated = () => {
       fetchConversations();
     };
 
     const onOpenChat = async (e: any) => {
-      const { shopId, partnerId, productWidget } = e.detail || {};
+      const { shopId, partnerId, productWidget, toggle } = e.detail || {};
+
+      if (toggle) {
+        setIsOpen((prev) => {
+          const next = !prev;
+          if (next) fetchConversations();
+          return next;
+        });
+        return;
+      }
+
       setIsOpen(true);
+      fetchConversations();
 
       if (productWidget) {
         setActiveProductWidget(productWidget);
@@ -203,26 +207,7 @@ export function BuyerChatWidget({ user }: BuyerChatWidgetProps) {
 
   return (
     <>
-      {/* Nút Bong Bóng Chat Nổi */}
-      {!isOpen && (
-        <button
-          onClick={() => {
-            setIsOpen(true);
-            fetchConversations();
-          }}
-          className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-tr from-[#15803d] to-[#16a34a] text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 border-2 border-white/20 group"
-          title="Tin nhắn với người bán"
-        >
-          <MessageCircle size={26} className="group-hover:rotate-12 transition-transform duration-200" />
-          {totalUnread > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-xs font-bold bg-red-500 text-white rounded-full border-2 border-white shadow-md animate-pulse">
-              {totalUnread > 99 ? '99+' : totalUnread}
-            </span>
-          )}
-        </button>
-      )}
-
-      {/* Cửa Sổ Chat Pop-up */}
+      {/* Cửa Sổ Chat Pop-up (kích hoạt từ icon trên header) */}
       {isOpen && (
         <div className="fixed bottom-6 right-6 z-50 w-[380px] max-w-[calc(100vw-32px)] h-[540px] max-h-[calc(100vh-48px)] bg-white rounded-2xl shadow-2xl border border-stone-200 flex flex-col overflow-hidden animate-fade-in font-sans">
           {/* Header */}
