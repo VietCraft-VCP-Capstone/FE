@@ -78,6 +78,14 @@ export function useSocket(currentRoomId?: string) {
       window.dispatchEvent(new CustomEvent('vietcraft-chat-unread-updated', { detail: data }));
     });
 
+    socket.on('notification_received', (notification: any) => {
+      window.dispatchEvent(new CustomEvent('vietcraft-notification-received', { detail: notification }));
+    });
+
+    socket.on('notification_unread_count', (data: { unreadCount: number }) => {
+      window.dispatchEvent(new CustomEvent('vietcraft-notification-unread-updated', { detail: data }));
+    });
+
     socket.on('user_typing', (data: { userId: string; roomId: string; isTyping: boolean }) => {
       if (currentRoomId && data.roomId === currentRoomId) {
         setIsTypingPartner(data.isTyping);

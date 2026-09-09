@@ -8,6 +8,7 @@ import {
   Settings, Bell, Mail, PanelLeft, ExternalLink, LogOut, ChevronDown, MessageSquare
 } from 'lucide-react';
 import { chatService } from '../../chat/services/chatService';
+import { notificationService } from '../../notification/services/notificationService';
 
 interface SellerLayoutProps {
   children: React.ReactNode;
@@ -44,12 +45,17 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
 
   useEffect(() => {
     chatService.getUnreadCount()
       .then(c => setUnreadChatCount(c))
+      .catch(() => {});
+
+    notificationService.getUnreadCount()
+      .then(c => setUnreadNotifCount(c))
       .catch(() => {});
 
     const onUnreadUpdate = (e: any) => {
@@ -60,12 +66,24 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
       }
     };
 
+    const onNotifUpdate = (e: any) => {
+      if (typeof e.detail?.unreadCount === 'number') {
+        setUnreadNotifCount(e.detail.unreadCount);
+      } else {
+        notificationService.getUnreadCount().then(c => setUnreadNotifCount(c)).catch(() => {});
+      }
+    };
+
     window.addEventListener('vietcraft-chat-unread-updated', onUnreadUpdate);
     window.addEventListener('vietcraft-message-received', onUnreadUpdate);
+    window.addEventListener('vietcraft-notification-unread-updated', onNotifUpdate);
+    window.addEventListener('vietcraft-notification-received', onNotifUpdate);
 
     return () => {
       window.removeEventListener('vietcraft-chat-unread-updated', onUnreadUpdate);
       window.removeEventListener('vietcraft-message-received', onUnreadUpdate);
+      window.removeEventListener('vietcraft-notification-unread-updated', onNotifUpdate);
+      window.removeEventListener('vietcraft-notification-received', onNotifUpdate);
     };
   }, []);
 
@@ -125,7 +143,14 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
               <Mail size={19} />
               {unreadChatCount > 0 && <span className="seller-bell-dot" />}
             </Link>
-            <button className="seller-icon-btn seller-bell"><Bell size={19} /><span className="seller-bell-dot" /></button>
+            <button
+              className="seller-icon-btn seller-bell relative"
+              onClick={() => navigate('/notifications')}
+              title="Thông báo"
+            >
+              <Bell size={19} />
+              {unreadNotifCount > 0 && <span className="seller-bell-dot" />}
+            </button>
             <button className="seller-lang-badge">VN <ChevronDown size={13} /></button>
             <div className="seller-user-menu" ref={menuRef}>
               <button className="seller-avatar" onClick={() => setMenuOpen(o => !o)} title="Tài khoản">{user?.name?.[0]?.toUpperCase() || 'S'}</button>

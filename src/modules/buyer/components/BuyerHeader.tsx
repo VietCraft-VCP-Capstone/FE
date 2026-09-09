@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import { userService } from '../../user/services/userService';
 import { chatService } from '../../chat/services/chatService';
+import { notificationService } from '../../notification/services/notificationService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 interface BuyerHeaderProps {
@@ -18,6 +19,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
   const location = useLocation();
   const [favCount, setFavCount] = useState(0);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   const name = user?.full_name || user?.name || '';
   const initial = name.charAt(0).toUpperCase() || '';
@@ -44,16 +46,41 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
       .catch(() => setUnreadChatCount(0));
   };
 
+  const refreshNotifUnread = () => {
+    if (!isLoggedIn()) {
+      setUnreadNotifCount(0);
+      return;
+    }
+    notificationService.getUnreadCount()
+      .then((count) => setUnreadNotifCount(count))
+      .catch(() => setUnreadNotifCount(0));
+  };
+
   useEffect(() => {
     refreshFavCount();
     refreshChatUnread();
+    refreshNotifUnread();
+
+    const handleNotifUpdate = (e: any) => {
+      if (typeof e.detail?.unreadCount === 'number') {
+        setUnreadNotifCount(e.detail.unreadCount);
+      } else {
+        refreshNotifUnread();
+      }
+    };
+
     window.addEventListener('wishlist-updated', refreshFavCount);
     window.addEventListener('vietcraft-chat-unread-updated', refreshChatUnread);
     window.addEventListener('vietcraft-message-received', refreshChatUnread);
+    window.addEventListener('vietcraft-notification-unread-updated', handleNotifUpdate);
+    window.addEventListener('vietcraft-notification-received', handleNotifUpdate);
+
     return () => {
       window.removeEventListener('wishlist-updated', refreshFavCount);
       window.removeEventListener('vietcraft-chat-unread-updated', refreshChatUnread);
       window.removeEventListener('vietcraft-message-received', refreshChatUnread);
+      window.removeEventListener('vietcraft-notification-unread-updated', handleNotifUpdate);
+      window.removeEventListener('vietcraft-notification-received', handleNotifUpdate);
     };
   }, [location.pathname]);
 
@@ -103,6 +130,11 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
                   : 'text-gray-600 stroke-[1.8] hover:text-gray-900 transition-colors'
               }
             />
+            {unreadNotifCount > 0 && (
+              <span className="badge bg-red-600 text-white animate-pulse">
+                {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+              </span>
+            )}
           </button>
 
           {/* Favorites Icon */}

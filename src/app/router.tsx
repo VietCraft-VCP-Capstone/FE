@@ -17,6 +17,7 @@ import { BuyerOrdersPage } from '../modules/buyer/pages/BuyerOrdersPage';
 import { BuyerOrderDetailPage } from '../modules/buyer/pages/BuyerOrderDetailPage';
 import { BuyerProductDetailPage } from '../modules/buyer/pages/BuyerProductDetailPage';
 import { BuyerShopPage } from '../modules/buyer/pages/BuyerShopPage';
+import { BuyerNotificationsPage } from '../modules/buyer/pages/BuyerNotificationsPage';
 import { useAuth } from '../modules/auth/hooks/useAuth';
 
 function RolePortal({ user, onLogout }: { user: any; onLogout: () => void }) {
@@ -111,6 +112,7 @@ export function AppRouter() {
         <Route path="/favorites" element={<BuyerFavoritesPage />} />
         <Route path="/orders" element={<BuyerOrdersPage />} />
         <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
+        <Route path="/notifications" element={<BuyerNotificationsPage />} />
       </Route>
 
       <Route path="/login" element={<LoginPage onLogin={login} onGoogleLogin={googleLogin} user={user} />} />
