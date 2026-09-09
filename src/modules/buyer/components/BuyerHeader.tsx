@@ -3,6 +3,7 @@ import { Search, Heart, Bell, ShoppingBag, MessageCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import { userService } from '../../user/services/userService';
+import { chatService } from '../../chat/services/chatService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 interface BuyerHeaderProps {
@@ -16,6 +17,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
   const navigate = useNavigate();
   const location = useLocation();
   const [favCount, setFavCount] = useState(0);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   const name = user?.full_name || user?.name || '';
   const initial = name.charAt(0).toUpperCase() || '';
@@ -32,10 +34,27 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
       .catch(() => setFavCount(0));
   };
 
+  const refreshChatUnread = () => {
+    if (!isLoggedIn()) {
+      setUnreadChatCount(0);
+      return;
+    }
+    chatService.getUnreadCount()
+      .then((count) => setUnreadChatCount(count))
+      .catch(() => setUnreadChatCount(0));
+  };
+
   useEffect(() => {
     refreshFavCount();
+    refreshChatUnread();
     window.addEventListener('wishlist-updated', refreshFavCount);
-    return () => window.removeEventListener('wishlist-updated', refreshFavCount);
+    window.addEventListener('vietcraft-chat-unread-updated', refreshChatUnread);
+    window.addEventListener('vietcraft-message-received', refreshChatUnread);
+    return () => {
+      window.removeEventListener('wishlist-updated', refreshFavCount);
+      window.removeEventListener('vietcraft-chat-unread-updated', refreshChatUnread);
+      window.removeEventListener('vietcraft-message-received', refreshChatUnread);
+    };
   }, [location.pathname]);
 
   const displayCartCount = cartCount;
@@ -132,8 +151,18 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
           </button>
 
           {/* Message / Chat Icon */}
-          <button type="button" className="icon-btn relative" title="Tin nhắn">
+          <button
+            type="button"
+            className="icon-btn relative"
+            title="Tin nhắn"
+            onClick={() => window.dispatchEvent(new CustomEvent('vietcraft-open-chat'))}
+          >
             <MessageCircle size={22} className="text-gray-600 hover:text-gray-900 transition-colors" />
+            {unreadChatCount > 0 && (
+              <span className="badge bg-red-600 text-white animate-pulse">
+                {unreadChatCount > 99 ? '99+' : unreadChatCount}
+              </span>
+            )}
           </button>
 
           {/* User Green Circle Avatar with Letter P */}

@@ -5,8 +5,9 @@ import { POD_CREATE_ENABLED, POD_CREATE_PATH } from '../featureFlags';
 import {
   LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Truck, Ticket,
   Wallet, Banknote, BarChart2, TrendingUp, LineChart, Flame, Tag, PieChart, Rocket,
-  Settings, Bell, Mail, PanelLeft, ExternalLink, LogOut, ChevronDown
+  Settings, Bell, Mail, PanelLeft, ExternalLink, LogOut, ChevronDown, MessageSquare
 } from 'lucide-react';
+import { chatService } from '../../chat/services/chatService';
 
 interface SellerLayoutProps {
   children: React.ReactNode;
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { to: '/seller/catalog', icon: Archive, label: 'Danh mục sản phẩm' },
   { to: '/seller/storefront', icon: Store, label: 'Thông tin cửa hàng' },
   { to: '/seller/orders', icon: ShoppingCart, label: 'Đơn hàng' },
+  { to: '/seller/chat', icon: MessageSquare, label: 'Tin nhắn khách hàng' },
   { to: '/seller/products', icon: Package, label: 'Quản lí sản phẩm' },
   { to: '/seller/products/new', icon: PlusCircle, label: 'Tạo sản phẩm POD' },
   { to: '/seller/shipping', icon: Truck, label: 'Vận chuyển' },
@@ -41,8 +43,31 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
+
+  useEffect(() => {
+    chatService.getUnreadCount()
+      .then(c => setUnreadChatCount(c))
+      .catch(() => {});
+
+    const onUnreadUpdate = (e: any) => {
+      if (typeof e.detail?.unreadCount === 'number') {
+        setUnreadChatCount(e.detail.unreadCount);
+      } else {
+        chatService.getUnreadCount().then(c => setUnreadChatCount(c)).catch(() => {});
+      }
+    };
+
+    window.addEventListener('vietcraft-chat-unread-updated', onUnreadUpdate);
+    window.addEventListener('vietcraft-message-received', onUnreadUpdate);
+
+    return () => {
+      window.removeEventListener('vietcraft-chat-unread-updated', onUnreadUpdate);
+      window.removeEventListener('vietcraft-message-received', onUnreadUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -67,6 +92,11 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
             <Link key={to} to={to} className={`seller-nav-item ${currentPath === to ? 'active' : ''}`} title={collapsed ? label : undefined}>
               <Icon size={19} />
               {!collapsed && <span>{label}</span>}
+              {to === '/seller/chat' && unreadChatCount > 0 && (
+                <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold bg-red-500 text-white rounded-full">
+                  {unreadChatCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -91,7 +121,10 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
             <Link to="/seller/analytics" className="seller-market-btn">Phân tích thị trường<ExternalLink size={14} /></Link>
           </div>
           <div className="seller-header-actions">
-            <button className="seller-icon-btn"><Mail size={19} /></button>
+            <Link to="/seller/chat" className="seller-icon-btn relative" title="Tin nhắn khách hàng">
+              <Mail size={19} />
+              {unreadChatCount > 0 && <span className="seller-bell-dot" />}
+            </Link>
             <button className="seller-icon-btn seller-bell"><Bell size={19} /><span className="seller-bell-dot" /></button>
             <button className="seller-lang-badge">VN <ChevronDown size={13} /></button>
             <div className="seller-user-menu" ref={menuRef}>

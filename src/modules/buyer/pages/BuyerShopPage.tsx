@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Star, Store, ArrowLeft, PackageSearch } from 'lucide-react';
+import { Star, Store, ArrowLeft, PackageSearch, MessageCircle } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
+import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 interface ShopHeader {
   name: string;
@@ -44,25 +45,44 @@ export function BuyerShopPage() {
         <ArrowLeft className="h-4 w-4" /> Quay lại
       </button>
 
-      <header className="mb-8 flex items-center gap-5 rounded-2xl border border-stone-200 bg-white p-6">
-        {shop?.logo ? (
-          <img src={shop.logo} alt="" className="h-20 w-20 shrink-0 rounded-full border border-stone-200 object-cover" />
-        ) : (
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-400">
-            <Store className="h-8 w-8" />
-          </div>
-        )}
-        <div className="min-w-0">
-          <h1 className="m-0 truncate text-2xl font-extrabold text-[#330033]">
-            {shop?.name || 'Gian hàng'}
-          </h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm text-stone-500">
-            <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
-              <Star className="h-4 w-4 fill-current" /> {(shop?.rating ?? 5).toFixed(1)}
-            </span>
-            <span>{loading ? '—' : `${products.length} sản phẩm`}</span>
+      <header className="mb-8 flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-stone-200 bg-white p-6 shadow-xs">
+        <div className="flex items-center gap-5">
+          {shop?.logo ? (
+            <img src={shop.logo} alt="" className="h-20 w-20 shrink-0 rounded-full border border-stone-200 object-cover" />
+          ) : (
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-400">
+              <Store className="h-8 w-8" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className="m-0 truncate text-2xl font-extrabold text-[#330033]">
+              {shop?.name || 'Gian hàng'}
+            </h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm text-stone-500">
+              <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
+                <Star className="h-4 w-4 fill-current" /> {(shop?.rating ?? 5).toFixed(1)}
+              </span>
+              <span>{loading ? '—' : `${products.length} sản phẩm`}</span>
+            </div>
           </div>
         </div>
+
+        <button
+          onClick={() => {
+            if (!isLoggedIn()) {
+              navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+              return;
+            }
+            window.dispatchEvent(new CustomEvent('vietcraft-open-chat', {
+              detail: { shopId: id }
+            }));
+          }}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#007700] hover:bg-[#006000] text-white rounded-xl text-sm font-bold shadow-xs transition-colors cursor-pointer"
+          title="Bắt đầu chat với gian hàng này"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Chat với Shop
+        </button>
       </header>
 
       {loading ? (
