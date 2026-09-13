@@ -7,6 +7,7 @@ import { ForgotPasswordPage } from '../modules/auth/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../modules/auth/pages/ResetPasswordPage';
 import { AdminPortal } from '../modules/admin/pages/AdminPortal';
 import { SellerPortal } from '../modules/seller/pages/SellerPortal';
+import { SellerRegisterPage } from '../modules/seller/pages/SellerRegisterPage';
 import { BuyerLayout } from '../modules/buyer/pages/BuyerLayout';
 import { BuyerDashboard } from '../modules/buyer/pages/BuyerHomePage';
 import { BuyerCartPage } from '../modules/buyer/pages/BuyerCartPage';
@@ -127,6 +128,13 @@ export function AppRouter() {
           <RequireRole user={user} roles={['admin']}>
             <AdminPortal user={user} onLogout={logout} />
           </RequireRole>
+        }
+      />
+
+      <Route
+        path="/seller/register"
+        element={
+          user ? <SellerRegisterPage /> : <Navigate to="/login?next=%2Fseller%2Fregister" replace />
         }
       />
 

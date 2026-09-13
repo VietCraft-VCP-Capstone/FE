@@ -5,6 +5,7 @@ import { AdminDashboard } from './AdminDashboard';
 import { AdminModeration } from './AdminModeration';
 import { AdminCategories } from './AdminCategories';
 import { AdminTags } from './AdminTags';
+import { AdminSellers } from './AdminSellers';
 import { Search, Edit, Lock, Unlock } from 'lucide-react';
 import { authService } from '../../auth/services/authService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
@@ -161,6 +162,7 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="moderation" element={<AdminModeration />} />
+        <Route path="sellers" element={<AdminSellers />} />
         <Route path="categories" element={<AdminCategories />} />
         <Route path="tags" element={<AdminTags />} />
         <Route path="disputes" element={<AdminDisputes />} />

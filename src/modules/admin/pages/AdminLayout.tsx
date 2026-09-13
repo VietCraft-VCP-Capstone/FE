@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import {
-  LayoutDashboard, Users, ClipboardCheck, Tag, Scale, Megaphone, Bell, Search, LogOut
+  LayoutDashboard, Users, ClipboardCheck, Tag, Scale, Megaphone, Bell, Search, LogOut, Store
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Tổng quan' },
   { to: '/admin/users', icon: Users, label: 'Người dùng' },
   { to: '/admin/moderation', icon: ClipboardCheck, label: 'Kiểm duyệt' },
+  { to: '/admin/sellers', icon: Store, label: 'Duyệt Người bán' },
   { to: '/admin/categories', icon: Tag, label: 'Danh mục' },
   { to: '/admin/tags', icon: Tag, label: 'Thẻ' },
   { to: '/admin/disputes', icon: Scale, label: 'Tranh chấp' },

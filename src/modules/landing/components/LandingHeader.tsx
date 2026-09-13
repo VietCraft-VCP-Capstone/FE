@@ -66,6 +66,9 @@ export function LandingHeader({
           <a href="#qua-tang" className="hover:text-[#007700] transition-colors">Quà tặng</a>
           <span className="cursor-pointer hover:text-[#007700] transition-colors" onClick={onSignup}>Đăng ký</span>
           <a href="#xu-huong" className="hover:text-[#007700] transition-colors">Xu hướng</a>
+          <Link to="/seller/register" className="text-[#007700] hover:text-[#005B00] font-bold transition-colors">
+            Kênh Người Bán
+          </Link>
         </nav>
 
         {/* Search Bar */}

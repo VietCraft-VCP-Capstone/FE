@@ -100,6 +100,13 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
           <a onClick={() => navigate('/gifts')} className={isActive('/gifts') ? 'nav-active' : ''}>Quà tặng</a>
           <a onClick={() => navigate('/collections')} className={isActive('/collections') ? 'nav-active' : ''}>Bộ sưu tập</a>
           <a onClick={() => navigate('/vouchers')} className={isActive('/vouchers') ? 'nav-active' : ''}>Voucher</a>
+          <a
+            onClick={() => navigate(user?.role?.toLowerCase() === 'seller' ? '/seller' : '/seller/register')}
+            className={location.pathname.startsWith('/seller') ? 'nav-active text-[#007700] font-bold' : 'text-[#007700] font-semibold hover:text-[#005B00]'}
+            style={{ cursor: 'pointer' }}
+          >
+            Kênh Người Bán
+          </a>
         </nav>
 
         {/* Search Bar */}
