@@ -42,15 +42,20 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
+// Cache sản phẩm chi tiết trong RAM để khi chuyển qua lại hiển thị tức thì
+const productDetailCache = new Map<string, any>();
+const relatedDetailCache = new Map<string, any[]>();
+const suggestionsDetailCache = new Map<string, any[]>();
+
 export function BuyerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [related, setRelated] = useState<any[]>([]);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState<Product | null>(() => (id ? productDetailCache.get(id) || null : null));
+  const [related, setRelated] = useState<any[]>(() => (id ? relatedDetailCache.get(id) || [] : []));
+  const [suggestions, setSuggestions] = useState<any[]>(() => (id ? suggestionsDetailCache.get(id) || [] : []));
+  const [loading, setLoading] = useState(() => (id ? !productDetailCache.has(id) : true));
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
@@ -72,30 +77,66 @@ export function BuyerProductDetailPage() {
   // ── Load product ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    setSelectedImage(0);
 
-    Promise.all([
-      productsService.getById(id),
-      productsService.getRelated(id).catch(() => []),
-      productsService.getAll().catch(() => []),
-    ]).then(([prod, rel, all]) => {
-      setProduct(prod);
-      setRelated(rel.slice(0, 4));
-      const relIds = new Set(rel.map((r: any) => r.id));
-      const allList = Array.isArray(all) ? all : ((all as any)?.items || []);
-      const pool = allList.filter((p: any) => p.id !== id && !relIds.has(p.id));
-      setSuggestions(pool.slice(0, 4));
-
-      // pre-select first variant values
-      if (prod.variants?.length) {
-        const v0 = prod.variants[0];
+    if (productDetailCache.has(id)) {
+      const cached = productDetailCache.get(id);
+      setProduct(cached);
+      setRelated(relatedDetailCache.get(id) || []);
+      setSuggestions(suggestionsDetailCache.get(id) || []);
+      setLoading(false);
+      if (cached.variants?.length) {
+        const v0 = cached.variants[0];
         setSelectedVariant(v0);
         if (v0.size) setSelectedSize(v0.size);
         if (v0.color) setSelectedColor(v0.color);
         if (v0.material) setSelectedMaterial(v0.material);
       }
-    }).catch(() => {}).finally(() => setLoading(false));
+    } else {
+      setLoading(true);
+    }
+    setSelectedImage(0);
+
+    // 1. Fetch main product details first for instantaneous rendering
+    productsService.getById(id)
+      .then((prod) => {
+        productDetailCache.set(id, prod);
+        setProduct(prod);
+
+        // pre-select first variant values
+        if (prod.variants?.length) {
+          const v0 = prod.variants[0];
+          setSelectedVariant(v0);
+          if (v0.size) setSelectedSize(v0.size);
+          if (v0.color) setSelectedColor(v0.color);
+          if (v0.material) setSelectedMaterial(v0.material);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load product:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
+    // 2. Fetch related & suggestions non-blockingly in background with small limit
+    productsService.getRelated(id)
+      .catch(() => [])
+      .then((rel: any[]) => {
+        const relSlice = (Array.isArray(rel) ? rel : []).slice(0, 4);
+        relatedDetailCache.set(id, relSlice);
+        setRelated(relSlice);
+        const relIds = new Set(relSlice.map((r: any) => r.id));
+
+        return productsService.getAll({ limit: 8 } as any)
+          .catch(() => [])
+          .then((all: any) => {
+            const allList = Array.isArray(all) ? all : (all?.items || []);
+            const pool = allList.filter((p: any) => p.id !== id && !relIds.has(p.id));
+            const sugg = pool.slice(0, 4);
+            suggestionsDetailCache.set(id, sugg);
+            setSuggestions(sugg);
+          });
+      });
 
     // check favorites from backend — /users/wishlist cần token.
     // Khách vãng lai bỏ qua hẳn: interceptor 401 sẽ đá về /login, mà trang chi tiết

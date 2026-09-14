@@ -82,7 +82,60 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
       window.removeEventListener('vietcraft-notification-unread-updated', handleNotifUpdate);
       window.removeEventListener('vietcraft-notification-received', handleNotifUpdate);
     };
-  }, [location.pathname]);
+  }, []);
+
+  const handleNav = (target: 'home' | 'gifts' | 'collections' | 'vouchers') => {
+    if (target === 'home') {
+      if (location.pathname === '/') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        navigate('/');
+      }
+      return;
+    }
+
+    if (target === 'vouchers') {
+      if (location.pathname === '/' || location.pathname === '/vouchers') {
+        const el = document.getElementById('vouchers-section');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          navigate('/vouchers');
+        }
+      } else {
+        navigate('/vouchers');
+      }
+      return;
+    }
+
+    if (target === 'collections') {
+      if (location.pathname === '/' || location.pathname === '/collections') {
+        const el = document.getElementById('collections-section');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          navigate('/collections');
+        }
+      } else {
+        navigate('/collections');
+      }
+      return;
+    }
+
+    if (target === 'gifts') {
+      if (location.pathname === '/' || location.pathname === '/gifts') {
+        const el = document.getElementById('gifts-section') || document.getElementById('kham-pha');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          navigate('/gifts');
+        }
+      } else {
+        navigate('/gifts');
+      }
+      return;
+    }
+  };
 
   const displayCartCount = cartCount;
 
@@ -90,16 +143,16 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
     <header className="buyer-header-nav">
       <div className="buyer-header-container">
         {/* Logo */}
-        <div className="buyer-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
+        <div className="buyer-logo" onClick={() => handleNav('home')} style={{ cursor: 'pointer' }}>
           <span className="logo-green">Viet</span><span className="logo-purple">Craft</span>
         </div>
 
         {/* Navigation Menu */}
         <nav className="buyer-nav-menu">
-          <a onClick={() => navigate('/')} className={location.pathname === '/' ? 'nav-active' : ''}>Khám phá</a>
-          <a onClick={() => navigate('/gifts')} className={isActive('/gifts') ? 'nav-active' : ''}>Quà tặng</a>
-          <a onClick={() => navigate('/collections')} className={isActive('/collections') ? 'nav-active' : ''}>Bộ sưu tập</a>
-          <a onClick={() => navigate('/vouchers')} className={isActive('/vouchers') ? 'nav-active' : ''}>Voucher</a>
+          <a onClick={() => handleNav('home')} className={location.pathname === '/' ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Khám phá</a>
+          <a onClick={() => handleNav('gifts')} className={isActive('/gifts') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Quà tặng</a>
+          <a onClick={() => handleNav('collections')} className={isActive('/collections') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Bộ sưu tập</a>
+          <a onClick={() => handleNav('vouchers')} className={isActive('/vouchers') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Voucher</a>
           <a
             onClick={() => navigate(user?.role?.toLowerCase() === 'seller' ? '/seller' : '/seller/register')}
             className={location.pathname.startsWith('/seller') ? 'nav-active text-[#007700] font-bold' : 'text-[#007700] font-semibold hover:text-[#005B00]'}

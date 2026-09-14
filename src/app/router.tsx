@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import { LandingPage } from '../modules/landing/pages/LandingPage';
 import { LoginPage } from '../modules/auth/pages/LoginPage';
 import { SignupPage } from '../modules/auth/pages/SignupPage';
@@ -25,7 +25,7 @@ function RolePortal({ user, onLogout }: { user: any; onLogout: () => void }) {
   const role = user?.role?.toLowerCase();
   if (role === 'admin') return <AdminPortal user={user} onLogout={onLogout} />;
   if (role === 'seller') return <SellerPortal user={user} onLogout={onLogout} />;
-  return <BuyerLayout user={user} />;
+  return <Navigate to="/" replace />;
 }
 
 function RequireRole({ user, roles, children }: { user: any; roles: string[]; children: React.ReactNode }) {
@@ -42,7 +42,7 @@ function RequireRole({ user, roles, children }: { user: any; roles: string[]; ch
   return <>{children}</>;
 }
 
-function RequireAuth({ user }: { user: any }) {
+function RequireBuyerAuth({ user }: { user: any }) {
   const location = useLocation();
 
   if (!user) {
@@ -50,7 +50,7 @@ function RequireAuth({ user }: { user: any }) {
     return <Navigate to={`/login?next=${next}`} replace />;
   }
 
-  return <BuyerLayout user={user} />;
+  return <Outlet />;
 }
 
 function VerifyRoute() {
@@ -81,39 +81,43 @@ export function AppRouter() {
 
   return (
     <Routes>
-      {/* Trang chủ: khách vãng lai thấy LandingPage, đã đăng nhập thì theo role */}
-      <Route
-        path="/"
-        element={
-          user ? (
-            role === 'admin' ? (
-              <Navigate to="/admin" replace />
-            ) : role === 'seller' ? (
-              <Navigate to="/seller" replace />
-            ) : (
-              <BuyerLayout user={user} />
-            )
-          ) : (
-            <LandingPage user={user} onLogout={logout} />
-          )
-        }
-      >
-        <Route index element={<BuyerDashboard user={user} onLogout={logout} />} />
-      </Route>
+      {/* Trang chủ: khách vãng lai thấy LandingPage */}
+      {!user && (
+        <Route path="/" element={<LandingPage user={user} onLogout={logout} />} />
+      )}
+
+      {/* Dùng chung 1 BuyerLayout duy nhất cho toàn bộ các trang Buyer để không bị unmount/load lại khi chuyển trang */}
       <Route element={<BuyerLayout user={user ?? null} />}>
+        {user && (
+          <Route
+            path="/"
+            element={
+              role === 'admin' ? (
+                <Navigate to="/admin" replace />
+              ) : role === 'seller' ? (
+                <Navigate to="/seller" replace />
+              ) : (
+                <BuyerDashboard user={user} onLogout={logout} />
+              )
+            }
+          />
+        )}
+        <Route path="/gifts" element={<BuyerDashboard user={user} onLogout={logout} />} />
+        <Route path="/collections" element={<BuyerDashboard user={user} onLogout={logout} />} />
+        <Route path="/vouchers" element={<BuyerDashboard user={user} onLogout={logout} />} />
         <Route path="/product/:id" element={<BuyerProductDetailPage />} />
         <Route path="/cart" element={<BuyerCartPage />} />
         <Route path="/shop/:id" element={<BuyerShopPage />} />
-      </Route>
 
-      {/* CẦN ĐĂNG NHẬP — tường chắn duy nhất, bắt đầu từ bước thanh toán */}
-      <Route element={<RequireAuth user={user} />}>
-        <Route path="/checkout" element={<BuyerCheckoutPage />} />
-        <Route path="/profile" element={<BuyerProfilePage onLogout={logout} />} />
-        <Route path="/favorites" element={<BuyerFavoritesPage />} />
-        <Route path="/orders" element={<BuyerOrdersPage />} />
-        <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
-        <Route path="/notifications" element={<BuyerNotificationsPage />} />
+        {/* Các trang Buyer yêu cầu đăng nhập */}
+        <Route element={<RequireBuyerAuth user={user} />}>
+          <Route path="/checkout" element={<BuyerCheckoutPage />} />
+          <Route path="/profile" element={<BuyerProfilePage onLogout={logout} />} />
+          <Route path="/favorites" element={<BuyerFavoritesPage />} />
+          <Route path="/orders" element={<BuyerOrdersPage />} />
+          <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
+          <Route path="/notifications" element={<BuyerNotificationsPage />} />
+        </Route>
       </Route>
 
       <Route path="/login" element={<LoginPage onLogin={login} onGoogleLogin={googleLogin} user={user} />} />

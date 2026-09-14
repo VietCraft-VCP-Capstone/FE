@@ -22,12 +22,14 @@ export interface SellerKycStatusResponse {
         kyc_data: {
             full_name: string;
             id_card_number_masked?: string;
+            identity_card_number?: string;
             date_of_birth?: string;
             id_issue_date?: string;
             id_issue_place?: string;
             tax_code?: string;
             company_name?: string;
             business_license_number_masked?: string;
+            business_license_number?: string;
             legal_rep_name?: string;
             legal_rep_position?: string;
             front_id_url?: string;
@@ -124,7 +126,7 @@ export const sellerKycService = {
         return res.data?.data;
     },
 
-    async sendPhoneOtp(phone: string): Promise<{ success: boolean; message: string }> {
+    async sendPhoneOtp(phone: string): Promise<{ success: boolean; message: string; otp?: string; sentToEmail?: string | null; isSimulation?: boolean }> {
         const res = await api.post('/seller/kyc/phone-otp/send', { phone });
         return res.data;
     },

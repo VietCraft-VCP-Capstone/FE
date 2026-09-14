@@ -22,11 +22,16 @@ interface BuyerProfilePageProps {
     onLogout: () => void;
 }
 
+// Cache thông tin profile giữa các lần chuyển trang
+let profileCache: UserProfile | null = null;
+let lastOrderCache: any = null;
+let savedProductsCache: any[] = [];
+
 export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     const navigate = useNavigate();
-    const [profile, setProfile] = useState<UserProfile | null>(null);
-    const [lastOrder, setLastOrder] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState<UserProfile | null>(() => profileCache);
+    const [lastOrder, setLastOrder] = useState<any>(() => lastOrderCache);
+    const [loading, setLoading] = useState(() => !profileCache);
 
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -43,7 +48,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
 
     const [activeTab, setActiveTab] = useState<'overview' | 'addresses'>('overview');
-    const [savedProducts, setSavedProducts] = useState<any[]>([]);
+    const [savedProducts, setSavedProducts] = useState<any[]>(() => savedProductsCache);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,49 +120,66 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const prof = await userService.getProfile();
-                setProfile(prof);
+                // 1. Fetch user profile and orders in parallel for immediate rendering
+                const [prof, orders] = await Promise.all([
+                    userService.getProfile().catch((err) => {
+                        console.error('Failed to get profile:', err);
+                        return null;
+                    }),
+                    ordersService.getByUser().catch((err) => {
+                        console.error('Failed to get orders:', err);
+                        return [];
+                    })
+                ]);
 
-                const orders = await ordersService.getByUser();
+                if (prof) {
+                    profileCache = prof;
+                    setProfile(prof);
+                }
                 if (orders && orders.length > 0) {
+                    lastOrderCache = orders[0];
                     setLastOrder(orders[0]);
                 }
+            } catch (err) {
+                console.error('Failed to load core profile data', err);
+            } finally {
+                // Unblock profile view immediately
+                setLoading(false);
+            }
 
-                try {
-                    const [allProducts, wishlistIds] = await Promise.all([
-                        productsService.getAll(),
-                        userService.getWishlist().catch(() => [])
-                    ]);
-                    const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
-                    const products: any[] = Array.isArray(allProducts)
-                        ? allProducts
-                        : (allProducts?.items || []);
-                    
-                    const matchedItems = products.filter((p: any) =>
-                        ids.includes(p.id) || ids.includes(p._id?.toString())
-                    );
-                    
-                    const mapped = matchedItems.slice(0, 3).map((p: any) => ({
+            // 2. Fetch saved products preview asynchronously in background (limited to 6)
+            try {
+                const [allProducts, wishlistIds] = await Promise.all([
+                    productsService.getAll({ limit: 6 } as any).catch(() => ({ items: [] })),
+                    userService.getWishlist().catch(() => [])
+                ]);
+                const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
+                const products: any[] = Array.isArray(allProducts)
+                    ? allProducts
+                    : (allProducts?.items || []);
+                
+                const matchedItems = products.filter((p: any) =>
+                    ids.includes(p.id) || ids.includes(p._id?.toString())
+                );
+                
+                const mapped = matchedItems.slice(0, 3).map((p: any) => ({
+                    title: p.title || p.name || 'Sản phẩm sáng tạo',
+                    image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
+                }));
+
+                if (mapped.length === 0) {
+                    const fallbackMapped = products.slice(0, 3).map((p: any) => ({
                         title: p.title || p.name || 'Sản phẩm sáng tạo',
                         image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
                     }));
-
-                    if (mapped.length === 0) {
-                        const fallbackMapped = products.slice(0, 3).map((p: any) => ({
-                            title: p.title || p.name || 'Sản phẩm sáng tạo',
-                            image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
-                        }));
-                        setSavedProducts(fallbackMapped);
-                    } else {
-                        setSavedProducts(mapped);
-                    }
-                } catch (prodErr) {
-                    console.error('Failed to load real products for profile page', prodErr);
+                    savedProductsCache = fallbackMapped;
+                    setSavedProducts(fallbackMapped);
+                } else {
+                    savedProductsCache = mapped;
+                    setSavedProducts(mapped);
                 }
-            } catch (err) {
-                console.error('Failed to load profile data', err);
-            } finally {
-                setLoading(false);
+            } catch (prodErr) {
+                console.error('Failed to load real products for profile page', prodErr);
             }
         };
         loadData();

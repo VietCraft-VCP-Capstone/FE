@@ -4,7 +4,7 @@ import {
     ShieldCheck, CheckCircle2, AlertCircle, UploadCloud, FileText,
     ArrowLeft, ArrowRight, Store, Building2, User as UserIcon,
     CreditCard, Lock, Sparkles, Clock, RefreshCw, Trash2, Check,
-    Phone, Mail, AlertTriangle, FileCheck
+    Phone, Mail, AlertTriangle, FileCheck, Calendar
 } from 'lucide-react';
 import { sellerKycService, SellerKycStatusResponse } from '../services/sellerKycService';
 import { userService } from '../../user/services/userService';
@@ -32,6 +32,47 @@ function normalizeName(str: string) {
         .toUpperCase()
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+function toDisplayDate(str: string): string {
+    if (!str) return '';
+    if (str.includes('/')) return str;
+    const parts = str.split('-');
+    if (parts.length === 3) {
+        const [y, m, d] = parts;
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    }
+    return str;
+}
+
+function toIsoDate(str: string): string {
+    if (!str) return '';
+    if (str.includes('-') && str.length === 10) return str;
+    const parts = str.split('/');
+    if (parts.length === 3 && parts[2]?.length === 4) {
+        const [d, m, y] = parts;
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    return '';
+}
+
+function formatMaskedDateInput(raw: string): string {
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) {
+        if (raw.endsWith('/') && digits.length > 0) {
+            return `${digits.padStart(2, '0')}/`;
+        }
+        return digits;
+    }
+    if (digits.length <= 4) {
+        const part1 = digits.slice(0, 2);
+        const part2 = digits.slice(2);
+        if (raw.endsWith('/') && digits.length === 4) {
+            return `${part1}/${part2}/`;
+        }
+        return `${part1}/${part2}`;
+    }
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
 export function SellerRegisterPage() {
@@ -71,6 +112,7 @@ export function SellerRegisterPage() {
     const [shopName, setShopName] = useState('');
     const [shopDescription, setShopDescription] = useState('');
     const [mainCategory, setMainCategory] = useState(CRAFT_CATEGORIES[0]);
+    const [isCustomCategory, setIsCustomCategory] = useState(false);
     const [recipientName, setRecipientName] = useState('');
     const [pickupPhone, setPickupPhone] = useState('');
     const [province, setProvince] = useState('');
@@ -123,19 +165,42 @@ export function SellerRegisterPage() {
                 setPhoneVerified(app.is_phone_verified);
                 if (app.kyc_data) {
                     setFullName(app.kyc_data.full_name || data.user.name || '');
+                    setIdCardNumber(app.kyc_data.id_card_number_masked || app.kyc_data.identity_card_number || '');
+                    setDateOfBirth(toDisplayDate(app.kyc_data.date_of_birth || ''));
+                    setIdIssueDate(toDisplayDate(app.kyc_data.id_issue_date || ''));
+                    setIdIssuePlace(app.kyc_data.id_issue_place || '');
                     setCompanyName(app.kyc_data.company_name || '');
                     setLegalRepName(app.kyc_data.legal_rep_name || '');
                     setLegalRepPosition(app.kyc_data.legal_rep_position || '');
                     setTaxCode(app.kyc_data.tax_code || '');
-                    if (app.kyc_data.front_id_url) setFrontIdFile({ filename: 'front', url: app.kyc_data.front_id_url });
-                    if (app.kyc_data.back_id_url) setBackIdFile({ filename: 'back', url: app.kyc_data.back_id_url });
-                    if (app.kyc_data.portrait_url) setPortraitFile({ filename: 'portrait', url: app.kyc_data.portrait_url });
-                    if (app.kyc_data.business_license_url) setBusinessLicenseFile({ filename: 'license', url: app.kyc_data.business_license_url });
+                    if (app.kyc_data.business_license_number_masked || app.kyc_data.business_license_number) {
+                        setBusinessLicenseNumber(app.kyc_data.business_license_number_masked || app.kyc_data.business_license_number || '');
+                    }
+                    if (app.kyc_data.front_id_url) {
+                        const fn = app.kyc_data.front_id_url.split('/files/')[1]?.split('?')[0] || 'front.jpg';
+                        setFrontIdFile({ filename: fn, url: app.kyc_data.front_id_url });
+                    }
+                    if (app.kyc_data.back_id_url) {
+                        const fn = app.kyc_data.back_id_url.split('/files/')[1]?.split('?')[0] || 'back.jpg';
+                        setBackIdFile({ filename: fn, url: app.kyc_data.back_id_url });
+                    }
+                    if (app.kyc_data.portrait_url) {
+                        const fn = app.kyc_data.portrait_url.split('/files/')[1]?.split('?')[0] || 'portrait.jpg';
+                        setPortraitFile({ filename: fn, url: app.kyc_data.portrait_url });
+                    }
+                    if (app.kyc_data.business_license_url) {
+                        const fn = app.kyc_data.business_license_url.split('/files/')[1]?.split('?')[0] || 'license.jpg';
+                        setBusinessLicenseFile({ filename: fn, url: app.kyc_data.business_license_url });
+                    }
                 }
                 if (app.shop_info) {
                     setShopName(app.shop_info.shop_name || '');
                     setShopDescription(app.shop_info.description || '');
-                    setMainCategory(app.shop_info.main_category || CRAFT_CATEGORIES[0]);
+                    const savedCategory = app.shop_info.main_category || CRAFT_CATEGORIES[0];
+                    setMainCategory(savedCategory);
+                    if (app.shop_info.main_category && !CRAFT_CATEGORIES.includes(app.shop_info.main_category)) {
+                        setIsCustomCategory(true);
+                    }
                     if (app.shop_info.pickup_address) {
                         setRecipientName(app.shop_info.pickup_address.recipient_name || '');
                         setPickupPhone(app.shop_info.pickup_address.phone || '');
@@ -183,6 +248,7 @@ export function SellerRegisterPage() {
             await sellerKycService.sendPhoneOtp(phone);
             setOtpSent(true);
             setOtpCountdown(60);
+            setOtpCode('');
         } catch (err: any) {
             setError(getApiErrorMessage(err, 'Gửi mã OTP thất bại.'));
         }
@@ -190,13 +256,14 @@ export function SellerRegisterPage() {
 
     const handleVerifyOtp = async () => {
         if (!otpCode || otpCode.length < 6) {
-            setError('Vui lòng nhập mã OTP 6 chữ số.');
+            setError('Vui lòng nhập mã OTP 6 chữ số từ tin nhắn SMS trên điện thoại.');
             return;
         }
         setError(null);
         try {
             await sellerKycService.verifyPhoneOtp(phone, otpCode);
             setPhoneVerified(true);
+            await loadStatus();
         } catch (err: any) {
             setError(getApiErrorMessage(err, 'Mã OTP không chính xác hoặc đã hết hạn.'));
         }
@@ -276,7 +343,7 @@ export function SellerRegisterPage() {
                         phone: pickupPhone || phone,
                         province_id: province,
                         district_id: district,
-                        ward_code: ward,
+                        ward_code: ward || district || province || 'N/A',
                         address_detail: specificAddress,
                     }
                 },
@@ -296,7 +363,9 @@ export function SellerRegisterPage() {
             await loadStatus();
             setCurrentStep(6);
         } catch (err: any) {
-            setError(getApiErrorMessage(err, 'Nộp hồ sơ thất bại.'));
+            const errorMsg = getApiErrorMessage(err, 'Nộp hồ sơ thất bại.');
+            console.error('[KYC Submit Error]:', errorMsg, err?.response?.data);
+            setError(errorMsg);
         } finally {
             setSubmitting(false);
         }
@@ -318,10 +387,10 @@ export function SellerRegisterPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-stone-50">
+            <div className="min-h-screen flex items-center justify-center bg-white">
                 <div className="text-center">
                     <div className="w-10 h-10 border-4 border-[#007700] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                    <p className="text-sm font-semibold text-stone-600 font-jakarta">Đang kiểm tra hồ sơ định danh...</p>
+                    <p className="text-sm font-semibold text-slate-600 font-jakarta">Đang kiểm tra hồ sơ định danh...</p>
                 </div>
             </div>
         );
@@ -340,29 +409,30 @@ export function SellerRegisterPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-stone-50/70 py-10 px-4 sm:px-6 lg:px-8 font-sans">
+        <div className="min-h-screen bg-white py-10 px-4 sm:px-6 lg:px-8 font-sans">
             <div className="max-w-4xl mx-auto space-y-8">
                 <div className="flex items-center justify-between">
                     <button
                         onClick={() => navigate('/')}
-                        className="inline-flex items-center gap-2 text-xs font-bold text-stone-600 hover:text-[#007700] transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#007700] transition-colors cursor-pointer"
                     >
                         <ArrowLeft size={16} /> Quay lại trang chủ
                     </button>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-[#007700] border border-emerald-200 rounded-full text-xs font-bold font-jakarta shadow-xs">
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-emerald-50 text-[#007700] border border-emerald-200 rounded-full text-xs font-bold font-jakarta shadow-xs">
                         <Sparkles size={14} /> Quy trình Định danh Người bán VietCraft (KYC)
                     </span>
                 </div>
 
-                <div className="bg-gradient-to-r from-[#2B002B] to-[#3a053a] text-white p-8 rounded-3xl shadow-lg relative overflow-hidden">
-                    <div className="relative z-10 space-y-2">
-                        <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-400 font-jakarta">
+                <div className="bg-gradient-to-r from-[#173820] via-[#0e4823] to-[#007700] text-white p-8 sm:p-10 rounded-3xl shadow-sm relative overflow-hidden border border-emerald-800/30">
+                    <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
+                    <div className="relative z-10 space-y-2.5">
+                        <span className="inline-block text-[11px] font-extrabold uppercase tracking-wider text-emerald-300 bg-black/20 px-3 py-1 rounded-full font-jakarta backdrop-blur-xs">
                             Nghị định 52/2013 • Nghị định 85/2021 • Nghị định 13/2023 PDPD
                         </span>
                         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                             Đăng ký Trở thành Người bán VietCraft
                         </h1>
-                        <p className="text-sm text-stone-300 max-w-2xl leading-relaxed">
+                        <p className="text-xs sm:text-sm text-emerald-100 max-w-2xl leading-relaxed">
                             Hoàn tất quy trình định danh khách hàng (KYC) để kích hoạt gian hàng trực tuyến, bảo vệ quyền lợi người tiêu dùng và tuân thủ các quy định TMĐT Việt Nam.
                         </p>
                     </div>
@@ -395,9 +465,9 @@ export function SellerRegisterPage() {
                     </div>
                 )}
 
-                <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-xs">
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                     <div className="flex items-center justify-between relative">
-                        <div className="absolute top-1/2 left-6 right-6 -translate-y-1/2 h-1 bg-stone-100 z-0">
+                        <div className="absolute top-1/2 left-6 right-6 -translate-y-1/2 h-1 bg-slate-100 z-0">
                             <div
                                 className="h-full bg-[#007700] transition-all duration-300 rounded-full"
                                 style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
@@ -410,20 +480,18 @@ export function SellerRegisterPage() {
                             return (
                                 <div key={step.id} className="relative z-10 flex flex-col items-center gap-2">
                                     <div
-                                        className={`w-9 h-9 rounded-full flex items-center justify-center font-extrabold text-xs transition-all ${
-                                            isDone
-                                                ? 'bg-[#007700] text-white ring-4 ring-emerald-50'
-                                                : isCurrent
-                                                ? 'bg-white border-2 border-[#007700] text-[#007700] ring-4 ring-emerald-100 shadow-sm'
-                                                : 'bg-white border border-stone-200 text-stone-400'
-                                        }`}
+                                        className={`w-9 h-9 rounded-full flex items-center justify-center font-extrabold text-xs transition-all ${isDone
+                                            ? 'bg-[#007700] text-white ring-4 ring-emerald-50 shadow-xs'
+                                            : isCurrent
+                                                ? 'bg-white border-2 border-[#007700] text-[#007700] ring-4 ring-emerald-100 shadow-xs'
+                                                : 'bg-white border border-slate-200 text-slate-400'
+                                            }`}
                                     >
                                         {isDone ? <Check size={16} className="stroke-[3]" /> : step.id}
                                     </div>
                                     <span
-                                        className={`text-[11px] font-jakarta font-bold hidden sm:block ${
-                                            isCurrent ? 'text-[#007700]' : isDone ? 'text-stone-800' : 'text-stone-400'
-                                        }`}
+                                        className={`text-[11px] font-jakarta font-bold hidden sm:block ${isCurrent ? 'text-[#007700]' : isDone ? 'text-slate-800' : 'text-slate-400'
+                                            }`}
                                     >
                                         {step.title}
                                     </span>
@@ -433,24 +501,24 @@ export function SellerRegisterPage() {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-stone-200 shadow-sm">
+                <div className="bg-white p-6 sm:p-9 rounded-3xl border border-slate-200 shadow-sm">
                     {currentStep === 1 && (
                         <div className="space-y-6">
-                            <div className="border-b border-stone-100 pb-4">
-                                <h3 className="text-lg font-extrabold text-stone-900">Bước 1: Xác thực tài khoản cơ bản</h3>
-                                <p className="text-xs text-stone-500 mt-1">
+                            <div className="border-b border-slate-100 pb-4">
+                                <h3 className="text-lg font-extrabold text-slate-900">Bước 1: Xác thực tài khoản cơ bản</h3>
+                                <p className="text-xs text-slate-500 mt-1">
                                     Theo quy định của sàn TMĐT, người bán phải xác thực chính chủ cả Email và Số điện thoại di động qua mã OTP.
                                 </p>
                             </div>
 
-                            <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 flex items-center justify-between">
+                            <div className="p-4 rounded-2xl bg-slate-50/70 border border-slate-200 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#007700] flex items-center justify-center">
                                         <Mail size={20} />
                                     </div>
                                     <div>
-                                        <div className="text-xs text-stone-500 font-semibold">Địa chỉ Email đăng nhập</div>
-                                        <div className="text-sm font-bold text-stone-900">{statusData?.user?.email}</div>
+                                        <div className="text-xs text-slate-500 font-semibold">Địa chỉ Email đăng nhập</div>
+                                        <div className="text-sm font-bold text-slate-900">{statusData?.user?.email}</div>
                                     </div>
                                 </div>
                                 <span className="inline-flex items-center gap-1 text-xs font-bold text-[#007700] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
@@ -458,15 +526,15 @@ export function SellerRegisterPage() {
                                 </span>
                             </div>
 
-                            <div className="p-5 rounded-2xl bg-white border border-stone-200 space-y-4">
+                            <div className="p-5 rounded-2xl bg-white border border-slate-200 space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#007700] flex items-center justify-center">
                                             <Phone size={20} />
                                         </div>
                                         <div>
-                                            <div className="text-xs text-stone-500 font-semibold">Số điện thoại di động</div>
-                                            <div className="text-sm font-bold text-stone-900">
+                                            <div className="text-xs text-slate-500 font-semibold">Số điện thoại di động</div>
+                                            <div className="text-sm font-bold text-slate-900">
                                                 {phoneVerified ? phone : 'Chưa xác thực số điện thoại'}
                                             </div>
                                         </div>
@@ -479,39 +547,61 @@ export function SellerRegisterPage() {
                                 </div>
 
                                 {!phoneVerified && (
-                                    <div className="space-y-4 pt-3 border-t border-stone-100">
+                                    <div className="space-y-4 pt-3 border-t border-slate-100">
                                         <div className="flex flex-col sm:flex-row gap-3">
                                             <input
                                                 type="tel"
                                                 placeholder="Nhập số điện thoại (ví dụ: 0912345678)"
                                                 value={phone}
                                                 onChange={(e) => setPhone(e.target.value)}
-                                                className="flex-1 px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700] focus:ring-1 focus:ring-[#007700]"
+                                                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 transition-all"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={handleSendOtp}
                                                 disabled={otpCountdown > 0}
-                                                className="px-5 py-2.5 bg-[#007700] hover:bg-[#005B00] disabled:bg-stone-300 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+                                                className="px-5 py-2.5 bg-[#007700] hover:bg-[#005B00] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5"
                                             >
-                                                {otpCountdown > 0 ? `Gửi lại (${otpCountdown}s)` : 'Gửi mã OTP qua SMS'}
+                                                {otpCountdown > 0 ? `Gửi lại (${otpCountdown}s)` : 'Gửi mã xác thực OTP'}
                                             </button>
                                         </div>
 
                                         {otpSent && (
-                                            <div className="flex gap-3">
-                                                <input
-                                                    type="text"
-                                                    maxLength={6}
-                                                    placeholder="Nhập 6 số OTP"
-                                                    value={otpCode}
-                                                    onChange={(e) => setOtpCode(e.target.value)}
-                                                    className="w-48 px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold tracking-widest text-center focus:outline-none focus:border-[#007700]"
-                                                />
+                                            <div className="p-4.5 bg-emerald-50/80 border border-emerald-300/80 rounded-2xl space-y-3 shadow-xs">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-[#007700] text-white flex items-center justify-center flex-shrink-0 font-bold text-xs shadow-xs">
+                                                        <Phone size={18} />
+                                                    </div>
+                                                    <div className="flex-1 space-y-1.5 text-xs">
+                                                        <div className="font-extrabold text-emerald-950 text-sm flex items-center gap-2">
+                                                            Đã gửi tin nhắn SMS xác thực
+                                                        </div>
+                                                        <p className="text-slate-600 leading-relaxed">
+                                                            Hệ thống đã gửi mã OTP gồm 6 chữ số qua tin nhắn SMS tới số điện thoại <strong className="text-slate-900 font-bold">{phone}</strong>. Vui lòng mở ứng dụng Tin nhắn (Messages/SMS) trên điện thoại để đọc mã và nhập vào ô bên dưới.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {otpSent && (
+                                            <div className="flex flex-col sm:flex-row gap-3 pt-1 items-stretch sm:items-center">
+                                                <div className="relative">
+                                                    <input
+                                                        type="text"
+                                                        maxLength={6}
+                                                        autoFocus
+                                                        placeholder="Nhập 6 số OTP"
+                                                        value={otpCode}
+                                                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                                                        className="w-full sm:w-56 px-4 py-3 rounded-xl border-2 border-slate-300 bg-white text-base font-extrabold tracking-widest text-center text-slate-800 placeholder:text-slate-300 placeholder:font-normal placeholder:tracking-normal focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/20 shadow-xs"
+                                                    />
+                                                </div>
                                                 <button
                                                     type="button"
                                                     onClick={handleVerifyOtp}
-                                                    className="px-6 py-2.5 bg-[#330033] hover:bg-[#4d004d] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                                                    disabled={otpCode.length < 6}
+                                                    className="px-6 py-3 bg-[#330033] hover:bg-[#4d004d] disabled:opacity-40 disabled:pointer-events-none text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                                                 >
                                                     Xác nhận OTP
                                                 </button>
@@ -537,9 +627,9 @@ export function SellerRegisterPage() {
 
                     {currentStep === 2 && (
                         <div className="space-y-6">
-                            <div className="border-b border-stone-100 pb-4">
-                                <h3 className="text-lg font-extrabold text-stone-900">Bước 2: Phân loại đối tượng bán hàng</h3>
-                                <p className="text-xs text-stone-500 mt-1">
+                            <div className="border-b border-slate-100 pb-4">
+                                <h3 className="text-lg font-extrabold text-slate-900">Bước 2: Phân loại đối tượng bán hàng</h3>
+                                <p className="text-xs text-slate-500 mt-1">
                                     Chọn hình thức kinh doanh phù hợp với quy mô hoạt động của bạn trên sàn VietCraft.
                                 </p>
                             </div>
@@ -547,11 +637,10 @@ export function SellerRegisterPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div
                                     onClick={() => setSellerType('INDIVIDUAL')}
-                                    className={`p-6 rounded-2xl border-2 transition-all cursor-pointer relative ${
-                                        sellerType === 'INDIVIDUAL'
-                                            ? 'border-[#007700] bg-emerald-50/40 shadow-sm'
-                                            : 'border-stone-200 hover:border-stone-300 bg-white'
-                                    }`}
+                                    className={`p-6 rounded-2xl border-2 transition-all cursor-pointer relative ${sellerType === 'INDIVIDUAL'
+                                        ? 'border-[#007700] bg-emerald-50/40 shadow-sm'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                        }`}
                                 >
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-[#007700] flex items-center justify-center">
@@ -561,11 +650,11 @@ export function SellerRegisterPage() {
                                             Phổ biến
                                         </span>
                                     </div>
-                                    <h4 className="font-extrabold text-base text-stone-900">Cá nhân / Nghệ nhân</h4>
-                                    <p className="text-xs text-stone-600 mt-2 leading-relaxed">
+                                    <h4 className="font-extrabold text-base text-slate-900">Cá nhân / Nghệ nhân</h4>
+                                    <p className="text-xs text-slate-600 mt-2 leading-relaxed">
                                         Dành cho thợ thủ công, nghệ nhân làng nghề, cá nhân sáng tạo hoặc các gia đình tự chế tác sản phẩm.
                                     </p>
-                                    <ul className="text-xs text-stone-500 mt-4 space-y-1.5 font-medium">
+                                    <ul className="text-xs text-slate-500 mt-4 space-y-1.5 font-medium">
                                         <li>✓ CCCD/CMND chính chủ (2 mặt)</li>
                                         <li>✓ Ảnh chân dung rõ mặt</li>
                                         <li>✓ Tài khoản ngân hàng cá nhân</li>
@@ -574,11 +663,10 @@ export function SellerRegisterPage() {
 
                                 <div
                                     onClick={() => setSellerType('BUSINESS')}
-                                    className={`p-6 rounded-2xl border-2 transition-all cursor-pointer relative ${
-                                        sellerType === 'BUSINESS'
-                                            ? 'border-[#007700] bg-emerald-50/40 shadow-sm'
-                                            : 'border-stone-200 hover:border-stone-300 bg-white'
-                                    }`}
+                                    className={`p-6 rounded-2xl border-2 transition-all cursor-pointer relative ${sellerType === 'BUSINESS'
+                                        ? 'border-[#007700] bg-emerald-50/40 shadow-sm'
+                                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                                        }`}
                                 >
                                     <div className="flex items-center justify-between mb-4">
                                         <div className="w-12 h-12 rounded-2xl bg-purple-100 text-[#330033] flex items-center justify-center">
@@ -588,11 +676,11 @@ export function SellerRegisterPage() {
                                             Doanh nghiệp
                                         </span>
                                     </div>
-                                    <h4 className="font-extrabold text-base text-stone-900">Hộ kinh doanh / Doanh nghiệp</h4>
-                                    <p className="text-xs text-stone-600 mt-2 leading-relaxed">
+                                    <h4 className="font-extrabold text-base text-slate-900">Hộ kinh doanh / Doanh nghiệp</h4>
+                                    <p className="text-xs text-slate-600 mt-2 leading-relaxed">
                                         Dành cho xưởng sản xuất, hợp tác xã thủ công mỹ nghệ, công ty POD và các đơn vị đã đăng ký kinh doanh.
                                     </p>
-                                    <ul className="text-xs text-stone-500 mt-4 space-y-1.5 font-medium">
+                                    <ul className="text-xs text-slate-500 mt-4 space-y-1.5 font-medium">
                                         <li>✓ Giấy phép Đăng ký Kinh doanh (GPKD)</li>
                                         <li>✓ Mã số thuế doanh nghiệp</li>
                                         <li>✓ CCCD Người đại diện pháp luật</li>
@@ -600,11 +688,11 @@ export function SellerRegisterPage() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between pt-4 border-t border-stone-100">
+                            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setCurrentStep(1)}
-                                    className="px-5 py-2.5 border border-stone-200 text-stone-600 rounded-xl text-xs font-bold hover:bg-stone-100 transition-colors cursor-pointer"
+                                    className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
                                 >
                                     Quay lại
                                 </button>
@@ -622,12 +710,12 @@ export function SellerRegisterPage() {
 
                     {currentStep === 3 && (
                         <div className="space-y-6">
-                            <div className="border-b border-stone-100 pb-4 flex items-center justify-between">
+                            <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-lg font-extrabold text-stone-900">
+                                    <h3 className="text-lg font-extrabold text-slate-900">
                                         Bước 3: Thu thập thông tin định danh (KYC)
                                     </h3>
-                                    <p className="text-xs text-stone-500 mt-1">
+                                    <p className="text-xs text-slate-500 mt-1">
                                         Đối tượng: <strong className="text-[#007700]">{sellerType === 'INDIVIDUAL' ? 'Cá nhân' : 'Hộ kinh doanh / Doanh nghiệp'}</strong>
                                     </p>
                                 </div>
@@ -638,7 +726,7 @@ export function SellerRegisterPage() {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-stone-700">
+                                    <label className="text-xs font-bold text-slate-700">
                                         Họ và tên trên CCCD <span className="text-rose-500">*</span>
                                     </label>
                                     <input
@@ -646,13 +734,13 @@ export function SellerRegisterPage() {
                                         placeholder="NGUYỄN VĂN A"
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm uppercase focus:outline-none focus:border-[#007700]"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm uppercase focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         required
                                     />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-stone-700">
+                                    <label className="text-xs font-bold text-slate-700">
                                         Số Căn cước công dân (12 số) <span className="text-rose-500">*</span>
                                     </label>
                                     <input
@@ -661,62 +749,110 @@ export function SellerRegisterPage() {
                                         placeholder="079200001234"
                                         value={idCardNumber}
                                         onChange={(e) => setIdCardNumber(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-medium focus:outline-none focus:border-[#007700]"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         required
                                     />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-stone-700">Ngày sinh</label>
-                                    <input
-                                        type="date"
-                                        value={dateOfBirth}
-                                        onChange={(e) => setDateOfBirth(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
-                                    />
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-bold text-slate-700">Ngày sinh</label>
+                                        <span className="text-[10.5px] text-slate-400 font-medium">Định dạng: Ngày/Tháng/Năm</span>
+                                    </div>
+                                    <div className="relative flex items-center">
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            placeholder="DD/MM/YYYY"
+                                            maxLength={10}
+                                            value={dateOfBirth}
+                                            onChange={(e) => setDateOfBirth(formatMaskedDateInput(e.target.value))}
+                                            className="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 font-mono"
+                                        />
+                                        <div className="absolute right-3 flex items-center justify-center">
+                                            <Calendar size={17} className="text-slate-400 hover:text-[#007700] transition-colors pointer-events-none" />
+                                            <input
+                                                type="date"
+                                                tabIndex={-1}
+                                                max={new Date().toISOString().split('T')[0]}
+                                                value={toIsoDate(dateOfBirth)}
+                                                onChange={(e) => {
+                                                    if (e.target.value) {
+                                                        setDateOfBirth(toDisplayDate(e.target.value));
+                                                    }
+                                                }}
+                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                title="Mở lịch chọn ngày sinh"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-stone-700">Ngày cấp CCCD</label>
-                                    <input
-                                        type="date"
-                                        value={idIssueDate}
-                                        onChange={(e) => setIdIssueDate(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
-                                    />
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-bold text-slate-700">Ngày cấp CCCD</label>
+                                        <span className="text-[10.5px] text-slate-400 font-medium">Định dạng: Ngày/Tháng/Năm</span>
+                                    </div>
+                                    <div className="relative flex items-center">
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            placeholder="DD/MM/YYYY"
+                                            maxLength={10}
+                                            value={idIssueDate}
+                                            onChange={(e) => setIdIssueDate(formatMaskedDateInput(e.target.value))}
+                                            className="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 font-mono"
+                                        />
+                                        <div className="absolute right-3 flex items-center justify-center">
+                                            <Calendar size={17} className="text-slate-400 hover:text-[#007700] transition-colors pointer-events-none" />
+                                            <input
+                                                type="date"
+                                                tabIndex={-1}
+                                                max={new Date().toISOString().split('T')[0]}
+                                                value={toIsoDate(idIssueDate)}
+                                                onChange={(e) => {
+                                                    if (e.target.value) {
+                                                        setIdIssueDate(toDisplayDate(e.target.value));
+                                                    }
+                                                }}
+                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                title="Mở lịch chọn ngày cấp CCCD"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-stone-700">Nơi cấp (Cục CS QLHC về TTXH)</label>
+                                    <label className="text-xs font-bold text-slate-700">Nơi cấp </label>
                                     <input
                                         type="text"
                                         placeholder="Cục Cảnh sát QLHC về TTXH"
                                         value={idIssuePlace}
                                         onChange={(e) => setIdIssuePlace(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                     />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-stone-700">Mã số thuế cá nhân (nếu có)</label>
+                                    <label className="text-xs font-bold text-slate-700">Mã số thuế cá nhân</label>
                                     <input
                                         type="text"
                                         placeholder="8012345678"
                                         value={taxCode}
                                         onChange={(e) => setTaxCode(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                     />
                                 </div>
                             </div>
 
                             {sellerType === 'BUSINESS' && (
-                                <div className="pt-4 border-t border-stone-200 space-y-4">
+                                <div className="pt-4 border-t border-slate-200 space-y-4">
                                     <h4 className="font-extrabold text-sm text-purple-900 flex items-center gap-1.5">
                                         <Building2 size={16} /> Thông tin Doanh nghiệp & Người đại diện
                                     </h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1 sm:col-span-2">
-                                            <label className="text-xs font-bold text-stone-700">
+                                            <label className="text-xs font-bold text-slate-700">
                                                 Tên Doanh nghiệp / Hộ kinh doanh <span className="text-rose-500">*</span>
                                             </label>
                                             <input
@@ -724,31 +860,31 @@ export function SellerRegisterPage() {
                                                 placeholder="CÔNG TY TNHH THỦ CÔNG VIỆTCRAFT"
                                                 value={companyName}
                                                 onChange={(e) => setCompanyName(e.target.value)}
-                                                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm uppercase focus:outline-none focus:border-[#007700]"
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm uppercase focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-xs font-bold text-stone-700">Mã số thuế / Mã số doanh nghiệp</label>
+                                            <label className="text-xs font-bold text-slate-700">Mã số thuế / Mã số doanh nghiệp</label>
                                             <input
                                                 type="text"
                                                 placeholder="0109123456"
                                                 value={businessLicenseNumber}
                                                 onChange={(e) => setBusinessLicenseNumber(e.target.value)}
-                                                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-xs font-bold text-stone-700">Chức vụ người đại diện</label>
+                                            <label className="text-xs font-bold text-slate-700">Chức vụ người đại diện</label>
                                             <input
                                                 type="text"
                                                 placeholder="Giám đốc / Đại diện pháp luật"
                                                 value={legalRepPosition}
                                                 onChange={(e) => setLegalRepPosition(e.target.value)}
-                                                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                             />
                                         </div>
                                         <div className="space-y-1 sm:col-span-2">
-                                            <label className="text-xs font-bold text-stone-700">
+                                            <label className="text-xs font-bold text-slate-700">
                                                 Họ tên người đại diện pháp luật <span className="text-rose-500">*</span>
                                             </label>
                                             <input
@@ -756,21 +892,21 @@ export function SellerRegisterPage() {
                                                 placeholder="NGUYỄN VĂN A"
                                                 value={legalRepName}
                                                 onChange={(e) => setLegalRepName(e.target.value)}
-                                                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm uppercase focus:outline-none focus:border-[#007700]"
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm uppercase focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                             />
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            <div className="pt-4 border-t border-stone-200 space-y-4">
-                                <h4 className="font-extrabold text-sm text-stone-900 flex items-center gap-1.5">
+                            <div className="pt-4 border-t border-slate-200 space-y-4">
+                                <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
                                     <FileCheck size={16} /> Tải lên tài liệu định danh (Ảnh rõ nét, không lóa sáng)
                                 </h4>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div className="p-4 rounded-2xl border border-dashed border-stone-300 bg-stone-50/50 flex flex-col items-center justify-center text-center space-y-2">
-                                        <span className="text-xs font-bold text-stone-700">Mặt trước CCCD *</span>
+                                    <div className="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center text-center space-y-2">
+                                        <span className="text-xs font-bold text-slate-700">Mặt trước CCCD *</span>
                                         {frontIdFile ? (
                                             <div className="text-center space-y-1">
                                                 <img src={frontIdFile.url} alt="Mặt trước" className="w-24 h-16 object-cover rounded-lg border mx-auto" />
@@ -778,7 +914,7 @@ export function SellerRegisterPage() {
                                             </div>
                                         ) : (
                                             <label className="cursor-pointer flex flex-col items-center">
-                                                <UploadCloud className="text-stone-400 mb-1" size={24} />
+                                                <UploadCloud className="text-slate-400 mb-1" size={24} />
                                                 <span className="text-[11px] font-bold text-[#007700] hover:underline">
                                                     {uploadingDoc === 'front' ? 'Đang tải...' : 'Chọn ảnh'}
                                                 </span>
@@ -787,8 +923,8 @@ export function SellerRegisterPage() {
                                         )}
                                     </div>
 
-                                    <div className="p-4 rounded-2xl border border-dashed border-stone-300 bg-stone-50/50 flex flex-col items-center justify-center text-center space-y-2">
-                                        <span className="text-xs font-bold text-stone-700">Mặt sau CCCD *</span>
+                                    <div className="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center text-center space-y-2">
+                                        <span className="text-xs font-bold text-slate-700">Mặt sau CCCD *</span>
                                         {backIdFile ? (
                                             <div className="text-center space-y-1">
                                                 <img src={backIdFile.url} alt="Mặt sau" className="w-24 h-16 object-cover rounded-lg border mx-auto" />
@@ -796,7 +932,7 @@ export function SellerRegisterPage() {
                                             </div>
                                         ) : (
                                             <label className="cursor-pointer flex flex-col items-center">
-                                                <UploadCloud className="text-stone-400 mb-1" size={24} />
+                                                <UploadCloud className="text-slate-400 mb-1" size={24} />
                                                 <span className="text-[11px] font-bold text-[#007700] hover:underline">
                                                     {uploadingDoc === 'back' ? 'Đang tải...' : 'Chọn ảnh'}
                                                 </span>
@@ -805,8 +941,8 @@ export function SellerRegisterPage() {
                                         )}
                                     </div>
 
-                                    <div className="p-4 rounded-2xl border border-dashed border-stone-300 bg-stone-50/50 flex flex-col items-center justify-center text-center space-y-2">
-                                        <span className="text-xs font-bold text-stone-700">Ảnh chân dung</span>
+                                    <div className="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center text-center space-y-2">
+                                        <span className="text-xs font-bold text-slate-700">Ảnh chân dung</span>
                                         {portraitFile ? (
                                             <div className="text-center space-y-1">
                                                 <img src={portraitFile.url} alt="Chân dung" className="w-16 h-16 object-cover rounded-full border mx-auto" />
@@ -814,7 +950,7 @@ export function SellerRegisterPage() {
                                             </div>
                                         ) : (
                                             <label className="cursor-pointer flex flex-col items-center">
-                                                <UploadCloud className="text-stone-400 mb-1" size={24} />
+                                                <UploadCloud className="text-slate-400 mb-1" size={24} />
                                                 <span className="text-[11px] font-bold text-[#007700] hover:underline">
                                                     {uploadingDoc === 'portrait' ? 'Đang tải...' : 'Chọn ảnh'}
                                                 </span>
@@ -842,11 +978,11 @@ export function SellerRegisterPage() {
                                 )}
                             </div>
 
-                            <div className="flex items-center justify-between pt-4 border-t border-stone-100">
+                            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setCurrentStep(2)}
-                                    className="px-5 py-2.5 border border-stone-200 text-stone-600 rounded-xl text-xs font-bold hover:bg-stone-100 transition-colors cursor-pointer"
+                                    className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
                                 >
                                     Quay lại
                                 </button>
@@ -879,20 +1015,20 @@ export function SellerRegisterPage() {
 
                     {currentStep === 4 && (
                         <div className="space-y-6">
-                            <div className="border-b border-stone-100 pb-4">
-                                <h3 className="text-lg font-extrabold text-stone-900">Bước 4: Thiết lập Gian hàng & Thanh toán</h3>
-                                <p className="text-xs text-stone-500 mt-1">
+                            <div className="border-b border-slate-100 pb-4">
+                                <h3 className="text-lg font-extrabold text-slate-900">Bước 4: Thiết lập Gian hàng & Thanh toán</h3>
+                                <p className="text-xs text-slate-500 mt-1">
                                     Thông tin này dùng để hiển thị thương hiệu và tự động đối soát thanh toán doanh thu định kỳ.
                                 </p>
                             </div>
 
                             <div className="space-y-4">
-                                <h4 className="font-extrabold text-sm text-stone-900 flex items-center gap-1.5">
+                                <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
                                     <Store size={16} /> Thông tin Gian hàng
                                 </h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-1">
-                                        <label className="text-xs font-bold text-stone-700">
+                                        <label className="text-xs font-bold text-slate-700">
                                             Tên Gian hàng (Shop Name) <span className="text-rose-500">*</span>
                                         </label>
                                         <input
@@ -900,106 +1036,163 @@ export function SellerRegisterPage() {
                                             placeholder="Gốm Mộc Bát Tràng"
                                             value={shopName}
                                             onChange={(e) => setShopName(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                             required
                                         />
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold text-stone-700">Danh mục thủ công mỹ nghệ chủ đạo</label>
-                                        <select
-                                            value={mainCategory}
-                                            onChange={(e) => setMainCategory(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
-                                        >
-                                            {CRAFT_CATEGORIES.map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                        </select>
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-slate-700">
+                                                Danh mục thủ công mỹ nghệ chủ đạo <span className="text-rose-500">*</span>
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (isCustomCategory) {
+                                                        setIsCustomCategory(false);
+                                                        if (!CRAFT_CATEGORIES.includes(mainCategory)) {
+                                                            setMainCategory(CRAFT_CATEGORIES[0]);
+                                                        }
+                                                    } else {
+                                                        setIsCustomCategory(true);
+                                                        setMainCategory('');
+                                                    }
+                                                }}
+                                                className="text-[11px] font-semibold text-[#007700] hover:text-[#005B00] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                                            >
+                                                {isCustomCategory ? '📋 Chọn từ danh mục mẫu' : '✏️ Tự điền danh mục khác'}
+                                            </button>
+                                        </div>
+
+                                        {isCustomCategory ? (
+                                            <div className="space-y-1">
+                                                <input
+                                                    type="text"
+                                                    autoFocus
+                                                    placeholder="Nhập tên ngành nghề / danh mục của bạn (ví dụ: Trầm hương, Đồ da thủ công, Khảm xà cừ...)"
+                                                    value={mainCategory}
+                                                    onChange={(e) => setMainCategory(e.target.value)}
+                                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
+                                                    required
+                                                />
+                                                <p className="text-[11px] text-slate-400">
+                                                    Nhập ngành nghề / sản phẩm thủ công đặc thù của xưởng hoặc gian hàng của bạn.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <select
+                                                value={mainCategory}
+                                                onChange={(e) => {
+                                                    if (e.target.value === '__CUSTOM__') {
+                                                        setIsCustomCategory(true);
+                                                        setMainCategory('');
+                                                    } else {
+                                                        setMainCategory(e.target.value);
+                                                    }
+                                                }}
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 cursor-pointer"
+                                            >
+                                                {CRAFT_CATEGORIES.map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                                <option value="__CUSTOM__">✨ Khác (Tự điền danh mục thủ công...)</option>
+                                            </select>
+                                        )}
                                     </div>
                                     <div className="space-y-1 sm:col-span-2">
-                                        <label className="text-xs font-bold text-stone-700">Mô tả câu chuyện thương hiệu</label>
+                                        <label className="text-xs font-bold text-slate-700">Mô tả câu chuyện thương hiệu</label>
                                         <textarea
                                             rows={2}
                                             placeholder="Giới thiệu nét độc đáo, xuất xứ làng nghề truyền thống hoặc kỹ thuật chế tác..."
                                             value={shopDescription}
                                             onChange={(e) => setShopDescription(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-stone-200 space-y-4">
-                                <h4 className="font-extrabold text-sm text-stone-900">Địa chỉ lấy hàng (Đơn vị vận chuyển sẽ tới lấy)</h4>
+                            <div className="pt-4 border-t border-slate-200 space-y-4">
+                                <h4 className="font-extrabold text-sm text-slate-900">Địa chỉ lấy hàng (Đơn vị vận chuyển sẽ tới lấy)</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-1">
-                                        <label className="text-xs font-bold text-stone-700">Người liên hệ gửi hàng</label>
+                                        <label className="text-xs font-bold text-slate-700">Người liên hệ gửi hàng</label>
                                         <input
                                             type="text"
                                             placeholder={fullName || 'Người đại diện kho'}
                                             value={recipientName}
                                             onChange={(e) => setRecipientName(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-xs font-bold text-stone-700">Số điện thoại liên hệ kho</label>
+                                        <label className="text-xs font-bold text-slate-700">Số điện thoại liên hệ kho</label>
                                         <input
                                             type="text"
                                             placeholder={phone}
                                             value={pickupPhone}
                                             onChange={(e) => setPickupPhone(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-xs font-bold text-stone-700">Tỉnh / Thành phố <span className="text-rose-500">*</span></label>
+                                        <label className="text-xs font-bold text-slate-700">Tỉnh / Thành phố <span className="text-rose-500">*</span></label>
                                         <input
                                             type="text"
                                             placeholder="Hà Nội"
                                             value={province}
                                             onChange={(e) => setProvince(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-xs font-bold text-stone-700">Quận / Huyện <span className="text-rose-500">*</span></label>
+                                        <label className="text-xs font-bold text-slate-700">Quận / Huyện <span className="text-rose-500">*</span></label>
                                         <input
                                             type="text"
                                             placeholder="Gia Lâm"
                                             value={district}
                                             onChange={(e) => setDistrict(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-700">Phường / Xã</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Bát Tràng"
+                                            value={ward}
+                                            onChange={(e) => setWard(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         />
                                     </div>
                                     <div className="space-y-1 sm:col-span-2">
-                                        <label className="text-xs font-bold text-stone-700">Địa chỉ cụ thể xưởng / kho hàng <span className="text-rose-500">*</span></label>
+                                        <label className="text-xs font-bold text-slate-700">Địa chỉ cụ thể xưởng / kho hàng <span className="text-rose-500">*</span></label>
                                         <input
                                             type="text"
                                             placeholder="Số 25 ngõ 12, làng cổ Bát Tràng"
                                             value={specificAddress}
                                             onChange={(e) => setSpecificAddress(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-stone-200 space-y-4">
+                            <div className="pt-4 border-t border-slate-200 space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <h4 className="font-extrabold text-sm text-stone-900 flex items-center gap-1.5">
+                                    <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
                                         <CreditCard size={16} /> Tài khoản ngân hàng nhận tiền quyết toán (Đối soát KYC)
                                     </h4>
-                                    <span className="text-[11px] text-stone-500">Mã hóa AES-256 an toàn</span>
+                                    <span className="text-[11px] text-slate-500">Mã hóa AES-256 an toàn</span>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-1">
-                                        <label className="text-xs font-bold text-stone-700">Ngân hàng thụ hưởng <span className="text-rose-500">*</span></label>
+                                        <label className="text-xs font-bold text-slate-700">Ngân hàng thụ hưởng <span className="text-rose-500">*</span></label>
                                         <select
                                             value={bankCode}
                                             onChange={(e) => setBankCode(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         >
                                             {SUPPORTED_BANKS.map(b => (
                                                 <option key={b.code} value={b.code}>{b.name}</option>
@@ -1008,20 +1201,20 @@ export function SellerRegisterPage() {
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-xs font-bold text-stone-700">Số tài khoản ngân hàng <span className="text-rose-500">*</span></label>
+                                        <label className="text-xs font-bold text-slate-700">Số tài khoản ngân hàng <span className="text-rose-500">*</span></label>
                                         <input
                                             type="text"
                                             placeholder="1903456789012"
                                             value={accountNumber}
                                             onChange={(e) => setAccountNumber(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-mono font-bold focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono font-bold focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                             required
                                         />
                                     </div>
 
                                     <div className="space-y-1 sm:col-span-2">
                                         <div className="flex items-center justify-between">
-                                            <label className="text-xs font-bold text-stone-700">
+                                            <label className="text-xs font-bold text-slate-700">
                                                 Tên chủ tài khoản (Phải khớp với giấy tờ định danh) <span className="text-rose-500">*</span>
                                             </label>
                                             <button
@@ -1037,18 +1230,17 @@ export function SellerRegisterPage() {
                                             placeholder={nameToCompare || 'NGUYEN VAN A'}
                                             value={accountHolder}
                                             onChange={(e) => setAccountHolder(e.target.value)}
-                                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold uppercase focus:outline-none focus:border-[#007700]"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold uppercase focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                             required
                                         />
                                     </div>
                                 </div>
 
                                 {accountHolder && (
-                                    <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 ${
-                                        isNameMatched
-                                            ? 'bg-emerald-50 border-emerald-200 text-[#007700]'
-                                            : 'bg-rose-50 border-rose-200 text-rose-700'
-                                    }`}>
+                                    <div className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 ${isNameMatched
+                                        ? 'bg-emerald-50 border-emerald-200 text-[#007700]'
+                                        : 'bg-rose-50 border-rose-200 text-rose-700'
+                                        }`}>
                                         {isNameMatched ? (
                                             <>
                                                 <CheckCircle2 size={16} className="flex-shrink-0" />
@@ -1064,11 +1256,11 @@ export function SellerRegisterPage() {
                                 )}
                             </div>
 
-                            <div className="flex items-center justify-between pt-4 border-t border-stone-100">
+                            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setCurrentStep(3)}
-                                    className="px-5 py-2.5 border border-stone-200 text-stone-600 rounded-xl text-xs font-bold hover:bg-stone-100 transition-colors cursor-pointer"
+                                    className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
                                 >
                                     Quay lại
                                 </button>
@@ -1079,8 +1271,12 @@ export function SellerRegisterPage() {
                                             setError('Vui lòng nhập tên gian hàng.');
                                             return;
                                         }
-                                        if (!province || !specificAddress) {
-                                            setError('Vui lòng nhập địa chỉ lấy hàng chi tiết.');
+                                        if (!mainCategory || !mainCategory.trim()) {
+                                            setError('Vui lòng chọn hoặc tự điền danh mục thủ công mỹ nghệ chủ đạo.');
+                                            return;
+                                        }
+                                        if (!province || !district || !specificAddress) {
+                                            setError('Vui lòng nhập đầy đủ Tỉnh/Thành phố, Quận/Huyện và địa chỉ lấy hàng chi tiết.');
                                             return;
                                         }
                                         if (!accountNumber || !accountHolder) {
@@ -1105,24 +1301,24 @@ export function SellerRegisterPage() {
 
                     {currentStep === 5 && (
                         <div className="space-y-6">
-                            <div className="border-b border-stone-100 pb-4">
-                                <h3 className="text-lg font-extrabold text-stone-900">Bước 5: Ký kết điện tử & Tuân thủ Pháp lý</h3>
-                                <p className="text-xs text-stone-500 mt-1">
+                            <div className="border-b border-slate-100 pb-4">
+                                <h3 className="text-lg font-extrabold text-slate-900">Bước 5: Ký kết điện tử & Tuân thủ Pháp lý</h3>
+                                <p className="text-xs text-slate-500 mt-1">
                                     Tuân thủ Nghị định 52/2013/NĐ-CP, Nghị định 85/2021/NĐ-CP và Nghị định 13/2023/NĐ-CP (PDPD) về bảo vệ dữ liệu cá nhân.
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                                     <FileText size={15} /> Điều khoản Dịch vụ dành cho Người bán VietCraft
                                 </label>
-                                <div className="h-44 overflow-y-auto p-4 rounded-2xl bg-stone-50 border border-stone-200 text-xs text-stone-600 leading-relaxed space-y-3 shadow-inner">
-                                    <p className="font-bold text-stone-900">1. NGHĨA VỤ VÀ TRÁCH NHIỆM CỦA NGƯỜI BÁN (SELLER):</p>
+                                <div className="h-44 overflow-y-auto p-4 rounded-2xl bg-slate-50/80 border border-slate-200 text-xs text-slate-600 leading-relaxed space-y-3 shadow-inner">
+                                    <p className="font-bold text-slate-900">1. NGHĨA VỤ VÀ TRÁCH NHIỆM CỦA NGƯỜI BÁN (SELLER):</p>
                                     <p>- Cam kết mọi sản phẩm đăng bán trên sàn VietCraft là hàng thủ công mỹ nghệ, sản phẩm in theo yêu cầu (POD) có nguồn gốc xuất xứ hợp pháp, không vi phạm bản quyền sở hữu trí tuệ hoặc hàng cấm theo pháp luật Việt Nam.</p>
                                     <p>- Cung cấp trung thực, đầy đủ và chính xác thông tin định danh cá nhân/doanh nghiệp, địa chỉ xưởng sản xuất và số tài khoản ngân hàng chính chủ.</p>
-                                    <p className="font-bold text-stone-900">2. QUY ĐỊNH PHÁP LÝ TMĐT (Nghị định 52/2013/NĐ-CP & 85/2021/NĐ-CP):</p>
+                                    <p className="font-bold text-slate-900">2. QUY ĐỊNH PHÁP LÝ TMĐT (Nghị định 52/2013/NĐ-CP & 85/2021/NĐ-CP):</p>
                                     <p>- Sàn VietCraft có trách nhiệm lưu trữ thông tin của Người bán và sẵn sàng cung cấp cho cơ quan quản lý nhà nước có thẩm quyền khi có yêu cầu (phục vụ quản lý thuế, chống hàng giả, bảo vệ quyền lợi người tiêu dùng).</p>
-                                    <p className="font-bold text-stone-900">3. QUY CHUẨN ĐỐI SOÁT & CHI TRẢ DOANH THU:</p>
+                                    <p className="font-bold text-slate-900">3. QUY CHUẨN ĐỐI SOÁT & CHI TRẢ DOANH THU:</p>
                                     <p>- Doanh thu bán hàng sau khi trừ phí nền tảng sẽ được quyết toán định kỳ vào tài khoản ngân hàng chính chủ đã được xác thực và đối soát tên khớp với hồ sơ định danh KYC.</p>
                                 </div>
                                 <label className="flex items-start gap-2.5 pt-2 cursor-pointer">
@@ -1132,7 +1328,7 @@ export function SellerRegisterPage() {
                                         onChange={(e) => setAgreedTerms(e.target.checked)}
                                         className="mt-0.5 rounded text-[#007700] focus:ring-[#007700]"
                                     />
-                                    <span className="text-xs font-bold text-stone-800">
+                                    <span className="text-xs font-bold text-slate-800">
                                         Tôi đã đọc kỹ và đồng ý với toàn bộ Điều khoản Dịch vụ Người bán của VietCraft.
                                     </span>
                                 </label>
@@ -1160,7 +1356,7 @@ export function SellerRegisterPage() {
                             </div>
 
                             <div className="space-y-2 pt-2">
-                                <label className="text-xs font-bold text-stone-700">
+                                <label className="text-xs font-bold text-slate-700">
                                     Ký tên xác nhận điện tử (Nhập họ và tên đầy đủ viết hoa) <span className="text-rose-500">*</span>
                                 </label>
                                 <input
@@ -1168,19 +1364,26 @@ export function SellerRegisterPage() {
                                     placeholder={fullName || 'NGUYỄN VĂN A'}
                                     value={signature}
                                     onChange={(e) => setSignature(e.target.value)}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold uppercase tracking-wide focus:outline-none focus:border-[#007700]"
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold uppercase tracking-wide focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                     required
                                 />
-                                <span className="text-[11px] text-stone-400 block">
+                                <span className="text-[11px] text-slate-400 block">
                                     Họ tên được ký sẽ được lưu cùng địa chỉ IP và dấu thời gian chứng thực điện tử.
                                 </span>
                             </div>
 
-                            <div className="flex items-center justify-between pt-4 border-t border-stone-100">
+                            {error && (
+                                <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
+                                    <AlertCircle size={16} className="flex-shrink-0" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setCurrentStep(4)}
-                                    className="px-5 py-2.5 border border-stone-200 text-stone-600 rounded-xl text-xs font-bold hover:bg-stone-100 transition-colors cursor-pointer"
+                                    className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
                                 >
                                     Quay lại
                                 </button>
@@ -1216,22 +1419,22 @@ export function SellerRegisterPage() {
                                 <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-xs font-bold uppercase tracking-wider">
                                     Trạng thái: Đang chờ phê duyệt (Pending Approval)
                                 </span>
-                                <h3 className="text-2xl font-extrabold text-stone-900">
+                                <h3 className="text-2xl font-extrabold text-slate-900">
                                     Hồ sơ đăng ký Người bán đã được tiếp nhận
                                 </h3>
-                                <p className="text-xs text-stone-600 leading-relaxed">
+                                <p className="text-xs text-slate-600 leading-relaxed">
                                     Hồ sơ định danh KYC và thông tin gian hàng của bạn đang được Ban Quản trị VietCraft đối soát và xét duyệt theo quy định. Thời gian dự kiến hoàn tất từ <strong>24 đến 48 giờ làm việc</strong>.
                                 </p>
                             </div>
 
-                            <div className="max-w-md mx-auto p-6 rounded-2xl bg-stone-50 border border-stone-200 text-left space-y-4">
+                            <div className="max-w-md mx-auto p-6 rounded-2xl bg-slate-50/80 border border-slate-200 text-left space-y-4">
                                 <div className="flex items-start gap-3">
                                     <div className="w-7 h-7 rounded-full bg-[#007700] text-white flex items-center justify-center text-xs font-bold mt-0.5">
                                         ✓
                                     </div>
                                     <div>
-                                        <div className="text-xs font-bold text-stone-900">Đã nộp hồ sơ định danh KYC</div>
-                                        <div className="text-[11px] text-stone-500">Mã hóa dữ liệu & upload tài liệu thành công</div>
+                                        <div className="text-xs font-bold text-slate-900">Đã nộp hồ sơ định danh KYC</div>
+                                        <div className="text-[11px] text-slate-500">Mã hóa dữ liệu & upload tài liệu thành công</div>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
@@ -1239,24 +1442,24 @@ export function SellerRegisterPage() {
                                         2
                                     </div>
                                     <div>
-                                        <div className="text-xs font-bold text-stone-900">Ban Quản trị đối soát thông tin</div>
-                                        <div className="text-[11px] text-stone-500">Kiểm tra CCCD/GPKD và tên chủ tài khoản ngân hàng</div>
+                                        <div className="text-xs font-bold text-slate-900">Ban Quản trị đối soát thông tin</div>
+                                        <div className="text-[11px] text-slate-500">Kiểm tra CCCD/GPKD và tên chủ tài khoản ngân hàng</div>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3 opacity-50">
-                                    <div className="w-7 h-7 rounded-full bg-stone-300 text-stone-600 flex items-center justify-center text-xs font-bold mt-0.5">
+                                    <div className="w-7 h-7 rounded-full bg-slate-300 text-slate-600 flex items-center justify-center text-xs font-bold mt-0.5">
                                         3
                                     </div>
                                     <div>
-                                        <div className="text-xs font-bold text-stone-900">Kích hoạt Gian hàng & Cấp quyền Seller</div>
-                                        <div className="text-[11px] text-stone-500">Nhận thông báo & email chúc mừng để bắt đầu đăng bán</div>
+                                        <div className="text-xs font-bold text-slate-900">Kích hoạt Gian hàng & Cấp quyền Seller</div>
+                                        <div className="text-[11px] text-slate-500">Nhận thông báo & email chúc mừng để bắt đầu đăng bán</div>
                                     </div>
                                 </div>
                             </div>
 
                             {app && (
-                                <div className="max-w-md mx-auto p-4 bg-white border border-stone-200 rounded-xl text-left text-xs text-stone-600 space-y-1.5">
-                                    <div className="font-bold text-stone-800 pb-1 border-b">Thông tin đã nộp:</div>
+                                <div className="max-w-md mx-auto p-4 bg-white border border-slate-200 rounded-xl text-left text-xs text-slate-600 space-y-1.5">
+                                    <div className="font-bold text-slate-800 pb-1 border-b border-slate-100">Thông tin đã nộp:</div>
                                     <div>Gian hàng: <strong>{app.shop_info?.shop_name}</strong></div>
                                     <div>Họ tên định danh: <strong>{app.kyc_data?.full_name}</strong></div>
                                     <div>Ngân hàng: <strong>{app.bank_info?.bank_name} ({app.bank_info?.account_number_masked})</strong></div>
