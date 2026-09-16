@@ -2,12 +2,14 @@ import { useRef, useEffect, useState } from 'react';
 import {
     Loader2, Upload, Trash2, Image as ImageIcon, AlertTriangle, ChevronUp, ChevronDown,
     Sliders, Maximize2, RotateCw, AlignCenterVertical, AlignCenterHorizontal,
-    Move, Info, FlipHorizontal, AlignLeft, AlignRight, RefreshCw, Scaling
+    Move, Info, FlipHorizontal, AlignLeft, AlignRight, RefreshCw, Scaling, Eye
 } from 'lucide-react';
-import { Stage, Layer, Image as KImage, Rect, Group, Transformer, Text as KText } from 'react-konva';
+import { Stage, Layer, Image as KImage, Rect, Group, Transformer, Text as KText, Line as KLine } from 'react-konva';
 import { useHTMLImage, abs } from './useHTMLImage';
 
 const CANVAS = 460;
+const TEMPLATE_SIZE = 800;
+const COLLAR_Y_PX = 160; // Collar line position on 800x800 shirt template space
 
 export interface LayerItem {
     id: string; type: 'image';
@@ -19,7 +21,10 @@ export interface LayerItem {
 // Konva Layer Node Component
 function LayerNode({ layer, ratio, offX, offY, onSelect, onChange, nodeRef }: any) {
     const ref = useRef<any>(null);
-    useEffect(() => { if (ref.current) nodeRef(layer.id, ref.current); }, [layer.id]);
+    useEffect(() => {
+        if (ref.current) nodeRef(layer.id, ref.current);
+        return () => { nodeRef(layer.id, null); };
+    }, [layer.id]);
     const designImg = useHTMLImage(layer.design?.file_url);
 
     const flipH = layer.flipH ? -1 : 1;
@@ -66,39 +71,53 @@ interface Step2DesignEditorProps {
     spaceOf: (area: any) => { x: number; y: number; width: number; height: number };
     updateAreaOverride: (key: string, patch: Partial<{ x: number; y: number; width: number; height: number }>) => void;
     resetAreaOverride: (key: string) => void;
+    resetAllDesigns?: () => void;
 }
 
 export function Step2DesignEditor({
     blank, designs, faces, activeFace, setActiveFace, layers, selected, selectedId, setSelectedId,
     updateLayer, removeLayer, reorderLayer, addImageDesign, uploading, onUpload, fileRef, areaOf, spaceOf,
-    updateAreaOverride, resetAreaOverride
+    updateAreaOverride, resetAreaOverride, resetAllDesigns
 }: Step2DesignEditorProps) {
-    const areas = blank.print_areas || [];
+    const areas = blank?.print_areas || [];
     const area = areaOf(activeFace);
     const isWrap = area?.surface === 'wrap';
+    const isTshirt = blank?._id ? blank._id.includes('tshirt') : false;
     const sp = spaceOf(area);
 
     const [isAreaSelected, setIsAreaSelected] = useState(false);
+    const [showGuides, setShowGuides] = useState(true);
 
-    const blankImg = useHTMLImage(isWrap ? undefined : (area?.image || blank.default_image));
+    const blankImg = useHTMLImage(isWrap ? undefined : (area?.image || blank?.default_image));
     const trRef = useRef<any>(null);
     const areaRectRef = useRef<any>(null);
     const areaTrRef = useRef<any>(null);
 
     const nodeMap = useRef<Record<string, any>>({});
-    const registerNode = (id: string, node: any) => { nodeMap.current[id] = node; };
+    const registerNode = (id: string, node: any) => {
+        if (node) nodeMap.current[id] = node;
+        else delete nodeMap.current[id];
+    };
 
-    const natW = isWrap ? sp.width : (blankImg?.naturalWidth || 800);
-    const natH = isWrap ? sp.height : (blankImg?.naturalHeight || 800);
-    const ratio = CANVAS / Math.max(natW, natH);
-    const dispW = natW * ratio, dispH = natH * ratio;
-    const offX = (CANVAS - dispW) / 2, offY = (CANVAS - dispH) / 2;
+    const natW = isWrap ? (sp?.width || 800) : TEMPLATE_SIZE;
+    const natH = isWrap ? (sp?.height || 800) : TEMPLATE_SIZE;
+    const ratio = CANVAS / Math.max(natW, natH, 1);
+    const dispW = CANVAS, dispH = CANVAS;
+    const offX = 0, offY = 0;
+
+    // Distance from collar calculation (cm)
+    const distFromCollarCm = Math.max(0, ((sp.y - COLLAR_Y_PX) * 0.1)).toFixed(1);
 
     // Design layer transformer binding
     useEffect(() => {
         const tr = trRef.current; if (!tr) return;
         const node = selectedId ? nodeMap.current[selectedId] : null;
-        tr.nodes(node ? [node] : []); tr.getLayer()?.batchDraw();
+        if (node && typeof node.getStage === 'function' && node.getStage()) {
+            tr.nodes([node]);
+        } else {
+            tr.nodes([]);
+        }
+        tr.getLayer()?.batchDraw();
         if (selectedId) setIsAreaSelected(false);
     }, [selectedId, layers, activeFace]);
 
@@ -106,7 +125,11 @@ export function Step2DesignEditor({
     useEffect(() => {
         const atr = areaTrRef.current; if (!atr) return;
         const rectNode = isAreaSelected ? areaRectRef.current : null;
-        atr.nodes(rectNode ? [rectNode] : []);
+        if (rectNode && typeof rectNode.getStage === 'function' && rectNode.getStage()) {
+            atr.nodes([rectNode]);
+        } else {
+            atr.nodes([]);
+        }
         atr.getLayer()?.batchDraw();
     }, [isAreaSelected, activeFace, sp.x, sp.y, sp.width, sp.height]);
 
@@ -188,9 +211,21 @@ export function Step2DesignEditor({
 
                     <input type="file" accept="image/png,image/jpeg,image/webp" ref={fileRef} style={{ display: 'none' }}
                         onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
-                    <button type="button" className="creator-upload-btn w-full mb-4" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                        {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}{uploading ? 'Đang tải...' : 'Tải hình thiết kế lên'}
-                    </button>
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                        <button type="button" className="creator-upload-btn flex-1" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}{uploading ? 'Đang tải...' : 'Tải hình thiết kế lên'}
+                        </button>
+                        {resetAllDesigns && (
+                            <button
+                                type="button"
+                                onClick={resetAllDesigns}
+                                className="px-2.5 py-2 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                                title="Xóa tất cả vị trí hình thiết kế chưa lưu trên các mặt phôi"
+                            >
+                                <Trash2 size={13} /> Reset
+                            </button>
+                        )}
+                    </div>
 
                     <div className="text-[11.5px] text-stone-500 mb-2">Bấm vào hình để chèn vào phôi:</div>
                     <div className="grid grid-cols-2 gap-2 overflow-y-auto max-h-[320px]">
@@ -221,6 +256,7 @@ export function Step2DesignEditor({
                             <li>Hỗ trợ file: JPG, PNG, SVG</li>
                             <li>Tối đa 100 MiB (JPG/PNG) hoặc 20 MiB (SVG)</li>
                             <li>Vùng in đang chọn: <b>{(sp.width * 0.1).toFixed(1)} × {(sp.height * 0.1).toFixed(1)} cm</b></li>
+                            {isTshirt && <li>Cách gờ cổ áo: <b className="text-[#1a6b1a]">{distFromCollarCm} cm</b></li>}
                             <li>Kích thước phôi: <b>{blank.dimensions_info || 'Dài 72cm × Rộng 54cm'}</b></li>
                         </ul>
                     </div>
@@ -229,15 +265,35 @@ export function Step2DesignEditor({
 
             {/* Stage Canvas */}
             <div className="creator-canvas-wrap">
-                {/* Print Area Presets & Interactive Resize Toolbar */}
+                {/* Print Area Presets & Interactive Toolbar */}
                 {!isWrap && (
                     <div className="flex flex-col gap-2 mb-2 p-2.5 bg-white rounded-xl border border-stone-200 shadow-sm">
                         <div className="flex items-center justify-between gap-2 border-b pb-2">
                             <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
                                 <Scaling size={15} className="text-[#1a6b1a]" />
-                                <span>Chỉnh kích thước vùng in:</span>
+                                <span>Kích thước & Khoảng cách vùng in:</span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
+                                {/* Collar Distance Control */}
+                                {isTshirt && (
+                                    <div className="flex items-center gap-1 text-xs bg-[#f0f7f0] border border-[#cce5cc] px-2 py-0.5 rounded-lg">
+                                        <span className="text-stone-700 font-semibold">Cách cổ:</span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={20}
+                                            step={0.5}
+                                            className="w-14 px-1 py-0.5 border border-stone-300 rounded text-xs font-bold text-[#1a6b1a] text-center outline-none focus:border-[#1a6b1a] bg-white"
+                                            value={distFromCollarCm}
+                                            onChange={(e) => {
+                                                const cm = parseFloat(e.target.value) || 0;
+                                                const newY = Math.round(COLLAR_Y_PX + cm * 10);
+                                                updateAreaOverride(activeFace, { y: newY });
+                                            }}
+                                        />
+                                        <span className="text-stone-600 font-medium">cm</span>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-1 text-xs">
                                     <span className="text-stone-500 font-medium">Rộng:</span>
                                     <input
@@ -245,7 +301,7 @@ export function Step2DesignEditor({
                                         min={10}
                                         max={50}
                                         step={0.5}
-                                        className="w-16 px-1.5 py-0.5 border border-stone-300 rounded text-xs font-bold text-[#1a6b1a] text-center outline-none focus:border-[#1a6b1a]"
+                                        className="w-14 px-1.5 py-0.5 border border-stone-300 rounded text-xs font-bold text-[#1a6b1a] text-center outline-none focus:border-[#1a6b1a]"
                                         value={(sp.width * 0.1).toFixed(1)}
                                         onChange={(e) => {
                                             const cm = parseFloat(e.target.value) || 20;
@@ -262,7 +318,7 @@ export function Step2DesignEditor({
                                         min={10}
                                         max={60}
                                         step={0.5}
-                                        className="w-16 px-1.5 py-0.5 border border-stone-300 rounded text-xs font-bold text-[#1a6b1a] text-center outline-none focus:border-[#1a6b1a]"
+                                        className="w-14 px-1.5 py-0.5 border border-stone-300 rounded text-xs font-bold text-[#1a6b1a] text-center outline-none focus:border-[#1a6b1a]"
                                         value={(sp.height * 0.1).toFixed(1)}
                                         onChange={(e) => {
                                             const cm = parseFloat(e.target.value) || 20;
@@ -273,27 +329,28 @@ export function Step2DesignEditor({
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setIsAreaSelected(!isAreaSelected)}
-                                    className={`text-[11px] px-2 py-1 rounded border font-semibold flex items-center gap-1 transition-colors ${isAreaSelected ? 'border-[#1a6b1a] bg-[#1a6b1a] text-white' : 'border-stone-300 bg-stone-50 text-stone-700 hover:bg-stone-100'}`}
+                                    onClick={() => setShowGuides(!showGuides)}
+                                    className={`text-[11px] px-2 py-1 rounded border font-semibold flex items-center gap-1 transition-colors ${showGuides ? 'border-[#1a6b1a] bg-[#f0f7f0] text-[#1a6b1a]' : 'border-stone-200 text-stone-500 hover:text-stone-800'}`}
+                                    title="Bật/Tắt đường chỉ gờ cổ áo và đường căn lề"
                                 >
-                                    {isAreaSelected ? '✓ Đang co kéo' : 'Co kéo trên Canvas'}
+                                    <Eye size={12} /> {showGuides ? 'Hiện đường mốc' : 'Ẩn đường mốc'}
                                 </button>
                             </div>
                         </div>
 
-                        {/* Quick Presets for Sizes & Positions */}
+                        {/* Quick Presets for Exact Shirt Proportions */}
                         <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
                             <div className="flex items-center gap-1">
                                 <span className="text-stone-400 font-medium">Khổ:</span>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 260, height: 340 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Thân chuẩn (26×34)</button>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 210, height: 300 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 300, height: 420 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A3 (30×42)</button>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 150, height: 150, x: 170, y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Ngực nhỏ (15×15)</button>
+                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 250, height: 330, x: 275, y: 245 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Thân chuẩn (25×33)</button>
+                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 210, height: 300, x: 295, y: 255 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
+                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 280, height: 380, x: 260, y: 235 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A3 (28×38)</button>
+                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 120, height: 120, x: 440, y: 270 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Ngực trái (12×12)</button>
                             </div>
                             <div className="flex items-center gap-1">
                                 <span className="text-stone-400 font-medium">Vị trí:</span>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { x: 270, y: 230 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm</button>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { x: 170, y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Ngực trái</button>
+                                <button type="button" onClick={() => updateAreaOverride(activeFace, { x: 275, y: 245 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm</button>
+                                <button type="button" onClick={() => updateAreaOverride(activeFace, { x: 440, y: 270 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Ngực trái</button>
                                 <button type="button" onClick={() => resetAreaOverride(activeFace)} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
                             </div>
                         </div>
@@ -311,9 +368,60 @@ export function Step2DesignEditor({
                             }
                         }}>
                         <Layer>
+                            {/* Product Blank Image background */}
                             {isWrap
                                 ? <Rect x={offX} y={offY} width={dispW} height={dispH} fill="#ffffff" stroke="#cbd5e1" strokeWidth={1} listening={false} />
                                 : (blankImg && <KImage image={blankImg} x={offX} y={offY} width={dispW} height={dispH} listening={false} />)}
+
+                            {/* T-Shirt Collar Line & Measurement Ruler Guides */}
+                            {isTshirt && showGuides && (
+                                <Group listening={false}>
+                                    {/* Red Dashed Collar Reference Line */}
+                                    <KLine
+                                        points={[offX + 150 * ratio, offY + COLLAR_Y_PX * ratio, offX + 650 * ratio, offY + COLLAR_Y_PX * ratio]}
+                                        stroke="#ef4444"
+                                        strokeWidth={1}
+                                        dash={[4, 4]}
+                                        opacity={0.8}
+                                    />
+                                    <KText
+                                        text="— Gờ cổ áo"
+                                        x={offX + 655 * ratio}
+                                        y={offY + COLLAR_Y_PX * ratio - 6}
+                                        fill="#ef4444"
+                                        fontSize={10}
+                                        fontStyle="bold"
+                                    />
+
+                                    {/* Dynamic Distance Ruler Line from Collar to Print Area */}
+                                    {sp.y > COLLAR_Y_PX && (
+                                        <Group x={offX + (sp.x - 24) * ratio} y={offY + COLLAR_Y_PX * ratio}>
+                                            <KLine
+                                                points={[0, 0, 0, (sp.y - COLLAR_Y_PX) * ratio]}
+                                                stroke="#1a6b1a"
+                                                strokeWidth={1.2}
+                                                dash={[3, 3]}
+                                            />
+                                            <Rect
+                                                x={-50}
+                                                y={((sp.y - COLLAR_Y_PX) * ratio) / 2 - 9}
+                                                width={48}
+                                                height={18}
+                                                fill="#1a6b1a"
+                                                rx={3}
+                                            />
+                                            <KText
+                                                text={`${distFromCollarCm}cm`}
+                                                x={-46}
+                                                y={((sp.y - COLLAR_Y_PX) * ratio) / 2 - 5}
+                                                fill="#ffffff"
+                                                fontSize={9.5}
+                                                fontStyle="bold"
+                                            />
+                                        </Group>
+                                    )}
+                                </Group>
+                            )}
 
                             {/* Moveable & Resizable Print Area Group */}
                             <Group
@@ -399,7 +507,7 @@ export function Step2DesignEditor({
                     </div>
                 )}
                 <div className="creator-zoombar">
-                    Phôi: <b>{blank.title}</b> ({blank.dimensions_info || '72×54cm'}) · Vùng in: {area?.label || area?.key} ({(sp.width * 0.1).toFixed(1)}×{(sp.height * 0.1).toFixed(1)}cm)
+                    Phôi: <b>{blank.title}</b> ({blank.dimensions_info || '72×54cm'}) · Vùng in: {area?.label || area?.key} ({(sp.width * 0.1).toFixed(1)}×{(sp.height * 0.1).toFixed(1)}cm) {isTshirt && `· Cách cổ: ${distFromCollarCm}cm`}
                 </div>
             </div>
 

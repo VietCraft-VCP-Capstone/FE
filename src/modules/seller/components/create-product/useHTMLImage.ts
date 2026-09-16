@@ -29,4 +29,7 @@ export function useHTMLImage(src?: string) {
     return img;
 }
 
+export const CANVAS = 460;
+export const TEMPLATE_SIZE = 800;
+
 export default useHTMLImage;

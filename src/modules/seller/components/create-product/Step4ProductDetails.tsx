@@ -61,28 +61,132 @@ export function Step4ProductDetails({
 
             {/* Bảng biến thể & Giá bán */}
             <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm">
-                <h2 className="text-base font-bold text-stone-900 mb-1">2. Biến thể & Lợi nhuận (Markup)</h2>
-                <p className="text-xs text-stone-500 mb-4">Chọn các biến thể muốn bán và điều chỉnh số tiền lời (markup). Giá bán = Tiền phôi + Markup.</p>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h2 className="text-base font-bold text-stone-900 mb-1">2. Biến thể & Lợi nhuận (Markup)</h2>
+                        <p className="text-xs text-stone-500">Chọn các biến thể muốn bán và điều chỉnh số tiền lời (markup). Giá bán = Tiền phôi + Markup.</p>
+                    </div>
 
-                <table className="w-full border-collapse text-[13.5px] text-left [&_thead_th]:bg-[#fafcfa] [&_thead_th]:px-[18px] [&_thead_th]:py-3 [&_thead_th]:text-[11.5px] [&_thead_th]:font-bold [&_thead_th]:uppercase [&_thead_th]:tracking-[0.04em] [&_thead_th]:text-stone-500 [&_thead_th]:border-b [&_thead_th]:border-stone-200 [&_tbody_td]:px-[18px] [&_tbody_td]:py-[14px] [&_tbody_td]:border-b [&_tbody_td]:border-stone-100 [&_tbody_td]:align-middle pod-variant-table">
-                    <thead><tr><th></th><th>Biến thể</th><th>Tiền phôi</th><th>Lợi nhuận Markup (đ)</th><th>Giá bán công bố</th><th>Tồn kho</th></tr></thead>
-                    <tbody>
-                        {blank.variations.map((v: any) => {
-                            const sv = selectedVariants[v.sku] || { on: false, markup: '0', stock: '0' };
-                            const retail = v.base_cost + (Number(sv.markup) || 0);
-                            return (
-                                <tr key={v.sku} className={sv.on ? '' : 'opacity-50'}>
-                                    <td><input type="checkbox" checked={sv.on} onChange={e => setV(v.sku, 'on', e.target.checked)} className="w-4 h-4 accent-[#1a6b1a]" /></td>
-                                    <td className="font-semibold text-stone-800">{[v.color, v.size].filter(Boolean).join(' / ') || v.sku}</td>
-                                    <td className="text-stone-500">{v.base_cost.toLocaleString()}đ</td>
-                                    <td><input type="number" value={sv.markup} disabled={!sv.on} onChange={e => setV(v.sku, 'markup', e.target.value)} className="border border-stone-300 rounded px-2 py-1 text-xs w-24 outline-none focus:border-[#1a6b1a]" /></td>
-                                    <td className="font-bold text-[#1a6b1a]">{retail.toLocaleString()}đ</td>
-                                    <td><input type="number" value={sv.stock} disabled={!sv.on} onChange={e => setV(v.sku, 'stock', e.target.value)} className="border border-stone-300 rounded px-2 py-1 text-xs w-20 outline-none focus:border-[#1a6b1a]" /></td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                    {/* Bulk Markup & Selection Action Bar */}
+                    <div className="flex items-center gap-2 bg-stone-50 p-2 rounded-lg border border-stone-200 self-start md:self-auto">
+                        <span className="text-xs font-semibold text-stone-700 whitespace-nowrap">Áp dụng chung:</span>
+                        <input
+                            type="number"
+                            step={5000}
+                            placeholder="Tiền lời (đ)"
+                            className="w-28 px-2.5 py-1 border border-stone-300 rounded text-xs font-bold text-stone-900 bg-white outline-none focus:border-[#1a6b1a]"
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    const val = (e.target as HTMLInputElement).value;
+                                    if (val) {
+                                        setSelectedVariants(prev => {
+                                            const next = { ...prev };
+                                            Object.keys(next).forEach(sku => { next[sku] = { ...next[sku], markup: val }; });
+                                            return next;
+                                        });
+                                    }
+                                }
+                            }}
+                            id="bulkMarkupInput"
+                        />
+                        <button
+                            type="button"
+                            className="px-2.5 py-1 bg-[#1a6b1a] text-white text-xs font-bold rounded hover:bg-[#145c14] transition-colors whitespace-nowrap"
+                            onClick={() => {
+                                const input = document.getElementById('bulkMarkupInput') as HTMLInputElement;
+                                if (input && input.value) {
+                                    const val = input.value;
+                                    setSelectedVariants(prev => {
+                                        const next = { ...prev };
+                                        Object.keys(next).forEach(sku => { next[sku] = { ...next[sku], markup: val }; });
+                                        return next;
+                                    });
+                                }
+                            }}
+                        >
+                            Áp dụng tất cả
+                        </button>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-[13.5px] text-left [&_thead_th]:bg-[#fafcfa] [&_thead_th]:px-[18px] [&_thead_th]:py-3 [&_thead_th]:text-[11.5px] [&_thead_th]:font-bold [&_thead_th]:uppercase [&_thead_th]:tracking-[0.04em] [&_thead_th]:text-stone-600 [&_thead_th]:border-b [&_thead_th]:border-stone-200 [&_tbody_td]:px-[18px] [&_tbody_td]:py-[12px] [&_tbody_td]:border-b [&_tbody_td]:border-stone-100 [&_tbody_td]:align-middle pod-variant-table">
+                        <thead>
+                            <tr>
+                                <th className="w-10">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 accent-[#1a6b1a] cursor-pointer"
+                                        checked={(blank?.variations || []).length > 0 && (blank?.variations || []).every((v: any) => selectedVariants[v.sku]?.on)}
+                                        onChange={e => {
+                                            const checked = e.target.checked;
+                                            setSelectedVariants(prev => {
+                                                const next = { ...prev };
+                                                (blank?.variations || []).forEach((v: any) => {
+                                                    next[v.sku] = { ...next[v.sku], on: checked };
+                                                });
+                                                return next;
+                                            });
+                                        }}
+                                    />
+                                </th>
+                                <th>Biến thể</th>
+                                <th>Tiền phôi</th>
+                                <th>Lợi nhuận Markup (đ)</th>
+                                <th>Giá bán công bố</th>
+                                <th>Tồn kho</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(blank?.variations || []).map((v: any) => {
+                                const sv = selectedVariants[v.sku] || { on: false, markup: '0', stock: '0' };
+                                const baseCost = v.base_cost || 0;
+                                const retail = baseCost + (Number(sv.markup) || 0);
+                                return (
+                                    <tr key={v.sku} className={sv.on ? 'bg-white' : 'bg-stone-50/60 opacity-60'}>
+                                        <td>
+                                            <input
+                                                type="checkbox"
+                                                checked={sv.on}
+                                                onChange={e => setV(v.sku, 'on', e.target.checked)}
+                                                className="w-4 h-4 accent-[#1a6b1a] cursor-pointer"
+                                            />
+                                        </td>
+                                        <td className="font-bold text-stone-900">{[v.color, v.size].filter(Boolean).join(' / ') || v.sku}</td>
+                                        <td className="text-stone-600 font-medium">{baseCost.toLocaleString()}đ</td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                value={sv.markup}
+                                                disabled={!sv.on}
+                                                onChange={e => setV(v.sku, 'markup', e.target.value)}
+                                                className={`px-3 py-1.5 rounded text-xs font-bold w-28 outline-none border transition-colors ${
+                                                    sv.on
+                                                        ? 'bg-white border-stone-300 text-stone-900 focus:border-[#1a6b1a] focus:ring-1 focus:ring-[#1a6b1a] shadow-sm'
+                                                        : 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
+                                                }`}
+                                            />
+                                        </td>
+                                        <td className="font-bold text-[#1a6b1a] text-sm">{retail.toLocaleString()}đ</td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                value={sv.stock}
+                                                disabled={!sv.on}
+                                                onChange={e => setV(v.sku, 'stock', e.target.value)}
+                                                className={`px-3 py-1.5 rounded text-xs font-bold w-24 outline-none border transition-colors ${
+                                                    sv.on
+                                                        ? 'bg-white border-stone-300 text-stone-900 focus:border-[#1a6b1a] focus:ring-1 focus:ring-[#1a6b1a] shadow-sm'
+                                                        : 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
+                                                }`}
+                                            />
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

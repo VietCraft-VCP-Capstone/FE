@@ -31,7 +31,7 @@ export function Step1PrinterAndBlank({
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {printers.map((p: any) => {
+                    {(printers || []).map((p: any) => {
                         const isSel = selectedPrinter === p.id;
                         return (
                             <div
@@ -68,21 +68,23 @@ export function Step1PrinterAndBlank({
                 </div>
 
                 <div className="blank-picker-grid">
-                    {blanks.map((b: any) => {
-                        const minCost = Math.min(...b.variations.map((v: any) => v.base_cost));
+                    {(blanks || []).map((b: any) => {
+                        const rawCosts = (b.variations || []).map((v: any) => v.base_cost || 0);
+                        const minCost = rawCosts.length ? Math.min(...rawCosts) : 0;
+                        const safeCost = isFinite(minCost) ? minCost : 0;
                         const faceCount = (b.print_areas || []).length;
                         return (
                             <button type="button" key={b._id} className={`blank-pick-card ${blank?._id === b._id ? 'selected' : ''}`} onClick={() => chooseBlank(b)}>
-                                <img src={abs(b.default_image)} alt={b.title} />
+                                <img src={abs(b.default_image || '')} alt={b.title || ''} />
                                 <span className="blank-pick-title">{b.title}</span>
-                                <span className="blank-pick-cost">Giá phôi từ {minCost.toLocaleString()}đ</span>
+                                <span className="blank-pick-cost">Giá phôi từ {safeCost.toLocaleString()}đ</span>
                                 {faceCount > 1 && <span className="blank-pick-faces">{faceCount} mặt in</span>}
                             </button>
                         );
                     })}
                 </div>
 
-                {blanks.length === 0 && (
+                {(!blanks || blanks.length === 0) && (
                     <div className="py-8 text-center text-xs text-stone-500 bg-stone-50 rounded-lg border border-dashed border-stone-200">
                         Chưa có phôi nào khả dụng từ xưởng in này. Vui lòng chọn xưởng in khác hoặc chọn phôi mặc định trên sàn.
                     </div>
@@ -93,3 +95,4 @@ export function Step1PrinterAndBlank({
 }
 
 export default Step1PrinterAndBlank;
+

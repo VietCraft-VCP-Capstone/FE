@@ -11,7 +11,10 @@ interface Step3Props {
 }
 
 export function Step3MockupPreview({ blank, faces, toApiLayer, selectedVariants }: Step3Props) {
-    const areas = (blank.print_areas || []).filter((a: any) => (faces[a.key] || []).length > 0);
+    if (!blank) return null;
+    const printAreas = blank.print_areas || [];
+    const variations = blank.variations || [];
+    const areas = printAreas.filter((a: any) => (faces[a.key] || []).length > 0);
     const [images, setImages] = useState<string[] | null>(null);
     const [active, setActive] = useState(0);
     const [err, setErr] = useState('');
@@ -20,15 +23,15 @@ export function Step3MockupPreview({ blank, faces, toApiLayer, selectedVariants 
         const placements = areas.map((a: any) => ({ print_area_key: a.key, layers: (faces[a.key] || []).map(toApiLayer) }));
         setImages(null); setErr('');
         productsService.previewMockup(blank._id, placements)
-            .then(setImages)
+            .then((imgs) => setImages(imgs && imgs.length ? imgs : [blank.default_image]))
             .catch((e: any) => setErr(e.response?.data?.error || 'Không tạo được xem trước'));
-    }, [blank._id]);
+    }, [blank._id, faces]);
 
     const chosen = Object.entries(selectedVariants || {}).filter(([, v]: any) => v.on);
-    const prices = (chosen.length ? chosen : blank.variations.map((v: any) => [v.sku, { markup: '0' }]))
-        .map(([sku, v]: any) => { const bv = blank.variations.find((x: any) => x.sku === sku); return bv ? bv.base_cost + (Number(v.markup) || 0) : 0; })
+    const prices = (chosen.length ? chosen : variations.map((v: any) => [v.sku, { markup: '0' }]))
+        .map(([sku, v]: any) => { const bv = variations.find((x: any) => x.sku === sku); return bv ? (bv.base_cost || 0) + (Number(v.markup) || 0) : 0; })
         .filter((n: number) => n > 0);
-    const minPrice = prices.length ? Math.min(...prices) : Math.min(...blank.variations.map((v: any) => v.base_cost));
+    const minPrice = prices.length ? Math.min(...prices) : (variations.length ? Math.min(...variations.map((v: any) => v.base_cost || 0)) : 0);
 
     return (
         <div className="preview-step">
