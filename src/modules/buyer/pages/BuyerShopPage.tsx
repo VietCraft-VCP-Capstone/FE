@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Star, Store, ArrowLeft, PackageSearch } from 'lucide-react';
+import { Star, Store, ArrowLeft, PackageSearch, Heart } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
+import { shopService } from '../../product/services/shopService';
+import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 interface ShopHeader {
+  id?: string;
   name: string;
   logo?: string;
+  banner?: string;
   rating: number;
+  followersCount?: number;
+  isFollowing?: boolean;
 }
 
 export function BuyerShopPage() {
@@ -14,24 +20,66 @@ export function BuyerShopPage() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<any[]>([]);
   const [shop, setShop] = useState<ShopHeader | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
     let alive = true;
     setLoading(true);
-    productsService
-      .getAll({ shopId: id, pageSize: 60 } as any)
-      .then((data) => {
+
+    Promise.all([
+      productsService.getAll({ shopId: id, pageSize: 60 } as any),
+      shopService.getById(id).catch(() => null)
+    ])
+      .then(([data, shopDetail]) => {
         if (!alive) return;
         const items = data.items || [];
         setProducts(items);
-        const info = items[0]?.shopInfo;
-        setShop(info ? { name: info.name, logo: info.logo, rating: info.rating ?? 5 } : null);
+
+        if (shopDetail) {
+          setShop({
+            id: shopDetail.id,
+            name: shopDetail.name || shopDetail.shopName,
+            logo: shopDetail.logo,
+            banner: shopDetail.banner,
+            rating: shopDetail.rating || shopDetail.averageRating || 5,
+            followersCount: shopDetail.followersCount || 0,
+            isFollowing: shopDetail.isFollowing
+          });
+          setIsFollowing(Boolean(shopDetail.isFollowing));
+          setFollowersCount(shopDetail.followersCount || 0);
+        } else {
+          const info = items[0]?.shopInfo;
+          setShop(info ? { name: info.name, logo: info.logo, rating: info.rating ?? 5 } : null);
+        }
       })
       .finally(() => alive && setLoading(false));
+
     return () => { alive = false; };
   }, [id]);
+
+  const handleToggleFollow = async () => {
+    if (!id) return;
+    if (!isLoggedIn()) {
+      navigate('/login');
+      return;
+    }
+    try {
+      if (isFollowing) {
+        await shopService.unfollow(id);
+        setIsFollowing(false);
+        setFollowersCount(c => Math.max(0, c - 1));
+      } else {
+        await shopService.follow(id);
+        setIsFollowing(true);
+        setFollowersCount(c => c + 1);
+      }
+    } catch (err) {
+      console.error('Toggle follow failed', err);
+    }
+  };
 
   const money = (n: number) => (Number(n) || 0).toLocaleString('vi-VN') + 'đ';
 
@@ -44,24 +92,43 @@ export function BuyerShopPage() {
         <ArrowLeft className="h-4 w-4" /> Quay lại
       </button>
 
-      <header className="mb-8 flex items-center gap-5 rounded-2xl border border-stone-200 bg-white p-6">
-        {shop?.logo ? (
-          <img src={shop.logo} alt="" className="h-20 w-20 shrink-0 rounded-full border border-stone-200 object-cover" />
-        ) : (
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-400">
-            <Store className="h-8 w-8" />
+      <header className="mb-8 flex items-center justify-between gap-5 rounded-2xl border border-stone-200 bg-white p-6">
+        <div className="flex items-center gap-5">
+          {shop?.logo ? (
+            <img src={shop.logo} alt="" className="h-20 w-20 shrink-0 rounded-full border border-stone-200 object-cover" />
+          ) : (
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-400">
+              <Store className="h-8 w-8" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className="m-0 truncate text-2xl font-extrabold text-[#330033]">
+              {shop?.name || 'Gian hàng'}
+            </h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm text-stone-500">
+              <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
+                <Star className="h-4 w-4 fill-current" /> {(shop?.rating ?? 5).toFixed(1)}
+              </span>
+              <span>{loading ? '—' : `${products.length} sản phẩm`}</span>
+              {followersCount > 0 && (
+                <span>• {followersCount} người theo dõi</span>
+              )}
+            </div>
           </div>
-        )}
-        <div className="min-w-0">
-          <h1 className="m-0 truncate text-2xl font-extrabold text-[#330033]">
-            {shop?.name || 'Gian hàng'}
-          </h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm text-stone-500">
-            <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
-              <Star className="h-4 w-4 fill-current" /> {(shop?.rating ?? 5).toFixed(1)}
-            </span>
-            <span>{loading ? '—' : `${products.length} sản phẩm`}</span>
-          </div>
+        </div>
+
+        <div>
+          <button
+            onClick={handleToggleFollow}
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-colors ${
+              isFollowing
+                ? 'border border-stone-300 bg-stone-50 text-stone-700 hover:bg-stone-100'
+                : 'border border-transparent bg-[#008000] text-white hover:bg-emerald-700 shadow-sm'
+            }`}
+          >
+            <Heart className={`h-3.5 w-3.5 ${isFollowing ? 'fill-rose-500 text-rose-500' : ''}`} />
+            {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
+          </button>
         </div>
       </header>
 

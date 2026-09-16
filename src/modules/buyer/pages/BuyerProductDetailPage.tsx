@@ -5,6 +5,7 @@ import {
   ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
+import { reviewService } from '../../product/services/reviewService';
 import { userService } from '../../user/services/userService';
 import { cartService } from '../../order/services/cartService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
@@ -18,7 +19,7 @@ interface Product {
   shopInfo?: { id: string; name: string; logo?: string; rating: number };
 }
 
-// ─── Mock reviews (until a reviews endpoint exists) ───────────────────────────
+// ─── Mock reviews (fallback khi API loading hoặc sản phẩm chưa có review) ──────
 const MOCK_REVIEWS = [
   { id: '1', name: 'Trần Ngọc M.', date: '13/04/2024', rating: 5, avatar: 'https://randomuser.me/api/portraits/women/68.jpg', text: 'Áo rất đẹp, đúng màu, chất vải cotton chuẩn 100%. Đường may tỉ mỉ, không bị xổ. Sẽ ủng hộ shop dài dài!', images: [] },
   { id: '2', name: 'Nguyễn Văn T.', date: '10/04/2024', rating: 5, avatar: 'https://randomuser.me/api/portraits/men/45.jpg', text: 'Giao hàng nhanh, đóng gói cẩn thận. Sản phẩm đúng mô tả, mặc vừa size M. Chất lượng tốt cho mức giá này.', images: [] },
@@ -27,6 +28,14 @@ const MOCK_REVIEWS = [
 
 const AVG_RATING = 4.8;
 const REVIEW_COUNT = 62;
+const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100';
+const DEFAULT_RATING_BREAKDOWN: Record<string, { count: number; pct: string }> = {
+  '5': { count: 52, pct: '85%' },
+  '4': { count: 6, pct: '10%' },
+  '3': { count: 2, pct: '3%' },
+  '2': { count: 1, pct: '2%' },
+  '1': { count: 0, pct: '0%' }
+};
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function fmtPrice(n: number) { return n.toLocaleString('vi-VN') + 'đ'; }
@@ -51,6 +60,12 @@ export function BuyerProductDetailPage() {
   const [related, setRelated] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [reviews, setReviews] = useState<any[]>(MOCK_REVIEWS);
+  const [avgRating, setAvgRating] = useState<number>(AVG_RATING);
+  const [reviewCount, setReviewCount] = useState<number>(REVIEW_COUNT);
+  const [starBreakdown, setStarBreakdown] = useState<Record<string, { count: number; pct: string }>>(DEFAULT_RATING_BREAKDOWN);
+  const [isLoadingReviews, setIsLoadingReviews] = useState<boolean>(false);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
@@ -96,6 +111,55 @@ export function BuyerProductDetailPage() {
         if (v0.material) setSelectedMaterial(v0.material);
       }
     }).catch(() => {}).finally(() => setLoading(false));
+
+    // Load reviews từ backend MongoDB (fallback MOCK_REVIEWS nếu chưa có đánh giá hoặc lỗi)
+    setIsLoadingReviews(true);
+    reviewService.getProductReviews(id)
+      .then(res => {
+        if (res?.items && res.items.length > 0) {
+          setReviews(res.items);
+        } else {
+          setReviews(MOCK_REVIEWS);
+        }
+
+        if (res?.summary) {
+          const count = typeof res.summary.totalReviews === 'number' 
+            ? res.summary.totalReviews 
+            : (res.summary.reviewCount ?? 0);
+          const avg = typeof res.summary.averageRating === 'number' 
+            ? res.summary.averageRating 
+            : ((res.summary as any).avgRating ?? 0);
+
+          if (count > 0 && typeof avg === 'number') {
+            setAvgRating(avg);
+            setReviewCount(count);
+            if (res.summary.breakdown && res.summary.percentages) {
+              const newBd: Record<string, { count: number; pct: string }> = {};
+              for (let s = 1; s <= 5; s++) {
+                const strS = String(s);
+                newBd[strS] = {
+                  count: res.summary.breakdown[strS] || 0,
+                  pct: res.summary.percentages[strS] || '0%'
+                };
+              }
+              setStarBreakdown(newBd);
+            }
+          } else {
+            setAvgRating(AVG_RATING);
+            setReviewCount(REVIEW_COUNT);
+            setStarBreakdown(DEFAULT_RATING_BREAKDOWN);
+          }
+        }
+      })
+      .catch(() => {
+        setReviews(MOCK_REVIEWS);
+        setAvgRating(AVG_RATING);
+        setReviewCount(REVIEW_COUNT);
+        setStarBreakdown(DEFAULT_RATING_BREAKDOWN);
+      })
+      .finally(() => {
+        setIsLoadingReviews(false);
+      });
 
     // check favorites from backend — /users/wishlist cần token.
     // Khách vãng lai bỏ qua hẳn: interceptor 401 sẽ đá về /login, mà trang chi tiết
@@ -294,12 +358,16 @@ export function BuyerProductDetailPage() {
           <div>
             {/* Shop badge */}
             {product.shopInfo && (
-              <div style={S.shopRow}>
+              <div
+                style={{ ...S.shopRow, cursor: 'pointer' }}
+                onClick={() => product.shopInfo?.id && navigate(`/shop/${product.shopInfo.id}`)}
+                title="Xem trang gian hàng"
+              >
                 <Store size={14} color="#008000" />
                 <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
                   <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                  <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || '4.8'}</span>
+                  <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || avgRating.toFixed(1)}</span>
                 </div>
               </div>
             )}
@@ -433,46 +501,65 @@ export function BuyerProductDetailPage() {
 
         {/* ── Reviews ───────────────────────────────────────────────────────── */}
         <section style={S.reviewSection}>
-          <h2 style={S.sectionTitle}>Đánh giá sản phẩm</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <h2 style={{ ...S.sectionTitle, marginBottom: 0 }}>Đánh giá sản phẩm</h2>
+            {isLoadingReviews && (
+              <span style={{ fontSize: 12, color: '#888', fontStyle: 'italic' }}>Đang đồng bộ đánh giá...</span>
+            )}
+          </div>
           <div style={S.reviewSummary}>
             <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
-              <div style={S.ratingBig}>{AVG_RATING}</div>
-              <StarRow rating={5} size={18} />
-              <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{REVIEW_COUNT} đánh giá</div>
+              <div style={S.ratingBig}>{avgRating.toFixed(1)}</div>
+              <StarRow rating={Math.round(avgRating)} size={18} />
+              <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{reviewCount} đánh giá</div>
             </div>
             <div style={{ flex: 1, paddingLeft: 16 }}>
-              {[5, 4, 3, 2, 1].map(star => (
-                <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <StarRow rating={star} size={12} />
-                  <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', background: '#f59e0b', borderRadius: 4, width: star === 5 ? '85%' : star === 4 ? '10%' : '3%' }} />
+              {[5, 4, 3, 2, 1].map(star => {
+                const pctStr = starBreakdown[String(star)]?.pct || '0%';
+                return (
+                  <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <StarRow rating={star} size={12} />
+                    <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', background: '#f59e0b', borderRadius: 4, width: pctStr }} />
+                    </div>
+                    <span style={{ fontSize: 12, color: '#888', width: 32 }}>{pctStr}</span>
                   </div>
-                  <span style={{ fontSize: 12, color: '#888', width: 32 }}>{star === 5 ? '85%' : star === 4 ? '10%' : '2%'}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {MOCK_REVIEWS.map(rv => (
-            <div key={rv.id} style={S.reviewCard}>
-              <img src={rv.avatar} alt={rv.name} style={S.avatar} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{rv.name}</span>
-                  <StarRow rating={rv.rating} size={12} />
-                  <span style={{ fontSize: 12, color: '#aaa', marginLeft: 'auto' }}>{rv.date}</span>
-                </div>
-                <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{rv.text}</p>
-                {rv.images.length > 0 && (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {rv.images.map((img, i) => (
-                      <img key={i} src={img} alt="review" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
-                    ))}
+          <div style={{ opacity: isLoadingReviews ? 0.7 : 1, transition: 'opacity 0.2s' }}>
+          {reviews.map((rv, idx) => {
+            const authorName = rv.name || rv.buyer?.name || 'Khách hàng ẩn danh';
+            const authorAvatar = rv.avatar || rv.buyer?.avatar || DEFAULT_AVATAR;
+            const reviewDate = rv.date || (rv.createdAt ? new Date(rv.createdAt).toLocaleDateString('vi-VN') : '');
+            const reviewText = rv.text || rv.comment || '';
+            const reviewImages = Array.isArray(rv.images) ? rv.images : [];
+            const ratingVal = typeof rv.rating === 'number' ? rv.rating : 5;
+
+            return (
+              <div key={rv.id || rv._id || idx} style={S.reviewCard}>
+                <img src={authorAvatar} alt={authorName} style={S.avatar} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{authorName}</span>
+                    <StarRow rating={ratingVal} size={12} />
+                    <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 'auto' }}>{reviewDate}</span>
                   </div>
-                )}
+                  <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{reviewText}</p>
+                  {reviewImages.length > 0 && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {reviewImages.map((img: string, i: number) => (
+                        <img key={i} src={img} alt={`review-img-${i}`} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+          </div>
         </section>
 
         {/* ── Related products ──────────────────────────────────────────────── */}
