@@ -38,8 +38,8 @@ function AdminUsers() {
     const email = u.email || '';
     const id = u._id || '';
     const matchesSearch = name.toLowerCase().includes(search.toLowerCase()) ||
-                          email.toLowerCase().includes(search.toLowerCase()) ||
-                          id.toLowerCase().includes(search.toLowerCase());
+      email.toLowerCase().includes(search.toLowerCase()) ||
+      id.toLowerCase().includes(search.toLowerCase());
     if (filter === 'Buyer') return matchesSearch && u.role === 'BUYER';
     if (filter === 'Seller') return matchesSearch && u.role === 'SELLER';
     return matchesSearch;

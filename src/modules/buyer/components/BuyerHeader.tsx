@@ -33,7 +33,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
             setCurrentUser((prev: any) => ({ ...prev, ...prof }));
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [user]);
 
