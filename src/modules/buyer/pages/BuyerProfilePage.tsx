@@ -107,6 +107,19 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             setProfile((prev: UserProfile | null) => 
                 prev ? { ...prev, avatar: updated.avatar } : null
             );
+
+            try {
+                const storedUser = localStorage.getItem('user');
+                if (storedUser) {
+                    const parsed = JSON.parse(storedUser);
+                    const merged = { ...parsed, avatar: updated.avatar || uploadedUrl };
+                    localStorage.setItem('user', JSON.stringify(merged));
+                }
+            } catch (syncErr) {
+                console.error('Failed to sync localStorage user', syncErr);
+            }
+
+            window.dispatchEvent(new CustomEvent('vietcraft-user-updated', { detail: { avatar: updated.avatar || uploadedUrl } }));
             showToast('Cập nhật ảnh đại diện thành công!', 'success');
         } catch (error) {
             console.error('Failed to upload avatar', error);
@@ -135,6 +148,18 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                 if (prof) {
                     profileCache = prof;
                     setProfile(prof);
+
+                    try {
+                        const storedUser = localStorage.getItem('user');
+                        if (storedUser) {
+                            const parsed = JSON.parse(storedUser);
+                            const merged = { ...parsed, avatar: prof.avatar || parsed.avatar, full_name: prof.full_name || parsed.full_name, name: prof.full_name || parsed.name };
+                            localStorage.setItem('user', JSON.stringify(merged));
+                        }
+                    } catch (syncErr) {
+                        console.error('Failed to sync profile cache', syncErr);
+                    }
+                    window.dispatchEvent(new CustomEvent('vietcraft-user-updated', { detail: prof }));
                 }
                 if (orders && orders.length > 0) {
                     lastOrderCache = orders[0];
@@ -193,6 +218,19 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                 phone: phone
             });
             setProfile((prev: UserProfile | null) => prev ? { ...prev, full_name: updated.full_name, phone: updated.phone } : null);
+
+            try {
+                const storedUser = localStorage.getItem('user');
+                if (storedUser) {
+                    const parsed = JSON.parse(storedUser);
+                    const merged = { ...parsed, full_name: updated.full_name, name: updated.full_name, phone: updated.phone };
+                    localStorage.setItem('user', JSON.stringify(merged));
+                }
+            } catch (syncErr) {
+                console.error('Failed to sync localStorage user', syncErr);
+            }
+
+            window.dispatchEvent(new CustomEvent('vietcraft-user-updated', { detail: { full_name: updated.full_name, name: updated.full_name } }));
             showToast('Cập nhật hồ sơ thành công!', 'success');
         } catch (e) {
             showToast(getApiErrorMessage(e, 'Cập nhật hồ sơ thất bại.'), 'error');
@@ -557,8 +595,15 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                         className="flex items-center justify-between p-4 rounded-[20px] border border-gray-200 hover:bg-gray-50 transition-all cursor-pointer mt-4"
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                                <img src={lastOrder.items[0]?.image} alt={lastOrder.items[0]?.title} className="w-full h-full object-cover" />
+                                            <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0 flex items-center justify-center">
+                                                <img
+                                                    src={lastOrder.items[0]?.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'}
+                                                    alt={lastOrder.items[0]?.title || 'Sản phẩm'}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150';
+                                                    }}
+                                                />
                                             </div>
                                             <div>
                                                 <p className="text-[10px] font-bold text-gray-400">Mã đơn: #{lastOrder.id}</p>
@@ -590,7 +635,14 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                     {savedProducts.map((p, i) => (
                                         <div key={i} className="flex flex-col items-center">
                                             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-50 border border-gray-150 aspect-square cursor-pointer hover:scale-105 transition-all">
-                                                <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                                                <img
+                                                    src={p.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'}
+                                                    alt={p.title}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150';
+                                                    }}
+                                                />
                                             </div>
                                             <h4 className="text-[10px] font-bold text-gray-700 line-clamp-1 mt-2.5 text-center px-1 leading-normal w-full">{p.title}</h4>
                                         </div>

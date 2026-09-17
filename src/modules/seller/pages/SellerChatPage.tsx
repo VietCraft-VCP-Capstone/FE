@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { chatService } from '../../chat/services/chatService';
 import { useSocket } from '../../../infrastructure/websocket/useSocket';
-import { ChatMessage, ConversationItem, ProductWidget } from '../../chat/types/chatTypes';
+import { ChatMessage, ConversationItem, ProductWidget, appendUniqueMessage, filterUniqueMessages } from '../../chat/types/chatTypes';
 
 const getInitials = (name: string) => {
   if (!name) return 'KH';
@@ -97,8 +97,17 @@ export function SellerChatPage() {
     setLoadingMessages(true);
     try {
       const history = await chatService.getMessages(convId);
-      setMessages(history);
+      setMessages(filterUniqueMessages(history));
       markRead(convId);
+      
+      chatService.markAsRead(convId).then(async () => {
+        const count = await chatService.getUnreadCount();
+        window.dispatchEvent(new CustomEvent('vietcraft-chat-unread-updated', { detail: { unreadCount: count } }));
+      }).catch(() => {});
+
+      setConversations((prev) =>
+        prev.map((c) => (c.conversation_id === convId ? { ...c, unread_count: 0 } : c))
+      );
       setTimeout(() => scrollToBottom('auto'), 60);
     } catch (err) {
       console.error('Lỗi tải tin nhắn seller:', err);
@@ -114,7 +123,7 @@ export function SellerChatPage() {
     const onMessageReceived = (e: any) => {
       const msg: ChatMessage = e.detail;
       if (activeConv && msg.conversation_id === activeConv.conversation_id) {
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) => appendUniqueMessage(prev, msg));
         markRead(activeConv.conversation_id);
         setTimeout(() => scrollToBottom('smooth'), 50);
       }
@@ -162,7 +171,7 @@ export function SellerChatPage() {
       });
 
       if (sent) {
-        setMessages((prev) => [...prev, sent]);
+        setMessages((prev) => appendUniqueMessage(prev, sent));
         setTimeout(() => scrollToBottom('smooth'), 50);
       }
       fetchConversations();
@@ -172,7 +181,7 @@ export function SellerChatPage() {
           receiver_id: activeConv.partner.id,
           message_text: text
         });
-        setMessages((prev) => [...prev, fallbackMsg]);
+        setMessages((prev) => appendUniqueMessage(prev, fallbackMsg));
         setTimeout(() => scrollToBottom('smooth'), 50);
         fetchConversations();
       } catch (err) {
@@ -470,7 +479,11 @@ export function SellerChatPage() {
                   <p className="text-[11px] text-stone-400 mt-1">Hãy gửi phản hồi cho khách hàng!</p>
                 </div>
               ) : (
-                messages.map((m) => {
+                messages.map((m, idx) => {
+                  const text = (m.message_text || '').trim();
+                  // Bỏ qua tin nhắn không có chữ (sản phẩm đã có trên header ghim của Seller)
+                  if (!text) return null;
+
                   const isMe = m.sender_id !== activeConv.partner.id;
                   const timeStr = new Date(m.created_at).toLocaleTimeString('vi-VN', {
                     hour: '2-digit',
@@ -479,7 +492,7 @@ export function SellerChatPage() {
 
                   return (
                     <div
-                      key={m.id || m._id}
+                      key={m.id || m._id || idx}
                       className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                     >
                       {!isMe ? (
@@ -498,8 +511,8 @@ export function SellerChatPage() {
                           )}
 
                           <div>
-                            <div className="bg-white border border-stone-200 text-stone-800 rounded-2xl rounded-tl-xs p-3.5 px-4 text-xs sm:text-sm leading-relaxed shadow-xs">
-                              {m.message_text}
+                            <div className="bg-white border border-stone-200 text-stone-800 rounded-2xl rounded-tl-xs p-3 px-4 text-xs sm:text-sm leading-relaxed shadow-xs">
+                              {text}
                             </div>
                             <span className="text-[10px] text-stone-400 mt-1 ml-1 block">
                               {timeStr}
@@ -509,8 +522,8 @@ export function SellerChatPage() {
                       ) : (
                         /* Tin nhắn từ người bán (Bên phải: Bong bóng xanh lá đậm #0a5c15) */
                         <div className="flex flex-col items-end max-w-[70%]">
-                          <div className="bg-[#0a5c15] text-white rounded-2xl rounded-tr-xs p-3.5 px-4 text-xs sm:text-sm leading-relaxed shadow-xs">
-                            {m.message_text}
+                          <div className="bg-[#0a5c15] text-white rounded-2xl rounded-tr-xs p-3 px-4 text-xs sm:text-sm leading-relaxed shadow-xs">
+                            {text}
                           </div>
                           <div className="flex items-center gap-1 mt-1 mr-1 text-[10px] text-stone-400">
                             <span>{timeStr}</span>

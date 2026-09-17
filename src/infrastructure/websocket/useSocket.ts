@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { ChatMessage } from '../../modules/chat/types/chatTypes';
+import { ChatMessage, appendUniqueMessage } from '../../modules/chat/types/chatTypes';
 
 const SOCKET_URL = 'http://localhost:8080';
 
@@ -68,13 +68,17 @@ export function useSocket(currentRoomId?: string) {
         created_at: msg.created_at || msg.timestamp || new Date().toISOString()
       };
 
-      setMessages((prev) => [...prev, normalized]);
+      setMessages((prev) => appendUniqueMessage(prev, normalized));
       setLastMessage(normalized);
 
       window.dispatchEvent(new CustomEvent('vietcraft-message-received', { detail: normalized }));
     });
 
     socket.on('new_message_notification', (data: { message: ChatMessage; unreadCount: number }) => {
+      window.dispatchEvent(new CustomEvent('vietcraft-chat-unread-updated', { detail: data }));
+    });
+
+    socket.on('unread_count_updated', (data: { unreadCount: number }) => {
       window.dispatchEvent(new CustomEvent('vietcraft-chat-unread-updated', { detail: data }));
     });
 

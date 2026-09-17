@@ -5,6 +5,7 @@ import '../../../shared/components/layouts.css';
 import { userService } from '../../user/services/userService';
 import { chatService } from '../../chat/services/chatService';
 import { notificationService } from '../../notification/services/notificationService';
+import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 interface BuyerHeaderProps {
@@ -17,12 +18,38 @@ interface BuyerHeaderProps {
 export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [currentUser, setCurrentUser] = useState(user);
   const [favCount, setFavCount] = useState(0);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
-  const name = user?.full_name || user?.name || '';
+  useEffect(() => {
+    setCurrentUser(user);
+    if (!user?.avatar && isLoggedIn()) {
+      userService.getProfile()
+        .then((prof) => {
+          if (prof) {
+            setCurrentUser((prev: any) => ({ ...prev, ...prof }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handleUserUpdate = (e: any) => {
+      if (e?.detail) {
+        setCurrentUser((prev: any) => ({ ...prev, ...e.detail }));
+      }
+    };
+    window.addEventListener('vietcraft-user-updated', handleUserUpdate);
+    return () => window.removeEventListener('vietcraft-user-updated', handleUserUpdate);
+  }, []);
+
+  const name = currentUser?.full_name || currentUser?.name || '';
   const initial = name.charAt(0).toUpperCase() || '';
+  const avatarUrl = currentUser?.avatar;
 
   const isActive = (path: string) => location.pathname.startsWith(path);
 
@@ -61,6 +88,14 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
     refreshChatUnread();
     refreshNotifUnread();
 
+    const handleChatUpdate = (e: any) => {
+      if (typeof e.detail?.unreadCount === 'number') {
+        setUnreadChatCount(e.detail.unreadCount);
+      } else {
+        refreshChatUnread();
+      }
+    };
+
     const handleNotifUpdate = (e: any) => {
       if (typeof e.detail?.unreadCount === 'number') {
         setUnreadNotifCount(e.detail.unreadCount);
@@ -70,14 +105,14 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
     };
 
     window.addEventListener('wishlist-updated', refreshFavCount);
-    window.addEventListener('vietcraft-chat-unread-updated', refreshChatUnread);
+    window.addEventListener('vietcraft-chat-unread-updated', handleChatUpdate);
     window.addEventListener('vietcraft-message-received', refreshChatUnread);
     window.addEventListener('vietcraft-notification-unread-updated', handleNotifUpdate);
     window.addEventListener('vietcraft-notification-received', handleNotifUpdate);
 
     return () => {
       window.removeEventListener('wishlist-updated', refreshFavCount);
-      window.removeEventListener('vietcraft-chat-unread-updated', refreshChatUnread);
+      window.removeEventListener('vietcraft-chat-unread-updated', handleChatUpdate);
       window.removeEventListener('vietcraft-message-received', refreshChatUnread);
       window.removeEventListener('vietcraft-notification-unread-updated', handleNotifUpdate);
       window.removeEventListener('vietcraft-notification-received', handleNotifUpdate);
@@ -173,30 +208,8 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
           />
         </div>
 
-        {/* Action Icons */}
+        {/* Action Icons (Đã dời Thông báo sang bên phải, cạnh Avatar và Chat) */}
         <div className="buyer-actions">
-          {/* Notifications Icon */}
-          <button
-            type="button"
-            className="icon-btn relative"
-            onClick={() => navigate('/notifications')}
-            title="Thông báo"
-          >
-            <Bell
-              size={22}
-              className={
-                isActive('/notifications')
-                  ? 'text-gray-900 stroke-[2.5] transition-colors'
-                  : 'text-gray-600 stroke-[1.8] hover:text-gray-900 transition-colors'
-              }
-            />
-            {unreadNotifCount > 0 && (
-              <span className="badge bg-red-600 text-white animate-pulse">
-                {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
-              </span>
-            )}
-          </button>
-
           {/* Favorites Icon */}
           <button
             type="button"
@@ -257,10 +270,41 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
             )}
           </button>
 
-          {/* User Green Circle Avatar with Letter P */}
+          {/* Notifications Icon (Dời sang bên phía tay phải cạnh Avatar, tránh bị che giữa màn hình) */}
+          <div className="relative">
+            <button
+              type="button"
+              className="icon-btn relative"
+              onClick={() => setIsNotifOpen((prev) => !prev)}
+              title="Thông báo"
+            >
+              <Bell
+                size={22}
+                className={
+                  isNotifOpen
+                    ? 'text-[#15803d] stroke-[2.5] transition-colors'
+                    : 'text-gray-600 stroke-[1.8] hover:text-gray-900 transition-colors'
+                }
+              />
+              {unreadNotifCount > 0 && (
+                <span className="badge bg-red-600 text-white animate-pulse">
+                  {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                </span>
+              )}
+            </button>
+
+            <HeaderNotificationDropdown
+              isOpen={isNotifOpen}
+              onClose={() => setIsNotifOpen(false)}
+              onUnreadCountChange={(count) => setUnreadNotifCount(count)}
+              className="right-0 sm:right-[-40px]"
+            />
+          </div>
+
+          {/* User Avatar */}
           <button
             type="button"
-            className="buyer-avatar bg-[#007700] text-white font-bold text-base w-9 h-9 rounded-full flex items-center justify-center border-none shadow-sm hover:opacity-90 transition-opacity"
+            className="buyer-avatar bg-[#007700] text-white font-bold text-base w-9 h-9 rounded-full flex items-center justify-center border border-stone-200/60 shadow-sm hover:opacity-90 transition-opacity overflow-hidden shrink-0 cursor-pointer"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -268,7 +312,11 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
             }}
             title="Hồ sơ"
           >
-            {initial}
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={name || 'Avatar'} className="w-full h-full object-cover rounded-full" />
+            ) : (
+              initial
+            )}
           </button>
         </div>
       </div>

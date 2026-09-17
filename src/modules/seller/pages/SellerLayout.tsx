@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { chatService } from '../../chat/services/chatService';
 import { notificationService } from '../../notification/services/notificationService';
+import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
 
 interface SellerLayoutProps {
   children: React.ReactNode;
@@ -46,8 +47,15 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/seller/chat')) {
+      setCollapsed(true);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     chatService.getUnreadCount()
@@ -143,17 +151,32 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
               <Mail size={19} />
               {unreadChatCount > 0 && <span className="seller-bell-dot" />}
             </Link>
-            <button
-              className="seller-icon-btn seller-bell relative"
-              onClick={() => navigate('/notifications')}
-              title="Thông báo"
-            >
-              <Bell size={19} />
-              {unreadNotifCount > 0 && <span className="seller-bell-dot" />}
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                className="seller-icon-btn seller-bell relative cursor-pointer"
+                onClick={() => setIsNotifOpen((prev) => !prev)}
+                title="Thông báo"
+              >
+                <Bell size={19} />
+                {unreadNotifCount > 0 && <span className="seller-bell-dot" />}
+              </button>
+
+              <HeaderNotificationDropdown
+                isOpen={isNotifOpen}
+                onClose={() => setIsNotifOpen(false)}
+                onUnreadCountChange={(count) => setUnreadNotifCount(count)}
+              />
+            </div>
             <button className="seller-lang-badge">VN <ChevronDown size={13} /></button>
             <div className="seller-user-menu" ref={menuRef}>
-              <button className="seller-avatar" onClick={() => setMenuOpen(o => !o)} title="Tài khoản">{user?.name?.[0]?.toUpperCase() || 'S'}</button>
+              <button className="seller-avatar overflow-hidden flex items-center justify-center cursor-pointer" onClick={() => setMenuOpen(o => !o)} title="Tài khoản">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  user?.name?.[0]?.toUpperCase() || 'S'
+                )}
+              </button>
               {menuOpen && (
                 <div className="seller-user-dropdown">
                   <div className="seller-user-info">
@@ -168,7 +191,7 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
         </header>
 
         {/* Main Body */}
-        <main className={`seller-content ${location.pathname.startsWith('/seller/chat') ? 'seller-chat-content' : ''}`}>
+        <main className={`seller-content ${location.pathname.includes('/chat') ? 'seller-chat-content' : ''}`}>
           {children}
         </main>
       </div>

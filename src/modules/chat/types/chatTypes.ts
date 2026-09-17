@@ -65,3 +65,55 @@ export interface SendMessagePayload {
   product_widget?: ProductWidget;
   custom_quotation?: CustomQuotation;
 }
+
+export function appendUniqueMessage(prev: ChatMessage[], newMsg: ChatMessage): ChatMessage[] {
+  const newId = newMsg.id || (newMsg as any)._id;
+  if (newId) {
+    const exists = prev.some((m) => (m.id && m.id === newId) || ((m as any)._id && (m as any)._id === newId));
+    if (exists) return prev;
+  }
+  const isDuplicate = prev.some(
+    (m) =>
+      m.sender_id === newMsg.sender_id &&
+      (m.message_text || '') === (newMsg.message_text || '') &&
+      Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 3000
+  );
+  if (isDuplicate) return prev;
+
+  return [...prev, newMsg];
+}
+
+export function filterUniqueMessages(list: ChatMessage[]): ChatMessage[] {
+  const seenIds = new Set<string>();
+  const uniqueList: ChatMessage[] = [];
+
+  for (const m of list) {
+    const id = m.id || (m as any)._id;
+    if (id && !seenIds.has(id)) {
+      seenIds.add(id);
+      uniqueList.push(m);
+    } else if (!id) {
+      uniqueList.push(m);
+    }
+  }
+
+  // Lọc bỏ thẻ sản phẩm trùng lặp liên tiếp không có nội dung chữ
+  const result: ChatMessage[] = [];
+  for (let i = 0; i < uniqueList.length; i++) {
+    const cur = uniqueList[i];
+    const prev = result[result.length - 1];
+    if (
+      prev &&
+      !prev.message_text?.trim() &&
+      !cur.message_text?.trim() &&
+      prev.product_widget &&
+      cur.product_widget &&
+      prev.product_widget.product_id === cur.product_widget.product_id
+    ) {
+      continue;
+    }
+    result.push(cur);
+  }
+
+  return result;
+}
