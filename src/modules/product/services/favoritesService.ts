@@ -6,13 +6,30 @@ export interface FavoritesResponse {
     product_ids: any[];
 }
 
+export interface ToggleFavoriteResponse {
+    success: boolean;
+    isFavorite: boolean;
+    message: string;
+    wishlist?: FavoritesResponse;
+}
+
 export const favoritesService = {
     getFavorites: async (): Promise<FavoritesResponse> => {
         const res = await api.get('/favorites');
-        return res.data?.data || res.data;
+        return res.data?.data || res.data || { product_ids: [] };
     },
 
-    toggleFavorite: async (productId: string): Promise<any> => {
+    getFavoriteIds: async (): Promise<string[]> => {
+        try {
+            const favs = await favoritesService.getFavorites();
+            const list = favs?.product_ids || [];
+            return list.map((item: any) => (item?._id || item?.id || item)?.toString()).filter(Boolean);
+        } catch {
+            return [];
+        }
+    },
+
+    toggleFavorite: async (productId: string): Promise<ToggleFavoriteResponse> => {
         const res = await api.post('/favorites/toggle', { productId });
         return res.data;
     },
@@ -29,3 +46,4 @@ export const favoritesService = {
 };
 
 export default favoritesService;
+
