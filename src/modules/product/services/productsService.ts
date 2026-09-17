@@ -120,6 +120,12 @@ export const productsService = {
     return res.data;
   },
 
+  deleteDesign: async (id: string) => {
+    const res = await api.delete(`/designs/${id}`);
+    return res.data;
+  },
+
+
   previewMockup: async (blankId: string, designPlacements: any[]): Promise<string[]> => {
     const res = await api.post('/products/preview-mockup', { blankId, designPlacements });
     return (res.data.images as string[]).map(absImg);

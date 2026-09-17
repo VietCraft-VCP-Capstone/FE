@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store, MessageCircle
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
-import { userService } from '../../user/services/userService';
+import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 
@@ -144,7 +144,7 @@ export function BuyerProductDetailPage() {
     if (!isLoggedIn()) {
       setIsFav(false);
     } else {
-      userService.getWishlist()
+      favoritesService.getFavoriteIds()
         .then((ids) => setIsFav(ids.includes(id!)))
         .catch(() => {
           try {
@@ -236,15 +236,9 @@ export function BuyerProductDetailPage() {
       return;
     }
     try {
-      let updated: string[];
-      if (isFav) {
-        updated = await userService.removeFromWishlist(product.id);
-        triggerToast(`Đã xóa khỏi yêu thích`, 'info');
-      } else {
-        updated = await userService.addToWishlist(product.id);
-        triggerToast(`Đã thêm vào yêu thích!`, 'success');
-      }
-      setIsFav(updated.includes(product.id));
+      const res = await favoritesService.toggleFavorite(product.id);
+      setIsFav(res.isFavorite);
+      triggerToast(res.isFavorite ? 'Đã thêm vào yêu thích!' : 'Đã xóa khỏi yêu thích', res.isFavorite ? 'success' : 'info');
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch {
       // Fallback: toggle locally

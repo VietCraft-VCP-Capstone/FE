@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, Sparkles, Check, ArrowLeft } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { cartService } from '../../order/services/cartService';
-import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import api, { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 
 interface CartItem {
     id: string;
@@ -18,6 +18,34 @@ interface CartItem {
     checked: boolean;
     productType?: string;
 }
+
+const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+export const DEFAULT_PRODUCT_IMG = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=300';
+
+const absImg = (u: any): string => {
+    if (!u || typeof u !== 'string') return '';
+    const trimmed = u.trim();
+    if (!trimmed || trimmed.startsWith('#')) return ''; // Ignore hex color codes stored in mockup_image
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) return trimmed;
+    if (trimmed.startsWith('/')) return ORIGIN + trimmed;
+    return trimmed;
+};
+
+const resolveCartItemImage = (variant: any, prod: any): string => {
+    const vImg = absImg(variant?.mockup_image || variant?.mockupImage || variant?.image);
+    if (vImg) return vImg;
+
+    const pImgs = Array.isArray(prod?.images) ? prod.images : [];
+    for (const img of pImgs) {
+        const resolved = absImg(img);
+        if (resolved) return resolved;
+    }
+
+    const thumb = absImg(prod?.thumbnail || prod?.image);
+    if (thumb) return thumb;
+
+    return DEFAULT_PRODUCT_IMG;
+};
 
 const parseMongooseDecimal = (val: any): number => {
     if (val === null || val === undefined) return 0;
@@ -61,16 +89,17 @@ const mapBackendCart = (cartData: any): CartItem[] => {
             price = parseMongooseDecimal(prod.retail_price);
         } else if (prod.price) {
             price = parseMongooseDecimal(prod.price);
-        } else {
-            price = 150000;
+        } else if (Array.isArray(prod.variants) && prod.variants.length > 0) {
+            const firstV = prod.variants[0];
+            price = parseMongooseDecimal(firstV?.retail_price || firstV?.price || 0);
         }
 
-        const image = variant.mockup_image || prod.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=300';
+        const image = resolveCartItemImage(variant, prod);
 
         return {
             id: item._id, // Cart item DB MongoDB ObjectId
-            productId: prod._id || '',
-            variantId: variant._id || '',
+            productId: prod._id || prod.id || '',
+            variantId: variant._id || variant.id || '',
             title: prod.title || 'Sản phẩm VietCraft',
             shopName,
             variantName,
@@ -121,7 +150,9 @@ export function BuyerCartPage() {
                 const mapped = list.slice(0, 4).map((p: any) => ({
                     id: p._id || p.id,
                     title: p.title || p.name || 'Sản phẩm VietCraft',
-                    price: p.variants?.[0]?.retail_price ? Number(p.variants[0].retail_price.toString()) : 150000,
+                    price: p.variants?.[0]?.retail_price 
+                        ? parseMongooseDecimal(p.variants[0].retail_price) 
+                        : (p.price || 0),
                     image: p.images?.[0] || p.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=300'
                 }));
                 setRecommendations(mapped);
@@ -244,7 +275,14 @@ export function BuyerCartPage() {
                                         className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
                                     />
                                     <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                        <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                                        <img 
+                                            src={item.image} 
+                                            alt={item.title} 
+                                            className="w-full h-full object-cover" 
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMG;
+                                            }}
+                                        />
                                     </div>
                                     <div className="space-y-1">
                                         <h3 className="font-bold text-gray-900 leading-snug line-clamp-1">{item.title}</h3>
@@ -306,7 +344,14 @@ export function BuyerCartPage() {
                             <div key={rec.id} className="bg-white rounded-2xl border border-gray-100 p-3 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
                                 <div className="space-y-2">
                                     <div className="aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
-                                        <img src={rec.image} alt={rec.title} className="w-full h-full object-cover" />
+                                        <img 
+                                            src={rec.image} 
+                                            alt={rec.title} 
+                                            className="w-full h-full object-cover" 
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMG;
+                                            }}
+                                        />
                                     </div>
                                     <h4 className="text-xs font-bold text-gray-800 line-clamp-2 leading-snug min-h-[2.5rem]">
                                         {rec.title}

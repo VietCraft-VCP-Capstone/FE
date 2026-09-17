@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Search, Heart, Bell, ShoppingBag, MessageCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
-import { userService } from '../../user/services/userService';
 import { chatService } from '../../chat/services/chatService';
 import { notificationService } from '../../notification/services/notificationService';
 import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
+import { favoritesService } from '../../product/services/favoritesService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 interface BuyerHeaderProps {
@@ -58,8 +58,8 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
       setFavCount(0);
       return;
     }
-    userService.getWishlist()
-      .then((ids) => setFavCount(Array.isArray(ids) ? ids.length : 0))
+    favoritesService.getFavorites()
+      .then((res) => setFavCount(Array.isArray(res?.product_ids) ? res.product_ids.length : 0))
       .catch(() => setFavCount(0));
   };
 

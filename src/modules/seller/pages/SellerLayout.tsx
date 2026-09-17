@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import { POD_CREATE_ENABLED, POD_CREATE_PATH } from '../featureFlags';
 import {
-  LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Truck, Ticket,
+  LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Palette, Truck, Ticket,
   Wallet, Banknote, BarChart2, TrendingUp, LineChart, Flame, Tag, PieChart, Rocket,
   Settings, Bell, Mail, PanelLeft, ExternalLink, LogOut, ChevronDown, MessageSquare
 } from 'lucide-react';
@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { to: '/seller/chat', icon: MessageSquare, label: 'Tin nhắn khách hàng' },
   { to: '/seller/products', icon: Package, label: 'Quản lí sản phẩm' },
   { to: '/seller/products/new', icon: PlusCircle, label: 'Tạo sản phẩm POD' },
+  { to: '/seller/designs', icon: Palette, label: 'Kho thiết kế' },
   { to: '/seller/shipping', icon: Truck, label: 'Vận chuyển' },
   { to: '/seller/promotions', icon: Ticket, label: 'Khuyến mãi' },
   { to: '/seller/revenue', icon: Wallet, label: 'Doanh thu cửa hàng' },
@@ -37,6 +38,7 @@ const NAV_ITEMS = [
   { to: '/seller/market-share', icon: PieChart, label: 'Thị phần & đối thủ' },
   { to: '/seller/onboarding', icon: Rocket, label: 'Thiết lập gian hàng' },
 ];
+
 
 const VISIBLE_NAV_ITEMS = NAV_ITEMS.filter(item => POD_CREATE_ENABLED || item.to !== POD_CREATE_PATH);
 
