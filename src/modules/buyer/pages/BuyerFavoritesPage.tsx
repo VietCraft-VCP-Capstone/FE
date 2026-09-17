@@ -32,8 +32,8 @@ const resolveProductImage = (product: any): string => {
 
 export function BuyerFavoritesPage() {
   const navigate = useNavigate();
-  const [favorites, setFavorites] = useState<any[]>(() => getCachedFavorites());
-  const [loading, setLoading] = useState(() => getCachedFavorites().length === 0);
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchFavorites();
@@ -184,23 +184,25 @@ export function BuyerFavoritesPage() {
                   </div>
 
                   {/* Content */}
-                  <div className="flex flex-col flex-1">
-                    <h3 className="text-sm font-semibold text-gray-900 mt-3 line-clamp-1 group-hover:text-[#15803d] transition-colors">
-                      {product.title || product.name || 'Sản phẩm sáng tạo'}
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {shopTitle}
-                    </p>
-                    <p className="text-sm font-bold text-[#15803d] mt-1">
-                      {new Intl.NumberFormat('vi-VN').format(price)}{' '}đ
-                    </p>
+                  <div className="flex flex-col flex-1 justify-between mt-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-1 group-hover:text-[#15803d] transition-colors">
+                        {product.title || product.name || 'Sản phẩm sáng tạo'}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {shopTitle}
+                      </p>
+                      <p className="text-sm font-bold text-[#15803d] mt-1">
+                        {new Intl.NumberFormat('vi-VN').format(price)}{' '}đ
+                      </p>
+                    </div>
 
                     {/* Pill Button: Thêm vào giỏ */}
                     <button
                       onClick={(e) => handleAddToCart(product, e)}
-                      className="w-full mt-3 py-2 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold"
+                      className="w-full mt-3 py-2 px-3 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                     >
-                      <ShoppingBag size={13} />
+                      <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                       <span>Thêm vào giỏ</span>
                     </button>
                   </div>

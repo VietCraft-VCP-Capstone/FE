@@ -6,6 +6,7 @@ import { chatService } from '../../chat/services/chatService';
 import { notificationService } from '../../notification/services/notificationService';
 import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
 import { favoritesService } from '../../product/services/favoritesService';
+import { userService } from '../../user/services/userService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 interface BuyerHeaderProps {
@@ -28,7 +29,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
     setCurrentUser(user);
     if (!user?.avatar && isLoggedIn()) {
       userService.getProfile()
-        .then((prof) => {
+        .then((prof: any) => {
           if (prof) {
             setCurrentUser((prev: any) => ({ ...prev, ...prof }));
           }
