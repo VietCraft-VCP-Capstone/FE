@@ -27,11 +27,13 @@ function LayerNode({ layer, ratio, offX, offY, onSelect, onChange, nodeRef }: an
     }, [layer.id]);
     const designImg = useHTMLImage(layer.design?.file_url);
 
+    const hitW = layer.baseW || 0, hitH = layer.baseH || 0;
     const flipH = layer.flipH ? -1 : 1;
     const groupProps = {
         ref,
         x: offX + layer.x * ratio, y: offY + layer.y * ratio,
         scaleX: flipH * layer.scale * ratio, scaleY: layer.scale * ratio, rotation: layer.rotation,
+        offsetX: layer.flipH ? hitW : 0,
         draggable: true,
         onClick: onSelect, onTap: onSelect,
         onDragEnd: (e: any) => onChange({ x: (e.target.x() - offX) / ratio, y: (e.target.y() - offY) / ratio }),
@@ -41,7 +43,6 @@ function LayerNode({ layer, ratio, offX, offY, onSelect, onChange, nodeRef }: an
         },
     };
 
-    const hitW = layer.baseW || 0, hitH = layer.baseH || 0;
     return (
         <Group {...groupProps}>
             <Rect width={hitW} height={hitH} fill="rgba(0,0,0,0.001)" />
@@ -83,12 +84,15 @@ export function Step2DesignEditor({
     const area = areaOf(activeFace);
     const isWrap = area?.surface === 'wrap';
     const isTshirt = blank?._id ? blank._id.includes('tshirt') : false;
+    const isFrame = blank?._id ? blank._id.includes('frame') : false;
+    const isTote = blank?._id ? blank._id.includes('tote') : false;
+    const isMug = blank?._id ? blank._id.includes('mug') : false;
     const sp = spaceOf(area);
 
     const [isAreaSelected, setIsAreaSelected] = useState(false);
     const [showGuides, setShowGuides] = useState(true);
 
-    const blankImg = useHTMLImage(isWrap ? undefined : (area?.image || blank?.default_image));
+    const blankImg = useHTMLImage(area?.image || blank?.default_image);
     const trRef = useRef<any>(null);
     const areaRectRef = useRef<any>(null);
     const areaTrRef = useRef<any>(null);
@@ -99,9 +103,7 @@ export function Step2DesignEditor({
         else delete nodeMap.current[id];
     };
 
-    const natW = isWrap ? (sp?.width || 800) : TEMPLATE_SIZE;
-    const natH = isWrap ? (sp?.height || 800) : TEMPLATE_SIZE;
-    const ratio = CANVAS / Math.max(natW, natH, 1);
+    const ratio = CANVAS / TEMPLATE_SIZE;
     const dispW = CANVAS, dispH = CANVAS;
     const offX = 0, offY = 0;
 
@@ -129,6 +131,13 @@ export function Step2DesignEditor({
             atr.nodes([rectNode]);
         } else {
             atr.nodes([]);
+        }
+        // Đảm bảo Rect luôn giữ x=0, y=0, scaleX=1, scaleY=1 bên trong Group, không bị trôi lệch
+        if (areaRectRef.current) {
+            areaRectRef.current.x(0);
+            areaRectRef.current.y(0);
+            areaRectRef.current.scaleX(1);
+            areaRectRef.current.scaleY(1);
         }
         atr.getLayer()?.batchDraw();
     }, [isAreaSelected, activeFace, sp.x, sp.y, sp.width, sp.height]);
@@ -162,25 +171,53 @@ export function Step2DesignEditor({
         const h = (selected.baseH || 100) * selected.scale;
         updateLayer(selected.id, { y: sp.y + sp.height - h });
     };
+    const applyAreaOverride = (key: string, patch: Partial<{ x: number; y: number; width: number; height: number }>) => {
+        updateAreaOverride(key, patch);
+        const currentSp = spaceOf(areaOf(key));
+        const newSp = { ...currentSp, ...patch };
+        const activeLayers = faces[key] || [];
+        activeLayers.forEach(l => {
+            const bw = l.baseW || 800;
+            const bh = l.baseH || 800;
+            // Tính toán scale vừa vặn 100% trong khổ in mới, giữ nguyên tỉ lệ ảnh gốc
+            const s = Math.min(newSp.width / bw, newSp.height / bh);
+            const nw = bw * s;
+            const nh = bh * s;
+            updateLayer(l.id, {
+                scale: s,
+                x: Math.round(newSp.x + (newSp.width - nw) / 2),
+                y: Math.round(newSp.y + (newSp.height - nh) / 2),
+                rotation: 0
+            });
+        });
+    };
+
     const fitToPrintArea = () => {
         if (!selected) return;
-        const s = Math.min(sp.width / (selected.baseW || 1), sp.height / (selected.baseH || 1));
-        const w = (selected.baseW || 1) * s, h = (selected.baseH || 1) * s;
+        const bw = selected.baseW || 800;
+        const bh = selected.baseH || 800;
+        // Giữ nguyên tỉ lệ ảnh gốc, fit trọn vẹn bên trong khung in
+        const s = Math.min(sp.width / bw, sp.height / bh);
+        const w = bw * s;
+        const h = bh * s;
         updateLayer(selected.id, {
             scale: s,
-            x: sp.x + (sp.width - w) / 2,
-            y: sp.y + (sp.height - h) / 2,
+            x: Math.round(sp.x + (sp.width - w) / 2),
+            y: Math.round(sp.y + (sp.height - h) / 2),
             rotation: 0
         });
     };
     const fillPrintArea = () => {
         if (!selected) return;
-        const s = Math.max(sp.width / (selected.baseW || 1), sp.height / (selected.baseH || 1));
-        const w = (selected.baseW || 1) * s, h = (selected.baseH || 1) * s;
+        const bw = selected.baseW || 800;
+        const bh = selected.baseH || 800;
+        const s = Math.max(sp.width / bw, sp.height / bh);
+        const w = bw * s;
+        const h = bh * s;
         updateLayer(selected.id, {
             scale: s,
-            x: sp.x + (sp.width - w) / 2,
-            y: sp.y + (sp.height - h) / 2,
+            x: Math.round(sp.x + (sp.width - w) / 2),
+            y: Math.round(sp.y + (sp.height - h) / 2),
             rotation: 0
         });
     };
@@ -191,13 +228,16 @@ export function Step2DesignEditor({
 
     let outOfBounds = false;
     if (selected && sp) {
-        const w = (selected.baseW || 100) * selected.scale;
-        const h = (selected.baseH || 100) * selected.scale;
-        outOfBounds = selected.x < sp.x - 2 || selected.y < sp.y - 2 || selected.x + w > sp.x + sp.width + 2 || selected.y + h > sp.y + sp.height + 2;
+        const bw = selected.baseW || 800;
+        const bh = selected.baseH || 800;
+        const w = bw * selected.scale;
+        const h = bh * selected.scale;
+        // Cho phép dung sai 1.5px để không bị lỗi làm tròn số thực
+        outOfBounds = selected.x < sp.x - 1.5 || selected.y < sp.y - 1.5 || (selected.x + w) > (sp.x + sp.width + 1.5) || (selected.y + h) > (sp.y + sp.height + 1.5);
     }
 
-    const selW = selected ? (selected.baseW || 100) * selected.scale : 0;
-    const selH = selected ? (selected.baseH || 100) * selected.scale : 0;
+    const selW = selected ? (selected.baseW || 800) * selected.scale : 0;
+    const selH = selected ? (selected.baseH || 800) * selected.scale : 0;
 
     return (
         <div className="creator">
@@ -266,8 +306,7 @@ export function Step2DesignEditor({
             {/* Stage Canvas */}
             <div className="creator-canvas-wrap">
                 {/* Print Area Presets & Interactive Toolbar */}
-                {!isWrap && (
-                    <div className="flex flex-col gap-2 mb-2 p-2.5 bg-white rounded-xl border border-stone-200 shadow-sm">
+                <div className="flex flex-col gap-2 mb-2 p-2.5 bg-white rounded-xl border border-stone-200 shadow-sm">
                         <div className="flex items-center justify-between gap-2 border-b pb-2">
                             <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
                                 <Scaling size={15} className="text-[#1a6b1a]" />
@@ -288,7 +327,7 @@ export function Step2DesignEditor({
                                             onChange={(e) => {
                                                 const cm = parseFloat(e.target.value) || 0;
                                                 const newY = Math.round(COLLAR_Y_PX + cm * 10);
-                                                updateAreaOverride(activeFace, { y: newY });
+                                                applyAreaOverride(activeFace, { y: newY });
                                             }}
                                         />
                                         <span className="text-stone-600 font-medium">cm</span>
@@ -305,7 +344,7 @@ export function Step2DesignEditor({
                                         value={(sp.width * 0.1).toFixed(1)}
                                         onChange={(e) => {
                                             const cm = parseFloat(e.target.value) || 20;
-                                            updateAreaOverride(activeFace, { width: Math.round(cm * 10) });
+                                            applyAreaOverride(activeFace, { width: Math.round(cm * 10) });
                                         }}
                                     />
                                     <span className="text-stone-500 font-medium">cm</span>
@@ -322,7 +361,7 @@ export function Step2DesignEditor({
                                         value={(sp.height * 0.1).toFixed(1)}
                                         onChange={(e) => {
                                             const cm = parseFloat(e.target.value) || 20;
-                                            updateAreaOverride(activeFace, { height: Math.round(cm * 10) });
+                                            applyAreaOverride(activeFace, { height: Math.round(cm * 10) });
                                         }}
                                     />
                                     <span className="text-stone-500 font-medium">cm</span>
@@ -338,26 +377,74 @@ export function Step2DesignEditor({
                             </div>
                         </div>
 
-                        {/* Quick Presets for Exact Shirt Proportions */}
-                        <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
-                            <div className="flex items-center gap-1">
-                                <span className="text-stone-400 font-medium">Khổ:</span>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 250, height: 330, x: 275, y: 245 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Thân chuẩn (25×33)</button>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 210, height: 300, x: 295, y: 255 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 280, height: 380, x: 260, y: 235 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A3 (28×38)</button>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { width: 120, height: 120, x: 440, y: 270 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Ngực trái (12×12)</button>
+                        {/* Quick Presets tailored for each blank type */}
+                        {isTshirt && (
+                            <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Khổ:</span>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 250, height: 330, x: 275, y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Thân chuẩn (25×33)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 210, height: 300, x: 295, y: 235 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 280, height: 380, x: 260, y: 205 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A3 (28×38)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 100, height: 100, x: 450, y: 240 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Ngực trái (10×10)</button>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Vị trí:</span>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 275, y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 450, y: 240 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Ngực trái</button>
+                                    <button type="button" onClick={() => { resetAreaOverride(activeFace); applyAreaOverride(activeFace, { x: 275, y: 220, width: 250, height: 330 }); }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <span className="text-stone-400 font-medium">Vị trí:</span>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { x: 275, y: 245 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm</button>
-                                <button type="button" onClick={() => updateAreaOverride(activeFace, { x: 440, y: 270 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Ngực trái</button>
-                                <button type="button" onClick={() => resetAreaOverride(activeFace)} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                        )}
 
-                {isWrap && <div className="creator-wrap-hint"><Sliders size={13} /> Bề mặt cuộn — hình thiết kế uốn tròn quanh thân ly khi in.</div>}
+                        {isFrame && (
+                            <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Khổ:</span>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 390, height: 520, x: 205, y: 140 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Lòng tranh (30×40)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 273, height: 390, x: 263, y: 205 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 390, height: 390, x: 205, y: 205 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Vuông (30×30)</button>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Vị trí:</span>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 205, y: 140, width: 390, height: 520 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm tranh</button>
+                                    <button type="button" onClick={() => { resetAreaOverride(activeFace); applyAreaOverride(activeFace, { x: 205, y: 140, width: 390, height: 520 }); }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {isTote && (
+                            <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Khổ:</span>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 300, height: 330, x: 250, y: 320 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Thân túi (30×33)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 210, height: 300, x: 295, y: 335 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 150, height: 150, x: 325, y: 410 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Logo nhỏ (15×15)</button>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Vị trí:</span>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 250, y: 320, width: 300, height: 330 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm túi</button>
+                                    <button type="button" onClick={() => { resetAreaOverride(activeFace); applyAreaOverride(activeFace, { x: 250, y: 320, width: 300, height: 330 }); }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {(isMug || isWrap) && (
+                            <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Khổ:</span>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 440, height: 340, x: 180, y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Toàn thân ly (44×34)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 200, height: 200, x: 300, y: 290 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Logo 1 mặt (20×20)</button>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Vị trí:</span>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 180, y: 220, width: 440, height: 340 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Chính diện ly</button>
+                                    <button type="button" onClick={() => { resetAreaOverride(activeFace); applyAreaOverride(activeFace, { x: 180, y: 220, width: 440, height: 340 }); }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                {isWrap && <div className="creator-wrap-hint"><Sliders size={13} /> Bề mặt cuộn — hình thiết kế sẽ được uốn cong 3D ôm quanh thân ly khi tạo mockup.</div>}
 
                 <div className="creator-stage-shell">
                     <Stage width={CANVAS} height={CANVAS} className="creator-stage"
@@ -369,9 +456,7 @@ export function Step2DesignEditor({
                         }}>
                         <Layer>
                             {/* Product Blank Image background */}
-                            {isWrap
-                                ? <Rect x={offX} y={offY} width={dispW} height={dispH} fill="#ffffff" stroke="#cbd5e1" strokeWidth={1} listening={false} />
-                                : (blankImg && <KImage image={blankImg} x={offX} y={offY} width={dispW} height={dispH} listening={false} />)}
+                            {blankImg && <KImage image={blankImg} x={offX} y={offY} width={dispW} height={dispH} listening={false} />}
 
                             {/* T-Shirt Collar Line & Measurement Ruler Guides */}
                             {isTshirt && showGuides && (
@@ -427,17 +512,20 @@ export function Step2DesignEditor({
                             <Group
                                 x={offX + sp.x * ratio}
                                 y={offY + sp.y * ratio}
-                                draggable={!isWrap}
+                                draggable={true}
                                 onClick={() => { setSelectedId(null); setIsAreaSelected(true); }}
                                 onTap={() => { setSelectedId(null); setIsAreaSelected(true); }}
                                 onDragEnd={(e: any) => {
+                                    if (e.target !== e.currentTarget) return;
                                     const newX = Math.round((e.target.x() - offX) / ratio);
                                     const newY = Math.round((e.target.y() - offY) / ratio);
-                                    updateAreaOverride(activeFace, { x: newX, y: newY });
+                                    applyAreaOverride(activeFace, { x: newX, y: newY });
                                 }}
                             >
                                 <Rect
                                     ref={areaRectRef}
+                                    x={0}
+                                    y={0}
                                     width={sp.width * ratio}
                                     height={sp.height * ratio}
                                     stroke={isAreaSelected ? "#1a6b1a" : "#22c55e"}
@@ -449,11 +537,21 @@ export function Step2DesignEditor({
                                         if (!node) return;
                                         const scaleX = node.scaleX();
                                         const scaleY = node.scaleY();
+                                        const nodeX = node.x();
+                                        const nodeY = node.y();
+
+                                        // Reset toạ độ và scale cục bộ của Konva Node về 0 ngay lập tức
                                         node.scaleX(1);
                                         node.scaleY(1);
+                                        node.x(0);
+                                        node.y(0);
+
                                         const newW = Math.max(50, Math.round((node.width() * scaleX) / ratio));
                                         const newH = Math.max(50, Math.round((node.height() * scaleY) / ratio));
-                                        updateAreaOverride(activeFace, { width: newW, height: newH });
+                                        const newX = Math.round(sp.x + nodeX / ratio);
+                                        const newY = Math.round(sp.y + nodeY / ratio);
+
+                                        applyAreaOverride(activeFace, { x: newX, y: newY, width: newW, height: newH });
                                     }}
                                 />
                                 <Group x={0} y={-22}>

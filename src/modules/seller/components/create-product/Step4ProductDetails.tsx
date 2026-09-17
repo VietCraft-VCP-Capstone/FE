@@ -32,7 +32,7 @@ export function Step4ProductDetails({
                             className="w-full px-[13px] py-[10px] border border-[#d5ddd5] rounded-[9px] text-[13.5px] font-medium text-stone-900 bg-white placeholder:text-stone-400 outline-none focus:border-[#007700] focus:shadow-[0_0_0_3px_rgba(0,119,0,0.1)]"
                             value={title}
                             onChange={e => setTitle(e.target.value)}
-                            placeholder="VD: Áo thun Graphic Mèo Cutie Cotton Premium..."
+                            placeholder={`VD: ${blank?.title ? `${blank.title} Nghệ Thuật` : 'Sản phẩm POD sáng tạo...'}`}
                         />
                     </div>
                     <div>

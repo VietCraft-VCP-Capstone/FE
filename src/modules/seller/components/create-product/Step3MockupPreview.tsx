@@ -8,9 +8,10 @@ interface Step3Props {
     faces: Record<string, any[]>;
     toApiLayer: (layer: any) => any;
     selectedVariants: Record<string, { on: boolean; markup: string; stock: string }>;
+    spaceOf?: (area: any) => { x: number; y: number; width: number; height: number };
 }
 
-export function Step3MockupPreview({ blank, faces, toApiLayer, selectedVariants }: Step3Props) {
+export function Step3MockupPreview({ blank, faces, toApiLayer, selectedVariants, spaceOf }: Step3Props) {
     if (!blank) return null;
     const printAreas = blank.print_areas || [];
     const variations = blank.variations || [];
@@ -20,7 +21,11 @@ export function Step3MockupPreview({ blank, faces, toApiLayer, selectedVariants 
     const [err, setErr] = useState('');
 
     useEffect(() => {
-        const placements = areas.map((a: any) => ({ print_area_key: a.key, layers: (faces[a.key] || []).map(toApiLayer) }));
+        const placements = areas.map((a: any) => ({
+            print_area_key: a.key,
+            area: spaceOf ? spaceOf(a) : a,
+            layers: (faces[a.key] || []).map(toApiLayer)
+        }));
         setImages(null); setErr('');
         productsService.previewMockup(blank._id, placements)
             .then((imgs) => setImages(imgs && imgs.length ? imgs : [blank.default_image]))
