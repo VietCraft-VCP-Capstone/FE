@@ -2,6 +2,7 @@ import api from '../../../infrastructure/api/interceptors';
 
 export interface ShopDetail {
   id: string;
+  _id?: string;
   name: string;
   shopName: string;
   slug: string;
@@ -29,6 +30,11 @@ export const shopService = {
 
   unfollow: async (shopId: string) => {
     const res = await api.delete(`/shops/${shopId}/follow`);
+    return res.data;
+  },
+
+  getFollowedShops: async (): Promise<ShopDetail[]> => {
+    const res = await api.get('/shops/following/me');
     return res.data;
   }
 };

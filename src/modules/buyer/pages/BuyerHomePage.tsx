@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { Heart, Star, ArrowRight, CheckCircle2, Info } from 'lucide-react';
+import { Heart, Star, ArrowRight } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { promotionService } from '../../promotion/services/promotionService';
 import { userService } from '../../user/services/userService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { useToast } from '../../../shared/components/Toast';
 import '../../../shared/components/layouts.css';
 
 export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const outletContext = useOutletContext<any>() || {};
   const search = outletContext.search || '';
 
@@ -18,7 +20,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
   const [activeTab, setActiveTab] = useState<'quan-tam' | 'gan-day' | 'theo-doi' | 'khuyen-mai' | 'Thinh-hanh'>('gan-day');
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -64,11 +65,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     });
   }, []);
 
-  const triggerToast = (message: string, type: 'success' | 'info' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
   const toggleFavorite = async (productId: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isLoggedIn()) {
@@ -79,16 +75,16 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       let updated: string[];
       if (favoritedProductIds.includes(productId)) {
         updated = await userService.removeFromWishlist(productId);
-        triggerToast(`Đã xóa "${title}" khỏi danh sách yêu thích`, 'info');
+        showToast(`Đã xóa "${title}" khỏi danh sách yêu thích`, 'info');
       } else {
         updated = await userService.addToWishlist(productId);
-        triggerToast(`Đã thêm "${title}" vào danh sách yêu thích`, 'success');
+        showToast(`Đã thêm "${title}" vào danh sách yêu thích`, 'success');
       }
       setFavoritedProductIds(updated);
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch (err) {
       console.error('toggleFavorite failed', err);
-      triggerToast('Không thể cập nhật yêu thích, vui lòng thử lại.', 'info');
+      showToast('Không thể cập nhật yêu thích, vui lòng thử lại.', 'info');
     }
   };
 
@@ -97,10 +93,10 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     let updated: string[];
     if (savedVouchers.includes(voucherCode)) {
       updated = savedVouchers.filter(code => code !== voucherCode);
-      triggerToast(`Đã hủy lưu mã ${voucherCode}`, 'info');
+      showToast(`Đã hủy lưu mã ${voucherCode}`, 'info');
     } else {
       updated = [...savedVouchers, voucherCode];
-      triggerToast(`Lưu mã ưu đãi ${voucherCode} thành công!`, 'success');
+      showToast(`Lưu mã ưu đãi ${voucherCode} thành công!`, 'success');
     }
     setSavedVouchers(updated);
     localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
@@ -212,31 +208,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
 
   return (
     <div className="buyer-wrapper" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      {/* Toast Notification */}
-      {toast && (
-        <div style={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          backgroundColor: '#fff',
-          borderLeft: '4px solid #008000',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-          borderRadius: 8,
-          padding: '16px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          zIndex: 9999,
-          animation: 'slideUp 0.3s ease-out'
-        }}>
-          {toast.type === 'success'
-            ? <CheckCircle2 size={20} color="#008000" strokeWidth={2.5} />
-            : <Info size={20} color="#6366f1" strokeWidth={2.5} />
-          }
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#330033' }}>{toast.message}</span>
-        </div>
-      )}
-
       {/* Intro Banner */}
       <div className="buyer-intro-banner" style={{ background: 'transparent', textAlign: 'center', padding: '24px 0 12px' }}>
         <h1 style={{ fontSize: 32, fontWeight: 900, color: '#330033' }}>{name ? `Chào mừng trở lại, ${name}!` : 'Khám phá sản phẩm thủ công Việt'}</h1>

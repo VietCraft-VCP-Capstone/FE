@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Star, Store, ArrowLeft, PackageSearch, Heart } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { shopService } from '../../product/services/shopService';
-import { isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { isLoggedIn, getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { useToast } from '../../../shared/components/Toast';
 
 interface ShopHeader {
   id?: string;
@@ -18,11 +19,13 @@ interface ShopHeader {
 export function BuyerShopPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [products, setProducts] = useState<any[]>([]);
   const [shop, setShop] = useState<ShopHeader | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isSubmittingFollow, setIsSubmittingFollow] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -61,23 +64,30 @@ export function BuyerShopPage() {
   }, [id]);
 
   const handleToggleFollow = async () => {
-    if (!id) return;
+    if (!id || isSubmittingFollow) return;
     if (!isLoggedIn()) {
       navigate('/login');
       return;
     }
     try {
+      setIsSubmittingFollow(true);
       if (isFollowing) {
         await shopService.unfollow(id);
         setIsFollowing(false);
         setFollowersCount(c => Math.max(0, c - 1));
+        showToast('Đã hủy theo dõi gian hàng.', 'info');
       } else {
         await shopService.follow(id);
         setIsFollowing(true);
         setFollowersCount(c => c + 1);
+        showToast('Đã theo dõi gian hàng thành công!', 'success');
       }
-    } catch (err) {
+      window.dispatchEvent(new CustomEvent('shop-follow-updated'));
+    } catch (err: any) {
       console.error('Toggle follow failed', err);
+      showToast(getApiErrorMessage(err, 'Không thể thực hiện thao tác theo dõi.'), 'error');
+    } finally {
+      setIsSubmittingFollow(false);
     }
   };
 
@@ -119,15 +129,16 @@ export function BuyerShopPage() {
 
         <div>
           <button
+            disabled={isSubmittingFollow}
             onClick={handleToggleFollow}
-            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-colors ${
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
               isFollowing
                 ? 'border border-stone-300 bg-stone-50 text-stone-700 hover:bg-stone-100'
                 : 'border border-transparent bg-[#008000] text-white hover:bg-emerald-700 shadow-sm'
             }`}
           >
             <Heart className={`h-3.5 w-3.5 ${isFollowing ? 'fill-rose-500 text-rose-500' : ''}`} />
-            {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
+            {isSubmittingFollow ? 'Đang xử lý...' : isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
           </button>
         </div>
       </header>

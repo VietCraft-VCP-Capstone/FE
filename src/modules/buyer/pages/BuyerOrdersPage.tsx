@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
 import { useNavigate } from 'react-router-dom';
-import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck, Check } from 'lucide-react';
+import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
+import { useToast } from '../../../shared/components/Toast';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
 
@@ -30,19 +31,14 @@ interface Order {
 
 export function BuyerOrdersPage() {
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled'>('all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [reorderOrder, setReorderOrder] = useState<Order | null>(null);
     const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
     const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
-
-    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-        setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
-    };
 
     const handleOpenReview = (order: Order) => {
         setReviewOrder(order);
@@ -289,16 +285,6 @@ export function BuyerOrdersPage() {
                     order={reviewOrder}
                     onSuccess={handleReviewSuccess}
                 />
-            )}
-
-            {/* Toast Notification */}
-            {toast && (
-                <div className={`fixed top-5 right-5 z-[9999] bg-white border border-gray-100 shadow-2xl rounded-2xl p-4 flex items-center gap-3 max-w-sm border-l-4 ${toast.type === 'success' ? 'border-l-emerald-500' : 'border-l-red-500'} transition-all duration-300`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
-                        {toast.type === 'success' ? <Check size={18} /> : <span>⚠️</span>}
-                    </div>
-                    <p className="text-xs font-extrabold text-gray-900">{toast.message}</p>
-                </div>
             )}
         </div>
     );

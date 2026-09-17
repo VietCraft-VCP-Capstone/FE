@@ -5,11 +5,15 @@ import { productsService } from '../../product/services/productsService';
 import { userService } from '../../user/services/userService';
 import { cartService } from '../../order/services/cartService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { useToast } from '../../../shared/components/Toast';
 
 export function BuyerFavoritesPage() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [favorites, setFavorites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addingCartId, setAddingCartId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFavorites();
@@ -59,21 +63,31 @@ export function BuyerFavoritesPage() {
       navigate('/login');
       return;
     }
+    if (removingId === id) return;
     try {
+      setRemovingId(id);
       await userService.removeFromWishlist(id);
       setFavorites(prev => prev.filter(item => item._id !== id && item.id !== id));
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
+      showToast('Đã xóa khỏi danh sách yêu thích.', 'info');
     } catch (err) {
-      alert(getApiErrorMessage(err, 'Không thể bỏ yêu thích sản phẩm này.'));
+      showToast(getApiErrorMessage(err, 'Không thể bỏ yêu thích sản phẩm này.'), 'error');
+    } finally {
+      setRemovingId(null);
     }
   };
 
   const handleAddToCart = async (product: any) => {
+    const prodId = product._id || product.id;
+    if (addingCartId === prodId) return; // Prevent spam clicks
     try {
-      await cartService.addToCart({ productId: product._id || product.id, quantity: 1 });
-      alert('Đã thêm sản phẩm vào giỏ hàng!');
+      setAddingCartId(prodId);
+      await cartService.addToCart({ productId: prodId, quantity: 1 });
+      showToast(`Đã thêm "${product.title || product.name || 'sản phẩm'}" vào giỏ hàng!`, 'success');
     } catch (err) {
-      alert(getApiErrorMessage(err, 'Không thể thêm sản phẩm vào giỏ hàng.'));
+      showToast(getApiErrorMessage(err, 'Không thể thêm sản phẩm vào giỏ hàng.'), 'error');
+    } finally {
+      setAddingCartId(null);
     }
   };
 
@@ -112,8 +126,23 @@ export function BuyerFavoritesPage() {
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex items-center gap-2.5 my-4">
+          <button
+            className="px-5 py-2 rounded-full text-xs sm:text-sm font-bold bg-[#007700] text-white shadow-sm cursor-default"
+          >
+            Sản phẩm yêu thích ({favorites.length})
+          </button>
+          <button
+            onClick={() => navigate('/followed-shops')}
+            className="px-5 py-2 rounded-full text-xs sm:text-sm font-bold bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors cursor-pointer"
+          >
+            Gian hàng đang theo dõi
+          </button>
+        </div>
+
         {/* Đường kẻ ngang ngăn cách mỏng */}
-        <hr className="border-t border-gray-200 my-6" />
+        <hr className="border-t border-gray-200 my-4" />
 
         {/* 5-Column Grid */}
         {loading ? (
@@ -147,8 +176,10 @@ export function BuyerFavoritesPage() {
                     />
                     {/* Heart Badge Button */}
                     <button
+                      disabled={removingId === prodId}
                       onClick={() => handleRemoveFavorite(prodId)}
-                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10"
+                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10 disabled:opacity-50"
+                      title="Bỏ yêu thích"
                     >
                       <Heart className="fill-[#15803d] text-[#15803d] w-4 h-4" />
                     </button>
@@ -171,10 +202,11 @@ export function BuyerFavoritesPage() {
 
                     {/* Pill Border Button */}
                     <button
+                      disabled={addingCartId === prodId}
                       onClick={() => handleAddToCart(product)}
-                      className="w-full mt-3 py-2 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold"
+                      className="w-full mt-3 py-2 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      Thêm vào giỏ
+                      {addingCartId === prodId ? 'Đang thêm...' : 'Thêm vào giỏ'}
                     </button>
                   </div>
                 </div>

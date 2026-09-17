@@ -13,7 +13,7 @@ import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { EditProfileModal } from '../components/profile/EditProfileModal';
 import { AddressFormModal } from '../components/profile/AddressFormModal';
 import { ConfirmDeleteModal } from '../components/profile/ConfirmDeleteModal';
-import { ToastNotification } from '../components/profile/ToastNotification';
+import { useToast } from '../../../shared/components/Toast';
 const getFullAddressText = (addr: Address) => {
     return addr.address_detail;
 };
@@ -24,19 +24,11 @@ interface BuyerProfilePageProps {
 
 export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [lastOrder, setLastOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-        setToast({ message, type });
-        setTimeout(() => {
-            setToast(null);
-        }, 3000);
-    };
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -309,7 +301,10 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                 <span className="text-[10px] text-gray-500 font-bold">Bộ sưu tập</span>
                             </div>
                         </div>
-                        <button className="w-full flex items-center justify-between px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors mt-2">
+                        <button 
+                            onClick={() => navigate('/followed-shops')}
+                            className="w-full flex items-center justify-between px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors mt-2 cursor-pointer"
+                        >
                             <span className="flex items-center gap-2">
                                 <Eye size={14} className="text-gray-400" />
                                 <span>{profile.stats?.followingCount ?? 0} Đang theo dõi</span>
@@ -321,6 +316,18 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                     {/* Menu links */}
                     <div className="bg-white rounded-[20px] border border-gray-200 shadow-sm overflow-hidden">
                         <ul className="divide-y divide-gray-150">
+                            <li>
+                                <button 
+                                    onClick={() => navigate('/followed-shops')} 
+                                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 text-sm font-semibold text-gray-700 transition-colors cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Store size={18} className="text-gray-400" />
+                                        <span>Gian hàng đang theo dõi</span>
+                                    </div>
+                                    <ChevronRight size={16} className="text-gray-400" />
+                                </button>
+                            </li>
                             <li>
                                 <button 
                                     onClick={() => setActiveTab(activeTab === 'addresses' ? 'overview' : 'addresses')} 
@@ -701,14 +708,6 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                     }
                 }}
             />
-
-            {/* Toast Notification */}
-            {toast && (
-                <ToastNotification
-                    message={toast.message}
-                    type={toast.type}
-                />
-            )}
         </div>
     );
 }

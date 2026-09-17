@@ -31,6 +31,7 @@ const NAV_ITEMS = [
   { to: '/seller/golden-hour', icon: Flame, label: 'Danh mục & giờ vàng' },
   { to: '/seller/price-optimize', icon: Tag, label: 'Tối ưu giá bán' },
   { to: '/seller/market-share', icon: PieChart, label: 'Thị phần & đối thủ' },
+  { to: '/seller/competitors', icon: Store, label: 'Đối thủ theo dõi' },
   { to: '/seller/onboarding', icon: Rocket, label: 'Thiết lập gian hàng' },
 ];
 

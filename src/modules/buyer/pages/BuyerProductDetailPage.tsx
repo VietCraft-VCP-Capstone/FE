@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Star, ShoppingCart, Zap,
-  ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store
+  ChevronDown, ChevronUp, Truck, Shield, Store, CheckCircle2
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { reviewService } from '../../product/services/reviewService';
 import { userService } from '../../user/services/userService';
 import { cartService } from '../../order/services/cartService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { useToast } from '../../../shared/components/Toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Variant { id: string; name: string; color?: string; size?: string; material?: string; price: number; stock: number; mockupImage?: string; }
@@ -19,23 +20,7 @@ interface Product {
   shopInfo?: { id: string; name: string; logo?: string; rating: number };
 }
 
-// ─── Mock reviews (fallback khi API loading hoặc sản phẩm chưa có review) ──────
-const MOCK_REVIEWS = [
-  { id: '1', name: 'Trần Ngọc M.', date: '13/04/2024', rating: 5, avatar: 'https://randomuser.me/api/portraits/women/68.jpg', text: 'Áo rất đẹp, đúng màu, chất vải cotton chuẩn 100%. Đường may tỉ mỉ, không bị xổ. Sẽ ủng hộ shop dài dài!', images: [] },
-  { id: '2', name: 'Nguyễn Văn T.', date: '10/04/2024', rating: 5, avatar: 'https://randomuser.me/api/portraits/men/45.jpg', text: 'Giao hàng nhanh, đóng gói cẩn thận. Sản phẩm đúng mô tả, mặc vừa size M. Chất lượng tốt cho mức giá này.', images: [] },
-  { id: '3', name: 'Lê Thanh D.', date: '08/03/2024', rating: 4, avatar: 'https://randomuser.me/api/portraits/women/32.jpg', text: 'Giao nhanh 2 ngày, chất lượng ổn. Màu sắc đẹp như hình, size đúng. Tuy nhiên giặt lần đầu hơi phai màu một chút.', images: ['https://images.unsplash.com/photo-1556821840-3a63f15732ce?auto=format&fit=crop&w=80', 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=80'] },
-];
-
-const AVG_RATING = 4.8;
-const REVIEW_COUNT = 62;
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100';
-const DEFAULT_RATING_BREAKDOWN: Record<string, { count: number; pct: string }> = {
-  '5': { count: 52, pct: '85%' },
-  '4': { count: 6, pct: '10%' },
-  '3': { count: 2, pct: '3%' },
-  '2': { count: 1, pct: '2%' },
-  '1': { count: 0, pct: '0%' }
-};
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function fmtPrice(n: number) { return n.toLocaleString('vi-VN') + 'đ'; }
@@ -44,7 +29,7 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   return (
     <span style={{ display: 'inline-flex', gap: 2 }}>
       {[1, 2, 3, 4, 5].map(s => (
-        <Star key={s} size={size} style={{ fill: s <= rating ? '#f59e0b' : '#e5e7eb', color: s <= rating ? '#f59e0b' : '#e5e7eb' }} />
+        <Star key={s} size={size} style={{ fill: s <= rating && rating > 0 ? '#f59e0b' : '#e5e7eb', color: s <= rating && rating > 0 ? '#f59e0b' : '#e5e7eb' }} />
       ))}
     </span>
   );
@@ -54,6 +39,7 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
 export function BuyerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -61,11 +47,11 @@ export function BuyerProductDetailPage() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [reviews, setReviews] = useState<any[]>(MOCK_REVIEWS);
-  const [avgRating, setAvgRating] = useState<number>(AVG_RATING);
-  const [reviewCount, setReviewCount] = useState<number>(REVIEW_COUNT);
-  const [starBreakdown, setStarBreakdown] = useState<Record<string, { count: number; pct: string }>>(DEFAULT_RATING_BREAKDOWN);
-  const [isLoadingReviews, setIsLoadingReviews] = useState<boolean>(false);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [avgRating, setAvgRating] = useState<number>(0);
+  const [reviewCount, setReviewCount] = useState<number>(0);
+  const [starBreakdown, setStarBreakdown] = useState<Record<string, { count: number; pct: string }> | null>(null);
+  const [isLoadingReviews, setIsLoadingReviews] = useState<boolean>(true);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
@@ -77,12 +63,6 @@ export function BuyerProductDetailPage() {
   const [descOpen, setDescOpen] = useState(true);
   const [shippingOpen, setShippingOpen] = useState(false);
   const [isFav, setIsFav] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
-
-  const triggerToast = useCallback((msg: string, type: 'success' | 'info' = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  }, []);
 
   // ── Load product ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -112,50 +92,49 @@ export function BuyerProductDetailPage() {
       }
     }).catch(() => {}).finally(() => setLoading(false));
 
-    // Load reviews từ backend MongoDB (fallback MOCK_REVIEWS nếu chưa có đánh giá hoặc lỗi)
+    // Load reviews từ backend MongoDB
     setIsLoadingReviews(true);
     reviewService.getProductReviews(id)
       .then(res => {
-        if (res?.items && res.items.length > 0) {
-          setReviews(res.items);
-        } else {
-          setReviews(MOCK_REVIEWS);
-        }
+        const items = res?.items || [];
+        setReviews(items);
 
         if (res?.summary) {
           const count = typeof res.summary.totalReviews === 'number' 
             ? res.summary.totalReviews 
-            : (res.summary.reviewCount ?? 0);
+            : (res.summary.reviewCount ?? items.length);
           const avg = typeof res.summary.averageRating === 'number' 
             ? res.summary.averageRating 
             : ((res.summary as any).avgRating ?? 0);
 
-          if (count > 0 && typeof avg === 'number') {
-            setAvgRating(avg);
-            setReviewCount(count);
-            if (res.summary.breakdown && res.summary.percentages) {
-              const newBd: Record<string, { count: number; pct: string }> = {};
-              for (let s = 1; s <= 5; s++) {
-                const strS = String(s);
-                newBd[strS] = {
-                  count: res.summary.breakdown[strS] || 0,
-                  pct: res.summary.percentages[strS] || '0%'
-                };
-              }
-              setStarBreakdown(newBd);
+          setAvgRating(avg);
+          setReviewCount(count);
+
+          if (res.summary.breakdown && res.summary.percentages) {
+            const newBd: Record<string, { count: number; pct: string }> = {};
+            for (let s = 1; s <= 5; s++) {
+              const strS = String(s);
+              newBd[strS] = {
+                count: res.summary.breakdown[strS] || 0,
+                pct: res.summary.percentages[strS] || '0%'
+              };
             }
+            setStarBreakdown(newBd);
           } else {
-            setAvgRating(AVG_RATING);
-            setReviewCount(REVIEW_COUNT);
-            setStarBreakdown(DEFAULT_RATING_BREAKDOWN);
+            setStarBreakdown(null);
           }
+        } else {
+          setReviewCount(items.length);
+          setAvgRating(0);
+          setStarBreakdown(null);
         }
       })
-      .catch(() => {
-        setReviews(MOCK_REVIEWS);
-        setAvgRating(AVG_RATING);
-        setReviewCount(REVIEW_COUNT);
-        setStarBreakdown(DEFAULT_RATING_BREAKDOWN);
+      .catch((err) => {
+        console.error("Lỗi tải reviews:", err);
+        setReviews([]);
+        setReviewCount(0);
+        setAvgRating(0);
+        setStarBreakdown(null);
       })
       .finally(() => {
         setIsLoadingReviews(false);
@@ -211,11 +190,11 @@ export function BuyerProductDetailPage() {
         quantity: qty,
         customNotes: customText || undefined
       });
-      triggerToast(`Đã thêm "${product.title}" vào giỏ hàng!`, 'success');
+      showToast(`Đã thêm "${product.title}" vào giỏ hàng!`, 'success');
       return true;
     } catch (err) {
       // BE nay từ chối sản phẩm ngừng bán / vượt tồn kho kèm lý do cụ thể.
-      triggerToast(getApiErrorMessage(err, 'Không thể thêm vào giỏ, vui lòng thử lại.'), 'info');
+      showToast(getApiErrorMessage(err, 'Không thể thêm vào giỏ, vui lòng thử lại.'), 'info');
       return false;
     }
   };
@@ -243,10 +222,10 @@ export function BuyerProductDetailPage() {
       let updated: string[];
       if (isFav) {
         updated = await userService.removeFromWishlist(product.id);
-        triggerToast(`Đã xóa khỏi yêu thích`, 'info');
+        showToast(`Đã xóa khỏi yêu thích`, 'info');
       } else {
         updated = await userService.addToWishlist(product.id);
-        triggerToast(`Đã thêm vào yêu thích!`, 'success');
+        showToast(`Đã thêm vào yêu thích!`, 'success');
       }
       setIsFav(updated.includes(product.id));
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
@@ -323,14 +302,6 @@ export function BuyerProductDetailPage() {
 
   return (
     <div style={S.page}>
-      {/* Toast */}
-      {toast && (
-        <div style={{ position: 'fixed', bottom: 24, right: 24, backgroundColor: '#fff', borderLeft: `4px solid ${toast.type === 'success' ? '#008000' : '#6366f1'}`, boxShadow: '0 10px 25px rgba(0,0,0,0.12)', borderRadius: 10, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10, zIndex: 9999 }}>
-          {toast.type === 'success' ? <CheckCircle2 size={18} color="#008000" /> : <Info size={18} color="#6366f1" />}
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#330033' }}>{toast.msg}</span>
-        </div>
-      )}
-
       <div style={S.container}>
         {/* Back */}
         <button style={S.backBtn} onClick={() => navigate(-1)}>
@@ -503,19 +474,18 @@ export function BuyerProductDetailPage() {
         <section style={S.reviewSection}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <h2 style={{ ...S.sectionTitle, marginBottom: 0 }}>Đánh giá sản phẩm</h2>
-            {isLoadingReviews && (
-              <span style={{ fontSize: 12, color: '#888', fontStyle: 'italic' }}>Đang đồng bộ đánh giá...</span>
-            )}
           </div>
           <div style={S.reviewSummary}>
             <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
-              <div style={S.ratingBig}>{avgRating.toFixed(1)}</div>
+              <div style={S.ratingBig}>{reviewCount > 0 ? avgRating.toFixed(1) : '0.0'}</div>
               <StarRow rating={Math.round(avgRating)} size={18} />
-              <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{reviewCount} đánh giá</div>
+              <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>
+                {reviewCount > 0 ? `${reviewCount} đánh giá` : 'Chưa có đánh giá'}
+              </div>
             </div>
             <div style={{ flex: 1, paddingLeft: 16 }}>
               {[5, 4, 3, 2, 1].map(star => {
-                const pctStr = starBreakdown[String(star)]?.pct || '0%';
+                const pctStr = starBreakdown?.[String(star)]?.pct || '0%';
                 return (
                   <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                     <StarRow rating={star} size={12} />
@@ -529,37 +499,49 @@ export function BuyerProductDetailPage() {
             </div>
           </div>
 
-          <div style={{ opacity: isLoadingReviews ? 0.7 : 1, transition: 'opacity 0.2s' }}>
-          {reviews.map((rv, idx) => {
-            const authorName = rv.name || rv.buyer?.name || 'Khách hàng ẩn danh';
-            const authorAvatar = rv.avatar || rv.buyer?.avatar || DEFAULT_AVATAR;
-            const reviewDate = rv.date || (rv.createdAt ? new Date(rv.createdAt).toLocaleDateString('vi-VN') : '');
-            const reviewText = rv.text || rv.comment || '';
-            const reviewImages = Array.isArray(rv.images) ? rv.images : [];
-            const ratingVal = typeof rv.rating === 'number' ? rv.rating : 5;
+          {isLoadingReviews ? (
+            <div style={{ padding: '36px 0', textAlign: 'center' }}>
+              <div style={{ display: 'inline-block', width: 28, height: 28, border: '3px solid #e5e7eb', borderTopColor: '#008000', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: 8 }} />
+              <p style={{ fontSize: 13, color: '#888', margin: 0 }}>Đang tải đánh giá sản phẩm...</p>
+            </div>
+          ) : reviews.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', background: '#fafafa', borderRadius: 12, border: '1px dashed #e2e8f0', marginTop: 16 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>Sản phẩm này chưa có đánh giá nào.</p>
+              <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>Hãy là người đầu tiên mua hàng và để lại nhận xét nhé!</p>
+            </div>
+          ) : (
+            <div style={{ marginTop: 8 }}>
+              {reviews.map((rv, idx) => {
+                const authorName = rv.name || rv.buyer?.name || 'Khách hàng ẩn danh';
+                const authorAvatar = rv.avatar || rv.buyer?.avatar || DEFAULT_AVATAR;
+                const reviewDate = rv.date || (rv.createdAt ? new Date(rv.createdAt).toLocaleDateString('vi-VN') : '');
+                const reviewText = rv.text || rv.comment || '';
+                const reviewImages = Array.isArray(rv.images) ? rv.images : [];
+                const ratingVal = typeof rv.rating === 'number' ? rv.rating : 5;
 
-            return (
-              <div key={rv.id || rv._id || idx} style={S.reviewCard}>
-                <img src={authorAvatar} alt={authorName} style={S.avatar} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{authorName}</span>
-                    <StarRow rating={ratingVal} size={12} />
-                    <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 'auto' }}>{reviewDate}</span>
-                  </div>
-                  <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{reviewText}</p>
-                  {reviewImages.length > 0 && (
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {reviewImages.map((img: string, i: number) => (
-                        <img key={i} src={img} alt={`review-img-${i}`} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
-                      ))}
+                return (
+                  <div key={rv.id || rv._id || idx} style={S.reviewCard}>
+                    <img src={authorAvatar} alt={authorName} style={S.avatar} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{authorName}</span>
+                        <StarRow rating={ratingVal} size={12} />
+                        <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 'auto' }}>{reviewDate}</span>
+                      </div>
+                      <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{reviewText}</p>
+                      {reviewImages.length > 0 && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {reviewImages.map((img: string, i: number) => (
+                            <img key={i} src={img} alt={`review-img-${i}`} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* ── Related products ──────────────────────────────────────────────── */}
