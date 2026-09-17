@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Star, ShoppingCart, Zap,
-  ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store
+  ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store, MessageCircle
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
@@ -42,15 +42,20 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
+// Cache sản phẩm chi tiết trong RAM để khi chuyển qua lại hiển thị tức thì
+const productDetailCache = new Map<string, any>();
+const relatedDetailCache = new Map<string, any[]>();
+const suggestionsDetailCache = new Map<string, any[]>();
+
 export function BuyerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [related, setRelated] = useState<any[]>([]);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState<Product | null>(() => (id ? productDetailCache.get(id) || null : null));
+  const [related, setRelated] = useState<any[]>(() => (id ? relatedDetailCache.get(id) || [] : []));
+  const [suggestions, setSuggestions] = useState<any[]>(() => (id ? suggestionsDetailCache.get(id) || [] : []));
+  const [loading, setLoading] = useState(() => (id ? !productDetailCache.has(id) : true));
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
@@ -72,30 +77,66 @@ export function BuyerProductDetailPage() {
   // ── Load product ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    setSelectedImage(0);
 
-    Promise.all([
-      productsService.getById(id),
-      productsService.getRelated(id).catch(() => []),
-      productsService.getAll().catch(() => []),
-    ]).then(([prod, rel, all]) => {
-      setProduct(prod);
-      setRelated(rel.slice(0, 4));
-      const relIds = new Set(rel.map((r: any) => r.id));
-      const allList = Array.isArray(all) ? all : ((all as any)?.items || []);
-      const pool = allList.filter((p: any) => p.id !== id && !relIds.has(p.id));
-      setSuggestions(pool.slice(0, 4));
-
-      // pre-select first variant values
-      if (prod.variants?.length) {
-        const v0 = prod.variants[0];
+    if (productDetailCache.has(id)) {
+      const cached = productDetailCache.get(id);
+      setProduct(cached);
+      setRelated(relatedDetailCache.get(id) || []);
+      setSuggestions(suggestionsDetailCache.get(id) || []);
+      setLoading(false);
+      if (cached.variants?.length) {
+        const v0 = cached.variants[0];
         setSelectedVariant(v0);
         if (v0.size) setSelectedSize(v0.size);
         if (v0.color) setSelectedColor(v0.color);
         if (v0.material) setSelectedMaterial(v0.material);
       }
-    }).catch(() => {}).finally(() => setLoading(false));
+    } else {
+      setLoading(true);
+    }
+    setSelectedImage(0);
+
+    // 1. Fetch main product details first for instantaneous rendering
+    productsService.getById(id)
+      .then((prod) => {
+        productDetailCache.set(id, prod);
+        setProduct(prod);
+
+        // pre-select first variant values
+        if (prod.variants?.length) {
+          const v0 = prod.variants[0];
+          setSelectedVariant(v0);
+          if (v0.size) setSelectedSize(v0.size);
+          if (v0.color) setSelectedColor(v0.color);
+          if (v0.material) setSelectedMaterial(v0.material);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load product:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
+    // 2. Fetch related & suggestions non-blockingly in background with small limit
+    productsService.getRelated(id)
+      .catch(() => [])
+      .then((rel: any[]) => {
+        const relSlice = (Array.isArray(rel) ? rel : []).slice(0, 4);
+        relatedDetailCache.set(id, relSlice);
+        setRelated(relSlice);
+        const relIds = new Set(relSlice.map((r: any) => r.id));
+
+        return productsService.getAll({ limit: 8 } as any)
+          .catch(() => [])
+          .then((all: any) => {
+            const allList = Array.isArray(all) ? all : (all?.items || []);
+            const pool = allList.filter((p: any) => p.id !== id && !relIds.has(p.id));
+            const sugg = pool.slice(0, 4);
+            suggestionsDetailCache.set(id, sugg);
+            setSuggestions(sugg);
+          });
+      });
 
     // check favorites from backend — /users/wishlist cần token.
     // Khách vãng lai bỏ qua hẳn: interceptor 401 sẽ đá về /login, mà trang chi tiết
@@ -167,6 +208,25 @@ export function BuyerProductDetailPage() {
     if (ok) navigate('/cart');
   };
 
+  const handleChatWithSeller = () => {
+    if (!isLoggedIn()) {
+      navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+    const currentImg = (product?.images && product.images[selectedImage]) || (product?.variants && selectedVariant?.mockupImage) || '';
+    window.dispatchEvent(new CustomEvent('vietcraft-open-chat', {
+      detail: {
+        shopId: product?.shopInfo?.id,
+        productWidget: {
+          product_id: product?.id,
+          title: product?.title,
+          price: displayPrice,
+          image: currentImg
+        }
+      }
+    }));
+  };
+
   // ── Toggle favorite ──────────────────────────────────────────────────────────
   const toggleFav = async () => {
     if (!product) return;
@@ -209,7 +269,8 @@ export function BuyerProductDetailPage() {
     optionGroup: { display: 'flex', gap: 8, flexWrap: 'wrap' as const },
     optionBtn: (active: boolean) => ({ padding: '6px 16px', border: active ? '2px solid #008000' : '2px solid #ddd', borderRadius: 8, background: active ? '#e6f7e6' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', color: active ? '#005500' : '#333', transition: 'all 0.15s' } as React.CSSProperties),
     colorDot: (c: string, active: boolean) => ({ width: 28, height: 28, borderRadius: '50%', background: c, border: active ? '3px solid #008000' : '3px solid transparent', outline: '1px solid #ccc', cursor: 'pointer', transition: 'all 0.15s' } as React.CSSProperties),
-    actionBar: { display: 'flex', gap: 12, marginTop: 24 } as React.CSSProperties,
+    actionBar: { display: 'flex', gap: 10, marginTop: 24 } as React.CSSProperties,
+    btnChat: { padding: '13px 18px', border: '2px solid #008000', borderRadius: 10, background: '#f0fdf4', color: '#008000', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s', whiteSpace: 'nowrap' as const } as React.CSSProperties,
     btnOutline: { flex: 1, padding: '13px 0', border: '2px solid #008000', borderRadius: 10, background: '#fff', color: '#008000', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
     btnFill: { flex: 1, padding: '13px 0', border: 'none', borderRadius: 10, background: '#008000', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
     accordion: { border: '1px solid #eee', borderRadius: 10, marginTop: 12 } as React.CSSProperties,
@@ -288,13 +349,34 @@ export function BuyerProductDetailPage() {
           <div>
             {/* Shop badge */}
             {product.shopInfo && (
-              <div style={S.shopRow}>
-                <Store size={14} color="#008000" />
-                <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
-                  <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                  <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || '4.8'}</span>
+              <div style={{ ...S.shopRow, justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Store size={14} color="#008000" />
+                  <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                    <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
+                    <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || '4.8'}</span>
+                  </div>
                 </div>
+                <button
+                  onClick={handleChatWithSeller}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '4px 10px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#008000',
+                    backgroundColor: '#e6f4ea',
+                    border: '1px solid #c6e9c6',
+                    borderRadius: 6,
+                    cursor: 'pointer'
+                  }}
+                  title="Chat ngay với gian hàng"
+                >
+                  <MessageCircle size={13} /> Chat shop
+                </button>
               </div>
             )}
 
@@ -388,6 +470,9 @@ export function BuyerProductDetailPage() {
 
             {/* Action Buttons */}
             <div style={S.actionBar}>
+              <button style={S.btnChat} onClick={handleChatWithSeller} title="Chat với người bán">
+                <MessageCircle size={18} /> Chat ngay
+              </button>
               <button style={S.btnOutline} onClick={addToCart}>
                 <ShoppingCart size={18} /> Thêm vào giỏ
               </button>

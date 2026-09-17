@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart, ArrowLeft } from 'lucide-react';
+import { Heart, ArrowLeft, ShoppingBag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
@@ -32,8 +32,8 @@ const resolveProductImage = (product: any): string => {
 
 export function BuyerFavoritesPage() {
   const navigate = useNavigate();
-  const [favorites, setFavorites] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [favorites, setFavorites] = useState<any[]>(() => getCachedFavorites());
+  const [loading, setLoading] = useState(() => getCachedFavorites().length === 0);
 
   useEffect(() => {
     fetchFavorites();
@@ -51,7 +51,7 @@ export function BuyerFavoritesPage() {
       const items = Array.isArray(res?.product_ids) ? res.product_ids : [];
       setFavorites(items);
     } catch (err) {
-      console.error(err);
+      console.error('Lỗi khi tải danh sách yêu thích:', err);
     } finally {
       setLoading(false);
     }
@@ -63,11 +63,17 @@ export function BuyerFavoritesPage() {
       navigate('/login');
       return;
     }
+    // Optimistic Update: cập nhật giao diện ngay lập tức
+    const previous = favorites;
+    const next = favorites.filter((item) => item._id !== id && item.id !== id);
+    setFavorites(next);
     try {
       await favoritesService.removeFavorite(id);
       setFavorites(prev => prev.filter(item => (item._id || item.id) !== id));
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch (err) {
+      // Revert lại nếu có lỗi
+      setFavorites(previous);
       alert(getApiErrorMessage(err, 'Không thể bỏ yêu thích sản phẩm này.'));
     }
   };
@@ -98,40 +104,49 @@ export function BuyerFavoritesPage() {
         </div>
 
         {/* Header trang */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full border border-gray-200 overflow-hidden shrink-0 bg-gray-100 flex items-center justify-center">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"
-                alt="Avatar"
-                className="w-full h-full object-cover"
-              />
+            <div className="w-10 h-10 rounded-full border border-gray-200 overflow-hidden shrink-0 bg-emerald-50 flex items-center justify-center text-[#15803d]">
+              <Heart className="w-5 h-5 fill-[#15803d]" />
             </div>
-            <h1 className="text-2xl font-bold text-[#331b3b]">
-              Sản phẩm yêu thích của bạn
-            </h1>
-          </div>
-
-          <div className="relative">
-            <button className="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors flex items-center gap-2">
-              Sắp xếp: Mới nhất <span className="text-xs">▾</span>
-            </button>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 leading-tight">
+                Sản phẩm yêu thích của bạn
+              </h1>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {favorites.length > 0 ? `${favorites.length} sản phẩm đã lưu` : 'Chưa có sản phẩm nào'}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Đường kẻ ngang ngăn cách mỏng */}
-        <hr className="border-t border-gray-200 my-6" />
-
-        {/* 5-Column Grid */}
-        {loading ? (
+        {/* Trạng thái Loading / Danh sách sản phẩm */}
+        {loading && favorites.length === 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 animate-pulse">
             {[1, 2, 3, 4, 5].map((n) => (
-              <div key={n} className="h-80 bg-gray-100 rounded-[24px]"></div>
+              <div key={n} className="flex flex-col gap-2">
+                <div className="w-full aspect-square bg-gray-100 rounded-[24px]"></div>
+                <div className="h-4 bg-gray-100 rounded-md w-3/4 mt-2"></div>
+                <div className="h-3 bg-gray-100 rounded-md w-1/2"></div>
+                <div className="h-4 bg-gray-100 rounded-md w-1/3 mt-1"></div>
+              </div>
             ))}
           </div>
         ) : favorites.length === 0 ? (
-          <div className="py-20 text-center text-gray-500">
-            Chưa có sản phẩm yêu thích nào.
+          <div className="py-24 text-center text-gray-500 max-w-sm mx-auto">
+            <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mx-auto mb-3 text-stone-400">
+              <Heart className="w-8 h-8" />
+            </div>
+            <p className="text-sm font-semibold text-gray-700">Chưa có sản phẩm yêu thích nào</p>
+            <p className="text-xs text-gray-400 mt-1 mb-4 leading-relaxed">
+              Hãy thả tim những món đồ thủ công độc đáo bạn yêu thích để dễ dàng tìm lại sau này.
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              className="px-5 py-2 rounded-full bg-[#15803d] text-white text-xs font-bold hover:bg-[#166534] transition-colors shadow-xs cursor-pointer"
+            >
+              Khám phá sản phẩm ngay
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
@@ -149,7 +164,7 @@ export function BuyerFavoritesPage() {
                   className="group flex flex-col cursor-pointer"
                 >
                   {/* Image Container */}
-                  <div className="relative w-full aspect-square rounded-[24px] overflow-hidden bg-gray-100">
+                  <div className="relative w-full aspect-square rounded-[24px] overflow-hidden bg-gray-100 shadow-xs">
                     <img
                       src={imgUrl}
                       alt={product.title || product.name || 'Sản phẩm'}
@@ -158,13 +173,13 @@ export function BuyerFavoritesPage() {
                         (e.target as HTMLImageElement).src = DEFAULT_FAV_IMG;
                       }}
                     />
-                    {/* Heart Badge Button */}
+                    {/* Heart Badge Button (Xóa khỏi yêu thích) */}
                     <button
                       onClick={(e) => handleRemoveFavorite(prodId, e)}
                       className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10"
                       title="Bỏ yêu thích"
                     >
-                      <Heart className="fill-[#15803d] text-[#15803d] w-4 h-4" />
+                      <Heart className="fill-rose-500 text-rose-500 w-4 h-4" />
                     </button>
                   </div>
 
@@ -180,12 +195,13 @@ export function BuyerFavoritesPage() {
                       {new Intl.NumberFormat('vi-VN').format(price)}{' '}đ
                     </p>
 
-                    {/* Pill Border Button */}
+                    {/* Pill Button: Thêm vào giỏ */}
                     <button
                       onClick={(e) => handleAddToCart(product, e)}
                       className="w-full mt-3 py-2 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold"
                     >
-                      Thêm vào giỏ
+                      <ShoppingBag size={13} />
+                      <span>Thêm vào giỏ</span>
                     </button>
                   </div>
                 </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, Star, ArrowRight, CheckCircle2, Info } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { promotionService } from '../../promotion/services/promotionService';
@@ -7,20 +7,47 @@ import { favoritesService } from '../../product/services/favoritesService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import '../../../shared/components/layouts.css';
 
+// Bộ nhớ đệm cấp module: giữ lại sản phẩm và voucher khi người dùng chuyển trang
+let homeDataCache: {
+  products: any[];
+  shops: any[];
+  coupons: any[];
+  timestamp: number;
+} | null = null;
+
 export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const outletContext = useOutletContext<any>() || {};
   const search = outletContext.search || '';
 
-  const [allProducts, setAllProducts] = useState<any[]>([]);
-  const [shopList, setShopList] = useState<any[]>([]);
-  const [couponList, setCouponList] = useState<any[]>([]);
+  const [allProducts, setAllProducts] = useState<any[]>(() => homeDataCache?.products || []);
+  const [shopList, setShopList] = useState<any[]>(() => homeDataCache?.shops || []);
+  const [couponList, setCouponList] = useState<any[]>(() => homeDataCache?.coupons || []);
   const [activeTab, setActiveTab] = useState<'quan-tam' | 'gan-day' | 'theo-doi' | 'khuyen-mai' | 'Thinh-hanh'>('gan-day');
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !homeDataCache);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Tự động cuộn đến section tương ứng khi URL là /vouchers, /collections, /gifts
+  useEffect(() => {
+    if (location.pathname === '/vouchers' || location.hash === '#vouchers-section') {
+      setTimeout(() => {
+        document.getElementById('vouchers-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 80);
+    } else if (location.pathname === '/collections' || location.hash === '#collections-section') {
+      setTimeout(() => {
+        document.getElementById('collections-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 80);
+    } else if (location.pathname === '/gifts' || location.hash === '#gifts-section') {
+      setActiveTab('quan-tam');
+      setTimeout(() => {
+        document.getElementById('kham-pha')?.scrollIntoView({ behavior: 'smooth' });
+      }, 80);
+    }
+  }, [location.pathname, location.hash]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -49,7 +76,11 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       try { setSavedVouchers(JSON.parse(vls)); } catch (e) {}
     }
 
-    setIsLoading(true);
+    // Chỉ bật loading spinner nếu chưa có cache sẵn trong RAM
+    if (!homeDataCache) {
+      setIsLoading(true);
+    }
+
     Promise.all([
       productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
       productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
@@ -59,6 +90,12 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       setAllProducts(productList);
       setShopList(shops || []);
       setCouponList(coupons || []);
+      homeDataCache = {
+        products: productList,
+        shops: shops || [],
+        coupons: coupons || [],
+        timestamp: Date.now()
+      };
     }).finally(() => {
       setIsLoading(false);
     });
@@ -332,7 +369,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       </div>
 
       {/* Main Discover Grid */}
-      <section className="buyer-section pt-4">
+      <section id="kham-pha" className="buyer-section pt-4">
         <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Tiếp tục khám phá</h2>
           <span style={{ fontSize: 13, color: '#888', fontWeight: 500 }}>
@@ -438,7 +475,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       </section>
 
       {/* Unique Vouchers Voucher Section */}
-      <section className="buyer-section" style={{ marginTop: 40 }}>
+      <section id="vouchers-section" className="buyer-section" style={{ marginTop: 40 }}>
         <div className="section-head" style={{ marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Ưu đãi dành riêng cho bạn</h2>
         </div>
@@ -579,7 +616,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       </section>
 
       {/* Styles Discovery Section */}
-      <section className="buyer-section pb-12" style={{ marginTop: 40, marginBottom: 40 }}>
+      <section id="collections-section" className="buyer-section pb-12" style={{ marginTop: 40, marginBottom: 40 }}>
         <div className="section-head" style={{ marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Khám phá các phong cách mới</h2>
         </div>

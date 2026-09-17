@@ -5,6 +5,7 @@ import { AdminDashboard } from './AdminDashboard';
 import { AdminModeration } from './AdminModeration';
 import { AdminCategories } from './AdminCategories';
 import { AdminTags } from './AdminTags';
+import { AdminSellers } from './AdminSellers';
 import { Search, Edit, Lock, Unlock } from 'lucide-react';
 import { authService } from '../../auth/services/authService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
@@ -37,8 +38,8 @@ function AdminUsers() {
     const email = u.email || '';
     const id = u._id || '';
     const matchesSearch = name.toLowerCase().includes(search.toLowerCase()) ||
-                          email.toLowerCase().includes(search.toLowerCase()) ||
-                          id.toLowerCase().includes(search.toLowerCase());
+      email.toLowerCase().includes(search.toLowerCase()) ||
+      id.toLowerCase().includes(search.toLowerCase());
     if (filter === 'Buyer') return matchesSearch && u.role === 'BUYER';
     if (filter === 'Seller') return matchesSearch && u.role === 'SELLER';
     return matchesSearch;
@@ -161,6 +162,7 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="moderation" element={<AdminModeration />} />
+        <Route path="sellers" element={<AdminSellers />} />
         <Route path="categories" element={<AdminCategories />} />
         <Route path="tags" element={<AdminTags />} />
         <Route path="disputes" element={<AdminDisputes />} />

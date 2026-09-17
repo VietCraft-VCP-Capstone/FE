@@ -3,6 +3,7 @@ import { BuyerHeader } from '../components/BuyerHeader';
 import { BuyerFooter } from '../components/BuyerFooter';
 import { useState, useEffect } from 'react';
 import { cartService } from '../../order/services/cartService';
+import { BuyerChatWidget } from '../../chat/components/BuyerChatWidget';
 
 interface BuyerLayoutProps {
   user: any;
@@ -40,6 +41,9 @@ export function BuyerLayout({ user }: BuyerLayoutProps) {
       <main className="buyer-main-content">
         <Outlet context={{ cartCount, setCartCount, search }} />
       </main>
+
+      {/* Floating Realtime Chat Widget */}
+      {user && <BuyerChatWidget user={user} />}
 
       {/* Footer */}
       {!location.pathname.startsWith('/product') && <BuyerFooter />}
