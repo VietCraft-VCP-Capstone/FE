@@ -196,9 +196,6 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                 } catch (prodErr) {
                     console.error('Failed to load real products for profile page', prodErr);
                 }
-            } catch (prodErr) {
-                console.error('Failed to load real products for profile page', prodErr);
-            }
         };
         loadData();
     }, []);
