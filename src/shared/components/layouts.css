@@ -1496,7 +1496,7 @@
 .pod-wizard-wide { max-width: 1000px; }
 .creator {
     display: grid;
-    grid-template-columns: 84px 232px 1fr 288px;
+    grid-template-columns: 280px 1fr 288px;
     gap: 0;
     border: 1px solid #e4e9ee;
     border-radius: 18px;

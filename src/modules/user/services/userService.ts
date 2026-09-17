@@ -18,7 +18,7 @@ export interface UserProfile {
     phone?: string;
     avatar?: string;
     addresses: Address[];
-    notification_settings: {
+    notification_settings?: {
         in_app: boolean;
         push: boolean;
         email: boolean;
@@ -29,6 +29,8 @@ export interface UserProfile {
         collectionsCount: number;
         followingCount: number;
     };
+    role?: string;
+    createdAt?: string;
 }
 
 export const userService = {
@@ -55,22 +57,6 @@ export const userService = {
     deleteAddress: async (addressId: string): Promise<Address[]> => {
         const res = await api.delete(`/users/profile/addresses/${addressId}`);
         return res.data;
-    },
-
-    toIdList: (data: any): string[] =>
-        Array.isArray(data) ? data.map((id: any) => (id?.toString ? id.toString() : id)) : [],
-
-    getWishlist: async (): Promise<string[]> => {
-        const res = await api.get('/users/wishlist');
-        return userService.toIdList(res.data);
-    },
-    addToWishlist: async (productId: string): Promise<string[]> => {
-        const res = await api.post(`/users/wishlist/${productId}`);
-        return userService.toIdList(res.data);
-    },
-    removeFromWishlist: async (productId: string): Promise<string[]> => {
-        const res = await api.delete(`/users/wishlist/${productId}`);
-        return userService.toIdList(res.data);
     }
 };
 

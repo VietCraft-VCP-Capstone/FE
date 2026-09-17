@@ -1,10 +1,34 @@
 import { useState, useEffect } from 'react';
 import { Heart, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { productsService } from '../../product/services/productsService';
-import { userService } from '../../user/services/userService';
+import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
-import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
+import api, { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
+
+const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+const DEFAULT_FAV_IMG = 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400';
+
+const absImg = (u: any): string => {
+  if (!u || typeof u !== 'string') return '';
+  const trimmed = u.trim();
+  if (!trimmed || trimmed.startsWith('#')) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) return trimmed;
+  if (trimmed.startsWith('/')) return ORIGIN + trimmed;
+  return trimmed;
+};
+
+const resolveProductImage = (product: any): string => {
+  const directImg = absImg(product.image || product.thumbnail);
+  if (directImg) return directImg;
+  const pImgs = Array.isArray(product.images) ? product.images : [];
+  for (const img of pImgs) {
+    const resolved = absImg(img);
+    if (resolved) return resolved;
+  }
+  const vImg = absImg(product.variants?.[0]?.mockupImage || product.variants?.[0]?.mockup_image);
+  if (vImg) return vImg;
+  return DEFAULT_FAV_IMG;
+};
 
 export function BuyerFavoritesPage() {
   const navigate = useNavigate();
@@ -23,30 +47,9 @@ export function BuyerFavoritesPage() {
     }
     try {
       setLoading(true);
-      const [productsRes, wishlistIds] = await Promise.all([
-        productsService.getAll({ pageSize: 100 }),
-        userService.getWishlist().catch(() => [] as string[])
-      ]);
-
-      const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
-      const products = productsRes?.items || [];
-
-      const matchedItems = products.filter((p: any) =>
-        ids.includes(p.id) || ids.includes(p._id?.toString())
-      );
-
-      const total = Number(productsRes?.total ?? 0);
-      const sawFullCatalogue = products.length > 0 && total <= products.length;
-      if (sawFullCatalogue) {
-        const matchedIds = new Set(matchedItems.flatMap((p: any) => [p.id, p._id?.toString()].filter(Boolean)));
-        const staleIds = ids.filter((id: string) => !matchedIds.has(id));
-        if (staleIds.length > 0) {
-          await Promise.all(staleIds.map((id: string) => userService.removeFromWishlist(id).catch(() => {})));
-          window.dispatchEvent(new CustomEvent('wishlist-updated'));
-        }
-      }
-
-      setFavorites(matchedItems);
+      const res = await favoritesService.getFavorites();
+      const items = Array.isArray(res?.product_ids) ? res.product_ids : [];
+      setFavorites(items);
     } catch (err) {
       console.error(err);
     } finally {
@@ -54,23 +57,27 @@ export function BuyerFavoritesPage() {
     }
   };
 
-  const handleRemoveFavorite = async (id: string) => {
+  const handleRemoveFavorite = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!isLoggedIn()) {
       navigate('/login');
       return;
     }
     try {
-      await userService.removeFromWishlist(id);
-      setFavorites(prev => prev.filter(item => item._id !== id && item.id !== id));
+      await favoritesService.removeFavorite(id);
+      setFavorites(prev => prev.filter(item => (item._id || item.id) !== id));
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch (err) {
       alert(getApiErrorMessage(err, 'Không thể bỏ yêu thích sản phẩm này.'));
     }
   };
 
-  const handleAddToCart = async (product: any) => {
+  const handleAddToCart = async (product: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     try {
-      await cartService.addToCart({ productId: product._id || product.id, quantity: 1 });
+      const prodId = product._id || product.id;
+      const variantId = product.variants?.[0]?.id || product.variants?.[0]?._id;
+      await cartService.addToCart({ productId: prodId, variantId, quantity: 1 });
       alert('Đã thêm sản phẩm vào giỏ hàng!');
     } catch (err) {
       alert(getApiErrorMessage(err, 'Không thể thêm sản phẩm vào giỏ hàng.'));
@@ -131,24 +138,31 @@ export function BuyerFavoritesPage() {
             {favorites.map((item) => {
               const product = item.product || item;
               const prodId = product._id || product.id || item;
+              const price = Number(product.price || product.retail_price || product.variants?.[0]?.price || product.variants?.[0]?.retail_price || 0);
+              const shopTitle = product.shopInfo?.name || product.shopName || product.storeName || 'VietCraft Selection';
+              const imgUrl = resolveProductImage(product);
+
               return (
-                <div key={prodId} className="group flex flex-col">
+                <div 
+                  key={prodId} 
+                  onClick={() => navigate(`/products/${prodId}`)}
+                  className="group flex flex-col cursor-pointer"
+                >
                   {/* Image Container */}
                   <div className="relative w-full aspect-square rounded-[24px] overflow-hidden bg-gray-100">
                     <img
-                      src={
-                        product.image ||
-                        product.thumbnail ||
-                        product.images?.[0] ||
-                        'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400'
-                      }
+                      src={imgUrl}
                       alt={product.title || product.name || 'Sản phẩm'}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_FAV_IMG;
+                      }}
                     />
                     {/* Heart Badge Button */}
                     <button
-                      onClick={() => handleRemoveFavorite(prodId)}
+                      onClick={(e) => handleRemoveFavorite(prodId, e)}
                       className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10"
+                      title="Bỏ yêu thích"
                     >
                       <Heart className="fill-[#15803d] text-[#15803d] w-4 h-4" />
                     </button>
@@ -156,22 +170,19 @@ export function BuyerFavoritesPage() {
 
                   {/* Content */}
                   <div className="flex flex-col flex-1">
-                    <h3 className="text-sm font-semibold text-gray-900 mt-3 line-clamp-1">
-                      {product.title || product.name || 'Cốc Sứ Thủ Công'}
+                    <h3 className="text-sm font-semibold text-gray-900 mt-3 line-clamp-1 group-hover:text-[#15803d] transition-colors">
+                      {product.title || product.name || 'Sản phẩm sáng tạo'}
                     </h3>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {product.shopInfo?.name || product.storeName || product.shopName || 'Gốm Mộc Studio'}
+                      {shopTitle}
                     </p>
                     <p className="text-sm font-bold text-[#15803d] mt-1">
-                      {new Intl.NumberFormat('vi-VN').format(
-                        product.retail_price || product.price || 250000
-                      )}{' '}
-                      đ
+                      {new Intl.NumberFormat('vi-VN').format(price)}{' '}đ
                     </p>
 
                     {/* Pill Border Button */}
                     <button
-                      onClick={() => handleAddToCart(product)}
+                      onClick={(e) => handleAddToCart(product, e)}
                       className="w-full mt-3 py-2 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold"
                     >
                       Thêm vào giỏ
