@@ -36,6 +36,11 @@ export const sellerOrdersService = {
     const res = await api.patch(`/seller/orders/${encodeURIComponent(orderCode)}/status`, payload);
     return res.data;
   },
+
+  async dispatchToPrinter(orderCode: string): Promise<{ message: string; order: SellerOrder }> {
+    const res = await api.post(`/seller/orders/${encodeURIComponent(orderCode)}/dispatch-printer`);
+    return res.data;
+  },
 };
 
 export default sellerOrdersService;

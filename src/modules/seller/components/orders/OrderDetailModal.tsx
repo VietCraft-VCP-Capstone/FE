@@ -7,7 +7,8 @@
  * cần khi có gì đó bất thường.
  */
 
-import { ExternalLink, Package, X } from 'lucide-react';
+import { useState } from 'react';
+import { ExternalLink, Package, X, Printer, Loader2, CheckCircle2 } from 'lucide-react';
 
 import { ModalOverlay } from '../../../../shared/components/ModalOverlay';
 import { count as fmtCount, dateTime, money } from '../../../../shared/utils/format';
@@ -15,6 +16,7 @@ import type { SellerOrder } from '../../types/order';
 import type { StatusAction } from './orderStatusMeta';
 import { CARRIER_LABEL, NEXT_ACTIONS, PAYMENT_LABEL, PAYMENT_STATUS_LABEL, STATUS_META } from './orderStatusMeta';
 import { DetailRow, ItemThumb, StatusBadge } from './SellerOrdersUi';
+import { sellerOrdersService } from '../../services/sellerOrdersService';
 
 const SECTION_TITLE = 'm-0 mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-500';
 
@@ -23,18 +25,37 @@ export function OrderDetailModal({
   loading = false,
   onClose,
   onAction,
+  onRefresh,
 }: {
   order: SellerOrder | null;
   loading?: boolean;
   onClose: () => void;
   onAction: (action: StatusAction) => void;
+  onRefresh?: () => void;
 }) {
+  const [dispatchingPrinter, setDispatchingPrinter] = useState(false);
+  const [printerMsg, setPrinterMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   if (!order) return null;
 
   const f = order.financials;
   const buyerPaid = f.subtotal + f.shippingFee - f.discount;
   const actions = NEXT_ACTIONS[order.status] || [];
   const hasDesign = order.items.some(it => it.designFileUrl);
+
+  const handleDispatchPrinter = async () => {
+    setDispatchingPrinter(true);
+    setPrinterMsg(null);
+    try {
+      const res = await sellerOrdersService.dispatchToPrinter(order.orderCode);
+      setPrinterMsg({ type: 'success', text: res.message || 'Đã chuyển đơn sang xưởng in thành công!' });
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      setPrinterMsg({ type: 'error', text: err.response?.data?.error || err.message || 'Lỗi khi gửi xưởng in.' });
+    } finally {
+      setDispatchingPrinter(false);
+    }
+  };
 
   return (
     <ModalOverlay>
@@ -216,20 +237,41 @@ export function OrderDetailModal({
         </div>
 
         {/* --------------------------------------------------------- chân -- */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 bg-stone-50 px-6 py-4">
-          <span className="text-[12px] text-stone-500">
-            {actions.length === 0
-              ? 'Đơn đã kết thúc — không còn thao tác nào.'
-              : 'Bước tiếp theo bạn có thể thực hiện:'}
-          </span>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer rounded-xl border border-stone-200 bg-white px-4 py-2 text-[13.5px] font-semibold text-stone-600 transition-colors hover:bg-stone-100 motion-reduce:transition-none"
-            >
-              Đóng
-            </button>
+        <div className="flex flex-col gap-2.5 border-t border-stone-100 bg-stone-50 px-6 py-4">
+          {printerMsg && (
+            <div className={`w-full text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 ${
+              printerMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+            }`}>
+              {printerMsg.type === 'success' && <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />}
+              <span>{printerMsg.text}</span>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-[12px] text-stone-500">
+              {actions.length === 0
+                ? 'Đơn đã kết thúc — không còn thao tác nào.'
+                : 'Bước tiếp theo bạn có thể thực hiện:'}
+            </span>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {['ORDERED', 'PENDING_DESIGN', 'PROCESSING'].includes(order.status) && (
+                <button
+                  type="button"
+                  disabled={loading || dispatchingPrinter}
+                  onClick={handleDispatchPrinter}
+                  className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl border border-violet-600 bg-violet-50 hover:bg-violet-100 text-violet-700 px-4 py-2 text-[13.5px] font-bold transition-colors disabled:opacity-50"
+                  title="Chuyển dữ liệu và file in sang hệ thống Printing Shop"
+                >
+                  {dispatchingPrinter ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                  Gửi xưởng in (POD)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="cursor-pointer rounded-xl border border-stone-200 bg-white px-4 py-2 text-[13.5px] font-semibold text-stone-600 transition-colors hover:bg-stone-100 motion-reduce:transition-none"
+              >
+                Đóng
+              </button>
             {actions.map(action => (
               <button
                 key={action.to}
@@ -248,6 +290,7 @@ export function OrderDetailModal({
           </div>
         </div>
       </div>
-    </ModalOverlay>
-  );
+    </div>
+  </ModalOverlay>
+);
 }
