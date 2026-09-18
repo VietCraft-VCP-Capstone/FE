@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
 import { useNavigate } from 'react-router-dom';
-import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck, Check } from 'lucide-react';
+import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck, Check, CheckCircle2 } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
@@ -16,6 +16,7 @@ interface OrderItem {
     color?: string;
     size?: string;
     image?: string;
+    is_reviewed?: boolean;
 }
 
 interface Order {
@@ -26,6 +27,7 @@ interface Order {
     totalAmount: number;
     status: 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled';
     createdAt: string;
+    is_reviewed?: boolean;
 }
 
 export function BuyerOrdersPage() {
@@ -43,9 +45,29 @@ export function BuyerOrdersPage() {
         setReviewOrder(order);
     };
 
-    const handleReviewSuccess = (orderId: string, _productId: string) => {
+    const handleReviewSuccess = (orderId: string, productId: string) => {
         setReviewedOrders(prev => new Set(prev).add(orderId));
+        setOrders(prev => prev.map(ord => {
+            if (ord.id === orderId) {
+                const updatedItems = ord.items.map(it => {
+                    if (it.productId === productId) {
+                        return { ...it, is_reviewed: true };
+                    }
+                    return it;
+                });
+                const allReviewed = updatedItems.every(it => it.is_reviewed);
+                return {
+                    ...ord,
+                    items: updatedItems,
+                    is_reviewed: allReviewed
+                };
+            }
+            return ord;
+        }));
         showToast('Gửi đánh giá thành công! Cảm ơn bạn đã chia sẻ trải nghiệm.', 'success');
+        ordersService.getByUser(activeTab).then(res => {
+            setOrders(Array.isArray(res) ? (res as Order[]) : ((res as any)?.items || []));
+        }).catch(() => {});
     };
 
     const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -248,13 +270,23 @@ export function BuyerOrdersPage() {
 
                                     {order.status === 'completed' && (
                                         <>
-                                            <button
-                                                onClick={() => handleOpenReview(order)}
-                                                className="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
-                                            >
-                                                <Star size={14} className={reviewedOrders.has(order.id) ? 'fill-emerald-500' : ''} />
-                                                <span>{reviewedOrders.has(order.id) ? 'Đã đánh giá' : 'Đánh giá'}</span>
-                                            </button>
+                                            {order.is_reviewed || (order.items?.length > 0 && order.items.every(it => it.is_reviewed)) || reviewedOrders.has(order.id) ? (
+                                                <button
+                                                    disabled
+                                                    className="px-4 py-2 rounded-xl bg-gray-100 text-gray-400 text-sm font-medium flex items-center gap-1.5 cursor-not-allowed border border-gray-200"
+                                                >
+                                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                                    <span>Đã đánh giá</span>
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleOpenReview(order)}
+                                                    className="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
+                                                >
+                                                    <Star size={14} />
+                                                    <span>Đánh giá</span>
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => handleReorder(order)}
                                                 className="bg-[#008000] hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm"

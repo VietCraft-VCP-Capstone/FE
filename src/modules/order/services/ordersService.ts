@@ -9,6 +9,7 @@ export interface OrderItemResponse {
   color?: string;
   size?: string;
   image?: string;
+  is_reviewed?: boolean;
 }
 
 export interface OrderResponse {
@@ -26,6 +27,7 @@ export interface OrderResponse {
   shopLogo?: string;
   paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
   createdAt: string;
+  is_reviewed?: boolean;
   shippingAddress?: {
     recipient_name: string;
     phone: string;
