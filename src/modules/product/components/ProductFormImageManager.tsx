@@ -53,13 +53,15 @@ export function ProductFormImageManager({
   };
 
   const handleRemoveImage = (index: number) => {
+    const removedImg = images[index];
     const updated = images.filter((_, i) => i !== index);
-    const newThumb = updated[0] || '';
+    const newThumb = thumbnail === removedImg ? (updated[0] || '') : (thumbnail || updated[0] || '');
     onChangeImages(updated, newThumb);
   };
 
   const handleSetCover = (url: string) => {
-    onChangeImages(images, url);
+    const reordered = [url, ...images.filter((img) => img !== url)];
+    onChangeImages(reordered, url);
   };
 
   return (
@@ -125,7 +127,7 @@ export function ProductFormImageManager({
       {/* Images Grid */}
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
         {images.map((img, idx) => {
-          const isCover = thumbnail === img;
+          const isCover = thumbnail ? thumbnail === img : idx === 0;
           return (
             <div
               key={idx}
