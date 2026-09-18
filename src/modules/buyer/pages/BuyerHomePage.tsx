@@ -3,7 +3,7 @@ import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, Star, ArrowRight, CheckCircle2, Info } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { promotionService } from '../../promotion/services/promotionService';
-import { userService } from '../../user/services/userService';
+import { favoritesService } from '../../product/services/favoritesService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import '../../../shared/components/layouts.css';
 
@@ -59,7 +59,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     if (!isLoggedIn()) {
       setFavoritedProductIds([]);
     } else {
-      userService.getWishlist()
+      favoritesService.getFavoriteIds()
         .then((ids) => {
           setFavoritedProductIds(ids);
           localStorage.setItem('vietcraft_favorites', JSON.stringify(ids));
@@ -113,15 +113,15 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       return;
     }
     try {
-      let updated: string[];
-      if (favoritedProductIds.includes(productId)) {
-        updated = await userService.removeFromWishlist(productId);
-        triggerToast(`Đã xóa "${title}" khỏi danh sách yêu thích`, 'info');
-      } else {
-        updated = await userService.addToWishlist(productId);
-        triggerToast(`Đã thêm "${title}" vào danh sách yêu thích`, 'success');
-      }
-      setFavoritedProductIds(updated);
+      const res = await favoritesService.toggleFavorite(productId);
+      const isFav = res.isFavorite;
+      setFavoritedProductIds(prev =>
+        isFav ? [...prev, productId] : prev.filter(id => id !== productId)
+      );
+      triggerToast(
+        isFav ? `Đã thêm "${title}" vào danh sách yêu thích` : `Đã xóa "${title}" khỏi danh sách yêu thích`,
+        isFav ? 'success' : 'info'
+      );
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch (err) {
       console.error('toggleFavorite failed', err);

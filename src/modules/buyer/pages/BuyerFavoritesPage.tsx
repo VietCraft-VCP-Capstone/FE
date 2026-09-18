@@ -1,24 +1,44 @@
 import { useState, useEffect } from 'react';
 import { Heart, ArrowLeft, ShoppingBag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import api, { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/client';
+import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
+import { useToast } from '../../../shared/components/Toast';
+import { SelectVariantModal } from '../components/SelectVariantModal';
+import api, { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 
-const CACHE_KEY = 'vietcraft_favorites_cache';
+const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+const DEFAULT_FAV_IMG = 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400';
 
-function getCachedFavorites(): any[] {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+const absImg = (u: any): string => {
+  if (!u || typeof u !== 'string') return '';
+  const trimmed = u.trim();
+  if (!trimmed || trimmed.startsWith('#')) return '';
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) return trimmed;
+  if (trimmed.startsWith('/')) return ORIGIN + trimmed;
+  return trimmed;
+};
+
+const resolveProductImage = (product: any): string => {
+  const directImg = absImg(product.image || product.thumbnail);
+  if (directImg) return directImg;
+  const pImgs = Array.isArray(product.images) ? product.images : [];
+  for (const img of pImgs) {
+    const resolved = absImg(img);
+    if (resolved) return resolved;
   }
-}
+  const vImg = absImg(product.variants?.[0]?.mockupImage || product.variants?.[0]?.mockup_image);
+  if (vImg) return vImg;
+  return DEFAULT_FAV_IMG;
+};
 
 export function BuyerFavoritesPage() {
   const navigate = useNavigate();
-  const [favorites, setFavorites] = useState<any[]>(() => getCachedFavorites());
-  const [loading, setLoading] = useState(() => getCachedFavorites().length === 0);
+  const { showToast } = useToast();
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [variantModalOpen, setVariantModalOpen] = useState(false);
+  const [activeProductForCart, setActiveProductForCart] = useState<any>(null);
 
   useEffect(() => {
     fetchFavorites();
@@ -31,19 +51,10 @@ export function BuyerFavoritesPage() {
       return;
     }
     try {
-      // Chỉ hiện skeleton nếu chưa có dữ liệu trong cache
-      if (favorites.length === 0) {
-        setLoading(true);
-      }
-      const res = await api.get('/favorites');
-      const items = res.data?.data?.items || [];
+      setLoading(true);
+      const res = await favoritesService.getFavorites();
+      const items = Array.isArray(res?.product_ids) ? res.product_ids : [];
       setFavorites(items);
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(items));
-        // Cập nhật số lượng yêu thích cho header
-        localStorage.setItem('vietcraft_favorites', JSON.stringify(items.map((it: any) => it.id || it._id)));
-      } catch {}
-      window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch (err) {
       console.error('Lỗi khi tải danh sách yêu thích:', err);
     } finally {
@@ -51,7 +62,8 @@ export function BuyerFavoritesPage() {
     }
   };
 
-  const handleRemoveFavorite = async (id: string) => {
+  const handleRemoveFavorite = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!isLoggedIn()) {
       navigate('/login');
       return;
@@ -61,27 +73,34 @@ export function BuyerFavoritesPage() {
     const next = favorites.filter((item) => item._id !== id && item.id !== id);
     setFavorites(next);
     try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(next));
-      localStorage.setItem('vietcraft_favorites', JSON.stringify(next.map((it: any) => it.id || it._id)));
-    } catch {}
-    window.dispatchEvent(new CustomEvent('wishlist-updated'));
-
-    try {
-      await api.delete(`/favorites/${id}`);
+      await favoritesService.removeFavorite(id);
+      setFavorites(prev => prev.filter(item => (item._id || item.id) !== id));
+      window.dispatchEvent(new CustomEvent('wishlist-updated'));
+      showToast('Đã xóa khỏi danh sách yêu thích', 'info');
     } catch (err) {
       // Revert lại nếu có lỗi
       setFavorites(previous);
-      alert(getApiErrorMessage(err, 'Không thể bỏ yêu thích sản phẩm này.'));
+      showToast(getApiErrorMessage(err, 'Không thể bỏ yêu thích sản phẩm này.'), 'error');
     }
   };
 
-  const handleAddToCart = async (product: any, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleOpenAddToCartModal = (product: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!isLoggedIn()) {
+      navigate('/login');
+      return;
+    }
+    setActiveProductForCart(product);
+    setVariantModalOpen(true);
+  };
+
+  const handleConfirmAddToCart = async (payload: { productId: string; variantId?: string; quantity: number }) => {
     try {
-      await cartService.addToCart({ productId: product._id || product.id, quantity: 1 });
-      alert('Đã thêm sản phẩm vào giỏ hàng!');
+      await cartService.addToCart(payload);
+      showToast('Đã thêm sản phẩm vào giỏ hàng!', 'success');
     } catch (err) {
-      alert(getApiErrorMessage(err, 'Không thể thêm sản phẩm vào giỏ hàng.'));
+      showToast(getApiErrorMessage(err, 'Không thể thêm sản phẩm vào giỏ hàng.'), 'error');
+      throw err;
     }
   };
 
@@ -148,37 +167,30 @@ export function BuyerFavoritesPage() {
             {favorites.map((item) => {
               const product = item.product || item;
               const prodId = product._id || product.id || item;
-              const title = product.title || product.name || 'Sản phẩm thủ công';
-              const imgUrl =
-                product.image ||
-                product.thumbnail ||
-                product.images?.[0] ||
-                'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400';
-              const shopName = product.shopInfo?.name || product.shopName || product.storeName || 'VietCraft Studio';
-              const price = product.retail_price || product.price || 0;
+              const price = Number(product.price || product.retail_price || product.variants?.[0]?.price || product.variants?.[0]?.retail_price || 0);
+              const shopTitle = product.shopInfo?.name || product.shopName || product.storeName || 'VietCraft Selection';
+              const imgUrl = resolveProductImage(product);
 
               return (
-                <div
-                  key={prodId}
-                  onClick={() => navigate(`/product/${prodId}`)}
+                <div 
+                  key={prodId} 
+                  onClick={() => navigate(`/products/${prodId}`)}
                   className="group flex flex-col cursor-pointer"
                 >
                   {/* Image Container */}
                   <div className="relative w-full aspect-square rounded-[24px] overflow-hidden bg-gray-100 shadow-xs">
                     <img
                       src={imgUrl}
-                      alt={title}
+                      alt={product.title || product.name || 'Sản phẩm'}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_FAV_IMG;
+                      }}
                     />
                     {/* Heart Badge Button (Xóa khỏi yêu thích) */}
                     <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveFavorite(prodId);
-                      }}
-                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/95 backdrop-blur-xs shadow-md flex items-center justify-center cursor-pointer hover:scale-110 active:scale-95 transition-transform z-10"
+                      onClick={(e) => handleRemoveFavorite(prodId, e)}
+                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10"
                       title="Bỏ yêu thích"
                     >
                       <Heart className="fill-rose-500 text-rose-500 w-4 h-4" />
@@ -186,24 +198,25 @@ export function BuyerFavoritesPage() {
                   </div>
 
                   {/* Content */}
-                  <div className="flex flex-col flex-1">
-                    <h3 className="text-sm font-semibold text-gray-900 mt-2.5 line-clamp-1 group-hover:text-[#15803d] transition-colors">
-                      {title}
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5 truncate">
-                      {shopName}
-                    </p>
-                    <p className="text-sm font-bold text-[#15803d] mt-1">
-                      {price.toLocaleString('vi-VN')}₫
-                    </p>
+                  <div className="flex flex-col flex-1 justify-between mt-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-1 group-hover:text-[#15803d] transition-colors">
+                        {product.title || product.name || 'Sản phẩm sáng tạo'}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {shopTitle}
+                      </p>
+                      <p className="text-sm font-bold text-[#15803d] mt-1">
+                        {new Intl.NumberFormat('vi-VN').format(price)}{' '}đ
+                      </p>
+                    </div>
 
                     {/* Pill Button: Thêm vào giỏ */}
                     <button
-                      type="button"
-                      onClick={(e) => handleAddToCart(product, e)}
-                      className="w-full mt-2.5 py-1.5 px-3 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      onClick={(e) => handleOpenAddToCartModal(product, e)}
+                      className="w-full mt-3 py-2 px-3 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                     >
-                      <ShoppingBag size={13} />
+                      <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                       <span>Thêm vào giỏ</span>
                     </button>
                   </div>
@@ -213,6 +226,18 @@ export function BuyerFavoritesPage() {
           </div>
         )}
       </div>
+
+      {/* Modal Chọn Variant & Số Lượng */}
+      <SelectVariantModal
+        isOpen={variantModalOpen}
+        productId={activeProductForCart?._id || activeProductForCart?.id || null}
+        initialProduct={activeProductForCart}
+        onClose={() => {
+          setVariantModalOpen(false);
+          setActiveProductForCart(null);
+        }}
+        onAddToCart={handleConfirmAddToCart}
+      />
     </div>
   );
 }

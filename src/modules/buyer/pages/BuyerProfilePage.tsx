@@ -9,6 +9,7 @@ import {
 import { userService, UserProfile, Address } from '../../user/services/userService';
 import { ordersService } from '../../order/services/ordersService';
 import { productsService } from '../../product/services/productsService';
+import { favoritesService } from '../../product/services/favoritesService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { EditProfileModal } from '../components/profile/EditProfileModal';
 import { AddressFormModal } from '../components/profile/AddressFormModal';
@@ -172,40 +173,29 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                 setLoading(false);
             }
 
-            // 2. Fetch saved products preview asynchronously in background (limited to 6)
-            try {
-                const [allProducts, wishlistIds] = await Promise.all([
-                    productsService.getAll({ limit: 6 } as any).catch(() => ({ items: [] })),
-                    userService.getWishlist().catch(() => [])
-                ]);
-                const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
-                const products: any[] = Array.isArray(allProducts)
-                    ? allProducts
-                    : (allProducts?.items || []);
-                
-                const matchedItems = products.filter((p: any) =>
-                    ids.includes(p.id) || ids.includes(p._id?.toString())
-                );
-                
-                const mapped = matchedItems.slice(0, 3).map((p: any) => ({
-                    title: p.title || p.name || 'Sản phẩm sáng tạo',
-                    image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
-                }));
-
-                if (mapped.length === 0) {
-                    const fallbackMapped = products.slice(0, 3).map((p: any) => ({
+                try {
+                    const favsRes = await favoritesService.getFavorites().catch(() => ({ product_ids: [] }));
+                    const favItems = Array.isArray(favsRes?.product_ids) ? favsRes.product_ids : [];
+                    
+                    const mapped = favItems.slice(0, 3).map((p: any) => ({
                         title: p.title || p.name || 'Sản phẩm sáng tạo',
                         image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
                     }));
-                    savedProductsCache = fallbackMapped;
-                    setSavedProducts(fallbackMapped);
-                } else {
-                    savedProductsCache = mapped;
-                    setSavedProducts(mapped);
+
+                    if (mapped.length === 0) {
+                        const allProducts = await productsService.getAll().catch(() => ({ items: [] }));
+                        const products: any[] = Array.isArray(allProducts) ? allProducts : (allProducts?.items || []);
+                        const fallbackMapped = products.slice(0, 3).map((p: any) => ({
+                            title: p.title || p.name || 'Sản phẩm sáng tạo',
+                            image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
+                        }));
+                        setSavedProducts(fallbackMapped);
+                    } else {
+                        setSavedProducts(mapped);
+                    }
+                } catch (prodErr) {
+                    console.error('Failed to load real products for profile page', prodErr);
                 }
-            } catch (prodErr) {
-                console.error('Failed to load real products for profile page', prodErr);
-            }
         };
         loadData();
     }, []);

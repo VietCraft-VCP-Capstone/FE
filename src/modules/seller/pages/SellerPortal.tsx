@@ -10,6 +10,8 @@ import { SellerOrdersPage } from './SellerOrdersPage';
 import { SellerChatPage } from './SellerChatPage';
 import { POD_CREATE_ENABLED } from '../featureFlags';
 
+import { SellerDesignsPage } from './SellerDesignsPage';
+
 function SellerAnalytics() {
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-2 animate-fade-in">
@@ -46,6 +48,7 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
           path="products/new"
           element={POD_CREATE_ENABLED ? <CreateProductPage /> : <Navigate to="/seller/products" replace />}
         />
+        <Route path="designs" element={<SellerDesignsPage />} />
         <Route path="products" element={<ProductListingPage />} />
         <Route path="product-listing" element={<ProductListingPage />} />
         <Route path="settings" element={<SellerSettingsPage />} />
@@ -69,3 +72,4 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
     </SellerLayout>
   );
 }
+
