@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Star, ShoppingCart, Zap,
   ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store, MessageCircle
@@ -15,6 +15,7 @@ interface Product {
   id: string; title: string; description: string; category: string;
   tags: string[]; allowCustomization: boolean; customizationType: string;
   price: number; images?: string[]; variants: Variant[];
+  colors?: Array<{ name: string; hex: string }>;
   shopInfo?: { id: string; name: string; logo?: string; rating: number };
   rating?: number;
   reviews_count?: number;
@@ -34,6 +35,53 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   );
 }
 
+function resolveColorCss(colorName: string, productColors?: Array<{ name: string; hex: string }>): string {
+  if (!colorName) return '#e5e7eb';
+  const trimmed = colorName.trim();
+  if (trimmed.startsWith('#') || trimmed.startsWith('rgb') || trimmed.startsWith('hsl')) {
+    return trimmed;
+  }
+
+  // 1. Khớp mã hex từ danh sách colors của backend nếu có
+  if (productColors && productColors.length > 0) {
+    const match = productColors.find(pc => pc.name?.trim().toLowerCase() === trimmed.toLowerCase());
+    if (match?.hex && (match.hex.startsWith('#') || match.hex.startsWith('rgb'))) {
+      return match.hex;
+    }
+  }
+
+  // 2. Bảng ánh xạ màu thủ công mỹ nghệ và tên màu tiếng Việt / tiếng Anh
+  const lower = trimmed.toLowerCase();
+  if (lower.includes('hỏa biến')) return 'linear-gradient(135deg, #1e3a8a, #d97706)';
+  if (lower.includes('trắng ngà') || lower.includes('ngà') || lower.includes('men tro') || lower.includes('men mờ')) return '#F7F6EE';
+  if (lower.includes('trắng') || lower.includes('white') || lower.includes('bạch') || lower.includes('sữa')) return '#FFFFFF';
+  if (lower.includes('đen') || lower.includes('black') || lower.includes('mun') || lower.includes('huyền')) return '#1C1C1C';
+  if (lower.includes('rạn ngọc') || lower.includes('ngọc')) return '#0D9488';
+  if (lower.includes('xanh chàm') || lower.includes('chàm')) return '#1E3A8A';
+  if (lower.includes('xanh lam') || lower.includes('lam') || lower.includes('navy') || lower.includes('xanh dương') || lower.includes('blue')) return '#1D4ED8';
+  if (lower.includes('xanh lá') || lower.includes('xanh lục') || lower.includes('rêu') || lower.includes('chuối') || lower.includes('green')) return '#15803D';
+  if (lower.includes('xanh')) return '#3B82F6';
+  if (lower.includes('gỗ') || lower.includes('sồi') || lower.includes('óc chó') || lower.includes('wood')) return '#A16207';
+  if (lower.includes('nâu') || lower.includes('cà phê') || lower.includes('hạt dẻ') || lower.includes('cánh gián') || lower.includes('bò') || lower.includes('brown')) return '#78350F';
+  if (lower.includes('đất') || lower.includes('gốm') || lower.includes('mộc') || lower.includes('nâu cát')) return '#9A3412';
+  if (lower.includes('kem') || lower.includes('be') || lower.includes('beige') || lower.includes('tự nhiên')) return '#EFE5D1';
+  if (lower.includes('đỏ') || lower.includes('đô') || lower.includes('mận') || lower.includes('rượu') || lower.includes('red')) return '#DC2626';
+  if (lower.includes('cam') || lower.includes('orange')) return '#EA580C';
+  if (lower.includes('vàng') || lower.includes('chanh') || lower.includes('nghệ') || lower.includes('yellow') || lower.includes('gold')) return '#EAB308';
+  if (lower.includes('hồng') || lower.includes('phấn') || lower.includes('sen') || lower.includes('pink')) return '#EC4899';
+  if (lower.includes('tím') || lower.includes('purple') || lower.includes('violet')) return '#9333EA';
+  if (lower.includes('xám') || lower.includes('tro') || lower.includes('ghi') || lower.includes('bạc') || lower.includes('gray') || lower.includes('grey') || lower.includes('silver')) return '#9CA3AF';
+  if (lower.includes('đồng') || lower.includes('bronze')) return '#B45309';
+
+  // 3. Fallback bằng mã màu pastel cố định theo hash chuỗi để luôn là CSS hợp lệ
+  let hash = 0;
+  for (let i = 0; i < lower.length; i++) {
+    hash = lower.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h}, 55%, 65%)`;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 // Cache sản phẩm chi tiết trong RAM để khi chuyển qua lại hiển thị tức thì
 const productDetailCache = new Map<string, any>();
@@ -43,18 +91,38 @@ const suggestionsDetailCache = new Map<string, any[]>();
 export function BuyerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialProduct = (location.state as any)?.initialProduct;
+  const initialMatches = initialProduct && (initialProduct.id === id || initialProduct._id === id);
 
-
-  const [product, setProduct] = useState<Product | null>(() => (id ? productDetailCache.get(id) || null : null));
+  const [product, setProduct] = useState<Product | null>(() => {
+    if (!id) return null;
+    return productDetailCache.get(id) || (initialMatches ? initialProduct : null);
+  });
   const [related, setRelated] = useState<any[]>(() => (id ? relatedDetailCache.get(id) || [] : []));
   const [suggestions, setSuggestions] = useState<any[]>(() => (id ? suggestionsDetailCache.get(id) || [] : []));
-  const [loading, setLoading] = useState(() => (id ? !productDetailCache.has(id) : true));
+  const [loading, setLoading] = useState(() => {
+    if (!id) return true;
+    return !productDetailCache.has(id) && !initialMatches;
+  });
 
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
-  const [selectedSize, setSelectedSize] = useState<string>('');
-  const [selectedColor, setSelectedColor] = useState<string>('');
-  const [selectedMaterial, setSelectedMaterial] = useState<string>('');
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(() => {
+    const p = (id ? productDetailCache.get(id) : null) || (initialMatches ? initialProduct : null);
+    return p?.variants?.[0] || null;
+  });
+  const [selectedSize, setSelectedSize] = useState<string>(() => {
+    const p = (id ? productDetailCache.get(id) : null) || (initialMatches ? initialProduct : null);
+    return p?.variants?.[0]?.size || '';
+  });
+  const [selectedColor, setSelectedColor] = useState<string>(() => {
+    const p = (id ? productDetailCache.get(id) : null) || (initialMatches ? initialProduct : null);
+    return p?.variants?.[0]?.color || '';
+  });
+  const [selectedMaterial, setSelectedMaterial] = useState<string>(() => {
+    const p = (id ? productDetailCache.get(id) : null) || (initialMatches ? initialProduct : null);
+    return p?.variants?.[0]?.material || '';
+  });
   const [customText, setCustomText] = useState('');
   const [qty, setQty] = useState(1);
   const [descOpen, setDescOpen] = useState(true);
@@ -79,6 +147,16 @@ export function BuyerProductDetailPage() {
       setLoading(false);
       if (cached.variants?.length) {
         const v0 = cached.variants[0];
+        setSelectedVariant(v0);
+        if (v0.size) setSelectedSize(v0.size);
+        if (v0.color) setSelectedColor(v0.color);
+        if (v0.material) setSelectedMaterial(v0.material);
+      }
+    } else if (initialMatches) {
+      setProduct(initialProduct);
+      setLoading(false);
+      if (initialProduct.variants?.length) {
+        const v0 = initialProduct.variants[0];
         setSelectedVariant(v0);
         if (v0.size) setSelectedSize(v0.size);
         if (v0.color) setSelectedColor(v0.color);
@@ -261,7 +339,18 @@ export function BuyerProductDetailPage() {
     sectionLabel: { fontSize: 13, fontWeight: 700, color: '#330033', marginBottom: 8, marginTop: 16 } as React.CSSProperties,
     optionGroup: { display: 'flex', gap: 8, flexWrap: 'wrap' as const },
     optionBtn: (active: boolean) => ({ padding: '6px 16px', border: active ? '2px solid #008000' : '2px solid #ddd', borderRadius: 8, background: active ? '#e6f7e6' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', color: active ? '#005500' : '#333', transition: 'all 0.15s' } as React.CSSProperties),
-    colorDot: (c: string, active: boolean) => ({ width: 28, height: 28, borderRadius: '50%', background: c, border: active ? '3px solid #008000' : '3px solid transparent', outline: '1px solid #ccc', cursor: 'pointer', transition: 'all 0.15s' } as React.CSSProperties),
+    colorDot: (c: string, active: boolean) => ({
+      width: 28,
+      height: 28,
+      borderRadius: '50%',
+      background: c,
+      border: active ? '3px solid #008000' : '3px solid transparent',
+      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.18)',
+      outline: active ? 'none' : '1px solid #d6d3d1',
+      cursor: 'pointer',
+      transition: 'all 0.15s',
+      flexShrink: 0
+    } as React.CSSProperties),
     actionBar: { display: 'flex', gap: 10, marginTop: 24 } as React.CSSProperties,
     btnChat: { padding: '13px 18px', border: '2px solid #008000', borderRadius: 10, background: '#f0fdf4', color: '#008000', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s', whiteSpace: 'nowrap' as const } as React.CSSProperties,
     btnOutline: { flex: 1, padding: '13px 0', border: '2px solid #008000', borderRadius: 10, background: '#fff', color: '#008000', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
@@ -281,11 +370,7 @@ export function BuyerProductDetailPage() {
     cardInfo: { padding: '10px 12px 14px' } as React.CSSProperties,
   };
 
-  // ── Color name map (CSS color → label) ───────────────────────────────────────
-  const COLOR_CSS: Record<string, string> = {
-    'Trắng': 'white', 'Đen': '#222', 'Xanh': '#3b82f6', 'Đỏ': '#ef4444',
-    'Vàng': '#fbbf24', 'Hồng': '#f472b6', 'Xám': '#9ca3af', 'Nâu': '#92400e',
-  };
+
 
   if (loading) return (
     <div style={{ ...S.page }}>
@@ -342,34 +427,13 @@ export function BuyerProductDetailPage() {
           <div>
             {/* Shop badge */}
             {product.shopInfo && (
-              <div style={{ ...S.shopRow, justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Store size={14} color="#008000" />
-                  <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
-                    <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                    <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || '4.8'}</span>
-                  </div>
+              <div style={S.shopRow}>
+                <Store size={14} color="#008000" />
+                <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                  <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
+                  <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || '4.8'}</span>
                 </div>
-                <button
-                  onClick={handleChatWithSeller}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '4px 10px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#008000',
-                    backgroundColor: '#e6f4ea',
-                    border: '1px solid #c6e9c6',
-                    borderRadius: 6,
-                    cursor: 'pointer'
-                  }}
-                  title="Chat ngay với gian hàng"
-                >
-                  <MessageCircle size={13} /> Chat shop
-                </button>
               </div>
             )}
 
@@ -407,9 +471,9 @@ export function BuyerProductDetailPage() {
             {colors.length > 0 && (
               <>
                 <p style={S.sectionLabel}>Màu sắc: <span style={{ fontWeight: 400, color: '#555' }}>{selectedColor}</span></p>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   {colors.map(c => {
-                    const css = COLOR_CSS[c] || c;
+                    const css = resolveColorCss(c, product.colors);
                     return (
                       <button key={c} title={c} style={S.colorDot(css, selectedColor === c)} onClick={() => setSelectedColor(c)} />
                     );

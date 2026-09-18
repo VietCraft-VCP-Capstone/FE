@@ -240,7 +240,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
   };
 
   const displayProducts = getTabFilteredProducts();
-  const itemsPerPage = 5;
+  const itemsPerPage = 8;
   const totalPages = Math.ceil(displayProducts.length / itemsPerPage);
   const paginatedProducts = displayProducts.slice(
     (currentPage - 1) * itemsPerPage,
@@ -387,11 +387,11 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
           </div>
         ) : (
           <>
-            <div className="buyer-grid-5">
+            <div className="buyer-grid-4">
               {paginatedProducts.map((p: any) => {
                 const isFav = favoritedProductIds.includes(p.id);
                 return (
-                  <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`)}>
+                  <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`, { state: { initialProduct: p } })}>
                     <div className="card-media">
                       <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} />
                       <button
