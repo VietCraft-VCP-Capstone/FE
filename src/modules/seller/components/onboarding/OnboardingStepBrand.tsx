@@ -1,6 +1,7 @@
 import { SellerBrandSettings } from '../../types/settings';
-import { Store, UploadCloud, Camera, Trash2 } from 'lucide-react';
-import React, { useRef } from 'react';
+import { Store, UploadCloud, Camera, Trash2, Loader2 } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { uploadService } from '../../../../shared/services/uploadService';
 
 interface OnboardingStepBrandProps {
   data: SellerBrandSettings;
@@ -10,31 +11,49 @@ interface OnboardingStepBrandProps {
 export function OnboardingStepBrand({ data, onChange }: OnboardingStepBrandProps) {
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  const handleBannerFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (typeof ev.target?.result === 'string') {
-        onChange({ ...data, bannerUrl: ev.target!.result as string });
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Kích thước ảnh bìa vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.');
+      return;
+    }
+
+    try {
+      setUploadingBanner(true);
+      const res = await uploadService.uploadImage(file, 'shops');
+      onChange({ ...data, bannerUrl: res.url });
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'Tải ảnh bìa lên thất bại.');
+    } finally {
+      setUploadingBanner(false);
+      e.target.value = '';
+    }
   };
 
-  const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      if (typeof ev.target?.result === 'string') {
-        onChange({ ...data, logoUrl: ev.target!.result as string });
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Kích thước logo vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.');
+      return;
+    }
+
+    try {
+      setUploadingLogo(true);
+      const res = await uploadService.uploadImage(file, 'shops');
+      onChange({ ...data, logoUrl: res.url });
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'Tải logo lên thất bại.');
+    } finally {
+      setUploadingLogo(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -74,6 +93,12 @@ export function OnboardingStepBrand({ data, onChange }: OnboardingStepBrandProps
             onClick={() => bannerInputRef.current?.click()}
             className="relative w-full h-44 sm:h-52 rounded-t-2xl overflow-hidden bg-gradient-to-br from-stone-100 via-stone-50 to-emerald-50/40 cursor-pointer group flex items-center justify-center select-none"
           >
+            {uploadingBanner && (
+              <div className="absolute inset-0 bg-black/50 z-10 flex flex-col items-center justify-center text-white backdrop-blur-xs">
+                <Loader2 size={28} className="animate-spin mb-1" />
+                <span className="text-[11px] font-bold font-jakarta">Đang tải ảnh bìa...</span>
+              </div>
+            )}
             {data.bannerUrl ? (
               <>
                 <img
@@ -106,7 +131,7 @@ export function OnboardingStepBrand({ data, onChange }: OnboardingStepBrandProps
                 </div>
                 <div>
                   <p className="text-xs font-bold text-stone-800 font-jakarta">Tải lên ảnh bìa gian hàng</p>
-                  <p className="text-[11px] text-stone-400">Khuyến nghị 1200 x 300px (Tối đa 5MB)</p>
+                  <p className="text-[11px] text-stone-400">Khuyến nghị 1200 x 300px (Tối đa 10MB)</p>
                 </div>
               </div>
             )}
@@ -119,6 +144,11 @@ export function OnboardingStepBrand({ data, onChange }: OnboardingStepBrandProps
               className="relative group w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white bg-white shadow-md overflow-hidden flex items-center justify-center shrink-0 cursor-pointer hover:ring-2 hover:ring-[#007700] transition-all"
               title="Tải Logo"
             >
+              {uploadingLogo && (
+                <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center text-white">
+                  <Loader2 size={20} className="animate-spin" />
+                </div>
+              )}
               {data.logoUrl ? (
                 <>
                   <img

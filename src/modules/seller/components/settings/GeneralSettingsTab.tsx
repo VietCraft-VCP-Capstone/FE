@@ -10,8 +10,10 @@ import {
   Sparkles,
   Check,
   Camera,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
+import { uploadService } from '../../../../shared/services/uploadService';
 
 interface GeneralSettingsTabProps {
   initialData: SellerBrandSettings;
@@ -23,6 +25,8 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
   const [formData, setFormData] = useState<SellerBrandSettings>(initialData);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,43 +34,47 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
   };
 
   // Banner file upload handler
-  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Kích thước ảnh bìa vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Kích thước ảnh bìa vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (typeof event.target?.result === 'string') {
-        setFormData(prev => ({ ...prev, bannerUrl: event.target!.result as string }));
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    try {
+      setUploadingBanner(true);
+      const res = await uploadService.uploadImage(file, 'shops');
+      setFormData(prev => ({ ...prev, bannerUrl: res.url }));
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'Tải ảnh bìa lên thất bại.');
+    } finally {
+      setUploadingBanner(false);
+      e.target.value = '';
+    }
   };
 
   // Logo file upload handler
-  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Kích thước logo vượt quá 5MB. Vui lòng chọn ảnh nhỏ hơn.');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Kích thước logo vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (typeof event.target?.result === 'string') {
-        setFormData(prev => ({ ...prev, logoUrl: event.target!.result as string }));
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    try {
+      setUploadingLogo(true);
+      const res = await uploadService.uploadImage(file, 'shops');
+      setFormData(prev => ({ ...prev, logoUrl: res.url }));
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'Tải logo lên thất bại.');
+    } finally {
+      setUploadingLogo(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -107,6 +115,12 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
               onClick={() => bannerFileInputRef.current?.click()}
               className="relative w-full h-48 sm:h-64 rounded-t-2xl overflow-hidden bg-gradient-to-br from-stone-100 via-stone-50 to-emerald-50/40 cursor-pointer group select-none flex items-center justify-center transition-all"
             >
+              {uploadingBanner && (
+                <div className="absolute inset-0 bg-black/50 z-10 flex flex-col items-center justify-center text-white backdrop-blur-xs">
+                  <Loader2 size={32} className="animate-spin mb-2" />
+                  <span className="text-xs font-bold font-jakarta">Đang tải ảnh bìa lên Cloudinary...</span>
+                </div>
+              )}
               {formData.bannerUrl ? (
                 <>
                   <img
@@ -145,7 +159,7 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
                       Nhấp để tải lên ảnh bìa gian hàng
                     </p>
                     <p className="text-xs text-stone-400 mt-0.5 font-normal">
-                      Khuyến nghị tỷ lệ 4:1 (1200 x 300px) • PNG, JPG, WebP tối đa 5MB
+                      Khuyến nghị tỷ lệ 4:1 (1200 x 300px) • PNG, JPG, WebP tối đa 10MB
                     </p>
                   </div>
                 </div>
@@ -161,6 +175,11 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
                   className="relative group w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white bg-white shadow-lg overflow-hidden flex items-center justify-center shrink-0 cursor-pointer hover:ring-4 hover:ring-[#007700]/20 transition-all"
                   title="Nhấp để tải Logo gian hàng"
                 >
+                  {uploadingLogo && (
+                    <div className="absolute inset-0 bg-black/60 z-10 flex flex-col items-center justify-center text-white">
+                      <Loader2 size={24} className="animate-spin" />
+                    </div>
+                  )}
                   {formData.logoUrl ? (
                     <>
                       <img
