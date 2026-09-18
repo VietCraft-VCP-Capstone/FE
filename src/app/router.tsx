@@ -14,6 +14,7 @@ import { BuyerCartPage } from '../modules/buyer/pages/BuyerCartPage';
 import { BuyerCheckoutPage } from '../modules/buyer/pages/BuyerCheckoutPage';
 import { BuyerProfilePage } from '../modules/buyer/pages/BuyerProfilePage';
 import { BuyerFavoritesPage } from '../modules/buyer/pages/BuyerFavoritesPage';
+import { BuyerFollowedShopsPage } from '../modules/buyer/pages/BuyerFollowedShopsPage';
 import { BuyerOrdersPage } from '../modules/buyer/pages/BuyerOrdersPage';
 import { BuyerOrderDetailPage } from '../modules/buyer/pages/BuyerOrderDetailPage';
 import { BuyerProductDetailPage } from '../modules/buyer/pages/BuyerProductDetailPage';
@@ -113,6 +114,7 @@ export function AppRouter() {
           <Route path="/checkout" element={<BuyerCheckoutPage />} />
           <Route path="/profile" element={<BuyerProfilePage onLogout={logout} />} />
           <Route path="/favorites" element={<BuyerFavoritesPage />} />
+          <Route path="/followed-shops" element={<BuyerFollowedShopsPage />} />
           <Route path="/orders" element={<BuyerOrdersPage />} />
           <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
           <Route path="/notifications" element={<Navigate to="/" replace />} />

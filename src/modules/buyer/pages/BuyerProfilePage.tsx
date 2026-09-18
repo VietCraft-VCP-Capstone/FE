@@ -4,7 +4,7 @@ import {
     ShoppingBag, FolderHeart, UserCheck, MapPin,
     CreditCard, Settings, LogOut, ChevronRight, Check,
     Truck, Home, Plus, Trash2, Edit2, Camera, Loader2,
-    Calendar, Eye, Heart, Store
+    Calendar, Heart, Store
 } from 'lucide-react';
 import { userService, UserProfile, Address } from '../../user/services/userService';
 import { ordersService } from '../../order/services/ordersService';
@@ -359,10 +359,13 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                 <span className="text-[10px] text-gray-500 font-bold">Bộ sưu tập</span>
                             </div>
                         </div>
-                        <button className="w-full flex items-center justify-between px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors mt-2">
+                        <button
+                            onClick={() => navigate('/followed-shops')}
+                            className="w-full flex items-center justify-between px-4 py-2.5 rounded-full border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors mt-2 cursor-pointer"
+                        >
                             <span className="flex items-center gap-2">
-                                <Eye size={14} className="text-gray-400" />
-                                <span>{profile.stats?.followingCount ?? 0} Đang theo dõi</span>
+                                <Store size={14} className="text-[#15803d]" />
+                                <span>{profile.stats?.followingCount ?? 0} Gian hàng đang theo dõi</span>
                             </span>
                             <ChevronRight size={14} className="text-gray-400" />
                         </button>

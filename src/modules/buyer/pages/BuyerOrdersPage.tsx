@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck, Check } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
+import ReviewModal from '../components/profile/ReviewModal';
 
 interface OrderItem {
     productId: string;
@@ -35,6 +36,17 @@ export function BuyerOrdersPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [reorderOrder, setReorderOrder] = useState<Order | null>(null);
+    const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
+    const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
+
+    const handleOpenReview = (order: Order) => {
+        setReviewOrder(order);
+    };
+
+    const handleReviewSuccess = (orderId: string, _productId: string) => {
+        setReviewedOrders(prev => new Set(prev).add(orderId));
+        showToast('Gửi đánh giá thành công! Cảm ơn bạn đã chia sẻ trải nghiệm.', 'success');
+    };
 
     const showToast = (message: string, type: 'success' | 'error' = 'success') => {
         setToast({ message, type });
@@ -236,9 +248,12 @@ export function BuyerOrdersPage() {
 
                                     {order.status === 'completed' && (
                                         <>
-                                            <button className="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm">
-                                                <Star size={14} />
-                                                <span>Đánh giá</span>
+                                            <button
+                                                onClick={() => handleOpenReview(order)}
+                                                className="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
+                                            >
+                                                <Star size={14} className={reviewedOrders.has(order.id) ? 'fill-emerald-500' : ''} />
+                                                <span>{reviewedOrders.has(order.id) ? 'Đã đánh giá' : 'Đánh giá'}</span>
                                             </button>
                                             <button
                                                 onClick={() => handleReorder(order)}
@@ -263,6 +278,16 @@ export function BuyerOrdersPage() {
                     shopName={reorderOrder.shopName}
                     items={reorderOrder.items}
                     onConfirm={handleConfirmReorder}
+                />
+            )}
+
+            {/* Review Modal */}
+            {reviewOrder && (
+                <ReviewModal
+                    isOpen={!!reviewOrder}
+                    onClose={() => setReviewOrder(null)}
+                    order={reviewOrder}
+                    onSuccess={handleReviewSuccess}
                 />
             )}
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart, ArrowLeft, ShoppingBag } from 'lucide-react';
+import { Heart, ArrowLeft, ShoppingBag, Store } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
@@ -118,7 +118,7 @@ export function BuyerFavoritesPage() {
         </div>
 
         {/* Header trang */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full border border-gray-200 overflow-hidden shrink-0 bg-emerald-50 flex items-center justify-center text-[#15803d]">
               <Heart className="w-5 h-5 fill-[#15803d]" />
@@ -132,6 +132,14 @@ export function BuyerFavoritesPage() {
               </p>
             </div>
           </div>
+
+          <button
+            onClick={() => navigate('/followed-shops')}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-[#15803d] bg-stone-100 hover:bg-emerald-50 px-3.5 py-2 rounded-full transition-colors cursor-pointer self-start sm:self-auto"
+          >
+            <Store className="w-3.5 h-3.5 text-[#15803d]" />
+            <span>Gian hàng đang theo dõi</span>
+          </button>
         </div>
 
         {/* Trạng thái Loading / Danh sách sản phẩm */}
