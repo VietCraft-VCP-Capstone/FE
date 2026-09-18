@@ -15,6 +15,7 @@ import { EditProfileModal } from '../components/profile/EditProfileModal';
 import { AddressFormModal } from '../components/profile/AddressFormModal';
 import { ConfirmDeleteModal } from '../components/profile/ConfirmDeleteModal';
 import { ToastNotification } from '../components/profile/ToastNotification';
+import { uploadService } from '../../../shared/services/uploadService';
 const getFullAddressText = (addr: Address) => {
     return addr.address_detail;
 };
@@ -64,42 +65,8 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
         setUploadingAvatar(true);
 
         try {
-            let uploadedUrl = '';
-            const cloudName = (import.meta as any).env.VITE_CLOUDINARY_CLOUD_NAME;
-            const uploadPreset = (import.meta as any).env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-            if (cloudName && uploadPreset) {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('upload_preset', uploadPreset);
-
-                try {
-                    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        uploadedUrl = data.secure_url;
-                    } else {
-                        console.warn('Cloudinary upload failed, falling back to Base64');
-                    }
-                } catch (err) {
-                    console.warn('Cloudinary upload request failed, falling back to Base64', err);
-                }
-            }
-
-            if (!uploadedUrl) {
-                uploadedUrl = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        resolve(reader.result as string);
-                    };
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-            }
+            const uploadRes = await uploadService.uploadAvatar(file);
+            const uploadedUrl = uploadRes.url;
 
             const updated = await userService.updateProfile({
                 avatar: uploadedUrl
