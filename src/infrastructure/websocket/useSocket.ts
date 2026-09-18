@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { ChatMessage, appendUniqueMessage } from '../../modules/chat/types/chatTypes';
 
-const SOCKET_URL = 'http://localhost:8080';
+const SOCKET_URL = import.meta.env.VITE_WS_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8080' : ''));
 
 export interface SendMessageOptions {
   roomId?: string;

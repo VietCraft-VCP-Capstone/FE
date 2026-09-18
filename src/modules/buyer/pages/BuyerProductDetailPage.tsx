@@ -16,17 +16,10 @@ interface Product {
   tags: string[]; allowCustomization: boolean; customizationType: string;
   price: number; images?: string[]; variants: Variant[];
   shopInfo?: { id: string; name: string; logo?: string; rating: number };
+  rating?: number;
+  reviews_count?: number;
+  reviews?: Array<{ id: string; name: string; date: string; rating: number; avatar?: string; text: string; images?: string[] }>;
 }
-
-// ─── Mock reviews (until a reviews endpoint exists) ───────────────────────────
-const MOCK_REVIEWS = [
-  { id: '1', name: 'Trần Ngọc M.', date: '13/04/2024', rating: 5, avatar: 'https://randomuser.me/api/portraits/women/68.jpg', text: 'Áo rất đẹp, đúng màu, chất vải cotton chuẩn 100%. Đường may tỉ mỉ, không bị xổ. Sẽ ủng hộ shop dài dài!', images: [] },
-  { id: '2', name: 'Nguyễn Văn T.', date: '10/04/2024', rating: 5, avatar: 'https://randomuser.me/api/portraits/men/45.jpg', text: 'Giao hàng nhanh, đóng gói cẩn thận. Sản phẩm đúng mô tả, mặc vừa size M. Chất lượng tốt cho mức giá này.', images: [] },
-  { id: '3', name: 'Lê Thanh D.', date: '08/03/2024', rating: 4, avatar: 'https://randomuser.me/api/portraits/women/32.jpg', text: 'Giao nhanh 2 ngày, chất lượng ổn. Màu sắc đẹp như hình, size đúng. Tuy nhiên giặt lần đầu hơi phai màu một chút.', images: ['https://images.unsplash.com/photo-1556821840-3a63f15732ce?auto=format&fit=crop&w=80', 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=80'] },
-];
-
-const AVG_RATING = 4.8;
-const REVIEW_COUNT = 62;
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function fmtPrice(n: number) { return n.toLocaleString('vi-VN') + 'đ'; }
@@ -519,45 +512,55 @@ export function BuyerProductDetailPage() {
         {/* ── Reviews ───────────────────────────────────────────────────────── */}
         <section style={S.reviewSection}>
           <h2 style={S.sectionTitle}>Đánh giá sản phẩm</h2>
-          <div style={S.reviewSummary}>
-            <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
-              <div style={S.ratingBig}>{AVG_RATING}</div>
-              <StarRow rating={5} size={18} />
-              <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{REVIEW_COUNT} đánh giá</div>
-            </div>
-            <div style={{ flex: 1, paddingLeft: 16 }}>
-              {[5, 4, 3, 2, 1].map(star => (
-                <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <StarRow rating={star} size={12} />
-                  <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', background: '#f59e0b', borderRadius: 4, width: star === 5 ? '85%' : star === 4 ? '10%' : '3%' }} />
+          {product?.reviews && product.reviews.length > 0 ? (
+            <>
+              <div style={S.reviewSummary}>
+                <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
+                  <div style={S.ratingBig}>{product.rating ? product.rating.toFixed(1) : '5.0'}</div>
+                  <StarRow rating={Math.round(product.rating || 5)} size={18} />
+                  <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{product.reviews.length} đánh giá</div>
+                </div>
+              </div>
+              {product.reviews.map(rv => (
+                <div key={rv.id} style={S.reviewCard}>
+                  {rv.avatar ? (
+                    <img src={rv.avatar} alt={rv.name} style={S.avatar} />
+                  ) : (
+                    <div style={{ ...S.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e5e7eb', color: '#4b5563', fontWeight: 'bold' }}>
+                      {rv.name?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{rv.name}</span>
+                      <StarRow rating={rv.rating} size={12} />
+                      <span style={{ fontSize: 12, color: '#aaa', marginLeft: 'auto' }}>{rv.date}</span>
+                    </div>
+                    <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{rv.text}</p>
+                    {rv.images && rv.images.length > 0 && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {rv.images.map((img, i) => (
+                          <img key={i} src={img} alt="review" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <span style={{ fontSize: 12, color: '#888', width: 32 }}>{star === 5 ? '85%' : star === 4 ? '10%' : '2%'}</span>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {MOCK_REVIEWS.map(rv => (
-            <div key={rv.id} style={S.reviewCard}>
-              <img src={rv.avatar} alt={rv.name} style={S.avatar} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{rv.name}</span>
-                  <StarRow rating={rv.rating} size={12} />
-                  <span style={{ fontSize: 12, color: '#aaa', marginLeft: 'auto' }}>{rv.date}</span>
-                </div>
-                <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{rv.text}</p>
-                {rv.images.length > 0 && (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {rv.images.map((img, i) => (
-                      <img key={i} src={img} alt="review" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
-                    ))}
-                  </div>
-                )}
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '32px 16px', background: '#fafafa', borderRadius: 12, border: '1px dashed #e5e7eb' }}>
+              <div style={{ display: 'inline-flex', marginBottom: 8 }}>
+                <StarRow rating={product?.rating ? Math.round(product.rating) : 5} size={20} />
               </div>
+              <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#374151', fontSize: 14 }}>
+                Chưa có đánh giá nào cho sản phẩm này
+              </p>
+              <p style={{ margin: 0, fontSize: 12.5, color: '#6b7280' }}>
+                Khách hàng mua sản phẩm có thể để lại nhận xét và đánh giá tại đây.
+              </p>
             </div>
-          ))}
+          )}
         </section>
 
         {/* ── Related products ──────────────────────────────────────────────── */}
