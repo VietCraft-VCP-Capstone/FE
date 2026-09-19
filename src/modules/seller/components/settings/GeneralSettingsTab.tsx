@@ -14,6 +14,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { uploadService } from '../../../../shared/services/uploadService';
+import { useToast } from '../../../../shared/components/Toast';
 
 interface GeneralSettingsTabProps {
   initialData: SellerBrandSettings;
@@ -22,6 +23,7 @@ interface GeneralSettingsTabProps {
 }
 
 export function GeneralSettingsTab({ initialData, onSave, loading = false }: GeneralSettingsTabProps) {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState<SellerBrandSettings>(initialData);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
@@ -39,7 +41,7 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Kích thước ảnh bìa vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.');
+      showToast('Kích thước ảnh bìa vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.', 'error');
       return;
     }
 
@@ -48,7 +50,7 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
       const res = await uploadService.uploadImage(file, 'shops');
       setFormData(prev => ({ ...prev, bannerUrl: res.url }));
     } catch (err: any) {
-      alert(err?.response?.data?.error || 'Tải ảnh bìa lên thất bại.');
+      showToast(err?.response?.data?.error || 'Tải ảnh bìa lên thất bại.', 'error');
     } finally {
       setUploadingBanner(false);
       e.target.value = '';
@@ -61,7 +63,7 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Kích thước logo vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.');
+      showToast('Kích thước logo vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.', 'error');
       return;
     }
 
@@ -70,7 +72,7 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
       const res = await uploadService.uploadImage(file, 'shops');
       setFormData(prev => ({ ...prev, logoUrl: res.url }));
     } catch (err: any) {
-      alert(err?.response?.data?.error || 'Tải logo lên thất bại.');
+      showToast(err?.response?.data?.error || 'Tải logo lên thất bại.', 'error');
     } finally {
       setUploadingLogo(false);
       e.target.value = '';

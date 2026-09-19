@@ -2,6 +2,7 @@ import { SellerBrandSettings } from '../../types/settings';
 import { Store, UploadCloud, Camera, Trash2, Loader2 } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 import { uploadService } from '../../../../shared/services/uploadService';
+import { useToast } from '../../../../shared/components/Toast';
 
 interface OnboardingStepBrandProps {
   data: SellerBrandSettings;
@@ -9,6 +10,7 @@ interface OnboardingStepBrandProps {
 }
 
 export function OnboardingStepBrand({ data, onChange }: OnboardingStepBrandProps) {
+  const { showToast } = useToast();
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -19,7 +21,7 @@ export function OnboardingStepBrand({ data, onChange }: OnboardingStepBrandProps
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Kích thước ảnh bìa vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.');
+      showToast('Kích thước ảnh bìa vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.', 'error');
       return;
     }
 
@@ -28,7 +30,7 @@ export function OnboardingStepBrand({ data, onChange }: OnboardingStepBrandProps
       const res = await uploadService.uploadImage(file, 'shops');
       onChange({ ...data, bannerUrl: res.url });
     } catch (err: any) {
-      alert(err?.response?.data?.error || 'Tải ảnh bìa lên thất bại.');
+      showToast(err?.response?.data?.error || 'Tải ảnh bìa lên thất bại.', 'error');
     } finally {
       setUploadingBanner(false);
       e.target.value = '';
@@ -40,7 +42,7 @@ export function OnboardingStepBrand({ data, onChange }: OnboardingStepBrandProps
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Kích thước logo vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.');
+      showToast('Kích thước logo vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.', 'error');
       return;
     }
 
@@ -49,7 +51,7 @@ export function OnboardingStepBrand({ data, onChange }: OnboardingStepBrandProps
       const res = await uploadService.uploadImage(file, 'shops');
       onChange({ ...data, logoUrl: res.url });
     } catch (err: any) {
-      alert(err?.response?.data?.error || 'Tải logo lên thất bại.');
+      showToast(err?.response?.data?.error || 'Tải logo lên thất bại.', 'error');
     } finally {
       setUploadingLogo(false);
       e.target.value = '';

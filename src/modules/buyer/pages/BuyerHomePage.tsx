@@ -222,15 +222,17 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           if (!idStr || addedProductIds.has(idStr)) continue;
           const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
           if (p && p.price > 0) {
-            const basePrice = p.originalPrice && p.originalPrice > p.price ? p.originalPrice : p.price;
+            const basePrice = p.price;
             let dealPrice = basePrice;
             let discountText = '';
             if (discountVal <= 100) {
+              // val là %
               dealPrice = Math.round(basePrice * (1 - discountVal / 100));
               discountText = `-${discountVal}%`;
             } else {
+              // val là số tiền VNĐ
               dealPrice = Math.max(0, basePrice - discountVal);
-              discountText = `-${Math.round((discountVal / basePrice) * 100)}%`;
+              discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
             }
             deals.push({
               id: p.id || p._id,
@@ -253,15 +255,17 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         for (const p of matchingProds.slice(0, 4)) {
           const idStr = (p.id || p._id)?.toString();
           if (!idStr || addedProductIds.has(idStr)) continue;
-          const basePrice = p.originalPrice && p.originalPrice > p.price ? p.originalPrice : p.price;
+          const basePrice = p.price;
           let dealPrice = basePrice;
           let discountText = '';
           if (discountVal <= 100) {
+            // val là %
             dealPrice = Math.round(basePrice * (1 - discountVal / 100));
             discountText = `-${discountVal}%`;
           } else {
+            // val là số tiền VNĐ
             dealPrice = Math.max(0, basePrice - discountVal);
-            discountText = `-${Math.round((discountVal / basePrice) * 100)}%`;
+            discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
           }
           deals.push({
             id: p.id || p._id,
@@ -291,7 +295,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           if (!idStr || addedProductIds.has(idStr)) continue;
           const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
           if (p && p.price > 0) {
-            const basePrice = p.originalPrice && p.originalPrice > p.price ? p.originalPrice : p.price;
+            const basePrice = p.price;
             let dealPrice = basePrice;
             let discountText = '';
             if (coupon.discount_type === 'PERCENTAGE') {
@@ -358,12 +362,11 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
     currentPage * itemsPerPage
   );
 
+  // Map tất cả deal (FLASH SALE + ƯU ĐÃI) để hiện giá gạch ngang đúng
   const flashSaleProductMap = useMemo(() => {
     const map = new Map<string, any>();
     flashDeals.forEach((fd: any) => {
-      if (fd.badge === 'FLASH SALE') {
-        map.set(fd.id?.toString(), fd);
-      }
+      map.set(fd.id?.toString(), fd);
     });
     return map;
   }, [flashDeals]);
@@ -414,11 +417,9 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              backgroundColor: '#008000',
-              color: '#fff',
+              border: '#008000',
               padding: '8px 18px',
               borderRadius: 50,
-              border: 'none',
               fontSize: 13,
               fontWeight: 700,
               cursor: 'pointer',
@@ -637,7 +638,8 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
               {paginatedProducts.map((p: any) => {
                 const isFav = favoritedProductIds.includes(p.id);
                 const flashDeal = flashSaleProductMap.get((p.id || p._id)?.toString());
-                const isFlashSale = !!flashDeal;
+                const isFlashSale = flashDeal?.badge === 'FLASH SALE';
+                const isOtherDeal = flashDeal && !isFlashSale;
                 return (
                   <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`, { state: { initialProduct: p } })}>
                     <div className="card-media">
@@ -646,6 +648,13 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
                         <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 3 }}>
                           <span className="flash-sale-badge">
                             ⚡ FLASH SALE
+                          </span>
+                        </div>
+                      )}
+                      {isOtherDeal && (
+                        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 3 }}>
+                          <span style={{ backgroundColor: '#7c3aed', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 12 }}>
+                            🏷️ ƯU ĐÃI
                           </span>
                         </div>
                       )}

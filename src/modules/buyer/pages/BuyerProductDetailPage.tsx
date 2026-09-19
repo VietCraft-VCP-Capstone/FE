@@ -274,43 +274,59 @@ export function BuyerProductDetailPage() {
     if (!id || !availableCoupons.length) return null;
     const now = new Date();
 
-    // 1. Tìm coupon FLASH SALE áp dụng cho sản phẩm này
-    const flashSale = availableCoupons.find(c => {
-      if (!c.is_active || c.discount_type !== 'FLASH_SALE') return false;
+    const isActive = (c: any) => {
+      if (!c.is_active) return false;
       if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
+      return true;
+    };
+
+    const appliesToProduct = (c: any): boolean => {
       if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
         return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
       }
-      return c.shop_id && product?.shopInfo?.id && c.shop_id === product.shopInfo.id;
-    });
+      if (c.applicable_scope === 'ALL') {
+        // Nếu có shop_id thì chỉ áp dụng cho shop đó; nếu không thì toàn sàn
+        if (c.shop_id) return product?.shopInfo?.id === c.shop_id;
+        return true; // platform-wide
+      }
+      return false;
+    };
 
+    const parseVal = (raw: any) =>
+      typeof raw === 'object' && raw?.$numberDecimal
+        ? parseFloat(raw.$numberDecimal)
+        : parseFloat(raw || 0);
+
+    // 1. Flash Sale: ưu tiên SPECIFIC_PRODUCTS trước, sau đó scope ALL
+    const flashSale = availableCoupons.find(c =>
+      isActive(c) && c.discount_type === 'FLASH_SALE' && appliesToProduct(c)
+    );
     if (flashSale) {
-      const val = typeof flashSale.discount_value === 'object' && (flashSale.discount_value as any)?.$numberDecimal
-        ? parseFloat((flashSale.discount_value as any).$numberDecimal)
-        : parseFloat((flashSale.discount_value as any) || 0);
-      return {
-        type: 'FLASH_SALE' as const,
-        coupon: flashSale,
-        discountVal: val
-      };
+      return { type: 'FLASH_SALE' as const, coupon: flashSale, discountVal: parseVal(flashSale.discount_value) };
     }
 
-    // 2. Tìm coupon PERCENTAGE / FIXED_AMOUNT chỉ định cho sản phẩm này
-    const specificCoupon = availableCoupons.find(c => {
-      if (!c.is_active || c.applicable_scope !== 'SPECIFIC_PRODUCTS') return false;
-      if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
-      return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
-    });
-
+    // 2. Coupon chỉ định sản phẩm cụ thể (ưu tiên cao hơn scope ALL)
+    const specificCoupon = availableCoupons.find(c =>
+      isActive(c) &&
+      c.discount_type !== 'FLASH_SALE' &&
+      c.discount_type !== 'FREE_SHIPPING' &&
+      c.applicable_scope === 'SPECIFIC_PRODUCTS' &&
+      (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id)
+    );
     if (specificCoupon) {
-      const val = typeof specificCoupon.discount_value === 'object' && (specificCoupon.discount_value as any)?.$numberDecimal
-        ? parseFloat((specificCoupon.discount_value as any).$numberDecimal)
-        : parseFloat((specificCoupon.discount_value as any) || 0);
-      return {
-        type: specificCoupon.discount_type,
-        coupon: specificCoupon,
-        discountVal: val
-      };
+      return { type: specificCoupon.discount_type, coupon: specificCoupon, discountVal: parseVal(specificCoupon.discount_value) };
+    }
+
+    // 3. Coupon scope ALL (toàn shop hoặc toàn sàn) – chỉ PERCENTAGE / FIXED_AMOUNT
+    const allScopeCoupon = availableCoupons.find(c =>
+      isActive(c) &&
+      c.discount_type !== 'FLASH_SALE' &&
+      c.discount_type !== 'FREE_SHIPPING' &&
+      c.applicable_scope === 'ALL' &&
+      appliesToProduct(c)
+    );
+    if (allScopeCoupon) {
+      return { type: allScopeCoupon.discount_type, coupon: allScopeCoupon, discountVal: parseVal(allScopeCoupon.discount_value) };
     }
 
     return null;
@@ -328,13 +344,15 @@ export function BuyerProductDetailPage() {
     if (activePromotion.type === 'FLASH_SALE') {
       isFlashSale = true;
       if (val <= 100) {
+        // val là % giảm
         finalPrice = Math.round(basePrice * (1 - val / 100));
         discountPct = Math.round(val);
         discountBadgeText = `-${discountPct}%`;
       } else {
+        // val là số tiền giảm (VNĐ)
         finalPrice = Math.max(0, basePrice - val);
         discountPct = Math.round((val / basePrice) * 100);
-        discountBadgeText = `-${Math.round(val / 1000)}K`;
+        discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
       }
     } else if (activePromotion.type === 'PERCENTAGE') {
       finalPrice = Math.round(basePrice * (1 - val / 100));
@@ -343,16 +361,11 @@ export function BuyerProductDetailPage() {
     } else if (activePromotion.type === 'FIXED_AMOUNT') {
       finalPrice = Math.max(0, basePrice - val);
       discountPct = Math.round((val / basePrice) * 100);
-      discountBadgeText = `-${Math.round(val / 1000)}K`;
+      discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
     }
-  } else if (product?.originalPrice && product.originalPrice > basePrice) {
-    strikePrice = product.originalPrice;
-    finalPrice = basePrice;
-    discountPct = Math.round(((strikePrice - basePrice) / strikePrice) * 100);
-    discountBadgeText = `-${discountPct}%`;
   }
 
-  const hasDiscount = strikePrice > finalPrice && discountPct > 0;
+  const hasDiscount = strikePrice > finalPrice;
   const displayPrice = finalPrice;
 
   // Danh sách voucher áp dụng được cho sản phẩm hoặc shop này
@@ -455,7 +468,7 @@ export function BuyerProductDetailPage() {
 
   // ── Styles ────────────────────────────────────────────────────────────────────
   const S = {
-    page: { fontFamily: "'Inter', system-ui, sans-serif", background: '#f9f9f9', minHeight: '100vh' } as React.CSSProperties,
+    page: { fontFamily: "'Inter', system-ui, sans-serif", background: '#fcfcfc', minHeight: '100vh' } as React.CSSProperties,
     container: { maxWidth: 1100, margin: '0 auto', padding: '24px 20px' } as React.CSSProperties,
     backBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, fontWeight: 600, marginBottom: 20, padding: '6px 0' } as React.CSSProperties,
     grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 36, alignItems: 'start' } as React.CSSProperties,

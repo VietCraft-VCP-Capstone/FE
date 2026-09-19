@@ -10,6 +10,8 @@ import { sellerKycService, SellerKycStatusResponse } from '../services/sellerKyc
 import { userService } from '../../user/services/userService';
 import { SUPPORTED_BANKS } from '../types/settings';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { useToast } from '../../../shared/components/Toast';
 
 const CRAFT_CATEGORIES = [
     'Gốm sứ thủ công (Bát Tràng, Chu Đậu)',
@@ -77,10 +79,13 @@ function formatMaskedDateInput(raw: string): string {
 
 export function SellerRegisterPage() {
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [statusData, setStatusData] = useState<SellerKycStatusResponse | null>(null);
+    const [showCancelKycModal, setShowCancelKycModal] = useState(false);
+    const [cancellingKyc, setCancellingKyc] = useState(false);
 
     const [currentStep, setCurrentStep] = useState(1);
 
@@ -371,17 +376,22 @@ export function SellerRegisterPage() {
         }
     };
 
-    const handleCancelApplication = async () => {
-        if (!window.confirm('Bạn có chắc chắn muốn hủy đơn đăng ký và xóa toàn bộ dữ liệu định danh KYC cá nhân khỏi hệ thống theo Nghị định 13/2023/NĐ-CP?')) {
-            return;
-        }
+    const handleCancelApplication = () => {
+        setShowCancelKycModal(true);
+    };
+
+    const handleConfirmCancelKyc = async () => {
+        setCancellingKyc(true);
         try {
             await sellerKycService.cancelOrDelete();
-            alert('Đã xóa dữ liệu hồ sơ KYC thành công.');
+            showToast('Đã xóa dữ liệu hồ sơ KYC thành công.', 'success');
+            setShowCancelKycModal(false);
             await loadStatus();
             setCurrentStep(1);
         } catch (err: any) {
             setError(getApiErrorMessage(err, 'Hủy hồ sơ thất bại.'));
+        } finally {
+            setCancellingKyc(false);
         }
     };
 
@@ -1487,6 +1497,19 @@ export function SellerRegisterPage() {
                     )}
                 </div>
             </div>
+
+            {/* Modal xác nhận hủy hồ sơ KYC */}
+            <ConfirmModal
+                isOpen={showCancelKycModal}
+                variant="danger"
+                title="Xác nhận hủy hồ sơ & Xóa dữ liệu KYC"
+                message={`Bạn có chắc chắn muốn hủy đơn đăng ký và xóa toàn bộ dữ liệu định danh KYC cá nhân khỏi hệ thống theo Nghị định 13/2023/NĐ-CP?\n\nThao tác này không thể hoàn tác và bạn sẽ cần bắt đầu lại từ đầu.`}
+                confirmLabel="Hủy hồ sơ & Xóa dữ liệu"
+                cancelLabel="Giữ lại hồ sơ"
+                isLoading={cancellingKyc}
+                onConfirm={handleConfirmCancelKyc}
+                onCancel={() => setShowCancelKycModal(false)}
+            />
         </div>
     );
 }

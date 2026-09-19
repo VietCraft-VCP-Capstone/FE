@@ -7,6 +7,7 @@ import {
 
 import { promotionService, CouponDTO, CreateCouponPayload, CouponDiscountType, SelectableProduct } from '../../promotion/services/promotionService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 
 const parseVal = (val: any): number => {
     if (val === null || val === undefined) return 0;
@@ -30,8 +31,14 @@ export function SellerPromotionsPage() {
 
     // Create Modal state
     const [showModal, setShowModal] = useState(false);
+    const [modalError, setModalError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+    // Delete Confirmation modal states
+    const [couponToDelete, setCouponToDelete] = useState<CouponDTO | null>(null);
+    const [blockedDeleteCoupon, setBlockedDeleteCoupon] = useState<CouponDTO | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     // Selectable products for SPECIFIC_PRODUCTS scope
     const [selectableProducts, setSelectableProducts] = useState<SelectableProduct[]>([]);
@@ -135,19 +142,27 @@ export function SellerPromotionsPage() {
         }
     };
 
-    const handleDelete = async (coupon: CouponDTO) => {
+    const handleDelete = (coupon: CouponDTO) => {
         if ((coupon.used_count || 0) > 0) {
-            alert(`Không thể xóa mã "${coupon.code}" vì đã có ${coupon.used_count} đơn hàng sử dụng.\n\nĐể đảm bảo toàn vẹn dữ liệu đơn hàng và đối soát tài chính, bạn chỉ có thể TẮT (Tạm dừng) mã này thay vì xóa.`);
+            setBlockedDeleteCoupon(coupon);
             return;
         }
-        if (!window.confirm(`Bạn có chắc chắn muốn xóa mã giảm giá "${coupon.code}"? Thao tác này không thể hoàn tác.`)) return;
+        setCouponToDelete(coupon);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!couponToDelete) return;
+        setDeleting(true);
         try {
-            await promotionService.deleteSellerCoupon(coupon.id);
-            setCoupons(prev => prev.filter(c => c.id !== coupon.id));
-            setSuccessMsg(`Đã xóa mã giảm giá "${coupon.code}" thành công.`);
+            await promotionService.deleteSellerCoupon(couponToDelete.id);
+            setCoupons(prev => prev.filter(c => c.id !== couponToDelete.id));
+            setSuccessMsg(`Đã xóa mã giảm giá "${couponToDelete.code}" thành công.`);
             setTimeout(() => setSuccessMsg(null), 3000);
+            setCouponToDelete(null);
         } catch (err: any) {
             setError(getApiErrorMessage(err, 'Không thể xóa mã giảm giá.'));
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -161,6 +176,8 @@ export function SellerPromotionsPage() {
             errors.code = 'Mã voucher phải từ 3 đến 20 ký tự.';
         } else if (!/^[A-Z0-9_]+$/.test(cleanCode)) {
             errors.code = 'Mã chỉ được chứa chữ hoa không dấu, chữ số và dấu gạch dưới (VD: TET2026).';
+        } else if (coupons.some(c => c.code.toUpperCase() === cleanCode)) {
+            errors.code = `Mã giảm giá "${cleanCode}" đã tồn tại trong gian hàng. Vui lòng chọn mã khác.`;
         }
 
         const cleanTitle = (formData.title || '').trim();
@@ -207,7 +224,7 @@ export function SellerPromotionsPage() {
 
     const handleCreateCoupon = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError(null);
+        setModalError(null);
 
         if (!validateForm()) {
             return;
@@ -230,11 +247,19 @@ export function SellerPromotionsPage() {
             setShowModal(false);
             setFormData(initialForm);
             setFormErrors({});
+            setModalError(null);
             setProductSearch('');
             setSuccessMsg(`Đã tạo mã giảm giá ${newCoupon.code} thành công!`);
             setTimeout(() => setSuccessMsg(null), 4000);
         } catch (err: any) {
-            setError(getApiErrorMessage(err, 'Không thể tạo mã giảm giá. Vui lòng kiểm tra lại.'));
+            const errMsg = getApiErrorMessage(err, 'Không thể tạo mã giảm giá. Vui lòng kiểm tra lại.');
+            setModalError(errMsg);
+            if (errMsg.toLowerCase().includes('tồn tại') || errMsg.toLowerCase().includes('mã')) {
+                setFormErrors(prev => ({
+                    ...prev,
+                    code: errMsg
+                }));
+            }
         } finally {
             setSubmitting(false);
         }
@@ -320,6 +345,8 @@ export function SellerPromotionsPage() {
                 <button
                     onClick={() => {
                         setShowModal(true);
+                        setModalError(null);
+                        setFormErrors({});
                         if (selectableProducts.length === 0) fetchSelectableProducts();
                     }}
                     className="inline-flex items-center gap-2 bg-[#008000] hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all active:scale-[0.98]"
@@ -602,6 +629,7 @@ export function SellerPromotionsPage() {
                                 onClick={() => {
                                     setShowModal(false);
                                     setFormErrors({});
+                                    setModalError(null);
                                 }}
                                 className="text-stone-400 hover:text-stone-600 p-1.5 rounded-full hover:bg-stone-100"
                             >
@@ -610,6 +638,13 @@ export function SellerPromotionsPage() {
                         </div>
 
                         <form onSubmit={handleCreateCoupon} className="space-y-4 mt-4">
+                            {modalError && (
+                                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2 animate-shake">
+                                    <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
+                                    <span>{modalError}</span>
+                                </div>
+                            )}
+
                             {/* Mã & Tiêu đề */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>
@@ -621,6 +656,7 @@ export function SellerPromotionsPage() {
                                         onChange={(e) => {
                                             setFormData({ ...formData, code: e.target.value.toUpperCase() });
                                             if (formErrors.code) setFormErrors({ ...formErrors, code: '' });
+                                            if (modalError) setModalError(null);
                                         }}
                                         className={`w-full text-xs font-mono uppercase px-3 py-2.5 border rounded-xl font-bold transition ${
                                             formErrors.code ? 'border-red-400 bg-red-50/20 focus:ring-red-500/20 focus:border-red-500' : 'border-stone-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
@@ -923,7 +959,11 @@ export function SellerPromotionsPage() {
                             <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-100">
                                 <button
                                     type="button"
-                                    onClick={() => setShowModal(false)}
+                                    onClick={() => {
+                                        setShowModal(false);
+                                        setModalError(null);
+                                        setFormErrors({});
+                                    }}
                                     className="px-4 py-2 text-xs font-bold text-stone-500 hover:text-stone-800 transition"
                                 >
                                     Hủy bỏ
@@ -940,6 +980,31 @@ export function SellerPromotionsPage() {
                     </div>
                 </div>
             )}
+
+            {/* Modal thông báo không thể xóa voucher vì đã có đơn hàng sử dụng */}
+            <ConfirmModal
+                isOpen={!!blockedDeleteCoupon}
+                variant="warning"
+                title="Không thể xóa mã khuyến mãi"
+                message={`Không thể xóa mã "${blockedDeleteCoupon?.code}" vì đã có ${blockedDeleteCoupon?.used_count} đơn hàng sử dụng.\n\nĐể đảm bảo tính toàn vẹn dữ liệu đơn hàng và đối soát tài chính, bạn chỉ có thể TẮT (Tạm dừng) mã này thay vì xóa.`}
+                confirmLabel="Đã hiểu"
+                hideCancel={true}
+                onConfirm={() => setBlockedDeleteCoupon(null)}
+                onCancel={() => setBlockedDeleteCoupon(null)}
+            />
+
+            {/* Modal xác nhận xóa mã giảm giá */}
+            <ConfirmModal
+                isOpen={!!couponToDelete}
+                variant="danger"
+                title="Xác nhận xóa mã giảm giá"
+                message={`Bạn có chắc chắn muốn xóa mã giảm giá "${couponToDelete?.code}"?\n\nThao tác này không thể hoàn tác.`}
+                confirmLabel="Xóa vĩnh viễn"
+                cancelLabel="Hủy bỏ"
+                isLoading={deleting}
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setCouponToDelete(null)}
+            />
         </div>
     );
 }
