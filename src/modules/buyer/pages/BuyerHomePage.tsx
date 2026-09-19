@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
-import { Heart, Star, ArrowRight, CheckCircle2, Info, Ticket, Flame, X, Copy, Check } from 'lucide-react';
+import { Heart, Star, ArrowRight, CheckCircle2, Info, Ticket, Flame } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { promotionService } from '../../promotion/services/promotionService';
 import { favoritesService } from '../../product/services/favoritesService';
@@ -31,19 +31,9 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
   const [isLoading, setIsLoading] = useState(() => !homeDataCache);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Modal Kho Voucher
-  const [showVoucherModal, setShowVoucherModal] = useState(false);
-  const [voucherModalTab, setVoucherModalTab] = useState<'ALL' | 'PLATFORM' | 'SHOP' | 'FLASH_SALE' | 'SAVED'>('ALL');
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
-
-  // Tự động cuộn đến section tương ứng khi URL là /vouchers, /collections, /gifts
+  // Tự động cuộn đến section tương ứng khi URL là /collections, /gifts
   useEffect(() => {
-    if (location.pathname === '/vouchers' || location.hash === '#vouchers-section') {
-      setShowVoucherModal(true);
-      setTimeout(() => {
-        document.getElementById('vouchers-section')?.scrollIntoView({ behavior: 'smooth' });
-      }, 80);
-    } else if (location.pathname === '/collections' || location.hash === '#collections-section') {
+    if (location.pathname === '/collections' || location.hash === '#collections-section') {
       setTimeout(() => {
         document.getElementById('collections-section')?.scrollIntoView({ behavior: 'smooth' });
       }, 80);
@@ -54,6 +44,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       }, 80);
     }
   }, [location.pathname, location.hash]);
+
 
   useEffect(() => {
     setCurrentPage(1);
@@ -150,14 +141,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
   };
 
-  const handleCopyCode = (code: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    navigator.clipboard?.writeText(code);
-    setCopiedCode(code);
-    triggerToast(`Đã sao chép mã ${code}!`, 'success');
-    setTimeout(() => setCopiedCode(null), 2000);
-  };
-
   const vouchers = useMemo(() => {
     return couponList.map((v: any) => {
       const val = typeof v.discount_value === 'object' && v.discount_value?.$numberDecimal
@@ -204,21 +187,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       };
     });
   }, [couponList]);
-
-  const filteredModalVouchers = useMemo(() => {
-    switch (voucherModalTab) {
-      case 'PLATFORM':
-        return vouchers.filter(v => v.is_platform);
-      case 'SHOP':
-        return vouchers.filter(v => !v.is_platform);
-      case 'FLASH_SALE':
-        return vouchers.filter(v => v.discount_type === 'FLASH_SALE');
-      case 'SAVED':
-        return vouchers.filter(v => savedVouchers.includes(v.code));
-      default:
-        return vouchers;
-    }
-  }, [vouchers, voucherModalTab, savedVouchers]);
 
   // Lấy sản phẩm có ưu đãi thật / Flash Sale thật từ database và voucher đang chạy
   const flashDeals = useMemo(() => {
@@ -688,7 +656,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
             </p>
           </div>
           <button
-            onClick={() => setShowVoucherModal(true)}
+            onClick={() => navigate('/vouchers')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -797,7 +765,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
               Các gian hàng sẽ sớm tung ra khung giờ vàng giá sốc. Bạn hãy lưu voucher trước để sẵn sàng săn sale nhé!
             </p>
             <button
-              onClick={() => setShowVoucherModal(true)}
+              onClick={() => navigate('/vouchers')}
               style={{
                 backgroundColor: '#008000',
                 color: '#fff',
@@ -960,228 +928,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
           </div>
         </div>
       </section>
-
-      {/* Modal Kho Voucher & Khuyến Mãi */}
-      {showVoucherModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: 16
-        }}>
-          <div style={{
-            backgroundColor: '#fff',
-            borderRadius: 24,
-            width: '100%',
-            maxWidth: 680,
-            maxHeight: '85vh',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-            overflow: 'hidden',
-            animation: 'fadeIn 0.2s ease-out'
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              padding: '20px 24px',
-              borderBottom: '1px solid #f0f0f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 12,
-                  backgroundColor: '#ecfdf5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#008000'
-                }}>
-                  <Ticket size={22} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: 17, fontWeight: 800, color: '#1c1917', margin: 0 }}>
-                    Kho Voucher & Ưu Đãi VietCraft
-                  </h3>
-                  <p style={{ fontSize: 12, color: '#78716c', margin: '2px 0 0 0' }}>
-                    Lưu các voucher hấp dẫn để áp dụng trừ tiền khi đặt hàng
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowVoucherModal(false)}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  border: 'none',
-                  backgroundColor: '#f5f5f4',
-                  color: '#78716c',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Filter Tabs */}
-            <div style={{
-              padding: '12px 24px',
-              borderBottom: '1px solid #f5f5f4',
-              display: 'flex',
-              gap: 8,
-              overflowX: 'auto'
-            }}>
-              {[
-                { key: 'ALL', label: `Tất cả (${vouchers.length})` },
-                { key: 'PLATFORM', label: `Voucher Sàn (${vouchers.filter(v => v.is_platform).length})` },
-                { key: 'SHOP', label: `Voucher Shop (${vouchers.filter(v => !v.is_platform).length})` },
-                { key: 'FLASH_SALE', label: `Flash Sale (${vouchers.filter(v => v.discount_type === 'FLASH_SALE').length})` },
-                { key: 'SAVED', label: `Đã lưu (${savedVouchers.length})` },
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setVoucherModalTab(tab.key as any)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 20,
-                    border: 'none',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    backgroundColor: voucherModalTab === tab.key ? '#008000' : '#f5f5f4',
-                    color: voucherModalTab === tab.key ? '#fff' : '#57534e',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Voucher List Content */}
-            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {filteredModalVouchers.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: '#a8a29e' }}>
-                  <Ticket size={40} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
-                  <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Không có voucher nào trong mục này.</p>
-                </div>
-              ) : (
-                filteredModalVouchers.map((v) => {
-                  const isSaved = savedVouchers.includes(v.code);
-                  return (
-                    <div
-                      key={v.id || v.code}
-                      style={{
-                        borderRadius: 16,
-                        border: isSaved ? '1.5px solid #86efac' : '1px solid #e7e5e4',
-                        backgroundColor: isSaved ? '#f0fdf4' : '#fff',
-                        padding: 16,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 16,
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <span style={{
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                            fontWeight: 900,
-                            backgroundColor: '#f5f5f4',
-                            color: '#1c1917',
-                            padding: '2px 8px',
-                            borderRadius: 6,
-                            border: '1px solid #e7e5e4'
-                          }}>
-                            {v.code}
-                          </span>
-                          <button
-                            onClick={(e) => handleCopyCode(v.code, e)}
-                            title="Sao chép mã"
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#78716c', padding: 2 }}
-                          >
-                            {copiedCode === v.code ? <Check size={14} color="#008000" /> : <Copy size={14} />}
-                          </button>
-                          {v.is_platform ? (
-                            <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: '#ecfdf5', color: '#008000', padding: '2px 8px', borderRadius: 6 }}>
-                              Toàn Sàn VietCraft
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: '#f5f5f4', color: '#57534e', padding: '2px 8px', borderRadius: 6 }}>
-                              Shop: {v.shop_name}
-                            </span>
-                          )}
-                          {v.discount_type === 'FLASH_SALE' && (
-                            <span style={{ fontSize: 11, fontWeight: 800, backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: 6 }}>
-                              ⚡ Flash Sale
-                            </span>
-                          )}
-                        </div>
-
-                        <h4 style={{ fontSize: 14, fontWeight: 800, color: '#1c1917', margin: '4px 0 2px' }}>
-                          {v.title || v.value}
-                        </h4>
-
-                        <p style={{ fontSize: 12, fontWeight: 700, color: '#008000', margin: '2px 0' }}>
-                          {v.value}
-                        </p>
-
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: '#78716c', marginTop: 4 }}>
-                          <span>{v.condition}</span>
-                          {v.applicable_scope === 'SPECIFIC_PRODUCTS' && (
-                            <span style={{ color: '#d97706', fontWeight: 600 }}>
-                              • Áp dụng cho {v.applicable_products_count} sản phẩm chỉ định
-                            </span>
-                          )}
-                          {v.end_date && (
-                            <span>• HSD: {new Date(v.end_date).toLocaleDateString('vi-VN')}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-                        <button
-                          onClick={(e) => toggleVoucher(v.code, e)}
-                          style={{
-                            padding: '8px 20px',
-                            borderRadius: 12,
-                            border: 'none',
-                            fontSize: 12,
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            backgroundColor: isSaved ? '#008000' : '#cc1111',
-                            color: '#fff',
-                            boxShadow: isSaved ? '0 2px 6px rgba(0,128,0,0.2)' : '0 2px 6px rgba(204,17,17,0.2)',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {isSaved ? '✓ Đã lưu' : 'Lưu mã'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

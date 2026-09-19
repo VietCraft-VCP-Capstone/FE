@@ -16,8 +16,9 @@ import { BuyerProfilePage } from '../modules/buyer/pages/BuyerProfilePage';
 import { BuyerFavoritesPage } from '../modules/buyer/pages/BuyerFavoritesPage';
 import { BuyerOrdersPage } from '../modules/buyer/pages/BuyerOrdersPage';
 import { BuyerOrderDetailPage } from '../modules/buyer/pages/BuyerOrderDetailPage';
-import { BuyerProductDetailPage } from '../modules/buyer/pages/BuyerProductDetailPage';
 import { BuyerShopPage } from '../modules/buyer/pages/BuyerShopPage';
+import { BuyerProductDetailPage } from '../modules/buyer/pages/BuyerProductDetailPage';
+import { BuyerVouchersPage } from '../modules/buyer/pages/BuyerVouchersPage';
 import { useAuth } from '../modules/auth/hooks/useAuth';
 
 function RolePortal({ user, onLogout }: { user: any; onLogout: () => void }) {
@@ -103,7 +104,7 @@ export function AppRouter() {
         )}
         <Route path="/gifts" element={<BuyerDashboard user={user} onLogout={logout} />} />
         <Route path="/collections" element={<BuyerDashboard user={user} onLogout={logout} />} />
-        <Route path="/vouchers" element={<BuyerDashboard user={user} onLogout={logout} />} />
+        <Route path="/vouchers" element={<BuyerVouchersPage />} />
         <Route path="/product/:id" element={<BuyerProductDetailPage />} />
         <Route path="/cart" element={<BuyerCartPage />} />
         <Route path="/shop/:id" element={<BuyerShopPage />} />

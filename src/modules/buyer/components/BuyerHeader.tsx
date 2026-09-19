@@ -131,16 +131,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
     }
 
     if (target === 'vouchers') {
-      if (location.pathname === '/' || location.pathname === '/vouchers') {
-        const el = document.getElementById('vouchers-section');
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth' });
-        } else {
-          navigate('/vouchers');
-        }
-      } else {
-        navigate('/vouchers');
-      }
+      navigate('/vouchers');
       return;
     }
 
