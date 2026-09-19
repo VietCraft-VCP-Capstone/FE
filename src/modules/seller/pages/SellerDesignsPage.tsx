@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 
 import { useToast } from '../../../shared/components/Toast';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 
 const API_ORIGIN = 'http://localhost:8080';
 const abs = (u: string) => (u?.startsWith('http') ? u : `${API_ORIGIN}${u}`);
@@ -17,6 +18,7 @@ export function SellerDesignsPage() {
   const [uploading, setUploading] = useState(false);
   const [previewDesign, setPreviewDesign] = useState<any | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [designToDelete, setDesignToDelete] = useState<{ id: string; name: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadDesigns = async () => {
@@ -50,14 +52,20 @@ export function SellerDesignsPage() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Bạn có chắc muốn xoá hình thiết kế "${name}"?`)) return;
+  const handleDelete = (id: string, name: string) => {
+    setDesignToDelete({ id, name });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!designToDelete) return;
+    const { id, name } = designToDelete;
     setDeletingId(id);
     try {
       await productsService.deleteDesign(id);
       setDesigns(prev => prev.filter(d => d._id !== id));
       showToast(`Đã xoá thiết kế "${name}"`, 'success');
       if (previewDesign?._id === id) setPreviewDesign(null);
+      setDesignToDelete(null);
     } catch (err: any) {
       showToast(err.response?.data?.error || 'Xoá hình thiết kế thất bại', 'error');
     } finally {
@@ -228,6 +236,19 @@ export function SellerDesignsPage() {
           </div>
         </div>
       )}
+
+      {/* Modal xác nhận xóa thiết kế */}
+      <ConfirmModal
+        isOpen={!!designToDelete}
+        variant="danger"
+        title="Xác nhận xóa thiết kế"
+        message={`Bạn có chắc muốn xoá hình thiết kế "${designToDelete?.name}"?\n\nThao tác này không thể hoàn tác.`}
+        confirmLabel="Xóa thiết kế"
+        cancelLabel="Hủy"
+        isLoading={!!deletingId}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDesignToDelete(null)}
+      />
     </div>
   );
 }

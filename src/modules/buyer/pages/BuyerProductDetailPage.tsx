@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Star, ShoppingCart, Zap,
-  ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store, MessageCircle
+  ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store, MessageCircle, Ticket
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
+import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -14,7 +15,7 @@ interface Variant { id: string; name: string; color?: string; size?: string; mat
 interface Product {
   id: string; title: string; description: string; category: string;
   tags: string[]; allowCustomization: boolean; customizationType: string;
-  price: number; images?: string[]; variants: Variant[];
+  price: number; originalPrice?: number; images?: string[]; variants: Variant[];
   colors?: Array<{ name: string; hex: string }>;
   shopInfo?: { id: string; name: string; logo?: string; rating: number };
   rating?: number;
@@ -129,10 +130,38 @@ export function BuyerProductDetailPage() {
   const [shippingOpen, setShippingOpen] = useState(false);
   const [isFav, setIsFav] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<CouponDTO[]>([]);
+  const [savedVouchers, setSavedVouchers] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('vietcraft_saved_vouchers') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   const triggerToast = useCallback((msg: string, type: 'success' | 'info' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const handleSaveVoucher = (code: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    let updated: string[];
+    if (savedVouchers.includes(code)) {
+      updated = savedVouchers.filter(c => c !== code);
+      triggerToast(`Đã bỏ lưu mã ${code}`, 'info');
+    } else {
+      updated = [...savedVouchers, code];
+      triggerToast(`Đã lưu mã ${code}! Mã sẽ tự động gợi ý khi thanh toán.`, 'success');
+    }
+    setSavedVouchers(updated);
+    localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
+  };
+
+  useEffect(() => {
+    promotionService.getAll()
+      .then(res => setAvailableCoupons(res || []))
+      .catch(() => setAvailableCoupons([]));
   }, []);
 
   // ── Load product ─────────────────────────────────────────────────────────────
@@ -238,9 +267,123 @@ export function BuyerProductDetailPage() {
     (!selectedMaterial || v.material === selectedMaterial)
   ) || selectedVariant || product?.variants[0] || null;
 
-  const displayPrice = activeVariant?.price || product?.price || 0;
-  const discountPct  = 15; // UI decoration only
-  const strikePrice  = Math.round(displayPrice / (1 - discountPct / 100));
+  const basePrice = activeVariant?.price || product?.price || 0;
+
+  // Active promotion (Flash Sale or Specific Product Voucher)
+  const activePromotion = useMemo(() => {
+    if (!id || !availableCoupons.length) return null;
+    const now = new Date();
+
+    const isActive = (c: any) => {
+      if (!c.is_active) return false;
+      if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
+      return true;
+    };
+
+    const appliesToProduct = (c: any): boolean => {
+      if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
+        return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
+      }
+      if (c.applicable_scope === 'ALL') {
+        // Nếu có shop_id thì chỉ áp dụng cho shop đó; nếu không thì toàn sàn
+        if (c.shop_id) return product?.shopInfo?.id === c.shop_id;
+        return true; // platform-wide
+      }
+      return false;
+    };
+
+    const parseVal = (raw: any) =>
+      typeof raw === 'object' && raw?.$numberDecimal
+        ? parseFloat(raw.$numberDecimal)
+        : parseFloat(raw || 0);
+
+    // 1. Flash Sale: ưu tiên SPECIFIC_PRODUCTS trước, sau đó scope ALL
+    const flashSale = availableCoupons.find(c =>
+      isActive(c) && c.discount_type === 'FLASH_SALE' && appliesToProduct(c)
+    );
+    if (flashSale) {
+      return { type: 'FLASH_SALE' as const, coupon: flashSale, discountVal: parseVal(flashSale.discount_value) };
+    }
+
+    // 2. Coupon chỉ định sản phẩm cụ thể (ưu tiên cao hơn scope ALL)
+    const specificCoupon = availableCoupons.find(c =>
+      isActive(c) &&
+      c.discount_type !== 'FLASH_SALE' &&
+      c.discount_type !== 'FREE_SHIPPING' &&
+      c.applicable_scope === 'SPECIFIC_PRODUCTS' &&
+      (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id)
+    );
+    if (specificCoupon) {
+      return { type: specificCoupon.discount_type, coupon: specificCoupon, discountVal: parseVal(specificCoupon.discount_value) };
+    }
+
+    // 3. Coupon scope ALL (toàn shop hoặc toàn sàn) – chỉ PERCENTAGE / FIXED_AMOUNT
+    const allScopeCoupon = availableCoupons.find(c =>
+      isActive(c) &&
+      c.discount_type !== 'FLASH_SALE' &&
+      c.discount_type !== 'FREE_SHIPPING' &&
+      c.applicable_scope === 'ALL' &&
+      appliesToProduct(c)
+    );
+    if (allScopeCoupon) {
+      return { type: allScopeCoupon.discount_type, coupon: allScopeCoupon, discountVal: parseVal(allScopeCoupon.discount_value) };
+    }
+
+    return null;
+  }, [id, availableCoupons, product?.shopInfo?.id]);
+
+  let finalPrice = basePrice;
+  let strikePrice = 0;
+  let discountPct = 0;
+  let discountBadgeText = '';
+  let isFlashSale = false;
+
+  if (activePromotion) {
+    strikePrice = basePrice;
+    const val = activePromotion.discountVal;
+    if (activePromotion.type === 'FLASH_SALE') {
+      isFlashSale = true;
+      if (val <= 100) {
+        // val là % giảm
+        finalPrice = Math.round(basePrice * (1 - val / 100));
+        discountPct = Math.round(val);
+        discountBadgeText = `-${discountPct}%`;
+      } else {
+        // val là số tiền giảm (VNĐ)
+        finalPrice = Math.max(0, basePrice - val);
+        discountPct = Math.round((val / basePrice) * 100);
+        discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
+      }
+    } else if (activePromotion.type === 'PERCENTAGE') {
+      finalPrice = Math.round(basePrice * (1 - val / 100));
+      discountPct = Math.round(val);
+      discountBadgeText = `-${discountPct}%`;
+    } else if (activePromotion.type === 'FIXED_AMOUNT') {
+      finalPrice = Math.max(0, basePrice - val);
+      discountPct = Math.round((val / basePrice) * 100);
+      discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
+    }
+  }
+
+  const hasDiscount = strikePrice > finalPrice;
+  const displayPrice = finalPrice;
+
+  // Danh sách voucher áp dụng được cho sản phẩm hoặc shop này
+  const productVouchers = useMemo(() => {
+    if (!availableCoupons.length) return [];
+    const now = new Date();
+    return availableCoupons.filter(c => {
+      if (!c.is_active) return false;
+      if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
+      if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
+        return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
+      }
+      if (c.is_platform) return true;
+      if (c.shop_id && product?.shopInfo?.id && c.shop_id === product.shopInfo.id) return true;
+      return false;
+    });
+  }, [availableCoupons, id, product?.shopInfo?.id]);
+
 
   // Images list
   const images = product?.images?.length ? product.images : [
@@ -325,7 +468,7 @@ export function BuyerProductDetailPage() {
 
   // ── Styles ────────────────────────────────────────────────────────────────────
   const S = {
-    page: { fontFamily: "'Inter', system-ui, sans-serif", background: '#f9f9f9', minHeight: '100vh' } as React.CSSProperties,
+    page: { fontFamily: "'Inter', system-ui, sans-serif", background: '#fcfcfc', minHeight: '100vh' } as React.CSSProperties,
     container: { maxWidth: 1100, margin: '0 auto', padding: '24px 20px' } as React.CSSProperties,
     backBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, fontWeight: 600, marginBottom: 20, padding: '6px 0' } as React.CSSProperties,
     grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 36, alignItems: 'start' } as React.CSSProperties,
@@ -448,12 +591,80 @@ export function BuyerProductDetailPage() {
             </div>
 
             {/* Price */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={S.price}>{fmtPrice(displayPrice)}</span>
-              <span style={S.strike}>{fmtPrice(strikePrice)}</span>
-              <span style={S.tag('#fff', '#e11d48')}>-{discountPct}%</span>
+              {hasDiscount && (
+                <>
+                  <span style={S.strike}>{fmtPrice(strikePrice)}</span>
+                  {isFlashSale ? (
+                    <span className="flash-sale-badge">
+                      ⚡ FLASH SALE {discountBadgeText}
+                    </span>
+                  ) : (
+                    <span style={S.tag('#fff', '#e11d48')}>{discountBadgeText}</span>
+                  )}
+                </>
+              )}
+              {activePromotion?.coupon?.code && (
+                <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 6 }}>
+                  ⚡ Áp dụng mã: {activePromotion.coupon.code}
+                </span>
+              )}
             </div>
             <p style={{ fontSize: 12, color: '#888', margin: '4px 0 0' }}>Giá đã bao gồm VAT</p>
+
+            {/* Vouchers applicable */}
+            {productVouchers.length > 0 && (
+              <div style={{ marginTop: 14, padding: '10px 14px', backgroundColor: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#166534', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Ticket size={14} /> Mã giảm giá có thể áp dụng ({productVouchers.length})
+                  </span>
+                  <button
+                    onClick={() => navigate('/vouchers')}
+                    style={{ fontSize: 11, fontWeight: 700, color: '#008000', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    Kho voucher &rarr;
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {productVouchers.slice(0, 3).map(v => {
+                    const isSaved = savedVouchers.includes(v.code);
+                    return (
+                      <div key={v.id || v.code} style={{
+                        backgroundColor: '#fff',
+                        border: isSaved ? '1px solid #86efac' : '1px solid #e7e5e4',
+                        borderRadius: 8,
+                        padding: '6px 10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8
+                      }}>
+                        <div>
+                          <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 900, color: '#1c1917' }}>{v.code}</span>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#008000' }}>{v.title || `Giảm ${v.discount_value}`}</div>
+                        </div>
+                        <button
+                          onClick={(e) => handleSaveVoucher(v.code, e)}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            border: 'none',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            backgroundColor: isSaved ? '#dcfce7' : '#008000',
+                            color: isSaved ? '#166534' : '#fff'
+                          }}
+                        >
+                          {isSaved ? '✓ Đã lưu' : 'Lưu'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Material tabs (if variants have material) */}
             {materials.length > 0 && (

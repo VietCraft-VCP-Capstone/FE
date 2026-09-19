@@ -74,7 +74,7 @@ export function BuyerOrderDetailPage() {
 
     if (loading) {
         return (
-            <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
                 <p className="text-gray-400 font-semibold text-sm">Đang tải chi tiết đơn hàng...</p>
             </div>
         );
@@ -82,7 +82,7 @@ export function BuyerOrderDetailPage() {
 
     if (!order) {
         return (
-            <div className="max-w-4xl mx-auto px-4 py-16 text-center space-y-4">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center space-y-4">
                 <AlertCircle size={48} className="text-red-500 mx-auto" />
                 <h3 className="text-lg font-bold text-gray-900">Không tìm thấy đơn hàng</h3>
                 <button
@@ -169,7 +169,7 @@ export function BuyerOrderDetailPage() {
     const totalAmount = Number(order.totalAmount ?? (subtotal + shippingFee));
 
     return (
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
             {/* Back Button */}
             <button
                 onClick={() => navigate('/orders')}
@@ -263,7 +263,14 @@ export function BuyerOrderDetailPage() {
                     {orderItems.map((item: any, idx: number) => (
                         <div key={idx} className="flex gap-4 py-3 first:pt-0 last:pb-0">
                             <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                                <img
+                                    src={item.image || '/image-not-found.jpg'}
+                                    alt={item.title}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = '/image-not-found.jpg';
+                                    }}
+                                />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <h4 className="font-extrabold text-gray-900 text-sm leading-snug line-clamp-1">{item.title}</h4>
