@@ -2,10 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Ticket, Plus, Search, Trash2, Flame, Truck, Percent,
     Coins, Check, Copy, X, AlertCircle, RefreshCw,
-    Layers, ToggleLeft, ToggleRight, Store, ShieldCheck
+    Layers, ToggleLeft, ToggleRight, Store, ShieldCheck,
+    Package, Tag
 } from 'lucide-react';
 
-import { promotionService, CouponDTO, CreateCouponPayload, CouponDiscountType } from '../../promotion/services/promotionService';
+import { promotionService, CouponDTO, CreateCouponPayload, CouponDiscountType, SelectableProduct } from '../../promotion/services/promotionService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 
 const parseVal = (val: any): number => {
@@ -34,6 +35,11 @@ export function AdminPromotionsPage() {
     const [submitting, setSubmitting] = useState(false);
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
+    // Selectable products for SPECIFIC_PRODUCTS scope
+    const [selectableProducts, setSelectableProducts] = useState<SelectableProduct[]>([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const [productSearch, setProductSearch] = useState('');
+
     const initialForm: CreateCouponPayload = {
         code: '',
         title: '',
@@ -43,6 +49,8 @@ export function AdminPromotionsPage() {
         min_order_value: 200000,
         max_discount_amount: 100000,
         usage_limit: 500,
+        applicable_scope: 'ALL',
+        applicable_product_ids: [],
         start_date: new Date().toISOString().slice(0, 16),
         end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
         shop_id: null
@@ -62,6 +70,51 @@ export function AdminPromotionsPage() {
             setLoading(false);
         }
     };
+
+    const fetchSelectableProducts = async () => {
+        setLoadingProducts(true);
+        try {
+            const data = await promotionService.getAdminSelectableProducts();
+            setSelectableProducts(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Lỗi khi tải danh sách sản phẩm', err);
+        } finally {
+            setLoadingProducts(false);
+        }
+    };
+
+    const toggleProductSelection = (productId: string) => {
+        setFormData(prev => {
+            const current = prev.applicable_product_ids || [];
+            const next = current.includes(productId)
+                ? current.filter(id => id !== productId)
+                : [...current, productId];
+            return { ...prev, applicable_product_ids: next };
+        });
+        if (formErrors.applicable_product_ids) {
+            setFormErrors(prev => ({ ...prev, applicable_product_ids: '' }));
+        }
+    };
+
+    const toggleSelectAllFiltered = (filteredIds: string[]) => {
+        setFormData(prev => {
+            const current = prev.applicable_product_ids || [];
+            const allSelected = filteredIds.every(id => current.includes(id));
+            const next = allSelected
+                ? current.filter(id => !filteredIds.includes(id))
+                : Array.from(new Set([...current, ...filteredIds]));
+            return { ...prev, applicable_product_ids: next };
+        });
+        if (formErrors.applicable_product_ids) {
+            setFormErrors(prev => ({ ...prev, applicable_product_ids: '' }));
+        }
+    };
+
+    const filteredProducts = useMemo(() => {
+        if (!productSearch.trim()) return selectableProducts;
+        const term = productSearch.toLowerCase().trim();
+        return selectableProducts.filter(p => p.title.toLowerCase().includes(term));
+    }, [selectableProducts, productSearch]);
 
     useEffect(() => {
         fetchCoupons();
@@ -128,6 +181,12 @@ export function AdminPromotionsPage() {
             errors.discount_value = 'Số tiền giảm cố định phải nhỏ hơn giá trị đơn hàng tối thiểu.';
         }
 
+        if (formData.applicable_scope === 'SPECIFIC_PRODUCTS') {
+            if (!formData.applicable_product_ids || formData.applicable_product_ids.length === 0) {
+                errors.applicable_product_ids = 'Vui lòng chọn ít nhất 1 sản phẩm áp dụng cho mã này.';
+            }
+        }
+
         if (!formData.start_date) {
             errors.start_date = 'Vui lòng chọn thời gian bắt đầu.';
         }
@@ -165,6 +224,8 @@ export function AdminPromotionsPage() {
                 min_order_value: formData.min_order_value ? Number(formData.min_order_value) : undefined,
                 max_discount_amount: formData.max_discount_amount ? Number(formData.max_discount_amount) : undefined,
                 usage_limit: formData.usage_limit ? Number(formData.usage_limit) : undefined,
+                applicable_scope: formData.applicable_scope || 'ALL',
+                applicable_product_ids: formData.applicable_product_ids || [],
                 shop_id: null
             });
 
@@ -172,6 +233,7 @@ export function AdminPromotionsPage() {
             setShowModal(false);
             setFormData(initialForm);
             setFormErrors({});
+            setProductSearch('');
             setSuccessMsg(`Đã tạo mã giảm giá toàn sàn ${newCoupon.code} thành công!`);
             setTimeout(() => setSuccessMsg(null), 4000);
         } catch (err: any) {
@@ -263,7 +325,10 @@ export function AdminPromotionsPage() {
                     </p>
                 </div>
                 <button
-                    onClick={() => setShowModal(true)}
+                    onClick={() => {
+                        setShowModal(true);
+                        if (selectableProducts.length === 0) fetchSelectableProducts();
+                    }}
                     className="inline-flex items-center gap-2 bg-admin-brand hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm transition"
                 >
                     <Plus size={16} />
@@ -412,8 +477,22 @@ export function AdminPromotionsPage() {
                                                 </button>
                                             </div>
                                         </td>
-                                        <td className="p-3 font-semibold text-stone-900 max-w-[180px] truncate" title={coupon.title}>
-                                            {coupon.title}
+                                        <td className="p-3 font-semibold text-stone-900 max-w-[200px]">
+                                            <div className="truncate" title={coupon.title}>
+                                                {coupon.title}
+                                            </div>
+                                            <div className="mt-1">
+                                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                                    coupon.applicable_scope === 'SPECIFIC_PRODUCTS'
+                                                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                        : 'bg-stone-50 text-stone-600 border border-stone-200'
+                                                }`}>
+                                                    <Package size={10} className={coupon.applicable_scope === 'SPECIFIC_PRODUCTS' ? 'text-amber-600' : 'text-stone-400'} />
+                                                    {coupon.applicable_scope === 'SPECIFIC_PRODUCTS'
+                                                        ? `${coupon.applicable_product_ids?.length || 0} SP chỉ định`
+                                                        : 'Toàn sàn'}
+                                                </span>
+                                            </div>
                                         </td>
                                         <td className="p-3">
                                             {coupon.is_platform ? (
@@ -491,7 +570,7 @@ export function AdminPromotionsPage() {
             {/* Modal Tạo Voucher Toàn Sàn */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
-                    <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative my-8">
+                    <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between pb-3 border-b border-stone-100">
                             <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
                                 <Ticket className="text-admin-brand" size={20} />
@@ -576,6 +655,143 @@ export function AdminPromotionsPage() {
                                         );
                                     })}
                                 </div>
+                            </div>
+
+                            {/* Phạm vi áp dụng */}
+                            <div className="space-y-2">
+                                <label className="block font-bold text-stone-700 mb-1">Phạm vi áp dụng *</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setFormData({ ...formData, applicable_scope: 'ALL', applicable_product_ids: [] });
+                                            if (formErrors.applicable_product_ids) {
+                                                setFormErrors({ ...formErrors, applicable_product_ids: '' });
+                                            }
+                                        }}
+                                        className={`p-2 rounded-lg border font-bold flex items-center justify-center gap-1.5 transition ${
+                                            formData.applicable_scope === 'ALL'
+                                                ? 'border-admin-brand bg-[#e8f5e8] text-admin-brand'
+                                                : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                                        }`}
+                                    >
+                                        <Package size={15} className={formData.applicable_scope === 'ALL' ? 'text-admin-brand' : 'text-stone-400'} />
+                                        <span>Toàn bộ sản phẩm sàn</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setFormData({ ...formData, applicable_scope: 'SPECIFIC_PRODUCTS' });
+                                            if (selectableProducts.length === 0) {
+                                                fetchSelectableProducts();
+                                            }
+                                        }}
+                                        className={`p-2 rounded-lg border font-bold flex items-center justify-center gap-1.5 transition ${
+                                            formData.applicable_scope === 'SPECIFIC_PRODUCTS'
+                                                ? 'border-admin-brand bg-[#e8f5e8] text-admin-brand'
+                                                : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                                        }`}
+                                    >
+                                        <Tag size={15} className={formData.applicable_scope === 'SPECIFIC_PRODUCTS' ? 'text-admin-brand' : 'text-stone-400'} />
+                                        <span>Chỉ một số sản phẩm</span>
+                                    </button>
+                                </div>
+
+                                {/* Danh sách chọn sản phẩm nếu là SPECIFIC_PRODUCTS */}
+                                {formData.applicable_scope === 'SPECIFIC_PRODUCTS' && (
+                                    <div className="mt-2.5 p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-2 animate-fade-in">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-bold text-stone-700">
+                                                Sản phẩm áp dụng ({formData.applicable_product_ids?.length || 0} đã chọn)
+                                            </span>
+                                            {filteredProducts.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleSelectAllFiltered(filteredProducts.map(p => p.id))}
+                                                    className="text-[11px] font-bold text-admin-brand hover:underline"
+                                                >
+                                                    {filteredProducts.every(p => formData.applicable_product_ids?.includes(p.id))
+                                                        ? 'Bỏ chọn tất cả'
+                                                        : 'Chọn tất cả'}
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Ô tìm kiếm sản phẩm */}
+                                        <div className="relative">
+                                            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Tìm sản phẩm theo tên..."
+                                                value={productSearch}
+                                                onChange={(e) => setProductSearch(e.target.value)}
+                                                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-stone-200 rounded-md focus:outline-none focus:border-admin-brand"
+                                            />
+                                        </div>
+
+                                        {/* List sản phẩm cuộn */}
+                                        {loadingProducts ? (
+                                            <div className="py-6 text-center text-xs text-stone-400 flex items-center justify-center gap-2">
+                                                <RefreshCw size={14} className="animate-spin text-admin-brand" />
+                                                Đang tải danh sách sản phẩm sàn...
+                                            </div>
+                                        ) : selectableProducts.length === 0 ? (
+                                            <div className="py-4 text-center text-xs text-stone-400">
+                                                Hệ thống chưa có sản phẩm nào đang hoạt động.
+                                            </div>
+                                        ) : filteredProducts.length === 0 ? (
+                                            <div className="py-4 text-center text-xs text-stone-400">
+                                                Không tìm thấy sản phẩm phù hợp.
+                                            </div>
+                                        ) : (
+                                            <div className="max-h-44 overflow-y-auto space-y-1 pr-1 border border-stone-100 rounded-lg bg-white p-2 divide-y divide-stone-50">
+                                                {filteredProducts.map(prod => {
+                                                    const isChecked = formData.applicable_product_ids?.includes(prod.id);
+                                                    return (
+                                                        <label
+                                                            key={prod.id}
+                                                            className={`flex items-center gap-2.5 p-1.5 rounded cursor-pointer transition select-none ${
+                                                                isChecked ? 'bg-[#e8f5e8]/70' : 'hover:bg-stone-50'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isChecked}
+                                                                onChange={() => toggleProductSelection(prod.id)}
+                                                                className="w-3.5 h-3.5 text-admin-brand rounded border-stone-300 focus:ring-admin-brand"
+                                                            />
+                                                            {prod.image ? (
+                                                                <img
+                                                                    src={prod.image}
+                                                                    alt={prod.title}
+                                                                    className="w-8 h-8 object-cover rounded border border-stone-200 flex-shrink-0"
+                                                                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                                                                />
+                                                            ) : (
+                                                                <div className="w-8 h-8 bg-stone-100 rounded flex items-center justify-center flex-shrink-0 text-stone-400">
+                                                                    <Package size={14} />
+                                                                </div>
+                                                            )}
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="font-medium text-stone-900 truncate">{prod.title}</p>
+                                                                <div className="flex items-center gap-2 text-[10px] text-stone-500">
+                                                                    <span className="font-semibold text-admin-brand">{prod.price.toLocaleString('vi-VN')}đ</span>
+                                                                    <span>•</span>
+                                                                    <span>Kho: {prod.stock}</span>
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {formErrors.applicable_product_ids && (
+                                            <p className="text-[11px] text-red-500 font-medium">{formErrors.applicable_product_ids}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">

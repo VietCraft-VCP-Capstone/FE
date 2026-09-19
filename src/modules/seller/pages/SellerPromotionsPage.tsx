@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Ticket, Plus, Search, Trash2, Tag, Flame, Truck, Percent,
     Coins, Calendar, Check, Copy, X, AlertCircle, RefreshCw,
-    Layers, ToggleLeft, ToggleRight
+    Layers, ToggleLeft, ToggleRight, Package
 } from 'lucide-react';
 
-import { promotionService, CouponDTO, CreateCouponPayload, CouponDiscountType } from '../../promotion/services/promotionService';
+import { promotionService, CouponDTO, CreateCouponPayload, CouponDiscountType, SelectableProduct } from '../../promotion/services/promotionService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 
 const parseVal = (val: any): number => {
@@ -33,6 +33,11 @@ export function SellerPromotionsPage() {
     const [submitting, setSubmitting] = useState(false);
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
+    // Selectable products for SPECIFIC_PRODUCTS scope
+    const [selectableProducts, setSelectableProducts] = useState<SelectableProduct[]>([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const [productSearch, setProductSearch] = useState('');
+
     // Form data
     const initialForm: CreateCouponPayload = {
         code: '',
@@ -43,6 +48,8 @@ export function SellerPromotionsPage() {
         min_order_value: 100000,
         max_discount_amount: 50000,
         usage_limit: 100,
+        applicable_scope: 'ALL',
+        applicable_product_ids: [],
         start_date: new Date().toISOString().slice(0, 16),
         end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
     };
@@ -61,6 +68,51 @@ export function SellerPromotionsPage() {
             setLoading(false);
         }
     };
+
+    const fetchSelectableProducts = async () => {
+        setLoadingProducts(true);
+        try {
+            const data = await promotionService.getSellerSelectableProducts();
+            setSelectableProducts(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Lỗi khi tải danh sách sản phẩm', err);
+        } finally {
+            setLoadingProducts(false);
+        }
+    };
+
+    const toggleProductSelection = (productId: string) => {
+        setFormData(prev => {
+            const current = prev.applicable_product_ids || [];
+            const next = current.includes(productId)
+                ? current.filter(id => id !== productId)
+                : [...current, productId];
+            return { ...prev, applicable_product_ids: next };
+        });
+        if (formErrors.applicable_product_ids) {
+            setFormErrors(prev => ({ ...prev, applicable_product_ids: '' }));
+        }
+    };
+
+    const toggleSelectAllFiltered = (filteredIds: string[]) => {
+        setFormData(prev => {
+            const current = prev.applicable_product_ids || [];
+            const allSelected = filteredIds.every(id => current.includes(id));
+            const next = allSelected
+                ? current.filter(id => !filteredIds.includes(id))
+                : Array.from(new Set([...current, ...filteredIds]));
+            return { ...prev, applicable_product_ids: next };
+        });
+        if (formErrors.applicable_product_ids) {
+            setFormErrors(prev => ({ ...prev, applicable_product_ids: '' }));
+        }
+    };
+
+    const filteredProducts = useMemo(() => {
+        if (!productSearch.trim()) return selectableProducts;
+        const term = productSearch.toLowerCase().trim();
+        return selectableProducts.filter(p => p.title.toLowerCase().includes(term));
+    }, [selectableProducts, productSearch]);
 
     useEffect(() => {
         fetchCoupons();
@@ -127,6 +179,12 @@ export function SellerPromotionsPage() {
             errors.discount_value = 'Số tiền giảm cố định phải nhỏ hơn giá trị đơn hàng tối thiểu.';
         }
 
+        if (formData.applicable_scope === 'SPECIFIC_PRODUCTS') {
+            if (!formData.applicable_product_ids || formData.applicable_product_ids.length === 0) {
+                errors.applicable_product_ids = 'Vui lòng chọn ít nhất 1 sản phẩm áp dụng cho mã này.';
+            }
+        }
+
         if (!formData.start_date) {
             errors.start_date = 'Vui lòng chọn thời gian bắt đầu.';
         }
@@ -164,12 +222,15 @@ export function SellerPromotionsPage() {
                 min_order_value: formData.min_order_value ? Number(formData.min_order_value) : undefined,
                 max_discount_amount: formData.max_discount_amount ? Number(formData.max_discount_amount) : undefined,
                 usage_limit: formData.usage_limit ? Number(formData.usage_limit) : undefined,
+                applicable_scope: formData.applicable_scope || 'ALL',
+                applicable_product_ids: formData.applicable_product_ids || []
             });
 
             setCoupons(prev => [newCoupon, ...prev]);
             setShowModal(false);
             setFormData(initialForm);
             setFormErrors({});
+            setProductSearch('');
             setSuccessMsg(`Đã tạo mã giảm giá ${newCoupon.code} thành công!`);
             setTimeout(() => setSuccessMsg(null), 4000);
         } catch (err: any) {
@@ -257,7 +318,10 @@ export function SellerPromotionsPage() {
                     </p>
                 </div>
                 <button
-                    onClick={() => setShowModal(true)}
+                    onClick={() => {
+                        setShowModal(true);
+                        if (selectableProducts.length === 0) fetchSelectableProducts();
+                    }}
                     className="inline-flex items-center gap-2 bg-[#008000] hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all active:scale-[0.98]"
                 >
                     <Plus size={18} />
@@ -373,7 +437,10 @@ export function SellerPromotionsPage() {
                         Tạo voucher đầu tiên để khuyến khích khách hàng mua sắm nhiều hơn tại gian hàng của bạn.
                     </p>
                     <button
-                        onClick={() => setShowModal(true)}
+                        onClick={() => {
+                            setShowModal(true);
+                            if (selectableProducts.length === 0) fetchSelectableProducts();
+                        }}
                         className="mt-4 inline-flex items-center gap-2 bg-[#008000] text-white text-xs font-bold px-4 py-2 rounded-xl"
                     >
                         <Plus size={16} /> Tạo Voucher Ngay
@@ -445,6 +512,18 @@ export function SellerPromotionsPage() {
                                                 ? `Đơn tối thiểu: ${parseVal(coupon.min_order_value).toLocaleString('vi-VN')}đ`
                                                 : 'Áp dụng cho mọi giá trị đơn'}
                                         </p>
+                                        <div className="mt-2 flex items-center gap-1.5">
+                                            <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                                                coupon.applicable_scope === 'SPECIFIC_PRODUCTS'
+                                                    ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                                    : 'bg-stone-50 text-stone-600 border border-stone-200/60'
+                                            }`}>
+                                                <Package size={11} className={coupon.applicable_scope === 'SPECIFIC_PRODUCTS' ? 'text-amber-600' : 'text-stone-400'} />
+                                                {coupon.applicable_scope === 'SPECIFIC_PRODUCTS'
+                                                    ? `Áp dụng: ${coupon.applicable_product_ids?.length || 0} sản phẩm`
+                                                    : 'Áp dụng: Toàn bộ shop'}
+                                            </span>
+                                        </div>
                                     </div>
 
 
@@ -513,7 +592,7 @@ export function SellerPromotionsPage() {
             {/* Modal Tạo Voucher Mới */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
-                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 lg:p-8 shadow-2xl relative my-8">
+                    <div className="bg-white rounded-3xl max-w-xl w-full p-6 lg:p-8 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between pb-4 border-b border-stone-100">
                             <h3 className="text-lg font-black text-stone-900 flex items-center gap-2">
                                 <Ticket className="text-[#008000]" size={22} />
@@ -600,6 +679,143 @@ export function SellerPromotionsPage() {
                                         );
                                     })}
                                 </div>
+                            </div>
+
+                            {/* Phạm vi áp dụng */}
+                            <div className="space-y-2">
+                                <label className="block text-xs font-bold text-stone-700">Phạm vi áp dụng *</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setFormData({ ...formData, applicable_scope: 'ALL', applicable_product_ids: [] });
+                                            if (formErrors.applicable_product_ids) {
+                                                setFormErrors({ ...formErrors, applicable_product_ids: '' });
+                                            }
+                                        }}
+                                        className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                                            formData.applicable_scope === 'ALL'
+                                                ? 'border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
+                                                : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                                        }`}
+                                    >
+                                        <Package size={16} className={formData.applicable_scope === 'ALL' ? 'text-emerald-600' : 'text-stone-400'} />
+                                        <span>Toàn bộ sản phẩm của shop</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setFormData({ ...formData, applicable_scope: 'SPECIFIC_PRODUCTS' });
+                                            if (selectableProducts.length === 0) {
+                                                fetchSelectableProducts();
+                                            }
+                                        }}
+                                        className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                                            formData.applicable_scope === 'SPECIFIC_PRODUCTS'
+                                                ? 'border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
+                                                : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                                        }`}
+                                    >
+                                        <Tag size={16} className={formData.applicable_scope === 'SPECIFIC_PRODUCTS' ? 'text-emerald-600' : 'text-stone-400'} />
+                                        <span>Chọn một số sản phẩm</span>
+                                    </button>
+                                </div>
+
+                                {/* Danh sách chọn sản phẩm nếu là SPECIFIC_PRODUCTS */}
+                                {formData.applicable_scope === 'SPECIFIC_PRODUCTS' && (
+                                    <div className="mt-3 p-3 bg-stone-50 rounded-2xl border border-stone-200 space-y-2.5 animate-fade-in">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-bold text-stone-700">
+                                                Sản phẩm áp dụng ({formData.applicable_product_ids?.length || 0} đã chọn)
+                                            </span>
+                                            {filteredProducts.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleSelectAllFiltered(filteredProducts.map(p => p.id))}
+                                                    className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
+                                                >
+                                                    {filteredProducts.every(p => formData.applicable_product_ids?.includes(p.id))
+                                                        ? 'Bỏ chọn danh sách này'
+                                                        : 'Chọn tất cả trong danh sách'}
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Ô tìm kiếm sản phẩm */}
+                                        <div className="relative">
+                                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Tìm theo tên sản phẩm..."
+                                                value={productSearch}
+                                                onChange={(e) => setProductSearch(e.target.value)}
+                                                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                            />
+                                        </div>
+
+                                        {/* List sản phẩm cuộn */}
+                                        {loadingProducts ? (
+                                            <div className="py-6 text-center text-xs text-stone-400 flex items-center justify-center gap-2">
+                                                <RefreshCw size={14} className="animate-spin text-emerald-600" />
+                                                Đang tải danh sách sản phẩm...
+                                            </div>
+                                        ) : selectableProducts.length === 0 ? (
+                                            <div className="py-4 text-center text-xs text-stone-400">
+                                                Shop chưa có sản phẩm nào đang bán.
+                                            </div>
+                                        ) : filteredProducts.length === 0 ? (
+                                            <div className="py-4 text-center text-xs text-stone-400">
+                                                Không tìm thấy sản phẩm phù hợp.
+                                            </div>
+                                        ) : (
+                                            <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 border border-stone-100 rounded-xl bg-white p-2 divide-y divide-stone-50">
+                                                {filteredProducts.map(prod => {
+                                                    const isChecked = formData.applicable_product_ids?.includes(prod.id);
+                                                    return (
+                                                        <label
+                                                            key={prod.id}
+                                                            className={`flex items-center gap-2.5 p-1.5 rounded-lg cursor-pointer transition select-none ${
+                                                                isChecked ? 'bg-emerald-50/60' : 'hover:bg-stone-50'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isChecked}
+                                                                onChange={() => toggleProductSelection(prod.id)}
+                                                                className="w-3.5 h-3.5 text-emerald-600 rounded border-stone-300 focus:ring-emerald-500"
+                                                            />
+                                                            {prod.image ? (
+                                                                <img
+                                                                    src={prod.image}
+                                                                    alt={prod.title}
+                                                                    className="w-9 h-9 object-cover rounded-md border border-stone-200 flex-shrink-0"
+                                                                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                                                                />
+                                                            ) : (
+                                                                <div className="w-9 h-9 bg-stone-100 rounded-md flex items-center justify-center flex-shrink-0 text-stone-400">
+                                                                    <Package size={16} />
+                                                                </div>
+                                                            )}
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="text-xs font-medium text-stone-900 truncate">{prod.title}</p>
+                                                                <div className="flex items-center gap-2 text-[11px] text-stone-500">
+                                                                    <span className="font-semibold text-emerald-700">{prod.price.toLocaleString('vi-VN')}đ</span>
+                                                                    <span>•</span>
+                                                                    <span>Kho: {prod.stock}</span>
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {formErrors.applicable_product_ids && (
+                                            <p className="text-[11px] text-red-500 font-medium">{formErrors.applicable_product_ids}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Giá trị giảm & Giảm tối đa */}

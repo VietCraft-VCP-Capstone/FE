@@ -1,6 +1,17 @@
 import api from '../../../infrastructure/api/interceptors';
 
 export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING' | 'FLASH_SALE' | 'BUNDLE';
+export type CouponApplicableScope = 'ALL' | 'SPECIFIC_PRODUCTS';
+
+export interface SelectableProduct {
+    id: string;
+    title: string;
+    image?: string;
+    price: number;
+    stock?: number;
+    shop_name?: string;
+    status?: string;
+}
 
 export interface CouponDTO {
     id: string;
@@ -13,6 +24,9 @@ export interface CouponDTO {
     max_discount_amount?: number;
     usage_limit?: number;
     used_count: number;
+    applicable_scope?: CouponApplicableScope;
+    applicable_product_ids?: string[];
+    applicable_products_count?: number;
     start_date: string;
     end_date: string;
     is_active: boolean;
@@ -22,6 +36,7 @@ export interface CouponDTO {
     shop_logo?: string;
     is_eligible?: boolean;
     min_order_diff?: number;
+    scope_message?: string;
     created_at?: string;
 }
 
@@ -31,6 +46,7 @@ export interface ApplyCouponPayload {
     shippingFee?: number;
     shopId?: string;
     productId?: string;
+    items?: Array<{ productId: string; price: number; quantity: number }>;
 }
 
 export interface ApplyCouponResponse {
@@ -47,6 +63,8 @@ export interface ApplyCouponResponse {
         discount_value: number;
         min_order_value?: number;
         max_discount_amount?: number;
+        applicable_scope?: CouponApplicableScope;
+        applicable_product_ids?: string[];
         shop_id?: string | null;
         is_platform: boolean;
     };
@@ -61,6 +79,8 @@ export interface CreateCouponPayload {
     min_order_value?: number;
     max_discount_amount?: number;
     usage_limit?: number;
+    applicable_scope?: CouponApplicableScope;
+    applicable_product_ids?: string[];
     start_date: string;
     end_date: string;
     shop_id?: string | null;
@@ -73,11 +93,10 @@ export const promotionService = {
         return res.data;
     },
 
-    getAvailableCoupons: async (params?: { shopId?: string; productId?: string; subtotal?: number }): Promise<CouponDTO[]> => {
+    getAvailableCoupons: async (params?: { shopId?: string; productId?: string; subtotal?: number; items?: string }): Promise<CouponDTO[]> => {
         const res = await api.get('/promotions/available', { params });
         return res.data;
     },
-
 
     applyCoupon: async (payload: ApplyCouponPayload): Promise<ApplyCouponResponse> => {
         const res = await api.post('/promotions/apply', payload);
@@ -87,6 +106,11 @@ export const promotionService = {
     // Kênh Người Bán (Seller)
     getSellerCoupons: async (): Promise<CouponDTO[]> => {
         const res = await api.get('/seller/promotions');
+        return res.data;
+    },
+
+    getSellerSelectableProducts: async (): Promise<SelectableProduct[]> => {
+        const res = await api.get('/seller/promotions/selectable-products');
         return res.data;
     },
 
@@ -111,6 +135,11 @@ export const promotionService = {
         return res.data;
     },
 
+    getAdminSelectableProducts: async (): Promise<SelectableProduct[]> => {
+        const res = await api.get('/admin/promotions/selectable-products');
+        return res.data;
+    },
+
     createAdminCoupon: async (data: CreateCouponPayload): Promise<CouponDTO> => {
         const res = await api.post('/admin/promotions', data);
         return res.data;
@@ -128,3 +157,4 @@ export const promotionService = {
 };
 
 export default promotionService;
+

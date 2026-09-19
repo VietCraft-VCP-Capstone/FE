@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useOutletContext } from 'react-router-dom';
 import {
     ArrowLeft, Tag, CreditCard, Wallet, Landmark, Truck, Check,
     Ticket, X, Flame, Percent, Coins, Layers,
-    ChevronRight, AlertCircle, RefreshCw
+    ChevronRight, AlertCircle, RefreshCw, Package
 } from 'lucide-react';
 
 import { ordersService } from '../../order/services/ordersService';
@@ -110,7 +110,8 @@ export function BuyerCheckoutPage() {
         try {
             const data = await promotionService.getAvailableCoupons({
                 productId: items[0]?.productId,
-                subtotal
+                subtotal,
+                items: JSON.stringify(items.map(it => ({ productId: it.productId, price: it.price, quantity: it.quantity })))
             });
             setAvailableCoupons(Array.isArray(data) ? data : []);
         } catch (err) {
@@ -142,7 +143,8 @@ export function BuyerCheckoutPage() {
                 code: targetCode,
                 subtotal,
                 shippingFee,
-                productId: items[0]?.productId
+                productId: items[0]?.productId,
+                items: items.map(it => ({ productId: it.productId, price: it.price, quantity: it.quantity }))
             });
 
             setDiscount(res.discount);
@@ -524,6 +526,11 @@ export function BuyerCheckoutPage() {
                                                     Voucher Shop
                                                 </span>
                                             )}
+                                            {appliedCouponInfo?.coupon?.applicable_scope === 'SPECIFIC_PRODUCTS' && (
+                                                <span className="text-[10px] font-bold text-amber-700 bg-white px-1.5 py-0.5 rounded border border-amber-200">
+                                                    SP chỉ định
+                                                </span>
+                                            )}
                                         </div>
                                         <p className="text-xs font-bold text-emerald-900 mt-1">
                                             {appliedCouponInfo?.coupon?.title || 'Đã áp dụng mã giảm giá'}
@@ -670,6 +677,11 @@ export function BuyerCheckoutPage() {
                                                     ) : (
                                                         <span className="text-[10px] font-bold text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded truncate max-w-[120px]">
                                                             {c.shop_name}
+                                                        </span>
+                                                    )}
+                                                    {c.applicable_scope === 'SPECIFIC_PRODUCTS' && (
+                                                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                                            <Package size={10} /> {c.scope_message || 'SP chỉ định'}
                                                         </span>
                                                     )}
                                                 </div>
