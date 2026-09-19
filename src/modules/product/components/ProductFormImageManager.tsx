@@ -1,6 +1,7 @@
 import { useState, useRef, ChangeEvent } from 'react';
-import { UploadCloud, Trash2, Check, FolderOpen, Link as LinkIcon } from 'lucide-react';
+import { UploadCloud, Trash2, Check, FolderOpen, Link as LinkIcon, AlertCircle } from 'lucide-react';
 import { ProductImage } from './ProductImage';
+import { uploadService } from '../../../shared/services/uploadService';
 
 interface ProductFormImageManagerProps {
   images: string[];
@@ -15,6 +16,8 @@ export function ProductFormImageManager({
 }: ProductFormImageManagerProps) {
   const [newImageUrl, setNewImageUrl] = useState('');
   const [showAddUrl, setShowAddUrl] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddImage = () => {
@@ -26,41 +29,39 @@ export function ProductFormImageManager({
     setShowAddUrl(false);
   };
 
-  const handleDeviceUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleDeviceUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    let currentImages = [...images];
-    let currentThumb = thumbnail;
+    setIsUploading(true);
+    setUploadError(null);
 
-    let processed = 0;
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64Url = event.target?.result as string;
-        if (base64Url) {
-          currentImages.push(base64Url);
-          if (!currentThumb) currentThumb = base64Url;
-        }
-        processed++;
-        if (processed === files.length) {
-          onChangeImages(currentImages, currentThumb);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    try {
+      const uploadRes = await uploadService.uploadMultiple(files, 'products');
+      const uploadedUrls = uploadRes.images.map(img => img.url).filter(Boolean);
 
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      const updated = [...images, ...uploadedUrls];
+      const newThumb = thumbnail || updated[0] || '';
+      onChangeImages(updated, newThumb);
+    } catch (err: any) {
+      console.error('Failed to upload images to Cloudinary:', err);
+      setUploadError(err.response?.data?.error || err.message || 'Không thể tải ảnh lên Cloudinary.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleRemoveImage = (index: number) => {
+    const removedImg = images[index];
     const updated = images.filter((_, i) => i !== index);
-    const newThumb = updated[0] || '';
+    const newThumb = thumbnail === removedImg ? (updated[0] || '') : (thumbnail || updated[0] || '');
     onChangeImages(updated, newThumb);
   };
 
   const handleSetCover = (url: string) => {
-    onChangeImages(images, url);
+    const reordered = [url, ...images.filter((img) => img !== url)];
+    onChangeImages(reordered, url);
   };
 
   return (
@@ -116,10 +117,17 @@ export function ProductFormImageManager({
         </div>
       )}
 
+      {uploadError && (
+        <div className="flex items-center gap-2 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 animate-fade-in">
+          <AlertCircle size={14} className="shrink-0 text-rose-600" />
+          <span>{uploadError}</span>
+        </div>
+      )}
+
       {/* Images Grid */}
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
         {images.map((img, idx) => {
-          const isCover = thumbnail === img;
+          const isCover = thumbnail ? thumbnail === img : idx === 0;
           return (
             <div
               key={idx}
@@ -163,12 +171,22 @@ export function ProductFormImageManager({
 
         <button
           type="button"
+          disabled={isUploading}
           onClick={() => fileInputRef.current?.click()}
-          className="aspect-square rounded-xl border-2 border-dashed border-stone-300 hover:border-[#007700] bg-stone-50/60 hover:bg-[#EAF0E2]/30 flex flex-col items-center justify-center text-stone-400 hover:text-[#007700] transition-colors cursor-pointer p-2 text-center group"
+          className="aspect-square rounded-xl border-2 border-dashed border-stone-300 hover:border-[#007700] bg-stone-50/60 hover:bg-[#EAF0E2]/30 flex flex-col items-center justify-center text-stone-400 hover:text-[#007700] transition-colors cursor-pointer p-2 text-center group disabled:opacity-60 disabled:cursor-not-allowed"
           title="Bấm để chọn file ảnh từ máy tính hoặc điện thoại"
         >
-          <UploadCloud size={22} className="mb-1 group-hover:scale-110 transition-transform" />
-          <span className="text-[11px] font-bold font-jakarta">Tải từ máy</span>
+          {isUploading ? (
+            <>
+              <div className="w-5 h-5 border-2 border-[#007700] border-t-transparent rounded-full animate-spin mb-1.5" />
+              <span className="text-[10px] font-bold font-jakarta text-[#007700]">Đang tải...</span>
+            </>
+          ) : (
+            <>
+              <UploadCloud size={22} className="mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-bold font-jakarta">Tải từ máy</span>
+            </>
+          )}
         </button>
       </div>
     </div>

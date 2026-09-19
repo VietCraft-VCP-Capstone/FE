@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { authService } from '../services/authService';
 import { cartService } from '../../order/services/cartService';
+import { userService } from '../../user/services/userService';
 import { User } from '../types';
 
 export function useAuth() {
@@ -21,6 +22,40 @@ export function useAuth() {
             } catch { localStorage.clear(); }
         }
         setLoading(false);
+
+        // Luôn fetch profile mới nhất từ server để đồng bộ avatar và thông tin người dùng
+        if (token) {
+            userService.getProfile()
+                .then((prof) => {
+                    if (prof) {
+                        setUser((prev) => {
+                            const updated = {
+                                ...prev,
+                                ...prof,
+                                name: prof.full_name || prev?.name,
+                                role: prev?.role || (prof as any).role
+                            };
+                            try {
+                                const stored = localStorage.getItem('user');
+                                if (stored) {
+                                    localStorage.setItem('user', JSON.stringify({ ...JSON.parse(stored), ...updated }));
+                                }
+                            } catch {}
+                            return updated as User;
+                        });
+                    }
+                })
+                .catch(() => {});
+        }
+
+        const handleUserUpdate = (e: any) => {
+            if (e?.detail) {
+                setUser((prev) => prev ? { ...prev, ...e.detail } : e.detail);
+            }
+        };
+
+        window.addEventListener('vietcraft-user-updated', handleUserUpdate);
+        return () => window.removeEventListener('vietcraft-user-updated', handleUserUpdate);
     }, []);
 
     const persistSession = async (data: { token: string; user: User }) => {

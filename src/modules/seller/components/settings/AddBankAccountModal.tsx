@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BankAccountItem } from '../../types/settings';
+import { BankAccountItem, SUPPORTED_BANKS } from '../../types/settings';
 import { X, Landmark, CreditCard, User, Building, Check } from 'lucide-react';
 
 interface AddBankAccountModalProps {
@@ -8,18 +8,6 @@ interface AddBankAccountModalProps {
   onAdd: (account: Omit<BankAccountItem, 'id'>) => void;
   loading?: boolean;
 }
-
-const SUPPORTED_BANKS = [
-  { code: 'VCB', name: 'Ngân hàng TMCP Ngoại Thương Việt Nam (Vietcombank)' },
-  { code: 'MB', name: 'Ngân hàng TMCP Quân Đội (MB Bank)' },
-  { code: 'TCB', name: 'Ngân hàng TMCP Kỹ Thương Việt Nam (Techcombank)' },
-  { code: 'BIDV', name: 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV)' },
-  { code: 'CTG', name: 'Ngân hàng TMCP Công Thương Việt Nam (VietinBank)' },
-  { code: 'ACB', name: 'Ngân hàng TMCP Á Châu (ACB)' },
-  { code: 'TPB', name: 'Ngân hàng TMCP Tiên Phong (TPBank)' },
-  { code: 'VPB', name: 'Ngân hàng TMCP Việt Nam Thịnh Vượng (VPBank)' },
-  { code: 'VBA', name: 'Ngân hàng Nông nghiệp & Phát triển Nông thôn (Agribank)' },
-];
 
 export function AddBankAccountModal({
   isOpen,

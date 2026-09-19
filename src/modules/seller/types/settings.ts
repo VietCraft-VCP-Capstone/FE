@@ -44,6 +44,21 @@ export interface BankAccountItem {
   isDefault: boolean;
 }
 
+export const SUPPORTED_BANKS = [
+  { code: 'VCB', name: 'Ngân hàng TMCP Ngoại Thương Việt Nam (Vietcombank)' },
+  { code: 'MB', name: 'Ngân hàng TMCP Quân Đội (MB Bank)' },
+  { code: 'TCB', name: 'Ngân hàng TMCP Kỹ Thương Việt Nam (Techcombank)' },
+  { code: 'BIDV', name: 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIDV)' },
+  { code: 'CTG', name: 'Ngân hàng TMCP Công Thương Việt Nam (VietinBank)' },
+  { code: 'ACB', name: 'Ngân hàng TMCP Á Châu (ACB)' },
+  { code: 'TPB', name: 'Ngân hàng TMCP Tiên Phong (TPBank)' },
+  { code: 'VPB', name: 'Ngân hàng TMCP Việt Nam Thịnh Vượng (VPBank)' },
+  { code: 'AGR', name: 'Ngân hàng Nông nghiệp & Phát triển Nông thôn (Agribank)' },
+  { code: 'STB', name: 'Ngân hàng TMCP Sài Gòn Thương Tín (Sacombank)' },
+  { code: 'HDB', name: 'Ngân hàng TMCP Phát triển TP.HCM (HDBank)' },
+  { code: 'VIB', name: 'Ngân hàng TMCP Quốc tế Việt Nam (VIB)' },
+];
+
 export interface SellerPaymentSettings {
   bankAccounts: BankAccountItem[];
   autoWithdraw: boolean;

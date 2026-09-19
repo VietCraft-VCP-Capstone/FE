@@ -32,7 +32,10 @@ const notifyCartUpdate = (cartData: any) => {
 };
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
-const absImg = (u: any) => (typeof u === 'string' && u && !u.startsWith('http') ? ORIGIN + u : u);
+const absImg = (u: any) => {
+  if (typeof u !== 'string' || !u || u.startsWith('#')) return undefined;
+  return !u.startsWith('http') && !u.startsWith('data:') ? ORIGIN + u : u;
+};
 
 const entryKey = (productId: string, variantId?: string) => `${productId}::${variantId || ''}`;
 
@@ -73,17 +76,19 @@ const clearGuestStorage = () => {
 
 const buildGuestItem = (entry: GuestCartEntry, product: any) => {
   const variants: any[] = Array.isArray(product?.variants) ? product.variants : [];
-  const variant = entry.variantId ? variants.find((v: any) => String(v.id) === entry.variantId) : undefined;
+  const variant = entry.variantId 
+    ? variants.find((v: any) => String(v.id || v._id) === entry.variantId) 
+    : (variants[0] || undefined);
 
   return {
     _id: guestItemId(entry),
     product_id: {
-      _id: product?.id || entry.productId,
+      _id: product?.id || product?._id || entry.productId,
       title: product?.title,
       images: Array.isArray(product?.images) ? product.images : [],
       thumbnail: product?.thumbnail,
-      retail_price: product?.price,
-      price: product?.price,
+      retail_price: product?.price || variant?.price || variant?.retail_price,
+      price: product?.price || variant?.price || variant?.retail_price,
       shop_id: product?.shopInfo
         ? {
           _id: product.shopInfo.id,
@@ -94,15 +99,15 @@ const buildGuestItem = (entry: GuestCartEntry, product: any) => {
     },
     variant_id: variant
       ? {
-        _id: variant.id,
+        _id: variant.id || variant._id,
         name: variant.name,
         color: variant.color,
         size: variant.size,
         material: variant.material,
-        retail_price: variant.price,
-        price: variant.price,
-        stock_quantity: variant.stock,
-        mockup_image: absImg(variant.mockupImage),
+        retail_price: variant.price || variant.retail_price,
+        price: variant.price || variant.retail_price,
+        stock_quantity: variant.stock || variant.stock_quantity,
+        mockup_image: absImg(variant.mockupImage || variant.mockup_image),
       }
       : undefined,
     quantity: entry.quantity,

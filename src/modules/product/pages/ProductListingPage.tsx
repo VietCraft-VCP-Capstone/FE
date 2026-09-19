@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { ProductItem, ProductFormData, ProductFilterState } from '../types/product';
 import { productsService } from '../services/productsService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
@@ -9,13 +9,16 @@ import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { ProductDeleteModal } from '../components/ProductDeleteModal';
 import { useToast } from '../../../shared/components/Toast';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import {
   Plus,
   Trash2,
   CheckCircle2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
+
 
 const INITIAL_FILTER: ProductFilterState = {
   search: '',
@@ -45,17 +48,10 @@ export function ProductListingPage() {
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState<ProductItem | null>(null);
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
 
   const [actionLoading, setActionLoading] = useState(false);
 
-  /**
-   * Vào bằng /seller/products?new=1 thì mở sẵn hộp thoại tạo sản phẩm.
-   * Các nút "Tạo sản phẩm" ở Trang chủ gian hàng và Danh mục sản phẩm dẫn tới đây,
-   * nên người bán không phải bấm thêm một nhịp nữa sau khi trang tải xong.
-   *
-   * Xoá tham số ngay bằng replace: giữ lại thì F5 hay bấm Back sẽ bật lại hộp
-   * thoại lần nữa, kể cả khi người dùng vừa cố ý đóng nó.
-   */
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (searchParams.get('new') !== '1') return;
@@ -87,9 +83,6 @@ export function ProductListingPage() {
     }
 
     try {
-      // Trang quản lý của seller: phải dùng getMine (GET /products/mine) chứ không phải
-      // getAll — getAll nay là marketplace công khai, trả hàng PUBLISHED của MỌI shop và
-      // giấu mất hàng DRAFT/UNPUBLISHED của chính seller.
       const data = await productsService.getMine(currentFilter);
       cacheRef.current.set(key, {
         items: data.items,
@@ -198,17 +191,19 @@ export function ProductListingPage() {
   };
 
   // Batch Delete
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = () => {
     if (selectedIds.length === 0) return;
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} sản phẩm đã chọn không?`)) {
-      return;
-    }
+    setIsBatchDeleteOpen(true);
+  };
+
+  const handleConfirmBatchDelete = async () => {
     setActionLoading(true);
     try {
       cacheRef.current.clear();
       await productsService.batchDelete(selectedIds);
       showToast(`Đã xóa thành công ${selectedIds.length} sản phẩm.`, 'success');
       setSelectedIds([]);
+      setIsBatchDeleteOpen(false);
       await fetchProducts(filter);
     } catch (err: any) {
       showToast('Lỗi khi xóa hàng loạt: ' + err.message, 'error');
@@ -271,14 +266,21 @@ export function ProductListingPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            to="/seller/products/new"
+            className="flex items-center gap-2 px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer font-jakarta no-underline"
+          >
+            <Sparkles size={16} /> Tạo sản phẩm POD (Design)
+          </Link>
           <button
             onClick={handleOpenCreate}
             className="flex items-center gap-2 px-4 py-2.5 bg-[#007700] hover:bg-[#005B00] text-white text-sm font-bold rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer font-jakarta"
           >
-            <Plus size={16} /> Thêm sản phẩm
+            <Plus size={16} /> Thêm sản phẩm thường
           </button>
         </div>
       </div>
+
 
       {/* Filter and Search Bar */}
       <ProductFilterBar
@@ -425,6 +427,19 @@ export function ProductListingPage() {
         onConfirm={handleConfirmDelete}
         product={deletingProduct}
         loading={actionLoading}
+      />
+
+      {/* Batch Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isBatchDeleteOpen}
+        variant="danger"
+        title="Xác nhận xóa hàng loạt"
+        message={`Bạn có chắc chắn muốn xóa ${selectedIds.length} sản phẩm đã chọn không?\n\nThao tác này sẽ xóa các sản phẩm khỏi danh sách gian hàng.`}
+        confirmLabel={`Xóa ${selectedIds.length} sản phẩm`}
+        cancelLabel="Hủy bỏ"
+        isLoading={actionLoading}
+        onConfirm={handleConfirmBatchDelete}
+        onCancel={() => setIsBatchDeleteOpen(false)}
       />
     </div>
   );

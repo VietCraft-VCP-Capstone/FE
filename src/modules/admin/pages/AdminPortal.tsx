@@ -5,6 +5,7 @@ import { AdminDashboard } from './AdminDashboard';
 import { AdminModeration } from './AdminModeration';
 import { AdminCategories } from './AdminCategories';
 import { AdminTags } from './AdminTags';
+import { AdminSellers } from './AdminSellers';
 import { Search, Edit, Lock, Unlock } from 'lucide-react';
 import { authService } from '../../auth/services/authService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
@@ -37,8 +38,8 @@ function AdminUsers() {
     const email = u.email || '';
     const id = u._id || '';
     const matchesSearch = name.toLowerCase().includes(search.toLowerCase()) ||
-                          email.toLowerCase().includes(search.toLowerCase()) ||
-                          id.toLowerCase().includes(search.toLowerCase());
+      email.toLowerCase().includes(search.toLowerCase()) ||
+      id.toLowerCase().includes(search.toLowerCase());
     if (filter === 'Buyer') return matchesSearch && u.role === 'BUYER';
     if (filter === 'Seller') return matchesSearch && u.role === 'SELLER';
     return matchesSearch;
@@ -138,14 +139,11 @@ function AdminUsers() {
   );
 }
 
+import { AdminPromotionsPage } from './AdminPromotionsPage';
+
 /* ------------------------------------------------------------- Admin Disputes Page */
 function AdminDisputes() {
   return <div><h2 className="m-0 text-[24px] font-extrabold tracking-[-0.02em] text-admin-ink">Tranh chấp</h2><p className="mt-1.5 mb-0 text-[13.5px] leading-normal text-admin-muted">Xử lý và giải quyết các tranh chấp giữa người mua và người bán.</p></div>;
-}
-
-/* ------------------------------------------------------------- Admin Marketing Page */
-function AdminMarketing() {
-  return <div><h2 className="m-0 text-[24px] font-extrabold tracking-[-0.02em] text-admin-ink">Marketing</h2><p className="mt-1.5 mb-0 text-[13.5px] leading-normal text-admin-muted">Quản lý các chiến dịch khuyến mãi và tiếp thị.</p></div>;
 }
 
 interface AdminPortalProps {
@@ -161,12 +159,15 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="moderation" element={<AdminModeration />} />
+        <Route path="sellers" element={<AdminSellers />} />
         <Route path="categories" element={<AdminCategories />} />
         <Route path="tags" element={<AdminTags />} />
         <Route path="disputes" element={<AdminDisputes />} />
-        <Route path="marketing" element={<AdminMarketing />} />
+        <Route path="marketing" element={<AdminPromotionsPage />} />
+        <Route path="promotions" element={<AdminPromotionsPage />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Routes>
     </AdminLayout>
   );
 }
+

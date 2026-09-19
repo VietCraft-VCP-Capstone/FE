@@ -76,6 +76,15 @@ export function ProductFormModal({
 
   useEffect(() => {
     if (product) {
+      const rawImages = product.images && product.images.length > 0
+        ? [...product.images]
+        : (product.thumbnail ? [product.thumbnail] : []);
+      const activeThumb = product.thumbnail || rawImages[0] || '';
+      let orderedImages = [...rawImages];
+      if (activeThumb && orderedImages.includes(activeThumb)) {
+        orderedImages = [activeThumb, ...orderedImages.filter(img => img !== activeThumb)];
+      }
+
       setFormData({
         title: product.title || '',
         category: product.category || '',
@@ -89,8 +98,8 @@ export function ProductFormModal({
         rank: product.rank || 0,
         status: product.status || 'ACTIVE',
         description: product.description || '',
-        thumbnail: product.thumbnail || '',
-        images: product.images && product.images.length > 0 ? product.images : [product.thumbnail],
+        thumbnail: activeThumb,
+        images: orderedImages,
         colors: product.colors && product.colors.length > 0 ? product.colors : []
       });
     } else {
@@ -158,7 +167,16 @@ export function ProductFormModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    onSubmit(formData);
+    let finalImages = [...formData.images];
+    const targetCover = formData.thumbnail || finalImages[0] || '';
+    if (targetCover && finalImages.includes(targetCover)) {
+      finalImages = [targetCover, ...finalImages.filter(img => img !== targetCover)];
+    }
+    onSubmit({
+      ...formData,
+      images: finalImages,
+      thumbnail: targetCover,
+    });
   };
 
   const handleInsertFormatting = (prefix: string, suffix: string = '') => {

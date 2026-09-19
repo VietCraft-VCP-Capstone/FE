@@ -1,38 +1,57 @@
-import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
-import { Heart, Star, ArrowRight, CheckCircle2, Info } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
+import { Heart, Star, ArrowRight, CheckCircle2, Info, Ticket, Flame } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { promotionService } from '../../promotion/services/promotionService';
-import { userService } from '../../user/services/userService';
+import { favoritesService } from '../../product/services/favoritesService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import '../../../shared/components/layouts.css';
 
-export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
+// Bộ nhớ đệm cấp module: giữ lại sản phẩm và voucher khi người dùng chuyển trang
+let homeDataCache: {
+  products: any[];
+  shops: any[];
+  coupons: any[];
+  timestamp: number;
+} | null = null;
+
+export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const outletContext = useOutletContext<any>() || {};
   const search = outletContext.search || '';
 
-  const [allProducts, setAllProducts] = useState<any[]>([]);
-  const [shopList, setShopList] = useState<any[]>([]);
-  const [couponList, setCouponList] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'quan-tam' | 'gan-day' | 'theo-doi' | 'khuyen-mai' | 'Thinh-hanh'>('gan-day');
+  const [allProducts, setAllProducts] = useState<any[]>(() => homeDataCache?.products || []);
+  const [shopList, setShopList] = useState<any[]>(() => homeDataCache?.shops || []);
+  const [couponList, setCouponList] = useState<any[]>(() => homeDataCache?.coupons || []);
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !homeDataCache);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Tự động cuộn đến section tương ứng khi URL là /collections, /gifts
+  useEffect(() => {
+    if (location.pathname === '/collections' || location.hash === '#collections-section') {
+      setTimeout(() => {
+        document.getElementById('collections-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 80);
+    } else if (location.pathname === '/gifts' || location.hash === '#gifts-section') {
+      setTimeout(() => {
+        document.getElementById('kham-pha')?.scrollIntoView({ behavior: 'smooth' });
+      }, 80);
+    }
+  }, [location.pathname, location.hash]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, search]);
-
-  const name = user?.full_name || user?.name || '';
+  }, [search]);
 
   useEffect(() => {
     if (!isLoggedIn()) {
       setFavoritedProductIds([]);
     } else {
-      userService.getWishlist()
+      favoritesService.getFavoriteIds()
         .then((ids) => {
           setFavoritedProductIds(ids);
           localStorage.setItem('vietcraft_favorites', JSON.stringify(ids));
@@ -49,7 +68,11 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       try { setSavedVouchers(JSON.parse(vls)); } catch (e) {}
     }
 
-    setIsLoading(true);
+    // Chỉ bật loading spinner nếu chưa có cache sẵn trong RAM
+    if (!homeDataCache) {
+      setIsLoading(true);
+    }
+
     Promise.all([
       productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
       productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
@@ -59,6 +82,12 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       setAllProducts(productList);
       setShopList(shops || []);
       setCouponList(coupons || []);
+      homeDataCache = {
+        products: productList,
+        shops: shops || [],
+        coupons: coupons || [],
+        timestamp: Date.now()
+      };
     }).finally(() => {
       setIsLoading(false);
     });
@@ -76,15 +105,15 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       return;
     }
     try {
-      let updated: string[];
-      if (favoritedProductIds.includes(productId)) {
-        updated = await userService.removeFromWishlist(productId);
-        triggerToast(`Đã xóa "${title}" khỏi danh sách yêu thích`, 'info');
-      } else {
-        updated = await userService.addToWishlist(productId);
-        triggerToast(`Đã thêm "${title}" vào danh sách yêu thích`, 'success');
-      }
-      setFavoritedProductIds(updated);
+      const res = await favoritesService.toggleFavorite(productId);
+      const isFav = res.isFavorite;
+      setFavoritedProductIds(prev =>
+        isFav ? [...prev, productId] : prev.filter(id => id !== productId)
+      );
+      triggerToast(
+        isFav ? `Đã thêm "${title}" vào danh sách yêu thích` : `Đã xóa "${title}" khỏi danh sách yêu thích`,
+        isFav ? 'success' : 'info'
+      );
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch (err) {
       console.error('toggleFavorite failed', err);
@@ -92,58 +121,209 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     }
   };
 
-  const toggleVoucher = (voucherCode: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleVoucher = (voucherCode: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     let updated: string[];
     if (savedVouchers.includes(voucherCode)) {
       updated = savedVouchers.filter(code => code !== voucherCode);
       triggerToast(`Đã hủy lưu mã ${voucherCode}`, 'info');
     } else {
       updated = [...savedVouchers, voucherCode];
-      triggerToast(`Lưu mã ưu đãi ${voucherCode} thành công!`, 'success');
+      navigator.clipboard?.writeText(voucherCode);
+      triggerToast(`Lưu mã ưu đãi ${voucherCode} thành công! Đã sao chép mã.`, 'success');
     }
     setSavedVouchers(updated);
     localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
   };
 
-  const vouchers = couponList.map((v: any) => {
-    const val = v.discount_value?.$numberDecimal ? parseFloat(v.discount_value.$numberDecimal) : parseFloat(v.discount_value || 0);
-    const minVal = v.min_order_value?.$numberDecimal ? parseFloat(v.min_order_value.$numberDecimal) : parseFloat(v.min_order_value || 0);
+  const vouchers = useMemo(() => {
+    return couponList.map((v: any) => {
+      const val = typeof v.discount_value === 'object' && v.discount_value?.$numberDecimal
+        ? parseFloat(v.discount_value.$numberDecimal)
+        : parseFloat(v.discount_value || 0);
+      const minVal = typeof v.min_order_value === 'object' && v.min_order_value?.$numberDecimal
+        ? parseFloat(v.min_order_value.$numberDecimal)
+        : parseFloat(v.min_order_value || 0);
+      const maxVal = typeof v.max_discount_amount === 'object' && v.max_discount_amount?.$numberDecimal
+        ? parseFloat(v.max_discount_amount.$numberDecimal)
+        : parseFloat(v.max_discount_amount || 0);
 
-    let displayValue = '';
-    if (v.discount_type === 'PERCENTAGE') {
-      displayValue = `GIẢM ${val}%`;
-    } else {
-      displayValue = val >= 1000000 ? `GIẢM ${(val / 1000000).toLocaleString('vi-VN')} TRƯ` : `GIẢM ${(val / 1000).toLocaleString('vi-VN')}K`;
-      if (v.code === 'VCPFREE') {
-        displayValue = 'FREESHIP';
+      let displayValue = '';
+      if (v.discount_type === 'PERCENTAGE') {
+        displayValue = `GIẢM ${val}%${maxVal > 0 ? ` (Tối đa ${(maxVal / 1000).toLocaleString('vi-VN')}K)` : ''}`;
+      } else if (v.discount_type === 'FREE_SHIPPING') {
+        displayValue = val > 0 ? `FREESHIP ${(val / 1000).toLocaleString('vi-VN')}K` : 'FREESHIP 100%';
+      } else if (v.discount_type === 'FLASH_SALE') {
+        displayValue = val <= 100 ? `FLASH SALE ${val}%` : `FLASH SALE ${(val / 1000).toLocaleString('vi-VN')}K`;
+      } else {
+        displayValue = val >= 1000000 ? `GIẢM ${(val / 1000000).toLocaleString('vi-VN')} TR` : `GIẢM ${(val / 1000).toLocaleString('vi-VN')}K`;
+      }
+
+      let conditionLabel = 'Mọi đơn hàng';
+      if (minVal > 0) {
+        conditionLabel = minVal >= 1000000 ? `Đơn tối thiểu ${minVal / 1000000} triệu` : `Đơn tối thiểu ${(minVal / 1000)}K`;
+      }
+
+      return {
+        id: v._id || v.id,
+        code: v.code,
+        title: v.title,
+        discount_type: v.discount_type,
+        discount_value: val,
+        min_order_value: minVal,
+        max_discount_amount: maxVal,
+        is_platform: v.is_platform ?? !v.shop_id,
+        shop_name: v.shop_name || (v.shop_id ? 'Gian hàng' : 'VietCraft'),
+        applicable_scope: v.applicable_scope || 'ALL',
+        applicable_products_count: v.applicable_product_ids?.length || 0,
+        end_date: v.end_date,
+        value: displayValue,
+        condition: conditionLabel
+      };
+    });
+  }, [couponList]);
+
+  // Lấy sản phẩm có ưu đãi thật / Flash Sale thật từ database và voucher đang chạy
+  const flashDeals = useMemo(() => {
+    const now = new Date();
+    const activePromotions = couponList.filter((c: any) => {
+      if (!c.is_active) return false;
+      const start = new Date(c.start_date);
+      const end = new Date(c.end_date);
+      return start <= now && end >= now;
+    });
+
+    const flashSaleCoupons = activePromotions.filter((c: any) => c.discount_type === 'FLASH_SALE');
+    const otherCoupons = activePromotions.filter((c: any) => c.discount_type !== 'FLASH_SALE');
+
+    const deals: Array<{
+      id: string;
+      title: string;
+      price: number;
+      oldPrice: number;
+      discount: string;
+      image: string;
+      badge?: string;
+      couponCode?: string;
+      couponTitle?: string;
+    }> = [];
+
+    const addedProductIds = new Set<string>();
+
+    // 1. Sản phẩm thuộc chương trình FLASH SALE thật
+    for (const coupon of flashSaleCoupons) {
+      const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
+        ? parseFloat(coupon.discount_value.$numberDecimal)
+        : parseFloat(coupon.discount_value || 0);
+
+      if (coupon.applicable_scope === 'SPECIFIC_PRODUCTS' && Array.isArray(coupon.applicable_product_ids)) {
+        for (const prodId of coupon.applicable_product_ids) {
+          const idStr = (prodId?._id || prodId)?.toString();
+          if (!idStr || addedProductIds.has(idStr)) continue;
+          const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
+          if (p && p.price > 0) {
+            const basePrice = p.price;
+            let dealPrice = basePrice;
+            let discountText = '';
+            if (discountVal <= 100) {
+              // val là %
+              dealPrice = Math.round(basePrice * (1 - discountVal / 100));
+              discountText = `-${discountVal}%`;
+            } else {
+              // val là số tiền VNĐ
+              dealPrice = Math.max(0, basePrice - discountVal);
+              discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
+            }
+            deals.push({
+              id: p.id || p._id,
+              title: p.title || p.name,
+              price: dealPrice,
+              oldPrice: basePrice,
+              discount: discountText,
+              image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
+              badge: 'FLASH SALE',
+              couponCode: coupon.code,
+              couponTitle: coupon.title
+            });
+            addedProductIds.add(idStr);
+          }
+        }
+      } else if (coupon.applicable_scope === 'ALL') {
+        const matchingProds = coupon.shop_id
+          ? allProducts.filter((p: any) => (p.sellerId === coupon.shop_id || p.shop_id === coupon.shop_id))
+          : allProducts;
+        for (const p of matchingProds.slice(0, 4)) {
+          const idStr = (p.id || p._id)?.toString();
+          if (!idStr || addedProductIds.has(idStr)) continue;
+          const basePrice = p.price;
+          let dealPrice = basePrice;
+          let discountText = '';
+          if (discountVal <= 100) {
+            // val là %
+            dealPrice = Math.round(basePrice * (1 - discountVal / 100));
+            discountText = `-${discountVal}%`;
+          } else {
+            // val là số tiền VNĐ
+            dealPrice = Math.max(0, basePrice - discountVal);
+            discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
+          }
+          deals.push({
+            id: p.id || p._id,
+            title: p.title || p.name,
+            price: dealPrice,
+            oldPrice: basePrice,
+            discount: discountText,
+            image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
+            badge: 'FLASH SALE',
+            couponCode: coupon.code,
+            couponTitle: coupon.title
+          });
+          addedProductIds.add(idStr);
+        }
       }
     }
 
-    let conditionLabel = 'Mọi đơn hàng';
-    if (minVal > 0) {
-      conditionLabel = minVal >= 1000000 ? `Đơn tối thiểu ${minVal / 1000000} triệu` : `Đơn tối thiểu ${(minVal / 1000)}K`;
+    // 2. Sản phẩm thuộc các voucher giảm giá chỉ định khác
+    for (const coupon of otherCoupons) {
+      if (coupon.applicable_scope === 'SPECIFIC_PRODUCTS' && Array.isArray(coupon.applicable_product_ids)) {
+        const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
+          ? parseFloat(coupon.discount_value.$numberDecimal)
+          : parseFloat(coupon.discount_value || 0);
+
+        for (const prodId of coupon.applicable_product_ids) {
+          const idStr = (prodId?._id || prodId)?.toString();
+          if (!idStr || addedProductIds.has(idStr)) continue;
+          const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
+          if (p && p.price > 0) {
+            const basePrice = p.price;
+            let dealPrice = basePrice;
+            let discountText = '';
+            if (coupon.discount_type === 'PERCENTAGE') {
+              dealPrice = Math.round(basePrice * (1 - discountVal / 100));
+              discountText = `-${discountVal}%`;
+            } else {
+              dealPrice = Math.max(0, basePrice - discountVal);
+              discountText = `-${Math.round((discountVal / basePrice) * 100)}%`;
+            }
+            deals.push({
+              id: p.id || p._id,
+              title: p.title || p.name,
+              price: dealPrice,
+              oldPrice: basePrice,
+              discount: discountText,
+              image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
+              badge: 'ƯU ĐÃI',
+              couponCode: coupon.code,
+              couponTitle: coupon.title
+            });
+            addedProductIds.add(idStr);
+          }
+        }
+      }
     }
 
-    return {
-      code: v.code,
-      value: displayValue,
-      condition: conditionLabel
-    };
-  });
-
-  const flashDeals = allProducts.slice(0, 5).map((p: any, idx: number) => {
-    const discountPct = 10 * (idx + 2); // e.g. -20%, -30%, -40%...
-    const oldPrice = Math.round(p.price / (1 - discountPct / 100));
-    return {
-      id: p.id,
-      title: p.title,
-      price: p.price,
-      oldPrice: oldPrice,
-      discount: `-${discountPct}%`,
-      image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300'
-    };
-  });
+    return deals;
+  }, [allProducts, couponList]);
 
   const aiSuggestions = allProducts.slice(1, 5).map((p: any) => {
     return {
@@ -174,41 +354,23 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     (p.category || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const getTabFilteredProducts = () => {
-    switch (activeTab) {
-      case 'quan-tam':
-        const favItems = searchedProducts.filter((p: any) => favoritedProductIds.includes(p.id));
-        return favItems;
-      case 'gan-day':
-        return searchedProducts;
-      case 'theo-doi':
-        return [...searchedProducts].reverse();
-      case 'khuyen-mai':
-        return flashDeals.map(fd => ({
-          id: fd.id,
-          title: fd.title,
-          price: fd.price,
-          images: [fd.image]
-        }));
-      case 'Thinh-hanh':
-        const matches = searchedProducts.filter(p =>
-          (p.title || '').toLowerCase().includes('thịnh hành') ||
-          (p.title || '').toLowerCase().includes('gốm') ||
-          (p.title || '').toLowerCase().includes('tranh')
-        );
-        return matches.length > 0 ? matches : searchedProducts;
-      default:
-        return searchedProducts;
-    }
-  };
-
-  const displayProducts = getTabFilteredProducts();
-  const itemsPerPage = 5;
+  const displayProducts = searchedProducts;
+  const itemsPerPage = 8;
   const totalPages = Math.ceil(displayProducts.length / itemsPerPage);
   const paginatedProducts = displayProducts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  // Map tất cả deal (FLASH SALE + ƯU ĐÃI) để hiện giá gạch ngang đúng
+  const flashSaleProductMap = useMemo(() => {
+    const map = new Map<string, any>();
+    flashDeals.forEach((fd: any) => {
+      map.set(fd.id?.toString(), fd);
+    });
+    return map;
+  }, [flashDeals]);
+
 
   return (
     <div className="buyer-wrapper" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -237,102 +399,224 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
         </div>
       )}
 
-      {/* Intro Banner */}
-      <div className="buyer-intro-banner" style={{ background: 'transparent', textAlign: 'center', padding: '24px 0 12px' }}>
-        <h1 style={{ fontSize: 32, fontWeight: 900, color: '#330033' }}>{name ? `Chào mừng trở lại, ${name}!` : 'Khám phá sản phẩm thủ công Việt'}</h1>
-      </div>
+      {/* Unique Vouchers Voucher Section - Đẩy lên trên đầu trang */}
+      <section id="vouchers-section" className="buyer-section" style={{ marginTop: 20 }}>
+        <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+              <Ticket className="text-[#008000]" size={22} />
+              Ưu Đãi & Voucher Dành Cho Bạn
+            </h2>
+            <p style={{ fontSize: 13, color: '#78716c', margin: '4px 0 0 0' }}>
+              Lưu mã khuyến mãi toàn sàn và gian hàng để tự động trừ tiền khi thanh toán
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/vouchers')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              border: '#008000',
+              padding: '8px 18px',
+              borderRadius: 50,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,128,0,0.2)',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Ticket size={16} />
+            Xem tất cả Voucher ({vouchers.length})
+          </button>
+        </div>
 
-      {/* Tab Pills */}
-      <div className="buyer-tab-pills" style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 30 }}>
-        <button
-          className={activeTab === 'quan-tam' ? 'active' : ''}
-          onClick={() => setActiveTab('quan-tam')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'quan-tam' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'quan-tam' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Đã quan tâm
-        </button>
-        <button
-          className={activeTab === 'gan-day' ? 'active' : ''}
-          onClick={() => setActiveTab('gan-day')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'gan-day' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'gan-day' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Đã xem gần đây
-        </button>
-        <button
-          className={activeTab === 'theo-doi' ? 'active' : ''}
-          onClick={() => setActiveTab('theo-doi')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'theo-doi' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'theo-doi' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Shop đang theo dõi
-        </button>
-        <button
-          className={activeTab === 'khuyen-mai' ? 'active' : ''}
-          onClick={() => setActiveTab('khuyen-mai')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'khuyen-mai' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'khuyen-mai' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Khuyến mãi
-        </button>
-        <button
-          className={activeTab === 'Thinh-hanh' ? 'active' : ''}
-          onClick={() => setActiveTab('Thinh-hanh')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'Thinh-hanh' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'Thinh-hanh' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Thịnh hành
-        </button>
-      </div>
+        {vouchers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 16px', background: '#fafaf9', borderRadius: 16, color: '#78716c' }}>
+            <Ticket size={32} style={{ margin: '0 auto 8px', color: '#a8a29e' }} />
+            <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>Hiện chưa có mã ưu đãi công khai nào đang mở.</p>
+          </div>
+        ) : (
+          <div className="buyer-grid-4">
+            {vouchers.slice(0, 8).map((v, i) => {
+              const isSaved = savedVouchers.includes(v.code);
+              return (
+                <div key={i} className="voucher-card" style={{
+                  backgroundColor: isSaved ? '#f0fdf4' : '#fff8f8',
+                  borderColor: isSaved ? '#86efac' : '#fca5a5',
+                  height: 'auto',
+                  minHeight: 125,
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  padding: 14
+                }}>
+                  <div className="voucher-content">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
+                      <span className="font-mono" style={{ fontSize: 11, fontWeight: 900, backgroundColor: isSaved ? '#dcfce7' : '#fee2e2', color: isSaved ? '#166534' : '#991b1b', padding: '2px 6px', borderRadius: 4 }}>
+                        {v.code}
+                      </span>
+                      {v.is_platform ? (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#008000' }}>Toàn Sàn</span>
+                      ) : (
+                        <span style={{ fontSize: 10, color: '#57534e', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.shop_name}</span>
+                      )}
+                    </div>
+                    <span className="voucher-title" style={{ color: isSaved ? '#15803d' : '#cc1111', fontSize: 15, fontWeight: 800 }}>{v.value}</span>
+                    <span className="voucher-desc" style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{v.condition}</span>
+                    {v.applicable_scope === 'SPECIFIC_PRODUCTS' ? (
+                      <span style={{ fontSize: 10, color: '#d97706', fontWeight: 600, display: 'block', marginTop: 3 }}>
+                        • {v.applicable_products_count} sản phẩm chỉ định
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 10, color: '#78716c', fontWeight: 500, display: 'block', marginTop: 3 }}>
+                        • {v.is_platform ? 'Áp dụng toàn sàn' : 'Áp dụng toàn shop'}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    className="voucher-btn"
+                    onClick={(e) => toggleVoucher(v.code, e)}
+                    style={{
+                      backgroundColor: isSaved ? '#008000' : '#cc1111',
+                      color: '#fff',
+                      transition: 'all 0.2s',
+                      fontWeight: 700,
+                      marginTop: 8,
+                      padding: '5px 0'
+                    }}
+                  >
+                    {isSaved ? '✓ Đã lưu' : 'Lưu mã'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Flash Deals Section - Sản phẩm Flash Sale với badge nhảy nhảy */}
+      <section className="buyer-section" style={{ marginTop: 36 }}>
+        <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Flame size={22} className="text-amber-500 fill-amber-500 animate-pulse" />
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: 0 }}>
+              ⚡ Ưu Đãi Chớp Nhoáng & Flash Sale
+            </h2>
+            {flashDeals.length > 0 && (
+              <span style={{ fontSize: 12, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: 20 }}>
+                {flashDeals.length} sản phẩm giảm giá
+              </span>
+            )}
+          </div>
+        </div>
+
+        {flashDeals.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '36px 16px', background: '#fafaf9', borderRadius: 16, color: '#78716c', border: '1px dashed #e7e5e4' }}>
+            <Flame size={32} style={{ margin: '0 auto 8px', color: '#f59e0b' }} />
+            <p style={{ fontWeight: 700, fontSize: 14, color: '#44403c', margin: 0 }}>
+              Hiện chưa có sản phẩm Flash Sale chớp nhoáng nào đang mở.
+            </p>
+            <p style={{ fontSize: 12, color: '#a8a29e', marginTop: 4, marginBottom: 12 }}>
+              Các gian hàng sẽ sớm tung ra khung giờ vàng giá sốc. Bạn hãy lưu voucher trước để sẵn sàng săn sale nhé!
+            </p>
+            <button
+              onClick={() => navigate('/vouchers')}
+              style={{
+                backgroundColor: '#008000',
+                color: '#fff',
+                padding: '6px 16px',
+                borderRadius: 20,
+                border: 'none',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Mở Kho Voucher
+            </button>
+          </div>
+        ) : (
+          <div className="buyer-grid-5">
+            {flashDeals.map((fd) => {
+              const isFav = favoritedProductIds.includes(fd.id);
+              const isFlash = fd.badge === 'FLASH SALE';
+              return (
+                <div key={fd.id} className="buyer-card" onClick={() => navigate(`/product/${fd.id}`)}>
+                  <div className="card-media">
+                    <img src={fd.image} alt={fd.title} />
+                    <div style={{
+                      position: 'absolute',
+                      top: 8,
+                      left: 8,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                      alignItems: 'flex-start',
+                      zIndex: 3
+                    }}>
+                      {isFlash ? (
+                        <span className="flash-sale-badge">
+                          ⚡ FLASH SALE
+                        </span>
+                      ) : (
+                        <span className="discount-tag" style={{ position: 'static' }}>
+                          {fd.badge || 'ƯU ĐÃI'}
+                        </span>
+                      )}
+                      {fd.discount && (
+                        <span style={{
+                          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                          color: '#fef08a',
+                          fontSize: 10,
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          backdropFilter: 'blur(4px)'
+                        }}>
+                          {fd.discount}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      className="fav-overlay"
+                      onClick={(e) => toggleFavorite(fd.id, fd.title, e)}
+                      style={{ color: isFav ? '#e11d48' : '#888' }}
+                    >
+                      <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
+                    </button>
+                  </div>
+                  <div className="card-info">
+                    <h3>{fd.title}</h3>
+                    <div className="price-row">
+                      <span className="new-price" style={{ color: '#008000', fontWeight: 800 }}>
+                        {fd.price.toLocaleString('vi-VN')}đ
+                      </span>
+                      {fd.oldPrice > fd.price && (
+                        <span className="old-price" style={{ textDecoration: 'line-through', color: '#a8a29e' }}>
+                          {fd.oldPrice.toLocaleString('vi-VN')}đ
+                        </span>
+                      )}
+                    </div>
+                    {fd.couponCode && (
+                      <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: 4 }}>
+                          ⚡ {fd.couponCode}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Main Discover Grid */}
-      <section className="buyer-section pt-4">
+      <section id="kham-pha" className="buyer-section" style={{ marginTop: 40 }}>
         <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Tiếp tục khám phá</h2>
           <span style={{ fontSize: 13, color: '#888', fontWeight: 500 }}>
@@ -346,17 +630,34 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
           </div>
         ) : displayProducts.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
-            <p style={{ fontWeight: 650 }}>Không tìm thấy sản phẩm phù hợp ở danh mục này.</p>
+            <p style={{ fontWeight: 650 }}>Không tìm thấy sản phẩm phù hợp.</p>
           </div>
         ) : (
           <>
-            <div className="buyer-grid-5">
+            <div className="buyer-grid-4">
               {paginatedProducts.map((p: any) => {
                 const isFav = favoritedProductIds.includes(p.id);
+                const flashDeal = flashSaleProductMap.get((p.id || p._id)?.toString());
+                const isFlashSale = flashDeal?.badge === 'FLASH SALE';
+                const isOtherDeal = flashDeal && !isFlashSale;
                 return (
-                  <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`)}>
+                  <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`, { state: { initialProduct: p } })}>
                     <div className="card-media">
                       <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} />
+                      {isFlashSale && (
+                        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 3 }}>
+                          <span className="flash-sale-badge">
+                            ⚡ FLASH SALE
+                          </span>
+                        </div>
+                      )}
+                      {isOtherDeal && (
+                        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 3 }}>
+                          <span style={{ backgroundColor: '#7c3aed', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 12 }}>
+                            🏷️ ƯU ĐÃI
+                          </span>
+                        </div>
+                      )}
                       <button
                         className="fav-overlay"
                         onClick={(e) => toggleFavorite(p.id, p.title || p.name, e)}
@@ -367,9 +668,21 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
                     </div>
                     <div className="card-info">
                       <h3>{p.title || p.name}</h3>
-                      <p style={{ margin: 0, fontWeight: 700, color: '#007700' }}>
-                        {p.price.toLocaleString('vi-VN')}đ
-                      </p>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <p style={{ margin: 0, fontWeight: 700, color: '#007700' }}>
+                          {(flashDeal ? flashDeal.price : p.price).toLocaleString('vi-VN')}đ
+                        </p>
+                        {flashDeal && flashDeal.oldPrice > flashDeal.price && (
+                          <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#a8a29e' }}>
+                            {flashDeal.oldPrice.toLocaleString('vi-VN')}đ
+                          </span>
+                        )}
+                      </div>
+                      {flashDeal?.couponCode && (
+                        <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: 4, width: 'fit-content', marginTop: 3 }}>
+                          ⚡ {flashDeal.couponCode}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -435,74 +748,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
             )}
           </>
         )}
-      </section>
-
-      {/* Unique Vouchers Voucher Section */}
-      <section className="buyer-section" style={{ marginTop: 40 }}>
-        <div className="section-head" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Ưu đãi dành riêng cho bạn</h2>
-        </div>
-        <div className="buyer-grid-4">
-          {vouchers.map((v, i) => {
-            const isSaved = savedVouchers.includes(v.code);
-            return (
-              <div key={i} className="voucher-card" style={{
-                backgroundColor: isSaved ? '#f5f5f4' : '#fff8f8',
-                borderColor: isSaved ? '#e7e5e4' : '#fca5a5'
-              }}>
-                <div className="voucher-content">
-                  <span className="voucher-title" style={{ color: isSaved ? '#57534e' : '#cc1111' }}>{v.value}</span>
-                  <span className="voucher-desc">{v.condition}</span>
-                </div>
-                <button
-                  className="voucher-btn"
-                  onClick={(e) => toggleVoucher(v.code, e)}
-                  style={{
-                    backgroundColor: isSaved ? '#a8a29e' : '#cc1111',
-                    color: '#fff',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {isSaved ? 'Đã lưu' : 'Lưu mã'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Flash Deals Section */}
-      <section className="buyer-section" style={{ marginTop: 40 }}>
-        <div className="section-head" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>⚡ Ưu đãi chớp nhoáng</h2>
-        </div>
-        <div className="buyer-grid-5">
-          {flashDeals.map((fd) => {
-            const isFav = favoritedProductIds.includes(fd.id);
-            return (
-              <div key={fd.id} className="buyer-card" onClick={() => navigate(`/product/${fd.id}`)}>
-                <div className="card-media">
-                  <img src={fd.image} alt={fd.title} />
-                  <span className="discount-tag">{fd.discount}</span>
-                  <button
-                    className="fav-overlay"
-                    onClick={(e) => toggleFavorite(fd.id, fd.title, e)}
-                    style={{ color: isFav ? '#e11d48' : '#888' }}
-                  >
-                    <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
-                  </button>
-                </div>
-                <div className="card-info">
-                  <h3>{fd.title}</h3>
-                  <div className="price-row">
-                    <span className="new-price">{fd.price.toLocaleString('vi-VN')}đ</span>
-                    <span className="old-price">{fd.oldPrice.toLocaleString('vi-VN')}đ</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       </section>
 
       {/* AI Recommendation Section */}
@@ -579,7 +824,7 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
       </section>
 
       {/* Styles Discovery Section */}
-      <section className="buyer-section pb-12" style={{ marginTop: 40, marginBottom: 40 }}>
+      <section id="collections-section" className="buyer-section pb-12" style={{ marginTop: 40, marginBottom: 40 }}>
         <div className="section-head" style={{ marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Khám phá các phong cách mới</h2>
         </div>

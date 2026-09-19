@@ -9,11 +9,13 @@ import {
 import { userService, UserProfile, Address } from '../../user/services/userService';
 import { ordersService } from '../../order/services/ordersService';
 import { productsService } from '../../product/services/productsService';
+import { favoritesService } from '../../product/services/favoritesService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { EditProfileModal } from '../components/profile/EditProfileModal';
 import { AddressFormModal } from '../components/profile/AddressFormModal';
 import { ConfirmDeleteModal } from '../components/profile/ConfirmDeleteModal';
 import { ToastNotification } from '../components/profile/ToastNotification';
+import { uploadService } from '../../../shared/services/uploadService';
 const getFullAddressText = (addr: Address) => {
     return addr.address_detail;
 };
@@ -22,11 +24,16 @@ interface BuyerProfilePageProps {
     onLogout: () => void;
 }
 
+// Cache thông tin profile giữa các lần chuyển trang
+let profileCache: UserProfile | null = null;
+let lastOrderCache: any = null;
+let savedProductsCache: any[] = [];
+
 export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     const navigate = useNavigate();
-    const [profile, setProfile] = useState<UserProfile | null>(null);
-    const [lastOrder, setLastOrder] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState<UserProfile | null>(() => profileCache);
+    const [lastOrder, setLastOrder] = useState<any>(() => lastOrderCache);
+    const [loading, setLoading] = useState(() => !profileCache);
 
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -43,7 +50,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
 
     const [activeTab, setActiveTab] = useState<'overview' | 'addresses'>('overview');
-    const [savedProducts, setSavedProducts] = useState<any[]>([]);
+    const [savedProducts, setSavedProducts] = useState<any[]>(() => savedProductsCache);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,42 +65,8 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
         setUploadingAvatar(true);
 
         try {
-            let uploadedUrl = '';
-            const cloudName = (import.meta as any).env.VITE_CLOUDINARY_CLOUD_NAME;
-            const uploadPreset = (import.meta as any).env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-            if (cloudName && uploadPreset) {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('upload_preset', uploadPreset);
-
-                try {
-                    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        uploadedUrl = data.secure_url;
-                    } else {
-                        console.warn('Cloudinary upload failed, falling back to Base64');
-                    }
-                } catch (err) {
-                    console.warn('Cloudinary upload request failed, falling back to Base64', err);
-                }
-            }
-
-            if (!uploadedUrl) {
-                uploadedUrl = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        resolve(reader.result as string);
-                    };
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-            }
+            const uploadRes = await uploadService.uploadAvatar(file);
+            const uploadedUrl = uploadRes.url;
 
             const updated = await userService.updateProfile({
                 avatar: uploadedUrl
@@ -102,6 +75,19 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             setProfile((prev: UserProfile | null) => 
                 prev ? { ...prev, avatar: updated.avatar } : null
             );
+
+            try {
+                const storedUser = localStorage.getItem('user');
+                if (storedUser) {
+                    const parsed = JSON.parse(storedUser);
+                    const merged = { ...parsed, avatar: updated.avatar || uploadedUrl };
+                    localStorage.setItem('user', JSON.stringify(merged));
+                }
+            } catch (syncErr) {
+                console.error('Failed to sync localStorage user', syncErr);
+            }
+
+            window.dispatchEvent(new CustomEvent('vietcraft-user-updated', { detail: { avatar: updated.avatar || uploadedUrl } }));
             showToast('Cập nhật ảnh đại diện thành công!', 'success');
         } catch (error) {
             console.error('Failed to upload avatar', error);
@@ -115,34 +101,57 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const prof = await userService.getProfile();
-                setProfile(prof);
+                // 1. Fetch user profile and orders in parallel for immediate rendering
+                const [prof, orders] = await Promise.all([
+                    userService.getProfile().catch((err) => {
+                        console.error('Failed to get profile:', err);
+                        return null;
+                    }),
+                    ordersService.getByUser().catch((err) => {
+                        console.error('Failed to get orders:', err);
+                        return [];
+                    })
+                ]);
 
-                const orders = await ordersService.getByUser();
+                if (prof) {
+                    profileCache = prof;
+                    setProfile(prof);
+
+                    try {
+                        const storedUser = localStorage.getItem('user');
+                        if (storedUser) {
+                            const parsed = JSON.parse(storedUser);
+                            const merged = { ...parsed, avatar: prof.avatar || parsed.avatar, full_name: prof.full_name || parsed.full_name, name: prof.full_name || parsed.name };
+                            localStorage.setItem('user', JSON.stringify(merged));
+                        }
+                    } catch (syncErr) {
+                        console.error('Failed to sync profile cache', syncErr);
+                    }
+                    window.dispatchEvent(new CustomEvent('vietcraft-user-updated', { detail: prof }));
+                }
                 if (orders && orders.length > 0) {
+                    lastOrderCache = orders[0];
                     setLastOrder(orders[0]);
                 }
+            } catch (err) {
+                console.error('Failed to load core profile data', err);
+            } finally {
+                // Unblock profile view immediately
+                setLoading(false);
+            }
 
                 try {
-                    const [allProducts, wishlistIds] = await Promise.all([
-                        productsService.getAll(),
-                        userService.getWishlist().catch(() => [])
-                    ]);
-                    const ids = Array.isArray(wishlistIds) ? wishlistIds : [];
-                    const products: any[] = Array.isArray(allProducts)
-                        ? allProducts
-                        : (allProducts?.items || []);
+                    const favsRes = await favoritesService.getFavorites().catch(() => ({ product_ids: [] }));
+                    const favItems = Array.isArray(favsRes?.product_ids) ? favsRes.product_ids : [];
                     
-                    const matchedItems = products.filter((p: any) =>
-                        ids.includes(p.id) || ids.includes(p._id?.toString())
-                    );
-                    
-                    const mapped = matchedItems.slice(0, 3).map((p: any) => ({
+                    const mapped = favItems.slice(0, 3).map((p: any) => ({
                         title: p.title || p.name || 'Sản phẩm sáng tạo',
                         image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
                     }));
 
                     if (mapped.length === 0) {
+                        const allProducts = await productsService.getAll().catch(() => ({ items: [] }));
+                        const products: any[] = Array.isArray(allProducts) ? allProducts : (allProducts?.items || []);
                         const fallbackMapped = products.slice(0, 3).map((p: any) => ({
                             title: p.title || p.name || 'Sản phẩm sáng tạo',
                             image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
@@ -154,11 +163,6 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                 } catch (prodErr) {
                     console.error('Failed to load real products for profile page', prodErr);
                 }
-            } catch (err) {
-                console.error('Failed to load profile data', err);
-            } finally {
-                setLoading(false);
-            }
         };
         loadData();
     }, []);
@@ -171,6 +175,19 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                 phone: phone
             });
             setProfile((prev: UserProfile | null) => prev ? { ...prev, full_name: updated.full_name, phone: updated.phone } : null);
+
+            try {
+                const storedUser = localStorage.getItem('user');
+                if (storedUser) {
+                    const parsed = JSON.parse(storedUser);
+                    const merged = { ...parsed, full_name: updated.full_name, name: updated.full_name, phone: updated.phone };
+                    localStorage.setItem('user', JSON.stringify(merged));
+                }
+            } catch (syncErr) {
+                console.error('Failed to sync localStorage user', syncErr);
+            }
+
+            window.dispatchEvent(new CustomEvent('vietcraft-user-updated', { detail: { full_name: updated.full_name, name: updated.full_name } }));
             showToast('Cập nhật hồ sơ thành công!', 'success');
         } catch (e) {
             showToast(getApiErrorMessage(e, 'Cập nhật hồ sơ thất bại.'), 'error');
@@ -535,8 +552,15 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                         className="flex items-center justify-between p-4 rounded-[20px] border border-gray-200 hover:bg-gray-50 transition-all cursor-pointer mt-4"
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                                <img src={lastOrder.items[0]?.image} alt={lastOrder.items[0]?.title} className="w-full h-full object-cover" />
+                                            <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0 flex items-center justify-center">
+                                                <img
+                                                    src={lastOrder.items[0]?.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'}
+                                                    alt={lastOrder.items[0]?.title || 'Sản phẩm'}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150';
+                                                    }}
+                                                />
                                             </div>
                                             <div>
                                                 <p className="text-[10px] font-bold text-gray-400">Mã đơn: #{lastOrder.id}</p>
@@ -568,7 +592,14 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                     {savedProducts.map((p, i) => (
                                         <div key={i} className="flex flex-col items-center">
                                             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-50 border border-gray-150 aspect-square cursor-pointer hover:scale-105 transition-all">
-                                                <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                                                <img
+                                                    src={p.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'}
+                                                    alt={p.title}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150';
+                                                    }}
+                                                />
                                             </div>
                                             <h4 className="text-[10px] font-bold text-gray-700 line-clamp-1 mt-2.5 text-center px-1 leading-normal w-full">{p.title}</h4>
                                         </div>

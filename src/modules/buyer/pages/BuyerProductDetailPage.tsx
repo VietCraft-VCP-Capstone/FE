@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Star, ShoppingCart, Zap,
-  ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store
+  ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store, MessageCircle, Ticket
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
-import { userService } from '../../user/services/userService';
+import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
+import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -14,19 +15,13 @@ interface Variant { id: string; name: string; color?: string; size?: string; mat
 interface Product {
   id: string; title: string; description: string; category: string;
   tags: string[]; allowCustomization: boolean; customizationType: string;
-  price: number; images?: string[]; variants: Variant[];
+  price: number; originalPrice?: number; images?: string[]; variants: Variant[];
+  colors?: Array<{ name: string; hex: string }>;
   shopInfo?: { id: string; name: string; logo?: string; rating: number };
+  rating?: number;
+  reviews_count?: number;
+  reviews?: Array<{ id: string; name: string; date: string; rating: number; avatar?: string; text: string; images?: string[] }>;
 }
-
-// ─── Mock reviews (until a reviews endpoint exists) ───────────────────────────
-const MOCK_REVIEWS = [
-  { id: '1', name: 'Trần Ngọc M.', date: '13/04/2024', rating: 5, avatar: 'https://randomuser.me/api/portraits/women/68.jpg', text: 'Áo rất đẹp, đúng màu, chất vải cotton chuẩn 100%. Đường may tỉ mỉ, không bị xổ. Sẽ ủng hộ shop dài dài!', images: [] },
-  { id: '2', name: 'Nguyễn Văn T.', date: '10/04/2024', rating: 5, avatar: 'https://randomuser.me/api/portraits/men/45.jpg', text: 'Giao hàng nhanh, đóng gói cẩn thận. Sản phẩm đúng mô tả, mặc vừa size M. Chất lượng tốt cho mức giá này.', images: [] },
-  { id: '3', name: 'Lê Thanh D.', date: '08/03/2024', rating: 4, avatar: 'https://randomuser.me/api/portraits/women/32.jpg', text: 'Giao nhanh 2 ngày, chất lượng ổn. Màu sắc đẹp như hình, size đúng. Tuy nhiên giặt lần đầu hơi phai màu một chút.', images: ['https://images.unsplash.com/photo-1556821840-3a63f15732ce?auto=format&fit=crop&w=80', 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=80'] },
-];
-
-const AVG_RATING = 4.8;
-const REVIEW_COUNT = 62;
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function fmtPrice(n: number) { return n.toLocaleString('vi-VN') + 'đ'; }
@@ -41,61 +36,207 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   );
 }
 
+function resolveColorCss(colorName: string, productColors?: Array<{ name: string; hex: string }>): string {
+  if (!colorName) return '#e5e7eb';
+  const trimmed = colorName.trim();
+  if (trimmed.startsWith('#') || trimmed.startsWith('rgb') || trimmed.startsWith('hsl')) {
+    return trimmed;
+  }
+
+  // 1. Khớp mã hex từ danh sách colors của backend nếu có
+  if (productColors && productColors.length > 0) {
+    const match = productColors.find(pc => pc.name?.trim().toLowerCase() === trimmed.toLowerCase());
+    if (match?.hex && (match.hex.startsWith('#') || match.hex.startsWith('rgb'))) {
+      return match.hex;
+    }
+  }
+
+  // 2. Bảng ánh xạ màu thủ công mỹ nghệ và tên màu tiếng Việt / tiếng Anh
+  const lower = trimmed.toLowerCase();
+  if (lower.includes('hỏa biến')) return 'linear-gradient(135deg, #1e3a8a, #d97706)';
+  if (lower.includes('trắng ngà') || lower.includes('ngà') || lower.includes('men tro') || lower.includes('men mờ')) return '#F7F6EE';
+  if (lower.includes('trắng') || lower.includes('white') || lower.includes('bạch') || lower.includes('sữa')) return '#FFFFFF';
+  if (lower.includes('đen') || lower.includes('black') || lower.includes('mun') || lower.includes('huyền')) return '#1C1C1C';
+  if (lower.includes('rạn ngọc') || lower.includes('ngọc')) return '#0D9488';
+  if (lower.includes('xanh chàm') || lower.includes('chàm')) return '#1E3A8A';
+  if (lower.includes('xanh lam') || lower.includes('lam') || lower.includes('navy') || lower.includes('xanh dương') || lower.includes('blue')) return '#1D4ED8';
+  if (lower.includes('xanh lá') || lower.includes('xanh lục') || lower.includes('rêu') || lower.includes('chuối') || lower.includes('green')) return '#15803D';
+  if (lower.includes('xanh')) return '#3B82F6';
+  if (lower.includes('gỗ') || lower.includes('sồi') || lower.includes('óc chó') || lower.includes('wood')) return '#A16207';
+  if (lower.includes('nâu') || lower.includes('cà phê') || lower.includes('hạt dẻ') || lower.includes('cánh gián') || lower.includes('bò') || lower.includes('brown')) return '#78350F';
+  if (lower.includes('đất') || lower.includes('gốm') || lower.includes('mộc') || lower.includes('nâu cát')) return '#9A3412';
+  if (lower.includes('kem') || lower.includes('be') || lower.includes('beige') || lower.includes('tự nhiên')) return '#EFE5D1';
+  if (lower.includes('đỏ') || lower.includes('đô') || lower.includes('mận') || lower.includes('rượu') || lower.includes('red')) return '#DC2626';
+  if (lower.includes('cam') || lower.includes('orange')) return '#EA580C';
+  if (lower.includes('vàng') || lower.includes('chanh') || lower.includes('nghệ') || lower.includes('yellow') || lower.includes('gold')) return '#EAB308';
+  if (lower.includes('hồng') || lower.includes('phấn') || lower.includes('sen') || lower.includes('pink')) return '#EC4899';
+  if (lower.includes('tím') || lower.includes('purple') || lower.includes('violet')) return '#9333EA';
+  if (lower.includes('xám') || lower.includes('tro') || lower.includes('ghi') || lower.includes('bạc') || lower.includes('gray') || lower.includes('grey') || lower.includes('silver')) return '#9CA3AF';
+  if (lower.includes('đồng') || lower.includes('bronze')) return '#B45309';
+
+  // 3. Fallback bằng mã màu pastel cố định theo hash chuỗi để luôn là CSS hợp lệ
+  let hash = 0;
+  for (let i = 0; i < lower.length; i++) {
+    hash = lower.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h}, 55%, 65%)`;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
+// Cache sản phẩm chi tiết trong RAM để khi chuyển qua lại hiển thị tức thì
+const productDetailCache = new Map<string, any>();
+const relatedDetailCache = new Map<string, any[]>();
+const suggestionsDetailCache = new Map<string, any[]>();
+
 export function BuyerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialProduct = (location.state as any)?.initialProduct;
+  const initialMatches = initialProduct && (initialProduct.id === id || initialProduct._id === id);
 
-
-  const [product, setProduct] = useState<Product | null>(null);
-  const [related, setRelated] = useState<any[]>([]);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState<Product | null>(() => {
+    if (!id) return null;
+    return productDetailCache.get(id) || (initialMatches ? initialProduct : null);
+  });
+  const [related, setRelated] = useState<any[]>(() => (id ? relatedDetailCache.get(id) || [] : []));
+  const [suggestions, setSuggestions] = useState<any[]>(() => (id ? suggestionsDetailCache.get(id) || [] : []));
+  const [loading, setLoading] = useState(() => {
+    if (!id) return true;
+    return !productDetailCache.has(id) && !initialMatches;
+  });
 
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
-  const [selectedSize, setSelectedSize] = useState<string>('');
-  const [selectedColor, setSelectedColor] = useState<string>('');
-  const [selectedMaterial, setSelectedMaterial] = useState<string>('');
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(() => {
+    const p = (id ? productDetailCache.get(id) : null) || (initialMatches ? initialProduct : null);
+    return p?.variants?.[0] || null;
+  });
+  const [selectedSize, setSelectedSize] = useState<string>(() => {
+    const p = (id ? productDetailCache.get(id) : null) || (initialMatches ? initialProduct : null);
+    return p?.variants?.[0]?.size || '';
+  });
+  const [selectedColor, setSelectedColor] = useState<string>(() => {
+    const p = (id ? productDetailCache.get(id) : null) || (initialMatches ? initialProduct : null);
+    return p?.variants?.[0]?.color || '';
+  });
+  const [selectedMaterial, setSelectedMaterial] = useState<string>(() => {
+    const p = (id ? productDetailCache.get(id) : null) || (initialMatches ? initialProduct : null);
+    return p?.variants?.[0]?.material || '';
+  });
   const [customText, setCustomText] = useState('');
   const [qty, setQty] = useState(1);
   const [descOpen, setDescOpen] = useState(true);
   const [shippingOpen, setShippingOpen] = useState(false);
   const [isFav, setIsFav] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<CouponDTO[]>([]);
+  const [savedVouchers, setSavedVouchers] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('vietcraft_saved_vouchers') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   const triggerToast = useCallback((msg: string, type: 'success' | 'info' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  const handleSaveVoucher = (code: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    let updated: string[];
+    if (savedVouchers.includes(code)) {
+      updated = savedVouchers.filter(c => c !== code);
+      triggerToast(`Đã bỏ lưu mã ${code}`, 'info');
+    } else {
+      updated = [...savedVouchers, code];
+      triggerToast(`Đã lưu mã ${code}! Mã sẽ tự động gợi ý khi thanh toán.`, 'success');
+    }
+    setSavedVouchers(updated);
+    localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
+  };
+
+  useEffect(() => {
+    promotionService.getAll()
+      .then(res => setAvailableCoupons(res || []))
+      .catch(() => setAvailableCoupons([]));
+  }, []);
+
   // ── Load product ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    setSelectedImage(0);
 
-    Promise.all([
-      productsService.getById(id),
-      productsService.getRelated(id).catch(() => []),
-      productsService.getAll().catch(() => []),
-    ]).then(([prod, rel, all]) => {
-      setProduct(prod);
-      setRelated(rel.slice(0, 4));
-      const relIds = new Set(rel.map((r: any) => r.id));
-      const allList = Array.isArray(all) ? all : ((all as any)?.items || []);
-      const pool = allList.filter((p: any) => p.id !== id && !relIds.has(p.id));
-      setSuggestions(pool.slice(0, 4));
-
-      // pre-select first variant values
-      if (prod.variants?.length) {
-        const v0 = prod.variants[0];
+    if (productDetailCache.has(id)) {
+      const cached = productDetailCache.get(id);
+      setProduct(cached);
+      setRelated(relatedDetailCache.get(id) || []);
+      setSuggestions(suggestionsDetailCache.get(id) || []);
+      setLoading(false);
+      if (cached.variants?.length) {
+        const v0 = cached.variants[0];
         setSelectedVariant(v0);
         if (v0.size) setSelectedSize(v0.size);
         if (v0.color) setSelectedColor(v0.color);
         if (v0.material) setSelectedMaterial(v0.material);
       }
-    }).catch(() => {}).finally(() => setLoading(false));
+    } else if (initialMatches) {
+      setProduct(initialProduct);
+      setLoading(false);
+      if (initialProduct.variants?.length) {
+        const v0 = initialProduct.variants[0];
+        setSelectedVariant(v0);
+        if (v0.size) setSelectedSize(v0.size);
+        if (v0.color) setSelectedColor(v0.color);
+        if (v0.material) setSelectedMaterial(v0.material);
+      }
+    } else {
+      setLoading(true);
+    }
+    setSelectedImage(0);
+
+    // 1. Fetch main product details first for instantaneous rendering
+    productsService.getById(id)
+      .then((prod) => {
+        productDetailCache.set(id, prod);
+        setProduct(prod);
+
+        // pre-select first variant values
+        if (prod.variants?.length) {
+          const v0 = prod.variants[0];
+          setSelectedVariant(v0);
+          if (v0.size) setSelectedSize(v0.size);
+          if (v0.color) setSelectedColor(v0.color);
+          if (v0.material) setSelectedMaterial(v0.material);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load product:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
+    // 2. Fetch related & suggestions non-blockingly in background with small limit
+    productsService.getRelated(id)
+      .catch(() => [])
+      .then((rel: any[]) => {
+        const relSlice = (Array.isArray(rel) ? rel : []).slice(0, 4);
+        relatedDetailCache.set(id, relSlice);
+        setRelated(relSlice);
+        const relIds = new Set(relSlice.map((r: any) => r.id));
+
+        return productsService.getAll({ limit: 8 } as any)
+          .catch(() => [])
+          .then((all: any) => {
+            const allList = Array.isArray(all) ? all : (all?.items || []);
+            const pool = allList.filter((p: any) => p.id !== id && !relIds.has(p.id));
+            const sugg = pool.slice(0, 4);
+            suggestionsDetailCache.set(id, sugg);
+            setSuggestions(sugg);
+          });
+      });
 
     // check favorites from backend — /users/wishlist cần token.
     // Khách vãng lai bỏ qua hẳn: interceptor 401 sẽ đá về /login, mà trang chi tiết
@@ -103,7 +244,7 @@ export function BuyerProductDetailPage() {
     if (!isLoggedIn()) {
       setIsFav(false);
     } else {
-      userService.getWishlist()
+      favoritesService.getFavoriteIds()
         .then((ids) => setIsFav(ids.includes(id!)))
         .catch(() => {
           try {
@@ -126,9 +267,123 @@ export function BuyerProductDetailPage() {
     (!selectedMaterial || v.material === selectedMaterial)
   ) || selectedVariant || product?.variants[0] || null;
 
-  const displayPrice = activeVariant?.price || product?.price || 0;
-  const discountPct  = 15; // UI decoration only
-  const strikePrice  = Math.round(displayPrice / (1 - discountPct / 100));
+  const basePrice = activeVariant?.price || product?.price || 0;
+
+  // Active promotion (Flash Sale or Specific Product Voucher)
+  const activePromotion = useMemo(() => {
+    if (!id || !availableCoupons.length) return null;
+    const now = new Date();
+
+    const isActive = (c: any) => {
+      if (!c.is_active) return false;
+      if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
+      return true;
+    };
+
+    const appliesToProduct = (c: any): boolean => {
+      if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
+        return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
+      }
+      if (c.applicable_scope === 'ALL') {
+        // Nếu có shop_id thì chỉ áp dụng cho shop đó; nếu không thì toàn sàn
+        if (c.shop_id) return product?.shopInfo?.id === c.shop_id;
+        return true; // platform-wide
+      }
+      return false;
+    };
+
+    const parseVal = (raw: any) =>
+      typeof raw === 'object' && raw?.$numberDecimal
+        ? parseFloat(raw.$numberDecimal)
+        : parseFloat(raw || 0);
+
+    // 1. Flash Sale: ưu tiên SPECIFIC_PRODUCTS trước, sau đó scope ALL
+    const flashSale = availableCoupons.find(c =>
+      isActive(c) && c.discount_type === 'FLASH_SALE' && appliesToProduct(c)
+    );
+    if (flashSale) {
+      return { type: 'FLASH_SALE' as const, coupon: flashSale, discountVal: parseVal(flashSale.discount_value) };
+    }
+
+    // 2. Coupon chỉ định sản phẩm cụ thể (ưu tiên cao hơn scope ALL)
+    const specificCoupon = availableCoupons.find(c =>
+      isActive(c) &&
+      c.discount_type !== 'FLASH_SALE' &&
+      c.discount_type !== 'FREE_SHIPPING' &&
+      c.applicable_scope === 'SPECIFIC_PRODUCTS' &&
+      (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id)
+    );
+    if (specificCoupon) {
+      return { type: specificCoupon.discount_type, coupon: specificCoupon, discountVal: parseVal(specificCoupon.discount_value) };
+    }
+
+    // 3. Coupon scope ALL (toàn shop hoặc toàn sàn) – chỉ PERCENTAGE / FIXED_AMOUNT
+    const allScopeCoupon = availableCoupons.find(c =>
+      isActive(c) &&
+      c.discount_type !== 'FLASH_SALE' &&
+      c.discount_type !== 'FREE_SHIPPING' &&
+      c.applicable_scope === 'ALL' &&
+      appliesToProduct(c)
+    );
+    if (allScopeCoupon) {
+      return { type: allScopeCoupon.discount_type, coupon: allScopeCoupon, discountVal: parseVal(allScopeCoupon.discount_value) };
+    }
+
+    return null;
+  }, [id, availableCoupons, product?.shopInfo?.id]);
+
+  let finalPrice = basePrice;
+  let strikePrice = 0;
+  let discountPct = 0;
+  let discountBadgeText = '';
+  let isFlashSale = false;
+
+  if (activePromotion) {
+    strikePrice = basePrice;
+    const val = activePromotion.discountVal;
+    if (activePromotion.type === 'FLASH_SALE') {
+      isFlashSale = true;
+      if (val <= 100) {
+        // val là % giảm
+        finalPrice = Math.round(basePrice * (1 - val / 100));
+        discountPct = Math.round(val);
+        discountBadgeText = `-${discountPct}%`;
+      } else {
+        // val là số tiền giảm (VNĐ)
+        finalPrice = Math.max(0, basePrice - val);
+        discountPct = Math.round((val / basePrice) * 100);
+        discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
+      }
+    } else if (activePromotion.type === 'PERCENTAGE') {
+      finalPrice = Math.round(basePrice * (1 - val / 100));
+      discountPct = Math.round(val);
+      discountBadgeText = `-${discountPct}%`;
+    } else if (activePromotion.type === 'FIXED_AMOUNT') {
+      finalPrice = Math.max(0, basePrice - val);
+      discountPct = Math.round((val / basePrice) * 100);
+      discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
+    }
+  }
+
+  const hasDiscount = strikePrice > finalPrice;
+  const displayPrice = finalPrice;
+
+  // Danh sách voucher áp dụng được cho sản phẩm hoặc shop này
+  const productVouchers = useMemo(() => {
+    if (!availableCoupons.length) return [];
+    const now = new Date();
+    return availableCoupons.filter(c => {
+      if (!c.is_active) return false;
+      if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
+      if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
+        return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
+      }
+      if (c.is_platform) return true;
+      if (c.shop_id && product?.shopInfo?.id && c.shop_id === product.shopInfo.id) return true;
+      return false;
+    });
+  }, [availableCoupons, id, product?.shopInfo?.id]);
+
 
   // Images list
   const images = product?.images?.length ? product.images : [
@@ -167,6 +422,25 @@ export function BuyerProductDetailPage() {
     if (ok) navigate('/cart');
   };
 
+  const handleChatWithSeller = () => {
+    if (!isLoggedIn()) {
+      navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+    const currentImg = (product?.images && product.images[selectedImage]) || (product?.variants && selectedVariant?.mockupImage) || '';
+    window.dispatchEvent(new CustomEvent('vietcraft-open-chat', {
+      detail: {
+        shopId: product?.shopInfo?.id,
+        productWidget: {
+          product_id: product?.id,
+          title: product?.title,
+          price: displayPrice,
+          image: currentImg
+        }
+      }
+    }));
+  };
+
   // ── Toggle favorite ──────────────────────────────────────────────────────────
   const toggleFav = async () => {
     if (!product) return;
@@ -176,15 +450,9 @@ export function BuyerProductDetailPage() {
       return;
     }
     try {
-      let updated: string[];
-      if (isFav) {
-        updated = await userService.removeFromWishlist(product.id);
-        triggerToast(`Đã xóa khỏi yêu thích`, 'info');
-      } else {
-        updated = await userService.addToWishlist(product.id);
-        triggerToast(`Đã thêm vào yêu thích!`, 'success');
-      }
-      setIsFav(updated.includes(product.id));
+      const res = await favoritesService.toggleFavorite(product.id);
+      setIsFav(res.isFavorite);
+      triggerToast(res.isFavorite ? 'Đã thêm vào yêu thích!' : 'Đã xóa khỏi yêu thích', res.isFavorite ? 'success' : 'info');
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
     } catch {
       // Fallback: toggle locally
@@ -200,7 +468,7 @@ export function BuyerProductDetailPage() {
 
   // ── Styles ────────────────────────────────────────────────────────────────────
   const S = {
-    page: { fontFamily: "'Inter', system-ui, sans-serif", background: '#f9f9f9', minHeight: '100vh' } as React.CSSProperties,
+    page: { fontFamily: "'Inter', system-ui, sans-serif", background: '#fcfcfc', minHeight: '100vh' } as React.CSSProperties,
     container: { maxWidth: 1100, margin: '0 auto', padding: '24px 20px' } as React.CSSProperties,
     backBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, fontWeight: 600, marginBottom: 20, padding: '6px 0' } as React.CSSProperties,
     grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 36, alignItems: 'start' } as React.CSSProperties,
@@ -214,8 +482,20 @@ export function BuyerProductDetailPage() {
     sectionLabel: { fontSize: 13, fontWeight: 700, color: '#330033', marginBottom: 8, marginTop: 16 } as React.CSSProperties,
     optionGroup: { display: 'flex', gap: 8, flexWrap: 'wrap' as const },
     optionBtn: (active: boolean) => ({ padding: '6px 16px', border: active ? '2px solid #008000' : '2px solid #ddd', borderRadius: 8, background: active ? '#e6f7e6' : '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', color: active ? '#005500' : '#333', transition: 'all 0.15s' } as React.CSSProperties),
-    colorDot: (c: string, active: boolean) => ({ width: 28, height: 28, borderRadius: '50%', background: c, border: active ? '3px solid #008000' : '3px solid transparent', outline: '1px solid #ccc', cursor: 'pointer', transition: 'all 0.15s' } as React.CSSProperties),
-    actionBar: { display: 'flex', gap: 12, marginTop: 24 } as React.CSSProperties,
+    colorDot: (c: string, active: boolean) => ({
+      width: 28,
+      height: 28,
+      borderRadius: '50%',
+      background: c,
+      border: active ? '3px solid #008000' : '3px solid transparent',
+      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.18)',
+      outline: active ? 'none' : '1px solid #d6d3d1',
+      cursor: 'pointer',
+      transition: 'all 0.15s',
+      flexShrink: 0
+    } as React.CSSProperties),
+    actionBar: { display: 'flex', gap: 10, marginTop: 24 } as React.CSSProperties,
+    btnChat: { padding: '13px 18px', border: '2px solid #008000', borderRadius: 10, background: '#f0fdf4', color: '#008000', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s', whiteSpace: 'nowrap' as const } as React.CSSProperties,
     btnOutline: { flex: 1, padding: '13px 0', border: '2px solid #008000', borderRadius: 10, background: '#fff', color: '#008000', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
     btnFill: { flex: 1, padding: '13px 0', border: 'none', borderRadius: 10, background: '#008000', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
     accordion: { border: '1px solid #eee', borderRadius: 10, marginTop: 12 } as React.CSSProperties,
@@ -233,11 +513,7 @@ export function BuyerProductDetailPage() {
     cardInfo: { padding: '10px 12px 14px' } as React.CSSProperties,
   };
 
-  // ── Color name map (CSS color → label) ───────────────────────────────────────
-  const COLOR_CSS: Record<string, string> = {
-    'Trắng': 'white', 'Đen': '#222', 'Xanh': '#3b82f6', 'Đỏ': '#ef4444',
-    'Vàng': '#fbbf24', 'Hồng': '#f472b6', 'Xám': '#9ca3af', 'Nâu': '#92400e',
-  };
+
 
   if (loading) return (
     <div style={{ ...S.page }}>
@@ -315,12 +591,80 @@ export function BuyerProductDetailPage() {
             </div>
 
             {/* Price */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
               <span style={S.price}>{fmtPrice(displayPrice)}</span>
-              <span style={S.strike}>{fmtPrice(strikePrice)}</span>
-              <span style={S.tag('#fff', '#e11d48')}>-{discountPct}%</span>
+              {hasDiscount && (
+                <>
+                  <span style={S.strike}>{fmtPrice(strikePrice)}</span>
+                  {isFlashSale ? (
+                    <span className="flash-sale-badge">
+                      ⚡ FLASH SALE {discountBadgeText}
+                    </span>
+                  ) : (
+                    <span style={S.tag('#fff', '#e11d48')}>{discountBadgeText}</span>
+                  )}
+                </>
+              )}
+              {activePromotion?.coupon?.code && (
+                <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 6 }}>
+                  ⚡ Áp dụng mã: {activePromotion.coupon.code}
+                </span>
+              )}
             </div>
             <p style={{ fontSize: 12, color: '#888', margin: '4px 0 0' }}>Giá đã bao gồm VAT</p>
+
+            {/* Vouchers applicable */}
+            {productVouchers.length > 0 && (
+              <div style={{ marginTop: 14, padding: '10px 14px', backgroundColor: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#166534', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Ticket size={14} /> Mã giảm giá có thể áp dụng ({productVouchers.length})
+                  </span>
+                  <button
+                    onClick={() => navigate('/vouchers')}
+                    style={{ fontSize: 11, fontWeight: 700, color: '#008000', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    Kho voucher &rarr;
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {productVouchers.slice(0, 3).map(v => {
+                    const isSaved = savedVouchers.includes(v.code);
+                    return (
+                      <div key={v.id || v.code} style={{
+                        backgroundColor: '#fff',
+                        border: isSaved ? '1px solid #86efac' : '1px solid #e7e5e4',
+                        borderRadius: 8,
+                        padding: '6px 10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8
+                      }}>
+                        <div>
+                          <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 900, color: '#1c1917' }}>{v.code}</span>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#008000' }}>{v.title || `Giảm ${v.discount_value}`}</div>
+                        </div>
+                        <button
+                          onClick={(e) => handleSaveVoucher(v.code, e)}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            border: 'none',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            backgroundColor: isSaved ? '#dcfce7' : '#008000',
+                            color: isSaved ? '#166534' : '#fff'
+                          }}
+                        >
+                          {isSaved ? '✓ Đã lưu' : 'Lưu'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Material tabs (if variants have material) */}
             {materials.length > 0 && (
@@ -338,9 +682,9 @@ export function BuyerProductDetailPage() {
             {colors.length > 0 && (
               <>
                 <p style={S.sectionLabel}>Màu sắc: <span style={{ fontWeight: 400, color: '#555' }}>{selectedColor}</span></p>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   {colors.map(c => {
-                    const css = COLOR_CSS[c] || c;
+                    const css = resolveColorCss(c, product.colors);
                     return (
                       <button key={c} title={c} style={S.colorDot(css, selectedColor === c)} onClick={() => setSelectedColor(c)} />
                     );
@@ -394,6 +738,9 @@ export function BuyerProductDetailPage() {
 
             {/* Action Buttons */}
             <div style={S.actionBar}>
+              <button style={S.btnChat} onClick={handleChatWithSeller} title="Chat với người bán">
+                <MessageCircle size={18} /> Chat ngay
+              </button>
               <button style={S.btnOutline} onClick={addToCart}>
                 <ShoppingCart size={18} /> Thêm vào giỏ
               </button>
@@ -434,45 +781,55 @@ export function BuyerProductDetailPage() {
         {/* ── Reviews ───────────────────────────────────────────────────────── */}
         <section style={S.reviewSection}>
           <h2 style={S.sectionTitle}>Đánh giá sản phẩm</h2>
-          <div style={S.reviewSummary}>
-            <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
-              <div style={S.ratingBig}>{AVG_RATING}</div>
-              <StarRow rating={5} size={18} />
-              <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{REVIEW_COUNT} đánh giá</div>
-            </div>
-            <div style={{ flex: 1, paddingLeft: 16 }}>
-              {[5, 4, 3, 2, 1].map(star => (
-                <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <StarRow rating={star} size={12} />
-                  <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', background: '#f59e0b', borderRadius: 4, width: star === 5 ? '85%' : star === 4 ? '10%' : '3%' }} />
+          {product?.reviews && product.reviews.length > 0 ? (
+            <>
+              <div style={S.reviewSummary}>
+                <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
+                  <div style={S.ratingBig}>{product.rating ? product.rating.toFixed(1) : '5.0'}</div>
+                  <StarRow rating={Math.round(product.rating || 5)} size={18} />
+                  <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{product.reviews.length} đánh giá</div>
+                </div>
+              </div>
+              {product.reviews.map(rv => (
+                <div key={rv.id} style={S.reviewCard}>
+                  {rv.avatar ? (
+                    <img src={rv.avatar} alt={rv.name} style={S.avatar} />
+                  ) : (
+                    <div style={{ ...S.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e5e7eb', color: '#4b5563', fontWeight: 'bold' }}>
+                      {rv.name?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{rv.name}</span>
+                      <StarRow rating={rv.rating} size={12} />
+                      <span style={{ fontSize: 12, color: '#aaa', marginLeft: 'auto' }}>{rv.date}</span>
+                    </div>
+                    <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{rv.text}</p>
+                    {rv.images && rv.images.length > 0 && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {rv.images.map((img, i) => (
+                          <img key={i} src={img} alt="review" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <span style={{ fontSize: 12, color: '#888', width: 32 }}>{star === 5 ? '85%' : star === 4 ? '10%' : '2%'}</span>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {MOCK_REVIEWS.map(rv => (
-            <div key={rv.id} style={S.reviewCard}>
-              <img src={rv.avatar} alt={rv.name} style={S.avatar} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{rv.name}</span>
-                  <StarRow rating={rv.rating} size={12} />
-                  <span style={{ fontSize: 12, color: '#aaa', marginLeft: 'auto' }}>{rv.date}</span>
-                </div>
-                <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{rv.text}</p>
-                {rv.images.length > 0 && (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {rv.images.map((img, i) => (
-                      <img key={i} src={img} alt="review" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
-                    ))}
-                  </div>
-                )}
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '32px 16px', background: '#fafafa', borderRadius: 12, border: '1px dashed #e5e7eb' }}>
+              <div style={{ display: 'inline-flex', marginBottom: 8 }}>
+                <StarRow rating={product?.rating ? Math.round(product.rating) : 5} size={20} />
               </div>
+              <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#374151', fontSize: 14 }}>
+                Chưa có đánh giá nào cho sản phẩm này
+              </p>
+              <p style={{ margin: 0, fontSize: 12.5, color: '#6b7280' }}>
+                Khách hàng mua sản phẩm có thể để lại nhận xét và đánh giá tại đây.
+              </p>
             </div>
-          ))}
+          )}
         </section>
 
         {/* ── Related products ──────────────────────────────────────────────── */}

@@ -3,10 +3,13 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import { POD_CREATE_ENABLED, POD_CREATE_PATH } from '../featureFlags';
 import {
-  LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Truck, Ticket,
+  LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Palette, Ticket,
   Wallet, Banknote, BarChart2, TrendingUp, LineChart, Flame, Tag, PieChart, Rocket,
-  Settings, Bell, Mail, PanelLeft, ExternalLink, LogOut, ChevronDown
+  Settings, Bell, Mail, PanelLeft, ExternalLink, LogOut, ChevronDown, MessageSquare
 } from 'lucide-react';
+import { chatService } from '../../chat/services/chatService';
+import { notificationService } from '../../notification/services/notificationService';
+import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
 
 interface SellerLayoutProps {
   children: React.ReactNode;
@@ -19,9 +22,10 @@ const NAV_ITEMS = [
   { to: '/seller/catalog', icon: Archive, label: 'Danh mục sản phẩm' },
   { to: '/seller/storefront', icon: Store, label: 'Thông tin cửa hàng' },
   { to: '/seller/orders', icon: ShoppingCart, label: 'Đơn hàng' },
+  { to: '/seller/chat', icon: MessageSquare, label: 'Tin nhắn khách hàng' },
   { to: '/seller/products', icon: Package, label: 'Quản lí sản phẩm' },
   { to: '/seller/products/new', icon: PlusCircle, label: 'Tạo sản phẩm POD' },
-  { to: '/seller/shipping', icon: Truck, label: 'Vận chuyển' },
+  { to: '/seller/designs', icon: Palette, label: 'Kho thiết kế' },
   { to: '/seller/promotions', icon: Ticket, label: 'Khuyến mãi' },
   { to: '/seller/revenue', icon: Wallet, label: 'Doanh thu cửa hàng' },
   { to: '/seller/payouts', icon: Banknote, label: 'Đối soát & rút tiền' },
@@ -34,6 +38,7 @@ const NAV_ITEMS = [
   { to: '/seller/onboarding', icon: Rocket, label: 'Thiết lập gian hàng' },
 ];
 
+
 const VISIBLE_NAV_ITEMS = NAV_ITEMS.filter(item => POD_CREATE_ENABLED || item.to !== POD_CREATE_PATH);
 
 export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
@@ -41,8 +46,55 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/seller/chat')) {
+      setCollapsed(true);
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    chatService.getUnreadCount()
+      .then(c => setUnreadChatCount(c))
+      .catch(() => {});
+
+    notificationService.getUnreadCount()
+      .then(c => setUnreadNotifCount(c))
+      .catch(() => {});
+
+    const onUnreadUpdate = (e: any) => {
+      if (typeof e.detail?.unreadCount === 'number') {
+        setUnreadChatCount(e.detail.unreadCount);
+      } else {
+        chatService.getUnreadCount().then(c => setUnreadChatCount(c)).catch(() => {});
+      }
+    };
+
+    const onNotifUpdate = (e: any) => {
+      if (typeof e.detail?.unreadCount === 'number') {
+        setUnreadNotifCount(e.detail.unreadCount);
+      } else {
+        notificationService.getUnreadCount().then(c => setUnreadNotifCount(c)).catch(() => {});
+      }
+    };
+
+    window.addEventListener('vietcraft-chat-unread-updated', onUnreadUpdate);
+    window.addEventListener('vietcraft-message-received', onUnreadUpdate);
+    window.addEventListener('vietcraft-notification-unread-updated', onNotifUpdate);
+    window.addEventListener('vietcraft-notification-received', onNotifUpdate);
+
+    return () => {
+      window.removeEventListener('vietcraft-chat-unread-updated', onUnreadUpdate);
+      window.removeEventListener('vietcraft-message-received', onUnreadUpdate);
+      window.removeEventListener('vietcraft-notification-unread-updated', onNotifUpdate);
+      window.removeEventListener('vietcraft-notification-received', onNotifUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -67,6 +119,11 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
             <Link key={to} to={to} className={`seller-nav-item ${currentPath === to ? 'active' : ''}`} title={collapsed ? label : undefined}>
               <Icon size={19} />
               {!collapsed && <span>{label}</span>}
+              {to === '/seller/chat' && unreadChatCount > 0 && (
+                <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold bg-red-500 text-white rounded-full">
+                  {unreadChatCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -91,11 +148,36 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
             <Link to="/seller/analytics" className="seller-market-btn">Phân tích thị trường<ExternalLink size={14} /></Link>
           </div>
           <div className="seller-header-actions">
-            <button className="seller-icon-btn"><Mail size={19} /></button>
-            <button className="seller-icon-btn seller-bell"><Bell size={19} /><span className="seller-bell-dot" /></button>
+            <Link to="/seller/chat" className="seller-icon-btn relative" title="Tin nhắn khách hàng">
+              <Mail size={19} />
+              {unreadChatCount > 0 && <span className="seller-bell-dot" />}
+            </Link>
+            <div className="relative">
+              <button
+                type="button"
+                className="seller-icon-btn seller-bell relative cursor-pointer"
+                onClick={() => setIsNotifOpen((prev) => !prev)}
+                title="Thông báo"
+              >
+                <Bell size={19} />
+                {unreadNotifCount > 0 && <span className="seller-bell-dot" />}
+              </button>
+
+              <HeaderNotificationDropdown
+                isOpen={isNotifOpen}
+                onClose={() => setIsNotifOpen(false)}
+                onUnreadCountChange={(count) => setUnreadNotifCount(count)}
+              />
+            </div>
             <button className="seller-lang-badge">VN <ChevronDown size={13} /></button>
             <div className="seller-user-menu" ref={menuRef}>
-              <button className="seller-avatar" onClick={() => setMenuOpen(o => !o)} title="Tài khoản">{user?.name?.[0]?.toUpperCase() || 'S'}</button>
+              <button className="seller-avatar overflow-hidden flex items-center justify-center cursor-pointer" onClick={() => setMenuOpen(o => !o)} title="Tài khoản">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover rounded-full" />
+                ) : (
+                  user?.name?.[0]?.toUpperCase() || 'S'
+                )}
+              </button>
               {menuOpen && (
                 <div className="seller-user-dropdown">
                   <div className="seller-user-info">
@@ -110,7 +192,9 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
         </header>
 
         {/* Main Body */}
-        <main className="seller-content">{children}</main>
+        <main className={`seller-content ${location.pathname.includes('/chat') ? 'seller-chat-content' : ''}`}>
+          {children}
+        </main>
       </div>
     </div>
   );

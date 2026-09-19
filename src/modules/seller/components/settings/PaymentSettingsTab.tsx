@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SellerPaymentSettings, BankAccountItem } from '../../types/settings';
 import { AddBankAccountModal } from './AddBankAccountModal';
+import { useToast } from '../../../../shared/components/Toast';
 import {
   CreditCard,
   Landmark,
@@ -23,14 +24,15 @@ interface PaymentSettingsTabProps {
   loading?: boolean;
 }
 
-export function PaymentSettingsTab({
+export const PaymentSettingsTab: React.FC<PaymentSettingsTabProps> = ({
   initialData,
   onSave,
   onAddBank,
   onDeleteBank,
   onSetDefaultBank,
-  loading = false
-}: PaymentSettingsTabProps) {
+  loading = false,
+}) => {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState<SellerPaymentSettings>(initialData);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -39,7 +41,7 @@ export function PaymentSettingsTab({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.autoWithdraw && isMinPayoutInvalid) {
-      alert('Hạn mức rút tiền tối thiểu phải từ 50.000 VNĐ trở lên.');
+      showToast('Hạn mức rút tiền tối thiểu phải từ 50.000 VNĐ trở lên.', 'error');
       return;
     }
     onSave(formData);

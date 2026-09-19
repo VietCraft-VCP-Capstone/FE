@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Minus, Plus, ShoppingCart, X } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, X, AlertCircle } from 'lucide-react';
+import { useToast } from '../../../../shared/components/Toast';
 
 interface OrderItem {
     productId: string;
@@ -27,7 +28,9 @@ export const ReorderModal: React.FC<ReorderModalProps> = ({
     items,
     onConfirm
 }) => {
+    const { showToast } = useToast();
     const [editableItems, setEditableItems] = useState<(OrderItem & { selected: boolean })[]>([]);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen && items) {
@@ -37,25 +40,31 @@ export const ReorderModal: React.FC<ReorderModalProps> = ({
                     selected: true
                 }))
             );
+            setErrorMsg(null);
         }
     }, [isOpen, items]);
 
     if (!isOpen) return null;
 
     const handleToggleSelect = (index: number) => {
+        setErrorMsg(null);
         setEditableItems(prev =>
-            prev.map((item, idx) =>
-                idx === index ? { ...item, selected: !item.selected } : item
-            )
+            prev.map((item, i) => {
+                if (i === index) {
+                    return { ...item, selected: !item.selected };
+                }
+                return item;
+            })
         );
     };
 
     const handleQuantityChange = (index: number, delta: number) => {
+        setErrorMsg(null);
         setEditableItems(prev =>
-            prev.map((item, idx) => {
-                if (idx === index) {
-                    const newQty = Math.max(1, item.quantity + delta);
-                    return { ...item, quantity: newQty };
+            prev.map((item, i) => {
+                if (i === index) {
+                    const next = Math.max(1, item.quantity + delta);
+                    return { ...item, quantity: next };
                 }
                 return item;
             })
@@ -65,9 +74,12 @@ export const ReorderModal: React.FC<ReorderModalProps> = ({
     const handleConfirm = () => {
         const selected = editableItems.filter(item => item.selected);
         if (selected.length === 0) {
-            alert('Vui lòng chọn ít nhất một sản phẩm để mua lại.');
+            const msg = 'Vui lòng chọn ít nhất một sản phẩm để mua lại.';
+            setErrorMsg(msg);
+            showToast(msg, 'error');
             return;
         }
+        setErrorMsg(null);
         const finalItems = selected.map(({ selected, ...rest }) => rest);
         onConfirm(finalItems);
     };
@@ -90,6 +102,13 @@ export const ReorderModal: React.FC<ReorderModalProps> = ({
                         <X size={18} />
                     </button>
                 </div>
+
+                {errorMsg && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 animate-shake">
+                        <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                        <span>{errorMsg}</span>
+                    </div>
+                )}
 
                 {/* Items List */}
                 <div className="flex-1 overflow-y-auto py-2 space-y-3 pr-1">
