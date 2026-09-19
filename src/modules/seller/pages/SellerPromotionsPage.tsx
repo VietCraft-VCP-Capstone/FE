@@ -47,6 +47,7 @@ export function SellerPromotionsPage() {
         end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
     };
     const [formData, setFormData] = useState<CreateCouponPayload>(initialForm);
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
     const fetchCoupons = async () => {
         setLoading(true);
@@ -82,36 +83,75 @@ export function SellerPromotionsPage() {
         }
     };
 
-    const handleDelete = async (couponId: string) => {
-        if (!window.confirm('Bạn có chắc chắn muốn xóa mã giảm giá này?')) return;
+    const handleDelete = async (coupon: CouponDTO) => {
+        if ((coupon.used_count || 0) > 0) {
+            alert(`Không thể xóa mã "${coupon.code}" vì đã có ${coupon.used_count} đơn hàng sử dụng.\n\nĐể đảm bảo toàn vẹn dữ liệu đơn hàng và đối soát tài chính, bạn chỉ có thể TẮT (Tạm dừng) mã này thay vì xóa.`);
+            return;
+        }
+        if (!window.confirm(`Bạn có chắc chắn muốn xóa mã giảm giá "${coupon.code}"? Thao tác này không thể hoàn tác.`)) return;
         try {
-            await promotionService.deleteSellerCoupon(couponId);
-            setCoupons(prev => prev.filter(c => c.id !== couponId));
-            setSuccessMsg('Đã xóa mã giảm giá thành công.');
+            await promotionService.deleteSellerCoupon(coupon.id);
+            setCoupons(prev => prev.filter(c => c.id !== coupon.id));
+            setSuccessMsg(`Đã xóa mã giảm giá "${coupon.code}" thành công.`);
             setTimeout(() => setSuccessMsg(null), 3000);
         } catch (err: any) {
             setError(getApiErrorMessage(err, 'Không thể xóa mã giảm giá.'));
         }
     };
 
+    const validateForm = (): boolean => {
+        const errors: Record<string, string> = {};
+        const cleanCode = (formData.code || '').trim().toUpperCase();
+
+        if (!cleanCode) {
+            errors.code = 'Vui lòng nhập mã voucher.';
+        } else if (cleanCode.length < 3 || cleanCode.length > 20) {
+            errors.code = 'Mã voucher phải từ 3 đến 20 ký tự.';
+        } else if (!/^[A-Z0-9_]+$/.test(cleanCode)) {
+            errors.code = 'Mã chỉ được chứa chữ hoa không dấu, chữ số và dấu gạch dưới (VD: TET2026).';
+        }
+
+        const cleanTitle = (formData.title || '').trim();
+        if (!cleanTitle) {
+            errors.title = 'Vui lòng nhập tên chương trình ưu đãi.';
+        } else if (cleanTitle.length < 3 || cleanTitle.length > 100) {
+            errors.title = 'Tên chương trình phải từ 3 đến 100 ký tự.';
+        }
+
+        const discountVal = Number(formData.discount_value);
+        if (isNaN(discountVal) || discountVal <= 0) {
+            errors.discount_value = 'Mức giảm giá phải lớn hơn 0.';
+        } else if (formData.discount_type === 'PERCENTAGE' && discountVal > 100) {
+            errors.discount_value = 'Giảm giá theo % không thể vượt quá 100%.';
+        } else if (formData.discount_type === 'FIXED_AMOUNT' && formData.min_order_value && discountVal >= Number(formData.min_order_value)) {
+            errors.discount_value = 'Số tiền giảm cố định phải nhỏ hơn giá trị đơn hàng tối thiểu.';
+        }
+
+        if (!formData.start_date) {
+            errors.start_date = 'Vui lòng chọn thời gian bắt đầu.';
+        }
+        if (!formData.end_date) {
+            errors.end_date = 'Vui lòng chọn thời gian kết thúc.';
+        } else if (new Date(formData.end_date) <= new Date(formData.start_date)) {
+            errors.end_date = 'Thời gian kết thúc phải lớn hơn thời gian bắt đầu.';
+        }
+
+        if (formData.usage_limit !== undefined && formData.usage_limit !== null && formData.usage_limit !== ('' as any)) {
+            const limit = Number(formData.usage_limit);
+            if (isNaN(limit) || limit < 1 || !Number.isInteger(limit)) {
+                errors.usage_limit = 'Lượt sử dụng phải là số nguyên dương (>= 1).';
+            }
+        }
+
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleCreateCoupon = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
 
-        if (!formData.code.trim()) {
-            setError('Vui lòng nhập mã giảm giá (ví dụ: TET2026).');
-            return;
-        }
-        if (!formData.title.trim()) {
-            setError('Vui lòng nhập tiêu đề chương trình.');
-            return;
-        }
-        if (new Date(formData.end_date) <= new Date(formData.start_date)) {
-            setError('Thời gian kết thúc phải lớn hơn thời gian bắt đầu.');
-            return;
-        }
-        if (Number(formData.discount_value) <= 0) {
-            setError('Giá trị giảm giá phải lớn hơn 0.');
+        if (!validateForm()) {
             return;
         }
 
@@ -129,6 +169,7 @@ export function SellerPromotionsPage() {
             setCoupons(prev => [newCoupon, ...prev]);
             setShowModal(false);
             setFormData(initialForm);
+            setFormErrors({});
             setSuccessMsg(`Đã tạo mã giảm giá ${newCoupon.code} thành công!`);
             setTimeout(() => setSuccessMsg(null), 4000);
         } catch (err: any) {
@@ -452,9 +493,13 @@ export function SellerPromotionsPage() {
                                     </button>
 
                                     <button
-                                        onClick={() => handleDelete(coupon.id)}
-                                        className="p-1.5 text-stone-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition"
-                                        title="Xóa voucher"
+                                        onClick={() => handleDelete(coupon)}
+                                        className={`p-1.5 rounded-lg transition ${
+                                            (coupon.used_count || 0) > 0
+                                                ? 'text-stone-300 hover:text-stone-400 hover:bg-stone-50 cursor-not-allowed'
+                                                : 'text-stone-400 hover:text-red-500 rounded-lg hover:bg-red-50'
+                                        }`}
+                                        title={(coupon.used_count || 0) > 0 ? `Đã dùng ${coupon.used_count} lượt (Không thể xóa - Chỉ có thể Tắt để bảo vệ dữ liệu đối soát)` : "Xóa voucher"}
                                     >
                                         <Trash2 size={16} />
                                     </button>
@@ -475,7 +520,10 @@ export function SellerPromotionsPage() {
                                 Tạo Voucher Mới Cho Shop
                             </h3>
                             <button
-                                onClick={() => setShowModal(false)}
+                                onClick={() => {
+                                    setShowModal(false);
+                                    setFormErrors({});
+                                }}
                                 className="text-stone-400 hover:text-stone-600 p-1.5 rounded-full hover:bg-stone-100"
                             >
                                 <X size={18} />
@@ -491,10 +539,15 @@ export function SellerPromotionsPage() {
                                         type="text"
                                         placeholder="VD: TET50K"
                                         value={formData.code}
-                                        onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                                        className="w-full text-xs font-mono uppercase px-3 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold"
-                                        required
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, code: e.target.value.toUpperCase() });
+                                            if (formErrors.code) setFormErrors({ ...formErrors, code: '' });
+                                        }}
+                                        className={`w-full text-xs font-mono uppercase px-3 py-2.5 border rounded-xl font-bold transition ${
+                                            formErrors.code ? 'border-red-400 bg-red-50/20 focus:ring-red-500/20 focus:border-red-500' : 'border-stone-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+                                        }`}
                                     />
+                                    {formErrors.code && <p className="text-[11px] text-red-500 mt-1 font-medium">{formErrors.code}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-stone-700 mb-1">Tiêu đề chương trình *</label>
@@ -502,10 +555,15 @@ export function SellerPromotionsPage() {
                                         type="text"
                                         placeholder="VD: Tri ân đón Tết"
                                         value={formData.title}
-                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                        className="w-full text-xs px-3 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                                        required
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, title: e.target.value });
+                                            if (formErrors.title) setFormErrors({ ...formErrors, title: '' });
+                                        }}
+                                        className={`w-full text-xs px-3 py-2.5 border rounded-xl transition ${
+                                            formErrors.title ? 'border-red-400 bg-red-50/20 focus:ring-red-500/20 focus:border-red-500' : 'border-stone-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+                                        }`}
                                     />
+                                    {formErrors.title && <p className="text-[11px] text-red-500 mt-1 font-medium">{formErrors.title}</p>}
                                 </div>
                             </div>
 
@@ -526,7 +584,10 @@ export function SellerPromotionsPage() {
                                             <button
                                                 type="button"
                                                 key={item.type}
-                                                onClick={() => setFormData({ ...formData, discount_type: item.type as any })}
+                                                onClick={() => {
+                                                    setFormData({ ...formData, discount_type: item.type as any });
+                                                    if (formErrors.discount_value) setFormErrors({ ...formErrors, discount_value: '' });
+                                                }}
                                                 className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition ${
                                                     isSelected
                                                         ? 'border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
@@ -552,10 +613,15 @@ export function SellerPromotionsPage() {
                                         min="1"
                                         max={formData.discount_type === 'PERCENTAGE' ? 100 : undefined}
                                         value={formData.discount_value}
-                                        onChange={(e) => setFormData({ ...formData, discount_value: Number(e.target.value) })}
-                                        className="w-full text-xs px-3 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                                        required
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, discount_value: Number(e.target.value) });
+                                            if (formErrors.discount_value) setFormErrors({ ...formErrors, discount_value: '' });
+                                        }}
+                                        className={`w-full text-xs px-3 py-2.5 border rounded-xl transition ${
+                                            formErrors.discount_value ? 'border-red-400 bg-red-50/20 focus:ring-red-500/20 focus:border-red-500' : 'border-stone-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+                                        }`}
                                     />
+                                    {formErrors.discount_value && <p className="text-[11px] text-red-500 mt-1 font-medium">{formErrors.discount_value}</p>}
                                 </div>
                                 {formData.discount_type === 'PERCENTAGE' ? (
                                     <div>
@@ -575,7 +641,10 @@ export function SellerPromotionsPage() {
                                             type="number"
                                             placeholder="VD: 150000"
                                             value={formData.min_order_value || ''}
-                                            onChange={(e) => setFormData({ ...formData, min_order_value: e.target.value ? Number(e.target.value) : undefined })}
+                                            onChange={(e) => {
+                                                setFormData({ ...formData, min_order_value: e.target.value ? Number(e.target.value) : undefined });
+                                                if (formErrors.discount_value) setFormErrors({ ...formErrors, discount_value: '' });
+                                            }}
                                             className="w-full text-xs px-3 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                                         />
                                     </div>
@@ -589,9 +658,15 @@ export function SellerPromotionsPage() {
                                     type="number"
                                     placeholder="Để trống nếu không giới hạn"
                                     value={formData.usage_limit || ''}
-                                    onChange={(e) => setFormData({ ...formData, usage_limit: e.target.value ? Number(e.target.value) : undefined })}
-                                    className="w-full text-xs px-3 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, usage_limit: e.target.value ? Number(e.target.value) : undefined });
+                                        if (formErrors.usage_limit) setFormErrors({ ...formErrors, usage_limit: '' });
+                                    }}
+                                    className={`w-full text-xs px-3 py-2.5 border rounded-xl transition ${
+                                        formErrors.usage_limit ? 'border-red-400 bg-red-50/20 focus:ring-red-500/20 focus:border-red-500' : 'border-stone-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+                                    }`}
                                 />
+                                {formErrors.usage_limit && <p className="text-[11px] text-red-500 mt-1 font-medium">{formErrors.usage_limit}</p>}
                             </div>
 
                             {/* Thời gian */}
@@ -601,20 +676,30 @@ export function SellerPromotionsPage() {
                                     <input
                                         type="datetime-local"
                                         value={formData.start_date}
-                                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                                        className="w-full text-xs px-3 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                                        required
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, start_date: e.target.value });
+                                            if (formErrors.start_date || formErrors.end_date) setFormErrors({ ...formErrors, start_date: '', end_date: '' });
+                                        }}
+                                        className={`w-full text-xs px-3 py-2.5 border rounded-xl transition ${
+                                            formErrors.start_date ? 'border-red-400 bg-red-50/20 focus:ring-red-500/20 focus:border-red-500' : 'border-stone-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+                                        }`}
                                     />
+                                    {formErrors.start_date && <p className="text-[11px] text-red-500 mt-1 font-medium">{formErrors.start_date}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-stone-700 mb-1">Thời gian kết thúc *</label>
                                     <input
                                         type="datetime-local"
                                         value={formData.end_date}
-                                        onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                                        className="w-full text-xs px-3 py-2.5 border border-stone-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                                        required
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, end_date: e.target.value });
+                                            if (formErrors.end_date) setFormErrors({ ...formErrors, end_date: '' });
+                                        }}
+                                        className={`w-full text-xs px-3 py-2.5 border rounded-xl transition ${
+                                            formErrors.end_date ? 'border-red-400 bg-red-50/20 focus:ring-red-500/20 focus:border-red-500' : 'border-stone-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+                                        }`}
                                     />
+                                    {formErrors.end_date && <p className="text-[11px] text-red-500 mt-1 font-medium">{formErrors.end_date}</p>}
                                 </div>
                             </div>
 
