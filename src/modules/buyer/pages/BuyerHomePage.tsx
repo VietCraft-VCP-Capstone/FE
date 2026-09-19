@@ -15,7 +15,7 @@ let homeDataCache: {
   timestamp: number;
 } | null = null;
 
-export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
+export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
   const outletContext = useOutletContext<any>() || {};
@@ -24,7 +24,6 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
   const [allProducts, setAllProducts] = useState<any[]>(() => homeDataCache?.products || []);
   const [shopList, setShopList] = useState<any[]>(() => homeDataCache?.shops || []);
   const [couponList, setCouponList] = useState<any[]>(() => homeDataCache?.coupons || []);
-  const [activeTab, setActiveTab] = useState<'quan-tam' | 'gan-day' | 'theo-doi' | 'khuyen-mai' | 'Thinh-hanh'>('gan-day');
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
@@ -38,19 +37,15 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
         document.getElementById('collections-section')?.scrollIntoView({ behavior: 'smooth' });
       }, 80);
     } else if (location.pathname === '/gifts' || location.hash === '#gifts-section') {
-      setActiveTab('quan-tam');
       setTimeout(() => {
         document.getElementById('kham-pha')?.scrollIntoView({ behavior: 'smooth' });
       }, 80);
     }
   }, [location.pathname, location.hash]);
 
-
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, search]);
-
-  const name = user?.full_name || user?.name || '';
+  }, [search]);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -376,45 +371,24 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
     (p.category || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const getTabFilteredProducts = () => {
-    switch (activeTab) {
-      case 'quan-tam':
-        const favItems = searchedProducts.filter((p: any) => favoritedProductIds.includes(p.id));
-        return favItems;
-      case 'gan-day':
-        return searchedProducts;
-      case 'theo-doi':
-        return [...searchedProducts].reverse();
-      case 'khuyen-mai':
-        if (flashDeals.length > 0) {
-          return flashDeals.map(fd => ({
-            id: fd.id,
-            title: fd.title,
-            price: fd.price,
-            originalPrice: fd.oldPrice,
-            images: [fd.image]
-          }));
-        }
-        return searchedProducts.filter(p => p.originalPrice && p.originalPrice > p.price);
-      case 'Thinh-hanh':
-        const matches = searchedProducts.filter(p =>
-          (p.title || '').toLowerCase().includes('thịnh hành') ||
-          (p.title || '').toLowerCase().includes('gốm') ||
-          (p.title || '').toLowerCase().includes('tranh')
-        );
-        return matches.length > 0 ? matches : searchedProducts;
-      default:
-        return searchedProducts;
-    }
-  };
-
-  const displayProducts = getTabFilteredProducts();
+  const displayProducts = searchedProducts;
   const itemsPerPage = 8;
   const totalPages = Math.ceil(displayProducts.length / itemsPerPage);
   const paginatedProducts = displayProducts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  const flashSaleProductMap = useMemo(() => {
+    const map = new Map<string, any>();
+    flashDeals.forEach((fd: any) => {
+      if (fd.badge === 'FLASH SALE') {
+        map.set(fd.id?.toString(), fd);
+      }
+    });
+    return map;
+  }, [flashDeals]);
+
 
   return (
     <div className="buyer-wrapper" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -443,208 +417,8 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
         </div>
       )}
 
-      {/* Intro Banner */}
-      <div className="buyer-intro-banner" style={{ background: 'transparent', textAlign: 'center', padding: '24px 0 12px' }}>
-        <h1 style={{ fontSize: 32, fontWeight: 900, color: '#330033' }}>{name ? `Chào mừng trở lại, ${name}!` : 'Khám phá sản phẩm thủ công Việt'}</h1>
-      </div>
-
-      {/* Tab Pills */}
-      <div className="buyer-tab-pills" style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 30 }}>
-        <button
-          className={activeTab === 'quan-tam' ? 'active' : ''}
-          onClick={() => setActiveTab('quan-tam')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'quan-tam' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'quan-tam' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Đã quan tâm
-        </button>
-        <button
-          className={activeTab === 'gan-day' ? 'active' : ''}
-          onClick={() => setActiveTab('gan-day')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'gan-day' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'gan-day' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Đã xem gần đây
-        </button>
-        <button
-          className={activeTab === 'theo-doi' ? 'active' : ''}
-          onClick={() => setActiveTab('theo-doi')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'theo-doi' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'theo-doi' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Shop đang theo dõi
-        </button>
-        <button
-          className={activeTab === 'khuyen-mai' ? 'active' : ''}
-          onClick={() => setActiveTab('khuyen-mai')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'khuyen-mai' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'khuyen-mai' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Khuyến mãi
-        </button>
-        <button
-          className={activeTab === 'Thinh-hanh' ? 'active' : ''}
-          onClick={() => setActiveTab('Thinh-hanh')}
-          style={{
-            padding: '8px 20px',
-            borderRadius: 50,
-            border: 'none',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'Thinh-hanh' ? '#008000' : '#f5f5f4',
-            color: activeTab === 'Thinh-hanh' ? '#fff' : '#44403c',
-            transition: 'all 0.2s'
-          }}
-        >
-          Thịnh hành
-        </button>
-      </div>
-
-      {/* Main Discover Grid */}
-      <section id="kham-pha" className="buyer-section pt-4">
-        <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Tiếp tục khám phá</h2>
-          <span style={{ fontSize: 13, color: '#888', fontWeight: 500 }}>
-            {displayProducts.length} kết quả
-          </span>
-        </div>
-        
-        {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
-            <p style={{ fontWeight: 650 }}>Đang tải sản phẩm...</p>
-          </div>
-        ) : displayProducts.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
-            <p style={{ fontWeight: 650 }}>Không tìm thấy sản phẩm phù hợp ở danh mục này.</p>
-          </div>
-        ) : (
-          <>
-            <div className="buyer-grid-4">
-              {paginatedProducts.map((p: any) => {
-                const isFav = favoritedProductIds.includes(p.id);
-                return (
-                  <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`, { state: { initialProduct: p } })}>
-                    <div className="card-media">
-                      <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} />
-                      <button
-                        className="fav-overlay"
-                        onClick={(e) => toggleFavorite(p.id, p.title || p.name, e)}
-                        style={{ color: isFav ? '#e11d48' : '#888' }}
-                      >
-                        <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
-                      </button>
-                    </div>
-                    <div className="card-info">
-                      <h3>{p.title || p.name}</h3>
-                      <p style={{ margin: 0, fontWeight: 700, color: '#007700' }}>
-                        {p.price.toLocaleString('vi-VN')}đ
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Pagination controls */}
-            {totalPages > 1 && (
-              <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 16,
-                marginTop: 28,
-                marginBottom: 12
-              }}>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 20,
-                    border: '1px solid #e7e5e4',
-                    backgroundColor: '#fff',
-                    color: currentPage === 1 ? '#a8a29e' : '#1c1917',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4
-                  }}
-                >
-                  &larr; Trước
-                </button>
-
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#44403c' }}>
-                  Trang {currentPage} / {totalPages}
-                </span>
-
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 20,
-                    border: '1px solid #e7e5e4',
-                    backgroundColor: '#fff',
-                    color: currentPage === totalPages ? '#a8a29e' : '#1c1917',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4
-                  }}
-                >
-                  Sau &rarr;
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </section>
-
-      {/* Unique Vouchers Voucher Section */}
-      <section id="vouchers-section" className="buyer-section" style={{ marginTop: 40 }}>
+      {/* Unique Vouchers Voucher Section - Đẩy lên trên đầu trang */}
+      <section id="vouchers-section" className="buyer-section" style={{ marginTop: 20 }}>
         <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
@@ -739,8 +513,8 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
         )}
       </section>
 
-      {/* Flash Deals Section - Hiện sản phẩm có giảm giá thật */}
-      <section className="buyer-section" style={{ marginTop: 40 }}>
+      {/* Flash Deals Section - Sản phẩm Flash Sale với badge nhảy nhảy */}
+      <section className="buyer-section" style={{ marginTop: 36 }}>
         <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Flame size={22} className="text-amber-500 fill-amber-500 animate-pulse" />
@@ -784,16 +558,44 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
           <div className="buyer-grid-5">
             {flashDeals.map((fd) => {
               const isFav = favoritedProductIds.includes(fd.id);
+              const isFlash = fd.badge === 'FLASH SALE';
               return (
                 <div key={fd.id} className="buyer-card" onClick={() => navigate(`/product/${fd.id}`)}>
                   <div className="card-media">
                     <img src={fd.image} alt={fd.title} />
-                    <span className="discount-tag" style={{
-                      backgroundColor: fd.badge === 'FLASH SALE' ? '#dc2626' : '#ea580c',
-                      fontWeight: 800
+                    <div style={{
+                      position: 'absolute',
+                      top: 8,
+                      left: 8,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                      alignItems: 'flex-start',
+                      zIndex: 3
                     }}>
-                      {fd.discount}
-                    </span>
+                      {isFlash ? (
+                        <span className="flash-sale-badge">
+                          ⚡ FLASH SALE
+                        </span>
+                      ) : (
+                        <span className="discount-tag" style={{ position: 'static' }}>
+                          {fd.badge || 'ƯU ĐÃI'}
+                        </span>
+                      )}
+                      {fd.discount && (
+                        <span style={{
+                          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                          color: '#fef08a',
+                          fontSize: 10,
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          backdropFilter: 'blur(4px)'
+                        }}>
+                          {fd.discount}
+                        </span>
+                      )}
+                    </div>
                     <button
                       className="fav-overlay"
                       onClick={(e) => toggleFavorite(fd.id, fd.title, e)}
@@ -826,6 +628,138 @@ export function BuyerDashboard({ user }: { user: any; onLogout?: () => void }) {
               );
             })}
           </div>
+        )}
+      </section>
+
+      {/* Main Discover Grid */}
+      <section id="kham-pha" className="buyer-section" style={{ marginTop: 40 }}>
+        <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Tiếp tục khám phá</h2>
+          <span style={{ fontSize: 13, color: '#888', fontWeight: 500 }}>
+            {displayProducts.length} kết quả
+          </span>
+        </div>
+        
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
+            <p style={{ fontWeight: 650 }}>Đang tải sản phẩm...</p>
+          </div>
+        ) : displayProducts.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
+            <p style={{ fontWeight: 650 }}>Không tìm thấy sản phẩm phù hợp.</p>
+          </div>
+        ) : (
+          <>
+            <div className="buyer-grid-4">
+              {paginatedProducts.map((p: any) => {
+                const isFav = favoritedProductIds.includes(p.id);
+                const flashDeal = flashSaleProductMap.get((p.id || p._id)?.toString());
+                const isFlashSale = !!flashDeal;
+                return (
+                  <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`, { state: { initialProduct: p } })}>
+                    <div className="card-media">
+                      <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} />
+                      {isFlashSale && (
+                        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 3 }}>
+                          <span className="flash-sale-badge">
+                            ⚡ FLASH SALE
+                          </span>
+                        </div>
+                      )}
+                      <button
+                        className="fav-overlay"
+                        onClick={(e) => toggleFavorite(p.id, p.title || p.name, e)}
+                        style={{ color: isFav ? '#e11d48' : '#888' }}
+                      >
+                        <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
+                      </button>
+                    </div>
+                    <div className="card-info">
+                      <h3>{p.title || p.name}</h3>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <p style={{ margin: 0, fontWeight: 700, color: '#007700' }}>
+                          {(flashDeal ? flashDeal.price : p.price).toLocaleString('vi-VN')}đ
+                        </p>
+                        {flashDeal && flashDeal.oldPrice > flashDeal.price && (
+                          <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#a8a29e' }}>
+                            {flashDeal.oldPrice.toLocaleString('vi-VN')}đ
+                          </span>
+                        )}
+                        {!flashDeal && p.originalPrice && p.originalPrice > p.price && (
+                          <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#a8a29e' }}>
+                            {p.originalPrice.toLocaleString('vi-VN')}đ
+                          </span>
+                        )}
+                      </div>
+                      {flashDeal?.couponCode && (
+                        <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: 4, width: 'fit-content', marginTop: 3 }}>
+                          ⚡ {flashDeal.couponCode}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 16,
+                marginTop: 28,
+                marginBottom: 12
+              }}>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    border: '1px solid #e7e5e4',
+                    backgroundColor: '#fff',
+                    color: currentPage === 1 ? '#a8a29e' : '#1c1917',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}
+                >
+                  &larr; Trước
+                </button>
+
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#44403c' }}>
+                  Trang {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    border: '1px solid #e7e5e4',
+                    backgroundColor: '#fff',
+                    color: currentPage === totalPages ? '#a8a29e' : '#1c1917',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}
+                >
+                  Sau &rarr;
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
 

@@ -1100,6 +1100,54 @@
     border-radius: 4px;
 }
 
+/* ============ FLASH SALE JUMPING BADGE ============ */
+@keyframes flashSaleJump {
+    0%, 100% {
+        transform: translateY(0) scale(1);
+    }
+    20% {
+        transform: translateY(-6px) scale(1.06);
+    }
+    35% {
+        transform: translateY(0) scale(0.97);
+    }
+    50% {
+        transform: translateY(-2.5px) scale(1.02);
+    }
+    65% {
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes flashSaleGlow {
+    0%, 100% {
+        box-shadow: 0 2px 8px rgba(220, 38, 38, 0.45);
+    }
+    50% {
+        box-shadow: 0 5px 14px rgba(239, 68, 68, 0.8), 0 0 0 3px rgba(239, 68, 68, 0.2);
+    }
+}
+
+.flash-sale-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #b91c1c 100%);
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    animation: flashSaleJump 1.3s infinite cubic-bezier(0.28, 0.84, 0.42, 1), flashSaleGlow 1.8s infinite ease-in-out;
+    user-select: none;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+
 .card-info {
     padding: 12px;
     flex: 1;
