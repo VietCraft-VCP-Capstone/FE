@@ -490,7 +490,7 @@ export function AdminPromotionsPage() {
                                                     <Package size={10} className={coupon.applicable_scope === 'SPECIFIC_PRODUCTS' ? 'text-amber-600' : 'text-stone-400'} />
                                                     {coupon.applicable_scope === 'SPECIFIC_PRODUCTS'
                                                         ? `${coupon.applicable_product_ids?.length || 0} SP chỉ định`
-                                                        : 'Toàn sàn'}
+                                                        : (coupon.is_platform ? 'Toàn sàn' : 'Toàn shop')}
                                                 </span>
                                             </div>
                                         </td>

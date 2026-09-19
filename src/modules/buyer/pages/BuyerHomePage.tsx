@@ -318,27 +318,6 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       }
     }
 
-    // 3. Sản phẩm có giảm giá thật trực tiếp (originalPrice > price)
-    for (const p of allProducts) {
-      const idStr = (p.id || p._id)?.toString();
-      if (!idStr || addedProductIds.has(idStr)) continue;
-      if (p.originalPrice && p.originalPrice > p.price) {
-        const discountPct = Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100);
-        if (discountPct >= 5) {
-          deals.push({
-            id: p.id || p._id,
-            title: p.title || p.name,
-            price: p.price,
-            oldPrice: p.originalPrice,
-            discount: `-${discountPct}%`,
-            image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
-            badge: 'GIẢM GIÁ'
-          });
-          addedProductIds.add(idStr);
-        }
-      }
-    }
-
     return deals;
   }, [allProducts, couponList]);
 
@@ -486,9 +465,13 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
                     </div>
                     <span className="voucher-title" style={{ color: isSaved ? '#15803d' : '#cc1111', fontSize: 15, fontWeight: 800 }}>{v.value}</span>
                     <span className="voucher-desc" style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{v.condition}</span>
-                    {v.applicable_scope === 'SPECIFIC_PRODUCTS' && (
+                    {v.applicable_scope === 'SPECIFIC_PRODUCTS' ? (
                       <span style={{ fontSize: 10, color: '#d97706', fontWeight: 600, display: 'block', marginTop: 3 }}>
                         • {v.applicable_products_count} sản phẩm chỉ định
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 10, color: '#78716c', fontWeight: 500, display: 'block', marginTop: 3 }}>
+                        • {v.is_platform ? 'Áp dụng toàn sàn' : 'Áp dụng toàn shop'}
                       </span>
                     )}
                   </div>
@@ -683,11 +666,6 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
                         {flashDeal && flashDeal.oldPrice > flashDeal.price && (
                           <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#a8a29e' }}>
                             {flashDeal.oldPrice.toLocaleString('vi-VN')}đ
-                          </span>
-                        )}
-                        {!flashDeal && p.originalPrice && p.originalPrice > p.price && (
-                          <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#a8a29e' }}>
-                            {p.originalPrice.toLocaleString('vi-VN')}đ
                           </span>
                         )}
                       </div>
