@@ -107,6 +107,7 @@ export function AppRouter() {
         <Route path="/collections" element={<BuyerDashboard user={user} onLogout={logout} />} />
         <Route path="/vouchers" element={<BuyerVouchersPage />} />
         <Route path="/product/:id" element={<BuyerProductDetailPage />} />
+        <Route path="/products/:id" element={<BuyerProductDetailPage />} />
         <Route path="/cart" element={<BuyerCartPage />} />
         <Route path="/shop/:id" element={<BuyerShopPage />} />
 

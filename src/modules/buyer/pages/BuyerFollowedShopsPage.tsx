@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Store, ArrowLeft, Heart } from 'lucide-react';
+import { Store, ArrowLeft } from 'lucide-react';
 import { shopService, ShopDetail } from '../../product/services/shopService';
 import { useToast } from '../../../shared/components/Toast';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
@@ -53,20 +53,12 @@ export function BuyerFollowedShopsPage() {
     <div className="w-full bg-[#fdfbf7] min-h-[calc(100vh-160px)] py-8 text-gray-900 font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Navigation Breadcrumb / Back Button */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6">
           <button
             onClick={() => navigate(-1)}
             className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-[#15803d] transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" /> Quay lại
-          </button>
-
-          <button
-            onClick={() => navigate('/favorites')}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-rose-600 bg-white border border-stone-200 px-3 py-1.5 rounded-full shadow-xs transition-colors cursor-pointer"
-          >
-            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
-            <span>Xem sản phẩm yêu thích</span>
           </button>
         </div>
 

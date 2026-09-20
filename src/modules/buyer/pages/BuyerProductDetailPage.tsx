@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
+import { reviewService } from '../../product/services/reviewService';
 import { cartService } from '../../order/services/cartService';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
@@ -200,7 +201,7 @@ export function BuyerProductDetailPage() {
           }
         }
       })
-      .catch(err => {
+      .catch((err: any) => {
         console.warn('Could not load reviews:', err);
       })
       .finally(() => {

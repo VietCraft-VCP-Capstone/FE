@@ -53,6 +53,11 @@ export const reviewService = {
     return res.data;
   },
 
+  updateReview: async (reviewId: string, data: { rating?: number; comment?: string; images?: string[]; orderId?: string; productId?: string }) => {
+    const res = await api.put(`/reviews/${reviewId}`, data);
+    return res.data;
+  },
+
   getOrderProductReview: async (orderId: string, productId: string) => {
     const res = await api.get(`/reviews/order/${orderId}/product/${productId}`);
     return res.data;

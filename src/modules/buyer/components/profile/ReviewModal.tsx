@@ -31,6 +31,7 @@ interface ReviewModalProps {
     isOpen: boolean;
     onClose: () => void;
     order: OrderForReview | null;
+    initialProductId?: string;
     onSuccess: (orderId: string, productId: string) => void;
 }
 
@@ -48,6 +49,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     isOpen,
     onClose,
     order,
+    initialProductId,
     onSuccess
 }) => {
     const [selectedItemIndex, setSelectedItemIndex] = useState<number>(0);
@@ -77,9 +79,16 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
         return order.items;
     }, [order]);
 
-    // Tự động chọn sản phẩm đầu tiên chưa đánh giá khi mở modal
+    // Tự động chọn sản phẩm mục tiêu hoặc sản phẩm đầu tiên chưa đánh giá khi mở modal
     useEffect(() => {
         if (isOpen && order?.items && order.items.length > 0) {
+            if (initialProductId) {
+                const targetIdx = order.items.findIndex(it => (it.productId || it._id) === initialProductId);
+                if (targetIdx >= 0) {
+                    setSelectedItemIndex(targetIdx);
+                    return;
+                }
+            }
             const firstUnreviewed = order.items.findIndex(it => !it.is_reviewed);
             if (firstUnreviewed >= 0) {
                 setSelectedItemIndex(firstUnreviewed);
@@ -87,7 +96,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 setSelectedItemIndex(0);
             }
         }
-    }, [isOpen, order]);
+    }, [isOpen, order, initialProductId]);
 
     const selectedItem = items.length > 0 ? items[selectedItemIndex] || items[0] : null;
 
@@ -180,7 +189,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (existingReview) return;
 
         if (!comment.trim()) {
             setErrorMessage('Vui lòng nhập nội dung đánh giá của bạn.');
@@ -193,18 +201,28 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
         const prodId = selectedItem.productId || selectedItem._id || '';
 
         try {
-            await reviewService.createReview({
-                orderId: order.id,
-                productId: prodId,
-                rating,
-                comment: comment.trim(),
-                images
-            });
+            if (existingReview?.id) {
+                await reviewService.updateReview(existingReview.id, {
+                    orderId: order.id,
+                    productId: prodId,
+                    rating,
+                    comment: comment.trim(),
+                    images
+                });
+            } else {
+                await reviewService.createReview({
+                    orderId: order.id,
+                    productId: prodId,
+                    rating,
+                    comment: comment.trim(),
+                    images
+                });
+            }
 
             onSuccess(order.id, prodId);
             onClose();
         } catch (err: any) {
-            setErrorMessage(getApiErrorMessage(err, 'Gửi đánh giá không thành công. Vui lòng thử lại.'));
+            setErrorMessage(getApiErrorMessage(err, 'Lưu đánh giá không thành công. Vui lòng thử lại.'));
         } finally {
             setIsSubmitting(false);
         }
@@ -288,23 +306,16 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                                         const itemPrice = Number(it.price || 0);
                                         const variantText = `${it.color || ''} ${it.size || ''}`.trim();
                                         const itemKey = it.productId || it._id || `${idx}-${itemTitle}`;
-                                        const hasUnreviewedItems = items.some(p => !p.is_reviewed);
-                                        const isDisabled = Boolean(it.is_reviewed && hasUnreviewedItems);
 
                                         return (
                                             <button
                                                 key={itemKey}
                                                 type="button"
-                                                disabled={isDisabled}
-                                                onClick={() => {
-                                                    if (!isDisabled) setSelectedItemIndex(idx);
-                                                }}
-                                                className={`w-[270px] p-3 rounded-2xl border text-left transition-all flex items-center gap-3 shrink-0 relative ${
-                                                    isDisabled
-                                                        ? 'opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed'
-                                                        : isSelected
-                                                        ? 'border-2 border-emerald-600 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-600/20 cursor-pointer'
-                                                        : 'border border-gray-200 hover:border-gray-300 bg-white shadow-2xs cursor-pointer'
+                                                onClick={() => setSelectedItemIndex(idx)}
+                                                className={`w-[270px] p-3 rounded-2xl border text-left transition-all flex items-center gap-3 shrink-0 relative cursor-pointer ${
+                                                    isSelected
+                                                        ? 'border-2 border-emerald-600 bg-emerald-50/60 shadow-xs ring-2 ring-emerald-600/20'
+                                                        : 'border border-gray-200 hover:border-gray-300 bg-white shadow-2xs'
                                                 }`}
                                             >
                                                 <div className="w-14 h-14 rounded-xl overflow-hidden border border-gray-150 shrink-0 bg-stone-50 flex items-center justify-center">
@@ -341,7 +352,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                                                         )}
                                                     </div>
                                                 </div>
-                                                {isSelected && !isDisabled && (
+                                                {isSelected && (
                                                     <div className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
                                                         <Check size={12} strokeWidth={3} />
                                                     </div>
@@ -394,48 +405,21 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                             )}
                         </div>
 
-                        {/* Trạng thái kiểm tra hoặc đã đánh giá */}
+                        {/* Trạng thái kiểm tra hoặc Form đánh giá / chỉnh sửa */}
                         {checkingExisting ? (
                             <div className="py-10 text-center text-xs text-gray-400 flex items-center justify-center gap-2.5">
                                 <Loader2 size={18} className="animate-spin text-emerald-600" />
                                 <span>Đang kiểm tra lịch sử đánh giá sản phẩm...</span>
                             </div>
-                        ) : existingReview ? (
-                            <div className="p-5 bg-emerald-50/70 border border-emerald-200 rounded-3xl space-y-3 shadow-xs">
-                                <div className="flex items-center gap-2 text-emerald-800 font-bold text-sm">
-                                    <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-                                    <span>Bạn đã đánh giá sản phẩm này cho đơn hàng #{order.id}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 pt-1">
-                                    {[1, 2, 3, 4, 5].map(s => (
-                                        <Star
-                                            key={s}
-                                            size={20}
-                                            className={s <= (existingReview.rating || 5) ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}
-                                        />
-                                    ))}
-                                    <span className="text-xs font-semibold text-amber-700 ml-2">
-                                        {existingReview.rating}/5 sao ({RATING_LABELS[existingReview.rating || 5]})
-                                    </span>
-                                </div>
-                                <p className="text-xs sm:text-sm text-gray-800 italic bg-white p-4 rounded-2xl border border-emerald-100 leading-relaxed">
-                                    "{existingReview.comment || existingReview.text}"
-                                </p>
-                                {Array.isArray(existingReview.images) && existingReview.images.length > 0 && (
-                                    <div className="flex gap-2.5 pt-1 flex-wrap">
-                                        {existingReview.images.map((img: string, i: number) => (
-                                            <img
-                                                key={i}
-                                                src={img}
-                                                alt=""
-                                                className="w-16 h-16 rounded-2xl object-cover border border-emerald-200 shadow-xs"
-                                            />
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
                         ) : (
                             <>
+                                {existingReview && (
+                                    <div className="p-3.5 bg-amber-50/90 border border-amber-200/80 rounded-2xl text-xs text-amber-900 font-semibold flex items-center gap-2 shadow-xs">
+                                        <CheckCircle2 size={16} className="text-amber-600 shrink-0" />
+                                        <span>Bạn đang xem/chỉnh sửa đánh giá đã gửi cho sản phẩm này. Bạn có thể thay đổi số sao, nhận xét, ảnh và nhấn <strong>Lưu thay đổi</strong>.</span>
+                                    </div>
+                                )}
+
                                 {/* 3. Khu vực Đánh giá sao (Interactive Star Rating) */}
                                 <div className="bg-amber-50/40 border border-amber-100/80 rounded-2xl py-5 px-4 text-center shadow-xs">
                                     <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-2">
@@ -468,7 +452,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                                     </p>
                                 </div>
 
-                                {/* 4.1 Khung Nhận xét (Textarea không viền trong box viền bo tròn) */}
+                                {/* 4.1 Khung Nhận xét */}
                                 <div>
                                     <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-2">
                                         Nhận xét chi tiết
@@ -541,42 +525,30 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
                     {/* 1.3 Footer cố định (Sticky Footer) */}
                     <div className="border-t border-gray-100 px-6 py-4 bg-gray-50/90 backdrop-blur-sm flex justify-end gap-3 shrink-0">
-                        {existingReview ? (
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="px-6 py-2.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 text-sm font-semibold rounded-xl transition-colors cursor-pointer"
-                            >
-                                Đóng
-                            </button>
-                        ) : (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    className="px-5 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-gray-700 text-sm font-semibold transition-colors cursor-pointer"
-                                >
-                                    Hủy
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting || isUploading || !comment.trim()}
-                                    className="px-6 py-2.5 rounded-xl bg-[#15803d] hover:bg-[#166534] disabled:opacity-50 text-white text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 size={16} className="animate-spin" />
-                                            <span>Đang gửi đánh giá...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Star size={16} className="fill-white text-white" />
-                                            <span>Gửi đánh giá</span>
-                                        </>
-                                    )}
-                                </button>
-                            </>
-                        )}
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-5 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-100 text-gray-700 text-sm font-semibold transition-colors cursor-pointer"
+                        >
+                            Hủy
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isSubmitting || isUploading || !comment.trim()}
+                            className="px-6 py-2.5 rounded-xl bg-[#15803d] hover:bg-[#166534] disabled:opacity-50 text-white text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    <span>{existingReview ? 'Đang lưu thay đổi...' : 'Đang gửi đánh giá...'}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Star size={16} className="fill-white text-white" />
+                                    <span>{existingReview ? 'Lưu thay đổi' : 'Gửi đánh giá'}</span>
+                                </>
+                            )}
+                        </button>
                     </div>
                 </form>
             </div>

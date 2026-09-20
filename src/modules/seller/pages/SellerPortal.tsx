@@ -8,6 +8,7 @@ import { SellerDashboard } from './SellerDashboard';
 import { SellerOrdersPage } from './SellerOrdersPage';
 import { SellerCatalogPage } from './SellerCatalogPage';
 import { SellerFollowedCompetitorsPage } from './SellerFollowedCompetitorsPage';
+import { SellerCompetitorDetailPage } from './SellerCompetitorDetailPage';
 import { SellerChatPage } from './SellerChatPage';
 import { POD_CREATE_ENABLED } from '../featureFlags';
 
@@ -72,6 +73,7 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
         <Route path="price-optimize" element={<Stub t="Tối ưu giá bán" d="Gợi ý giá bán tối ưu theo thị trường." />} />
         <Route path="market-share" element={<Stub t="Thị phần & đối thủ" d="Phân tích thị phần và đối thủ cạnh tranh." />} />
         <Route path="competitors" element={<SellerFollowedCompetitorsPage />} />
+        <Route path="competitors/:id" element={<SellerCompetitorDetailPage />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Routes>
     </SellerLayout>

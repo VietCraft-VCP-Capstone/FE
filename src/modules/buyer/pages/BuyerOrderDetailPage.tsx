@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle, Star } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
+import ReviewModal from '../components/profile/ReviewModal';
 
 export function BuyerOrderDetailPage() {
     const navigate = useNavigate();
@@ -14,6 +15,22 @@ export function BuyerOrderDetailPage() {
     const [copySuccess, setCopySuccess] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [targetReviewProductId, setTargetReviewProductId] = useState<string | undefined>(undefined);
+
+    const handleOpenReview = (productId?: string) => {
+        setTargetReviewProductId(productId);
+        setIsReviewModalOpen(true);
+    };
+
+    const handleReviewSuccess = (orderId: string, productId: string) => {
+        showToast('Lưu đánh giá thành công! Cảm ơn bạn đã chia sẻ trải nghiệm.', 'success');
+        if (id) {
+            ordersService.getById(id).then(res => {
+                setOrder(res);
+            }).catch(() => {});
+        }
+    };
 
     const showToast = (message: string, type: 'success' | 'error' = 'success') => {
         setToast({ message, type });
@@ -277,10 +294,35 @@ export function BuyerOrderDetailPage() {
                                 <p className="text-[11px] text-gray-400 mt-1">Phân loại: {item.color || 'Trắng'}</p>
                                 <p className="text-xs font-semibold text-gray-500 mt-0.5">x{item.quantity}</p>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right flex flex-col items-end justify-between">
                                 <span className="font-extrabold text-gray-900 text-sm">
                                     {(item.price * item.quantity).toLocaleString('vi-VN')}đ
                                 </span>
+                                {order.status === 'completed' && (
+                                    <div className="mt-2">
+                                        {item.is_reviewed ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenReview(item.productId)}
+                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-amber-200/70 shadow-2xs"
+                                                title="Xem và chỉnh sửa đánh giá cho sản phẩm này"
+                                            >
+                                                <Star size={11} className="fill-amber-500 text-amber-500" />
+                                                <span>Chỉnh sửa đánh giá</span>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenReview(item.productId)}
+                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-emerald-200/70 shadow-2xs"
+                                                title="Đánh giá sản phẩm này"
+                                            >
+                                                <Star size={11} />
+                                                <span>Đánh giá</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -294,6 +336,27 @@ export function BuyerOrderDetailPage() {
                     >
                         Yêu cầu Trả hàng/Hoàn tiền
                     </button>
+                    {order.status === 'completed' && (
+                        order.is_reviewed || (orderItems.length > 0 && orderItems.every((it: any) => it.is_reviewed)) ? (
+                            <button
+                                onClick={() => handleOpenReview()}
+                                className="border border-amber-500 text-amber-700 hover:bg-amber-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
+                                title="Xem và chỉnh sửa đánh giá của đơn hàng này"
+                            >
+                                <Star size={14} className="fill-amber-500 text-amber-500" />
+                                <span>Chỉnh sửa đánh giá</span>
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => handleOpenReview()}
+                                className="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
+                                title="Đánh giá sản phẩm trong đơn hàng"
+                            >
+                                <Star size={14} />
+                                <span>Đánh giá</span>
+                            </button>
+                        )
+                    )}
                     <button
                         onClick={handleReorder}
                         className="border border-emerald-600 hover:bg-emerald-50 text-emerald-600 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
@@ -365,6 +428,26 @@ export function BuyerOrderDetailPage() {
                     shopName={order.shopName || 'VietCraft Shop'}
                     items={orderItems}
                     onConfirm={handleConfirmReorder}
+                />
+            )}
+
+            {/* Review Modal */}
+            {order && (
+                <ReviewModal
+                    isOpen={isReviewModalOpen}
+                    onClose={() => {
+                        setIsReviewModalOpen(false);
+                        setTargetReviewProductId(undefined);
+                    }}
+                    order={{
+                        id: order.id,
+                        shopName: order.shopName,
+                        shopLogo: order.shopLogo,
+                        items: orderItems,
+                        is_reviewed: order.is_reviewed
+                    }}
+                    initialProductId={targetReviewProductId}
+                    onSuccess={handleReviewSuccess}
                 />
             )}
 

@@ -31,7 +31,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
 
   const handleVisit = () => {
     if (mode === 'seller') {
-      window.open(`/shop/${shopTarget}`, '_blank');
+      navigate(`/seller/competitors/${shopTarget}`);
     } else {
       navigate(`/shop/${shopTarget}`);
     }
@@ -118,8 +118,8 @@ export const ShopCard: React.FC<ShopCardProps> = ({
             onClick={handleVisit}
             className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-stone-100 hover:bg-emerald-50 hover:text-[#15803d] text-gray-700 text-xs font-bold transition-colors cursor-pointer"
           >
-            <ExternalLink size={14} />
-            {mode === 'seller' ? 'Ghé thăm' : 'Xem Shop'}
+            {mode === 'seller' ? <Store size={14} /> : <ExternalLink size={14} />}
+            {mode === 'seller' ? 'Chi tiết đối thủ' : 'Xem Shop'}
           </button>
 
           {onUnfollow ? (

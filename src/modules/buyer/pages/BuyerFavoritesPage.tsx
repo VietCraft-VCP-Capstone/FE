@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Heart, ArrowLeft, ShoppingBag, Store } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Heart, ArrowLeft, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
@@ -32,6 +32,24 @@ const resolveProductImage = (product: any): string => {
   return DEFAULT_FAV_IMG;
 };
 
+const getFavoriteItemId = (item: any): string => {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  const directId = item.product_id || item.productId || item._id || item.id;
+  if (directId && typeof directId === 'string') return directId;
+  if (directId && typeof directId === 'object' && directId.toString) return directId.toString();
+
+  const nested = item.product;
+  if (nested) {
+    if (typeof nested === 'string') return nested;
+    const nestedId = nested._id || nested.id || nested.product_id || nested.productId;
+    if (nestedId && typeof nestedId === 'string') return nestedId;
+    if (nestedId && typeof nestedId === 'object' && nestedId.toString) return nestedId.toString();
+  }
+
+  return '';
+};
+
 export function BuyerFavoritesPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -39,6 +57,23 @@ export function BuyerFavoritesPage() {
   const [loading, setLoading] = useState(true);
   const [variantModalOpen, setVariantModalOpen] = useState(false);
   const [activeProductForCart, setActiveProductForCart] = useState<any>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const totalItems = favorites.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const paginatedFavorites = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return favorites.slice(start, start + itemsPerPage);
+  }, [favorites, currentPage, itemsPerPage]);
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     fetchFavorites();
@@ -70,11 +105,11 @@ export function BuyerFavoritesPage() {
     }
     // Optimistic Update: cập nhật giao diện ngay lập tức
     const previous = favorites;
-    const next = favorites.filter((item) => item._id !== id && item.id !== id);
+    const next = favorites.filter((item) => getFavoriteItemId(item) !== id);
     setFavorites(next);
     try {
       await favoritesService.removeFavorite(id);
-      setFavorites(prev => prev.filter(item => (item._id || item.id) !== id));
+      setFavorites(prev => prev.filter(item => getFavoriteItemId(item) !== id));
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
       showToast('Đã xóa khỏi danh sách yêu thích', 'info');
     } catch (err) {
@@ -132,14 +167,6 @@ export function BuyerFavoritesPage() {
               </p>
             </div>
           </div>
-
-          <button
-            onClick={() => navigate('/followed-shops')}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-[#15803d] bg-stone-100 hover:bg-emerald-50 px-3.5 py-2 rounded-full transition-colors cursor-pointer self-start sm:self-auto"
-          >
-            <Store className="w-3.5 h-3.5 text-[#15803d]" />
-            <span>Gian hàng đang theo dõi</span>
-          </button>
         </div>
 
         {/* Trạng thái Loading / Danh sách sản phẩm */}
@@ -171,66 +198,148 @@ export function BuyerFavoritesPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {favorites.map((item) => {
-              const product = item.product || item;
-              const prodId = product._id || product.id || item;
-              const price = Number(product.price || product.retail_price || product.variants?.[0]?.price || product.variants?.[0]?.retail_price || 0);
-              const shopTitle = product.shopInfo?.name || product.shopName || product.storeName || 'VietCraft Selection';
-              const imgUrl = resolveProductImage(product);
+          <div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              {paginatedFavorites.map((item, index) => {
+                const product = item?.product || (typeof item === 'object' && item !== null ? item : {});
+                const prodId = getFavoriteItemId(item);
+                const price = Number(product.price || product.retail_price || product.variants?.[0]?.price || product.variants?.[0]?.retail_price || 0);
+                const shopTitle = product.shopInfo?.name || product.shopName || product.storeName || 'VietCraft Selection';
+                const imgUrl = resolveProductImage(product);
 
-              return (
-                <div 
-                  key={prodId} 
-                  onClick={() => navigate(`/products/${prodId}`)}
-                  className="group flex flex-col cursor-pointer"
-                >
-                  {/* Image Container */}
-                  <div className="relative w-full aspect-square rounded-[24px] overflow-hidden bg-gray-100 shadow-xs">
-                    <img
-                      src={imgUrl}
-                      alt={product.title || product.name || 'Sản phẩm'}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = DEFAULT_FAV_IMG;
-                      }}
-                    />
-                    {/* Heart Badge Button (Xóa khỏi yêu thích) */}
-                    <button
-                      onClick={(e) => handleRemoveFavorite(prodId, e)}
-                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10"
-                      title="Bỏ yêu thích"
-                    >
-                      <Heart className="fill-rose-500 text-rose-500 w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex flex-col flex-1 justify-between mt-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-1 group-hover:text-[#15803d] transition-colors">
-                        {product.title || product.name || 'Sản phẩm sáng tạo'}
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {shopTitle}
-                      </p>
-                      <p className="text-sm font-bold text-[#15803d] mt-1">
-                        {new Intl.NumberFormat('vi-VN').format(price)}{' '}đ
-                      </p>
+                return (
+                  <div
+                    key={prodId || index}
+                    onClick={() => {
+                      if (prodId) {
+                        navigate(`/products/${prodId}`);
+                      }
+                    }}
+                    className="group flex flex-col cursor-pointer"
+                  >
+                    {/* Image Container */}
+                    <div className="relative w-full aspect-square rounded-[24px] overflow-hidden bg-gray-100 shadow-xs">
+                      <img
+                        src={imgUrl}
+                        alt={product.title || product.name || 'Sản phẩm'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_FAV_IMG;
+                        }}
+                      />
+                      {/* Heart Badge Button (Xóa khỏi yêu thích) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveFavorite(prodId, e);
+                        }}
+                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10"
+                        title="Bỏ yêu thích"
+                      >
+                        <Heart className="fill-rose-500 text-rose-500 w-4 h-4" />
+                      </button>
                     </div>
 
-                    {/* Pill Button: Thêm vào giỏ */}
+                    {/* Content */}
+                    <div className="flex flex-col flex-1 justify-between mt-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900 line-clamp-1 group-hover:text-[#15803d] transition-colors">
+                          {product.title || product.name || 'Sản phẩm sáng tạo'}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {shopTitle}
+                        </p>
+                        <p className="text-sm font-bold text-[#15803d] mt-1">
+                          {new Intl.NumberFormat('vi-VN').format(price)}{' '}đ
+                        </p>
+                      </div>
+
+                      {/* Pill Button: Thêm vào giỏ */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAddToCartModal(product, e);
+                        }}
+                        className="w-full mt-3 py-2 px-3 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+                        <span>Thêm vào giỏ</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {totalItems > 0 && (
+              <div className="mt-10 pt-6 border-t border-stone-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-xs sm:text-sm text-stone-500 font-medium">
+                  Hiển thị{' '}
+                  <span className="font-bold text-gray-900">
+                    {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalItems)}
+                  </span>{' '}
+                  trên tổng số <span className="font-bold text-gray-900">{totalItems}</span> sản phẩm
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5">
                     <button
-                      onClick={(e) => handleOpenAddToCartModal(product, e)}
-                      className="w-full mt-3 py-2 px-3 rounded-full border border-[#15803d] text-[#15803d] bg-white hover:bg-[#15803d] hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl border border-stone-200 bg-white text-stone-700 text-xs font-bold hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs"
                     >
-                      <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
-                      <span>Thêm vào giỏ</span>
+                      <ChevronLeft className="w-4 h-4" />
+                      <span className="hidden sm:inline">Trước</span>
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentPage === pageNum
+                          ? 'bg-[#15803d] text-white shadow-sm'
+                          : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-50'
+                          }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl border border-stone-200 bg-white text-stone-700 text-xs font-bold hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <span className="hidden sm:inline">Sau</span>
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
+                )}
+
+                <div className="flex items-center gap-2 text-xs font-semibold text-stone-500">
+                  <span>Hiển thị:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="bg-white border border-stone-200 text-stone-800 text-xs font-bold rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#15803d] cursor-pointer shadow-2xs"
+                  >
+                    <option value={5}>5 / trang</option>
+                    <option value={10}>10 / trang</option>
+                    <option value={15}>15 / trang</option>
+                    <option value={20}>20 / trang</option>
+                  </select>
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -238,7 +347,7 @@ export function BuyerFavoritesPage() {
       {/* Modal Chọn Variant & Số Lượng */}
       <SelectVariantModal
         isOpen={variantModalOpen}
-        productId={activeProductForCart?._id || activeProductForCart?.id || null}
+        productId={getFavoriteItemId(activeProductForCart) || null}
         initialProduct={activeProductForCart}
         onClose={() => {
           setVariantModalOpen(false);

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, Star, ArrowRight, CheckCircle2, Info, Ticket, Flame } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
+import { shopService } from '../../product/services/shopService';
 import { promotionService } from '../../promotion/services/promotionService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
@@ -75,7 +76,11 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
     Promise.all([
       productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
-      productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
+      isLoggedIn()
+        ? shopService.getFollowedShops()
+            .then(followed => (Array.isArray(followed) && followed.length > 0 ? followed : productsService.getFeaturedShops()))
+            .catch(() => productsService.getFeaturedShops().catch(() => []))
+        : productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
       promotionService.getAll().catch((err) => { console.error('Failed to fetch coupons', err); return []; }),
     ]).then(([products, shops, coupons]) => {
       const productList = Array.isArray(products) ? products : (products as any)?.items || [];
@@ -335,19 +340,34 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
     };
   });
 
-  const subbedShops = shopList.length > 0 ? shopList.map((shop: any) => {
-    const shopProds = allProducts.filter((p: any) => p.sellerId === shop._id?.toString() || p.sellerId === shop.id).slice(0, 3);
-    const thumbnails = shopProds.map((p: any) => p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=150');
-    while (thumbnails.length < 3) {
-      thumbnails.push('https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=150');
-    }
-    return {
-      name: shop.shop_name,
-      caption: `Đã thêm ${shop.listing_count || 5} sản phẩm mới`,
-      image: shop.logo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200',
-      thumbnails
-    };
-  }) : [];
+  const subbedShops = useMemo(() => {
+    if (!shopList || shopList.length === 0) return [];
+    return shopList.map((shop: any) => {
+      const sId = (shop._id || shop.id)?.toString();
+      const sSlug = shop.slug;
+      const targetShop = sId || sSlug;
+
+      // Lọc sản phẩm của gian hàng này
+      const shopProds = allProducts.filter((p: any) => {
+        const pSeller = (p.sellerId || p.shop_id || p.shopInfo?.id || p.shopInfo?._id)?.toString();
+        return pSeller && sId && pSeller === sId;
+      }).slice(0, 3);
+
+      const thumbnails = shopProds.map((p: any) => p.images?.[0] || p.thumbnail || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=150');
+      while (thumbnails.length < 3) {
+        thumbnails.push('https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=150');
+      }
+
+      return {
+        id: targetShop,
+        slug: sSlug,
+        name: shop.shop_name || shop.name || shop.shopName || 'Gian hàng',
+        caption: `Đã thêm ${shop.listing_count || shop.listingCount || (shopProds.length > 0 ? shopProds.length : 1)} sản phẩm mới`,
+        image: shop.logo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200',
+        thumbnails
+      };
+    });
+  }, [shopList, allProducts]);
 
   const searchedProducts = allProducts.filter((p: any) =>
     (p.title || p.name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -791,35 +811,62 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Cập nhật từ gian hàng bạn theo dõi</h2>
         </div>
         <div className="buyer-grid-3">
-          {subbedShops.map((shop, i) => (
-            <div key={i} className="shop-update-card">
-              <div className="shop-head" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <img src={shop.image} alt={shop.name} className="shop-avatar" style={{ border: '1px solid #ebd0eb' }} />
-                <div>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{shop.name}</h3>
-                  <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{shop.caption}</p>
-                </div>
-              </div>
-              <div className="shop-thumbnails">
-                {shop.thumbnails.map((t, idx) => (
-                  <img key={idx} src={t} alt="thumbnail" />
-                ))}
-              </div>
-              <button
-                className="shop-view-btn"
-                onClick={() => navigate('/')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6
+          {subbedShops.map((shop, i) => {
+            const targetShop = shop.id || shop.slug;
+            return (
+              <div
+                key={shop.id || i}
+                className="shop-update-card cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => {
+                  if (targetShop) navigate(`/shop/${targetShop}`);
                 }}
+                style={{ cursor: 'pointer' }}
+                title={`Xem gian hàng ${shop.name}`}
               >
-                <span>Xem bộ sưu tập mới</span>
-                <ArrowRight size={12} />
-              </button>
-            </div>
-          ))}
+                <div className="shop-head" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img src={shop.image} alt={shop.name} className="shop-avatar" style={{ border: '1px solid #ebd0eb' }} />
+                  <div>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{shop.name}</h3>
+                    <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{shop.caption}</p>
+                  </div>
+                </div>
+                <div className="shop-thumbnails">
+                  {shop.thumbnails.map((t: string, idx: number) => (
+                    <img
+                      key={idx}
+                      src={t}
+                      alt="thumbnail"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (targetShop) navigate(`/shop/${targetShop}`);
+                      }}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="shop-view-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (targetShop) {
+                      navigate(`/shop/${targetShop}`);
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    cursor: 'pointer'
+                  }}
+                  title={`Xem bộ sưu tập mới của ${shop.name}`}
+                >
+                  <span>Xem bộ sưu tập mới</span>
+                  <ArrowRight size={12} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </section>
 

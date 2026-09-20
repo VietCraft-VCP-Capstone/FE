@@ -10,6 +10,14 @@ export interface OrderItemResponse {
   size?: string;
   image?: string;
   is_reviewed?: boolean;
+  review?: {
+    id?: string;
+    rating?: number;
+    comment?: string;
+    images?: string[];
+    createdAt?: string;
+    updatedAt?: string;
+  } | null;
 }
 
 export interface OrderResponse {
