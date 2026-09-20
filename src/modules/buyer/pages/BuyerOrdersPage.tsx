@@ -222,7 +222,14 @@ export function BuyerOrdersPage() {
                                 {order.items.map((item, idx) => (
                                     <div key={idx} className="flex gap-4 py-3 first:pt-0 last:pb-0">
                                         <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                            <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                                            <img
+                                                src={item.image || '/image-not-found.jpg'}
+                                                alt={item.title}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = '/image-not-found.jpg';
+                                                }}
+                                            />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="font-extrabold text-gray-900 text-sm leading-snug line-clamp-1">{item.title}</h4>

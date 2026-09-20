@@ -9,6 +9,7 @@ import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { ProductDeleteModal } from '../components/ProductDeleteModal';
 import { useToast } from '../../../shared/components/Toast';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import {
   Plus,
   Trash2,
@@ -47,6 +48,7 @@ export function ProductListingPage() {
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState<ProductItem | null>(null);
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
 
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -189,17 +191,19 @@ export function ProductListingPage() {
   };
 
   // Batch Delete
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = () => {
     if (selectedIds.length === 0) return;
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} sản phẩm đã chọn không?`)) {
-      return;
-    }
+    setIsBatchDeleteOpen(true);
+  };
+
+  const handleConfirmBatchDelete = async () => {
     setActionLoading(true);
     try {
       cacheRef.current.clear();
       await productsService.batchDelete(selectedIds);
       showToast(`Đã xóa thành công ${selectedIds.length} sản phẩm.`, 'success');
       setSelectedIds([]);
+      setIsBatchDeleteOpen(false);
       await fetchProducts(filter);
     } catch (err: any) {
       showToast('Lỗi khi xóa hàng loạt: ' + err.message, 'error');
@@ -423,6 +427,19 @@ export function ProductListingPage() {
         onConfirm={handleConfirmDelete}
         product={deletingProduct}
         loading={actionLoading}
+      />
+
+      {/* Batch Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isBatchDeleteOpen}
+        variant="danger"
+        title="Xác nhận xóa hàng loạt"
+        message={`Bạn có chắc chắn muốn xóa ${selectedIds.length} sản phẩm đã chọn không?\n\nThao tác này sẽ xóa các sản phẩm khỏi danh sách gian hàng.`}
+        confirmLabel={`Xóa ${selectedIds.length} sản phẩm`}
+        cancelLabel="Hủy bỏ"
+        isLoading={actionLoading}
+        onConfirm={handleConfirmBatchDelete}
+        onCancel={() => setIsBatchDeleteOpen(false)}
       />
     </div>
   );

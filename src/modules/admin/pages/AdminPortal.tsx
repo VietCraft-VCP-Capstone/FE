@@ -139,14 +139,11 @@ function AdminUsers() {
   );
 }
 
+import { AdminPromotionsPage } from './AdminPromotionsPage';
+
 /* ------------------------------------------------------------- Admin Disputes Page */
 function AdminDisputes() {
   return <div><h2 className="m-0 text-[24px] font-extrabold tracking-[-0.02em] text-admin-ink">Tranh chấp</h2><p className="mt-1.5 mb-0 text-[13.5px] leading-normal text-admin-muted">Xử lý và giải quyết các tranh chấp giữa người mua và người bán.</p></div>;
-}
-
-/* ------------------------------------------------------------- Admin Marketing Page */
-function AdminMarketing() {
-  return <div><h2 className="m-0 text-[24px] font-extrabold tracking-[-0.02em] text-admin-ink">Marketing</h2><p className="mt-1.5 mb-0 text-[13.5px] leading-normal text-admin-muted">Quản lý các chiến dịch khuyến mãi và tiếp thị.</p></div>;
 }
 
 interface AdminPortalProps {
@@ -166,9 +163,11 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="categories" element={<AdminCategories />} />
         <Route path="tags" element={<AdminTags />} />
         <Route path="disputes" element={<AdminDisputes />} />
-        <Route path="marketing" element={<AdminMarketing />} />
+        <Route path="marketing" element={<AdminPromotionsPage />} />
+        <Route path="promotions" element={<AdminPromotionsPage />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Routes>
     </AdminLayout>
   );
 }
+

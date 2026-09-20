@@ -1,9 +1,11 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { productsService } from '../../product/services/productsService';
+import { useToast } from '../../../shared/components/Toast';
 
 export function useLandingPage() {
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [searchQuery, setSearchQuery] = useState('');
     const [emailSubscription, setEmailSubscription] = useState('');
     const [products, setProducts] = useState<any[]>([]);
@@ -66,7 +68,7 @@ export function useLandingPage() {
     const handleSubscribe = (e: FormEvent) => {
         e.preventDefault();
         if (emailSubscription) {
-            alert(`Cảm ơn bạn đã đăng ký với email: ${emailSubscription}`);
+            showToast(`Cảm ơn bạn đã đăng ký với email: ${emailSubscription}`, 'success');
             setEmailSubscription('');
         }
     };
