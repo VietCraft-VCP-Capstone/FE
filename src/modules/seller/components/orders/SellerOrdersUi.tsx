@@ -18,8 +18,8 @@ export const SELLER_BRAND = '#007700';
 
 /* ------------------------------------------------------------ huy hiệu ----- */
 
-export function StatusBadge({ status, size = 'md' }: { status: SellerOrderStatus; size?: 'sm' | 'md' }) {
-  const meta = STATUS_META[status];
+export function StatusBadge({ status, size = 'md' }: { status: SellerOrderStatus | 'PENDING_APPROVAL'; size?: 'sm' | 'md' }) {
+  const meta = STATUS_META[status] || STATUS_META.ORDERED;
   return (
     <span
       title={meta.hint}
@@ -140,12 +140,14 @@ export function OrdersTable({
   orders,
   loading,
   onOpen,
+  onQuickApprove,
   emptyTitle,
   emptyHint,
 }: {
   orders: SellerOrder[];
   loading: boolean;
   onOpen: (order: SellerOrder) => void;
+  onQuickApprove?: (order: SellerOrder, e: React.MouseEvent) => void;
   emptyTitle: string;
   emptyHint: string;
 }) {
@@ -260,7 +262,23 @@ export function OrdersTable({
               </td>
 
               <td className={TD}>
-                <StatusBadge status={order.status} />
+                {order.approvalStatus === 'PENDING_APPROVAL' || order.fulfillmentStatus === 'PENDING_APPROVAL' ? (
+                  <div className="flex flex-col gap-1.5 items-start">
+                    <StatusBadge status="PENDING_APPROVAL" />
+                    {onQuickApprove && (
+                      <button
+                        type="button"
+                        onClick={(e) => onQuickApprove(order, e)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors cursor-pointer"
+                        title="Duyệt đơn và chuyển file in sang xưởng in"
+                      >
+                        Duyệt ngay
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <StatusBadge status={order.status} />
+                )}
               </td>
 
               <td className={`${TD} text-right`}>

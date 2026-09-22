@@ -41,6 +41,11 @@ export const sellerOrdersService = {
     const res = await api.post(`/seller/orders/${encodeURIComponent(orderCode)}/dispatch-printer`);
     return res.data;
   },
+
+  async rejectOrder(orderCode: string, reason?: string): Promise<{ message: string; order: SellerOrder }> {
+    const res = await api.post(`/seller/orders/${encodeURIComponent(orderCode)}/reject`, { reason });
+    return res.data;
+  },
 };
 
 export default sellerOrdersService;

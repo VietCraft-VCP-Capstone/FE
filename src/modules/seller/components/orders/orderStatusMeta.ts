@@ -21,7 +21,13 @@ export interface StatusMeta {
   dot: string;
 }
 
-export const STATUS_META: Record<SellerOrderStatus, StatusMeta> = {
+export const STATUS_META: Record<SellerOrderStatus | 'PENDING_APPROVAL', StatusMeta> = {
+  PENDING_APPROVAL: {
+    label: 'Chờ duyệt in',
+    hint: 'Đơn hàng đang chờ người bán kiểm tra thiết kế và duyệt chuyển sang xưởng in.',
+    badge: 'bg-purple-50 text-purple-800 border-purple-200',
+    dot: '#7E22CE',
+  },
   ORDERED: {
     label: 'Đơn mới',
     hint: 'Khách vừa đặt, chờ tiền về trước khi sản xuất.',

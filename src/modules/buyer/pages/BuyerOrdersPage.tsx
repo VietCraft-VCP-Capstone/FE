@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
 import { useNavigate } from 'react-router-dom';
-import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck, Check, CheckCircle2 } from 'lucide-react';
+import { Search, Store, ShoppingBag, Eye, RefreshCw, Star, Truck, Check } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';

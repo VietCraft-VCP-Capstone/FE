@@ -40,11 +40,12 @@ const EMPTY: SellerOrderList = {
   page: 1,
   pageSize: PAGE_SIZE,
   totalPages: 0,
-  counts: { all: 0, ORDERED: 0, PENDING_DESIGN: 0, PROCESSING: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 },
+  counts: { all: 0, PENDING_APPROVAL: 0, ORDERED: 0, PENDING_DESIGN: 0, PROCESSING: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 },
   revenue: { settled: 0, pending: 0 },
 };
 
 const TAB_ORDER: SellerOrderStatusFilter[] = [
+  'PENDING_APPROVAL',
   'TODO',
   'ORDERED',
   'PENDING_DESIGN',
@@ -67,6 +68,12 @@ function emptyCopy(status: SellerOrderStatusFilter, searching: boolean) {
     return {
       title: 'Không tìm thấy đơn nào khớp',
       hint: 'Thử tìm bằng mã đơn, tên người nhận, số điện thoại hoặc mã vận đơn.',
+    };
+  }
+  if (status === 'PENDING_APPROVAL') {
+    return {
+      title: 'Không có đơn nào chờ duyệt in',
+      hint: 'Mọi đơn in ấn theo yêu cầu đều đã được duyệt chuyển sang xưởng in.',
     };
   }
   if (status === 'ALL') {
@@ -180,6 +187,21 @@ export function SellerOrdersPage() {
       }
     },
     [detail, pendingAction, filter, load, showToast]
+  );
+
+  const handleQuickApprove = useCallback(
+    async (order: SellerOrder, e: React.MouseEvent) => {
+      e.stopPropagation();
+      try {
+        showToast(`Đang duyệt đơn #${order.orderCode}...`, 'info');
+        const res = await sellerOrdersService.dispatchToPrinter(order.orderCode);
+        showToast(res.message || 'Đã duyệt đơn và chuyển sang xưởng in!', 'success');
+        void load(filter, true);
+      } catch (err: any) {
+        showToast(getApiErrorMessage(err, 'Lỗi khi duyệt đơn.'), 'error');
+      }
+    },
+    [filter, load, showToast]
   );
 
   const searching = Boolean(filter.search.trim());
@@ -314,6 +336,7 @@ export function SellerOrdersPage() {
             orders={data.items}
             loading={loading}
             onOpen={order => void openDetail(order)}
+            onQuickApprove={handleQuickApprove}
             emptyTitle={empty.title}
             emptyHint={empty.hint}
           />
@@ -339,6 +362,7 @@ export function SellerOrdersPage() {
           setPendingAction(null);
         }}
         onAction={setPendingAction}
+        onRefresh={() => void load(filter, true)}
       />
 
       {/* Update Status Modal */}

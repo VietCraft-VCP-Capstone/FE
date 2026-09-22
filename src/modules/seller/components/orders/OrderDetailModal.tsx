@@ -34,6 +34,7 @@ export function OrderDetailModal({
   onRefresh?: () => void;
 }) {
   const [dispatchingPrinter, setDispatchingPrinter] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const [printerMsg, setPrinterMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   if (!order) return null;
@@ -42,18 +43,35 @@ export function OrderDetailModal({
   const buyerPaid = f.subtotal + f.shippingFee - f.discount;
   const actions = NEXT_ACTIONS[order.status] || [];
   const hasDesign = order.items.some(it => it.designFileUrl);
+  const isPendingApproval = order.approvalStatus === 'PENDING_APPROVAL' || order.fulfillmentStatus === 'PENDING_APPROVAL';
 
   const handleDispatchPrinter = async () => {
     setDispatchingPrinter(true);
     setPrinterMsg(null);
     try {
       const res = await sellerOrdersService.dispatchToPrinter(order.orderCode);
-      setPrinterMsg({ type: 'success', text: res.message || 'Đã chuyển đơn sang xưởng in thành công!' });
+      setPrinterMsg({ type: 'success', text: res.message || 'Đã duyệt đơn và chuyển sang xưởng in thành công!' });
       if (onRefresh) onRefresh();
     } catch (err: any) {
       setPrinterMsg({ type: 'error', text: err.response?.data?.error || err.message || 'Lỗi khi gửi xưởng in.' });
     } finally {
       setDispatchingPrinter(false);
+    }
+  };
+
+  const handleRejectOrder = async () => {
+    const reason = window.prompt('Nhập lý do từ chối đơn in này (ví dụ: File in bị vỡ, hết phôi):');
+    if (!reason) return;
+    setRejecting(true);
+    setPrinterMsg(null);
+    try {
+      const res = await sellerOrdersService.rejectOrder(order.orderCode, reason);
+      setPrinterMsg({ type: 'success', text: res.message || 'Đã từ chối đơn hàng.' });
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      setPrinterMsg({ type: 'error', text: err.response?.data?.error || err.message || 'Lỗi khi từ chối đơn.' });
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -66,6 +84,12 @@ export function OrderDetailModal({
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="m-0 text-lg font-extrabold text-stone-900 font-jakarta">{order.orderCode}</h2>
               <StatusBadge status={order.status} />
+              {isPendingApproval && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse" />
+                  Chờ duyệt in
+                </span>
+              )}
             </div>
             <p className="m-0 mt-1 text-[12.5px] text-stone-500">
               Đặt lúc {dateTime(order.createdAt)} · {STATUS_META[order.status].hint}
@@ -107,7 +131,7 @@ export function OrderDetailModal({
                         rel="noopener noreferrer"
                         className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-semibold text-[#007700] no-underline hover:underline"
                       >
-                        Tải file in
+                        Xem file in gốc
                         <ExternalLink size={11} aria-hidden />
                       </a>
                     )}
@@ -127,6 +151,43 @@ export function OrderDetailModal({
                 </li>
               ))}
             </ul>
+
+            {hasDesign && (
+              <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50/50 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Printer size={16} className="text-purple-700" />
+                    <span className="text-xs font-bold text-purple-950">
+                      Kết nối Xưởng In (POD Fulfillment)
+                    </span>
+                  </div>
+                  {isPendingApproval ? (
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                      Chờ duyệt chuyển xưởng
+                    </span>
+                  ) : (order.supplierOrderId || order.printerInfo?.supplierOrderId) ? (
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Mã xưởng: {order.supplierOrderId || order.printerInfo?.supplierOrderId}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-2 text-xs text-purple-900/90 space-y-1">
+                  <p className="m-0">
+                    Trạng thái xưởng: <strong>{order.printerInfo?.printerStatus || (order.supplierOrderId ? 'ĐÃ TIẾP NHẬN' : 'CHƯA GỬI XƯỞNG')}</strong>
+                  </p>
+                  {order.printerInfo?.printerName && (
+                    <p className="m-0 text-[11.5px] text-purple-700">
+                      Đơn vị in: {order.printerInfo.printerName}
+                    </p>
+                  )}
+                  {order.printerInfo?.rejectionReason && (
+                    <p className="m-0 text-[11.5px] text-rose-700 font-bold">
+                      Lý do xưởng báo lỗi: {order.printerInfo.rejectionReason}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {!hasDesign && (
               <p className="mb-0 mt-2 flex items-center gap-1.5 text-[11.5px] text-stone-400">
@@ -253,7 +314,29 @@ export function OrderDetailModal({
                 : 'Bước tiếp theo bạn có thể thực hiện:'}
             </span>
             <div className="flex flex-wrap items-center gap-2.5">
-              {['ORDERED', 'PENDING_DESIGN', 'PROCESSING'].includes(order.status) && (
+              {isPendingApproval ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={loading || rejecting || dispatchingPrinter}
+                    onClick={handleRejectOrder}
+                    className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 px-3.5 py-2 text-[13.5px] font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {rejecting ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
+                    Từ chối duyệt
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading || dispatchingPrinter || rejecting}
+                    onClick={handleDispatchPrinter}
+                    className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 text-[13.5px] font-bold transition-colors shadow-sm disabled:opacity-50"
+                    title="Duyệt đơn và chuyển dữ liệu in sang xưởng in"
+                  >
+                    {dispatchingPrinter ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                    Duyệt đơn & Đẩy sang xưởng
+                  </button>
+                </>
+              ) : ['ORDERED', 'PENDING_DESIGN', 'PROCESSING'].includes(order.status) && hasDesign && (
                 <button
                   type="button"
                   disabled={loading || dispatchingPrinter}
@@ -262,7 +345,7 @@ export function OrderDetailModal({
                   title="Chuyển dữ liệu và file in sang hệ thống Printing Shop"
                 >
                   {dispatchingPrinter ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                  Gửi xưởng in (POD)
+                  {order.supplierOrderId ? 'Đẩy lại xưởng in' : 'Gửi xưởng in (POD)'}
                 </button>
               )}
               <button

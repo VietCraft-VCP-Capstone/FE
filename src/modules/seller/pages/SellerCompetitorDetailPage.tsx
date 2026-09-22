@@ -4,15 +4,12 @@ import {
   Store,
   Star,
   Package,
-  Users,
   MapPin,
   ArrowLeft,
   ExternalLink,
   UserMinus,
   Search,
   Ticket,
-  TrendingUp,
-  Tag,
   DollarSign,
   ChevronRight
 } from 'lucide-react';

@@ -23,7 +23,7 @@ export function BuyerOrderDetailPage() {
         setIsReviewModalOpen(true);
     };
 
-    const handleReviewSuccess = (orderId: string, productId: string) => {
+    const handleReviewSuccess = (_orderId: string, _productId: string) => {
         showToast('Lưu đánh giá thành công! Cảm ơn bạn đã chia sẻ trải nghiệm.', 'success');
         if (id) {
             ordersService.getById(id).then(res => {
