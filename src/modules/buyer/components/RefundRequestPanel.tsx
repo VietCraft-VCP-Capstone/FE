@@ -18,6 +18,7 @@ export function RefundRequestPanel({ orderId, orderStatus }: { orderId: string; 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [testBusy, setTestBusy] = useState(false);
+  const [testConfirmOpen, setTestConfirmOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [reason, setReason] = useState('DAMAGED');
@@ -55,8 +56,7 @@ export function RefundRequestPanel({ orderId, orderStatus }: { orderId: string; 
     finally { setBusy(false); }
   };
   const createTestFlow = async () => {
-    if (!window.confirm('Tạo bản sao đơn TEST-REFUND và request mẫu? Thanh toán sẽ vẫn là PENDING; không có tiền thật được thu/hoàn.')) return;
-    setTestBusy(true); setError('');
+    setTestBusy(true); setError(''); setTestConfirmOpen(false);
     try {
       const result = await refundService.createTestFlow(orderId);
       navigate(`/orders/${encodeURIComponent(result.order_id)}?refundRequestId=${encodeURIComponent(result.refund_request_id)}`);
@@ -81,7 +81,7 @@ export function RefundRequestPanel({ orderId, orderStatus }: { orderId: string; 
       <div><h3 className="font-bold text-gray-900">Trả hàng / Hoàn tiền</h3>
         {request ? <p className="mt-1 text-sm text-gray-700">{labels[request.status] || request.status} · mã {request._id.slice(-8)}</p> : <p className="mt-1 text-sm text-gray-600">Yêu cầu trong vòng 7 ngày sau khi đơn được giao.</p>}
       </div>
-      {orderStatus === 'pending' && <button disabled={testBusy} onClick={() => void createTestFlow()} className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-semibold text-amber-800 disabled:opacity-50">{testBusy ? 'Đang tạo đơn test...' : 'Tạo flow Refund test'}</button>}
+      {orderStatus === 'pending' && <button disabled={testBusy} onClick={() => setTestConfirmOpen(true)} className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-semibold text-amber-800 disabled:opacity-50">{testBusy ? 'Đang tạo đơn test...' : 'Tạo flow Refund test'}</button>}
       {canRequest && <button onClick={() => setOpen(v => !v)} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">{open ? 'Đóng' : 'Tạo yêu cầu'}</button>}
       {canDispute && <button disabled={busy} onClick={() => setDisputeOpen(true)} className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Mở tranh chấp</button>}
     </div>
@@ -97,6 +97,14 @@ export function RefundRequestPanel({ orderId, orderStatus }: { orderId: string; 
       <div className="md:col-span-2"><button disabled={busy} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{busy ? 'Đang gửi...' : 'Gửi yêu cầu'}</button></div>
     </form>}
   </section>
+  {testConfirmOpen && <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setTestConfirmOpen(false); }}>
+    <section role="alertdialog" aria-modal="true" aria-labelledby="refund-test-title" aria-describedby="refund-test-description" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-amber-700"><span aria-hidden="true" className="text-xl font-bold">!</span></div>
+      <h2 id="refund-test-title" className="m-0 text-lg font-bold text-slate-900">Tạo đơn Refund test?</h2>
+      <p id="refund-test-description" className="mb-0 mt-2 text-sm leading-6 text-slate-600">Hệ thống sẽ tạo một bản sao của đơn hàng để thử luồng Refund. Đơn test giữ trạng thái thanh toán <strong>PENDING</strong>; không thu hoặc hoàn tiền thật.</p>
+      <div className="mt-6 flex flex-col-reverse justify-end gap-2 sm:flex-row"><button type="button" onClick={() => setTestConfirmOpen(false)} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Huỷ</button><button type="button" onClick={() => void createTestFlow()} disabled={testBusy} className="min-h-11 rounded-lg bg-amber-700 px-4 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50">{testBusy ? 'Đang tạo...' : 'Tạo đơn test'}</button></div>
+    </section>
+  </div>}
   {disputeOpen && request && <DisputeReasonModal orderCode={requestOrderCode || orderId} requestReason={request.description} sellerOutcome={sellerOutcome} loading={busy} error={error} onClose={() => setDisputeOpen(false)} onSubmit={submitDispute} />}
   </>;
 }
