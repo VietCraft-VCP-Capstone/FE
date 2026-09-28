@@ -1,0 +1,58 @@
+import api from '../../../infrastructure/api/interceptors';
+import type { InsightContext, InsightEnvelope } from '../types';
+
+/**
+ * Gọi 16 tính năng phân tích qua cổng BE /api/seller/analytics.
+ *
+ * FE không bao giờ gọi thẳng service AI: BE xác thực người bán, tra đúng shop rồi mới
+ * chuyển tiếp. Vì vậy không có tham số shopId nào ở đây — shop luôn lấy từ phiên đăng nhập.
+ */
+
+const BASE = '/seller/analytics';
+
+export type QueryParams = Record<string, string | number | undefined | null>;
+
+function clean(params?: QueryParams): Record<string, string> | undefined {
+  if (!params) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+    out[key] = String(value);
+  }
+  return out;
+}
+
+export const analyticsApi = {
+  async get<T>(path: string, params?: QueryParams, signal?: AbortSignal): Promise<InsightEnvelope<T>> {
+    const res = await api.get(`${BASE}${path}`, { params: clean(params), signal });
+    return res.data;
+  },
+
+  async context(signal?: AbortSignal): Promise<InsightContext> {
+    const res = await api.get(`${BASE}/context`, { signal });
+    return res.data.data;
+  },
+
+  async trackCompetitor(shopId: string) {
+    const res = await api.post(`${BASE}/competitor-tracking`, { shop_id: shopId });
+    return res.data;
+  },
+
+  async untrackCompetitor(shopId: string) {
+    const res = await api.delete(`${BASE}/competitor-tracking`, { data: { shop_id: shopId } });
+    return res.data;
+  },
+};
+
+/** Câu thông báo cho các mã lỗi riêng của khu phân tích (400 do AI trả về theo hợp đồng). */
+export function analyticsErrorMessage(err: any, fallback = 'Không thực hiện được, vui lòng thử lại.'): string {
+  const code = err?.response?.data?.error;
+  const field = err?.response?.data?.field;
+  const expected = err?.response?.data?.expected;
+  if (code === 'tracking_limit_reached') return `Đã theo dõi tối đa ${err.response.data.limit ?? 10} shop. Bỏ bớt một shop để thêm shop mới.`;
+  if (code === 'invalid_param' && expected === 'already_tracked') return 'Shop này đã có trong danh sách theo dõi.';
+  if (code === 'invalid_param' && field === 'shop_id') return expected ? `Mã shop không hợp lệ: ${expected}.` : 'Mã shop không hợp lệ.';
+  if (code === 'not_found') return 'Không tìm thấy shop này trong dữ liệu phân tích.';
+  if (typeof code === 'string' && code) return fallback;
+  return fallback;
+}

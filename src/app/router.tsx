@@ -7,6 +7,7 @@ import { ForgotPasswordPage } from '../modules/auth/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../modules/auth/pages/ResetPasswordPage';
 import { AdminPortal } from '../modules/admin/pages/AdminPortal';
 import { SellerPortal } from '../modules/seller/pages/SellerPortal';
+import { InsightsPortal } from '../modules/analytics/pages/InsightsPortal';
 import { SellerRegisterPage } from '../modules/seller/pages/SellerRegisterPage';
 import { BuyerLayout } from '../modules/buyer/pages/BuyerLayout';
 import { BuyerDashboard } from '../modules/buyer/pages/BuyerHomePage';
@@ -139,6 +140,17 @@ export function AppRouter() {
         path="/seller/register"
         element={
           user ? <SellerRegisterPage /> : <Navigate to="/login?next=%2Fseller%2Fregister" replace />
+        }
+      />
+
+      {/* Khu "Phân tích & AI" là một khu làm việc riêng, có thanh bên riêng, nên đứng
+          ngoài SellerPortal. Phải khai TRƯỚC /seller/* để đường dẫn cụ thể thắng. */}
+      <Route
+        path="/seller/insights/*"
+        element={
+          <RequireRole user={user} roles={['seller', 'admin']}>
+            <InsightsPortal user={user} onLogout={logout} />
+          </RequireRole>
         }
       />
 
