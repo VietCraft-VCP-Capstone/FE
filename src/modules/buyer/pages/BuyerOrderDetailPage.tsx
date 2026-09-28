@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
+import { RefundRequestPanel } from '../components/RefundRequestPanel';
 
 export function BuyerOrderDetailPage() {
     const navigate = useNavigate();
@@ -288,12 +289,7 @@ export function BuyerOrderDetailPage() {
 
                 {/* Item Card Actions */}
                 <div className="p-4 bg-gray-50/10 border-t border-gray-50 flex justify-end gap-2">
-                    <button
-                        disabled
-                        className="border border-gray-200 text-gray-300 bg-gray-50 text-xs font-bold px-4 py-2 rounded-lg cursor-not-allowed"
-                    >
-                        Yêu cầu Trả hàng/Hoàn tiền
-                    </button>
+                    <RefundRequestPanel orderId={order.id} orderStatus={order.status} />
                     <button
                         onClick={handleReorder}
                         className="border border-emerald-600 hover:bg-emerald-50 text-emerald-600 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
