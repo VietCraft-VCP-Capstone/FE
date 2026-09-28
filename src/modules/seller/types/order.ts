@@ -55,6 +55,8 @@ export interface SellerOrder {
     rejectionReason?: string;
   };
   canApprove?: boolean;
+  isPod?: boolean;
+  orderType?: 'POD' | 'READY_TO_SHIP' | 'STANDARD';
   paymentStatus: 'PENDING' | 'PAID' | 'REFUNDED';
   paymentMethod: 'VNPAY' | 'MOMO' | 'COD';
   createdAt: string;
@@ -76,7 +78,7 @@ export interface SellerOrder {
   statusHistory: { status: SellerOrderStatus; changedAt: string; note?: string }[];
 }
 
-export type SellerOrderCounts = Record<SellerOrderStatus | 'all' | 'PENDING_APPROVAL', number>;
+export type SellerOrderCounts = Record<SellerOrderStatus | 'all' | 'PENDING_APPROVAL' | 'POD_ORDERS', number>;
 
 export interface SellerOrderList {
   items: SellerOrder[];
@@ -92,9 +94,9 @@ export type SellerOrderSort = 'newest' | 'oldest' | 'highest' | 'lowest';
 
 /**
  * Giá trị lọc trạng thái. Ngoài 6 trạng thái thật còn các nhóm:
- * 'ALL' (không lọc), 'PENDING_APPROVAL' (chờ duyệt in) và 'TODO' (mọi đơn còn chờ tay người bán).
+ * 'ALL' (không lọc), 'PENDING_APPROVAL' (chờ duyệt in), 'POD_ORDERS' (đơn xưởng in) và 'TODO' (mọi đơn còn chờ tay người bán).
  */
-export type SellerOrderStatusFilter = SellerOrderStatus | 'ALL' | 'TODO' | 'PENDING_APPROVAL';
+export type SellerOrderStatusFilter = SellerOrderStatus | 'ALL' | 'TODO' | 'PENDING_APPROVAL' | 'POD_ORDERS';
 
 export interface SellerOrderFilter {
   status: SellerOrderStatusFilter;

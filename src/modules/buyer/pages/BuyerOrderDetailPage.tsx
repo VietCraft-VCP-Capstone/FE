@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle, Star } from 'lucide-react';
+import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle, Star, CheckCircle } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
@@ -89,6 +89,26 @@ export function BuyerOrderDetailPage() {
         setTimeout(() => navigate('/cart'), 1200);
     };
 
+    const [confirmingDelivery, setConfirmingDelivery] = useState(false);
+
+    const handleConfirmReceived = async () => {
+        if (!order?.id) return;
+        const ok = window.confirm('Bạn xác nhận đã nhận được kiện hàng và kiểm tra đầy đủ sản phẩm?');
+        if (!ok) return;
+
+        setConfirmingDelivery(true);
+        try {
+            await ordersService.confirmDelivery(order.id);
+            showToast('Xác nhận nhận hàng thành công! Đơn hàng đã hoàn tất.');
+            const res = await ordersService.getById(order.id);
+            setOrder(res);
+        } catch (err: any) {
+            showToast(getApiErrorMessage(err, 'Lỗi khi xác nhận nhận hàng.'), 'error');
+        } finally {
+            setConfirmingDelivery(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
@@ -123,22 +143,49 @@ export function BuyerOrderDetailPage() {
         return `${day} Thg ${month} ${year}, ${hour}:${min}`;
     };
 
+    const getPaymentMethodLabel = (method: string) => {
+        switch (method?.toLowerCase()) {
+            case 'momo': return 'Ví MoMo';
+            case 'vnpay': return 'VNPay';
+            case 'cod': return 'Thanh toán khi nhận hàng (COD)';
+            default: return 'Ví điện tử';
+        }
+    };
+
+    const getShippingCarrierLabel = (provider: string) => {
+        switch (provider?.toLowerCase()) {
+            case 'ghtk': return 'Giao Hàng Tiết Kiệm';
+            case 'ghn': return 'Giao Hàng Nhanh';
+            default: return 'Giao Hàng Nhanh';
+        }
+    };
+
     const statusBannerMap: Record<string, { title: string; desc: string; bg: string; iconBg: string }> = {
         pending: {
-            title: 'Đơn hàng đang chờ xác nhận',
-            desc: 'Shop đang chuẩn bị xác nhận đơn hàng của bạn.',
+            title: order.isPod ? 'Đơn hàng POD đang chờ xác nhận' : 'Đơn hàng đang chờ xác nhận',
+            desc: order.isPod ? 'Đơn hàng in theo yêu cầu đang được kiểm tra trước khi chuyển xưởng in.' : 'Shop đang chuẩn bị xác nhận đơn hàng của bạn.',
             bg: 'bg-amber-50 border-amber-100',
             iconBg: 'bg-amber-600'
         },
         paid: {
-            title: 'Đơn hàng đang chuẩn bị',
-            desc: 'Sản phẩm của bạn đang được shop in ấn và gia công đóng gói.',
+            title: order.fulfillmentStatus === 'PRINTING' 
+                ? 'Đơn hàng POD đang in ấn tại xưởng' 
+                : order.fulfillmentStatus === 'PACKAGED' 
+                ? 'Đã in xong & đang đóng gói'
+                : 'Đơn hàng đang chuẩn bị',
+            desc: order.fulfillmentStatus === 'PRINTING'
+                ? 'Xưởng in đang thực hiện in ấn họa tiết lên sản phẩm của bạn.'
+                : order.fulfillmentStatus === 'PACKAGED'
+                ? 'Sản phẩm đã in xong, xưởng in đang đóng hộp chuẩn bị giao cho shipper.'
+                : 'Sản phẩm của bạn đang được xưởng chuẩn bị gia công đóng gói.',
             bg: 'bg-indigo-50 border-indigo-100',
             iconBg: 'bg-indigo-600'
         },
         shipping: {
             title: 'Đơn hàng đang được giao',
-            desc: 'Vui lòng chú ý điện thoại để shipper liên hệ giao hàng.',
+            desc: order.shippingCode
+                ? `Đơn hàng đã xuất kho và bàn giao cho ${getShippingCarrierLabel(order.shippingProvider)} (Mã vận đơn: ${order.shippingCode}).`
+                : 'Vui lòng chú ý điện thoại để shipper liên hệ giao hàng.',
             bg: 'bg-[#EEF2FF] border-indigo-100',
             iconBg: 'bg-emerald-600'
         },
@@ -161,23 +208,6 @@ export function BuyerOrderDetailPage() {
         desc: 'Đơn hàng đang được cập nhật.',
         bg: 'bg-gray-50 border-gray-200',
         iconBg: 'bg-gray-500'
-    };
-
-    const getPaymentMethodLabel = (method: string) => {
-        switch (method?.toLowerCase()) {
-            case 'momo': return 'Ví MoMo';
-            case 'vnpay': return 'VNPay';
-            case 'cod': return 'Thanh toán khi nhận hàng (COD)';
-            default: return 'Ví điện tử';
-        }
-    };
-
-    const getShippingCarrierLabel = (provider: string) => {
-        switch (provider?.toLowerCase()) {
-            case 'ghtk': return 'Giao Hàng Tiết Kiệm';
-            case 'ghn': return 'Giao Hàng Nhanh';
-            default: return 'Giao Hàng Nhanh';
-        }
     };
 
     const orderItems: any[] = Array.isArray(order.items) ? order.items : [];
@@ -231,6 +261,11 @@ export function BuyerOrderDetailPage() {
                         <p className="text-xs text-gray-600 font-bold">
                             Đơn vị: {getShippingCarrierLabel(order.shippingProvider)}
                         </p>
+                        {order.shippingCode && (
+                            <p className="text-xs font-mono font-bold text-gray-800 pt-0.5">
+                                Mã vận đơn: <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{order.shippingCode}</span>
+                            </p>
+                        )}
                         <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-bold pt-1">
                             <div className="w-4 h-4 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
                                 <Check size={10} />
@@ -240,6 +275,10 @@ export function BuyerOrderDetailPage() {
                                     ? 'Đang giao hàng'
                                     : order.status === 'completed'
                                     ? 'Giao hàng thành công'
+                                    : order.fulfillmentStatus === 'PRINTING'
+                                    ? 'Đang in ấn tại xưởng'
+                                    : order.fulfillmentStatus === 'PACKAGED'
+                                    ? 'Đã đóng gói tại xưởng'
                                     : 'Chờ giao cho đơn vị vận chuyển'}
                             </span>
                         </div>
@@ -336,6 +375,18 @@ export function BuyerOrderDetailPage() {
                     >
                         Yêu cầu Trả hàng/Hoàn tiền
                     </button>
+                    {order.status === 'shipping' && (
+                        <button
+                            type="button"
+                            onClick={handleConfirmReceived}
+                            disabled={confirmingDelivery}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer disabled:opacity-60"
+                            title="Xác nhận bạn đã nhận được kiện hàng từ shipper"
+                        >
+                            <CheckCircle size={14} />
+                            <span>{confirmingDelivery ? 'Đang xử lý...' : 'Đã nhận được hàng'}</span>
+                        </button>
+                    )}
                     {order.status === 'completed' && (
                         order.is_reviewed || (orderItems.length > 0 && orderItems.every((it: any) => it.is_reviewed)) ? (
                             <button

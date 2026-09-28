@@ -34,6 +34,7 @@ export function OrderDetailModal({
   onRefresh?: () => void;
 }) {
   const [dispatchingPrinter, setDispatchingPrinter] = useState(false);
+  const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [printerMsg, setPrinterMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -43,7 +44,8 @@ export function OrderDetailModal({
   const buyerPaid = f.subtotal + f.shippingFee - f.discount;
   const actions = NEXT_ACTIONS[order.status] || [];
   const hasDesign = order.items.some(it => it.designFileUrl);
-  const isPendingApproval = order.approvalStatus === 'PENDING_APPROVAL' || order.fulfillmentStatus === 'PENDING_APPROVAL';
+  const isPodOrder = Boolean(order.isPod || order.orderType === 'POD' || hasDesign || order.supplierOrderId || order.printerInfo?.supplierOrderId);
+  const isPendingApproval = order.approvalStatus === 'PENDING_APPROVAL' || (isPodOrder && order.fulfillmentStatus === 'PENDING_APPROVAL');
 
   const handleDispatchPrinter = async () => {
     setDispatchingPrinter(true);
@@ -59,8 +61,25 @@ export function OrderDetailModal({
     }
   };
 
+  const handleApproveStockOrder = async () => {
+    setApproving(true);
+    setPrinterMsg(null);
+    try {
+      const res = await sellerOrdersService.approveOrder(order.orderCode);
+      setPrinterMsg({ type: 'success', text: res.message || 'Đã duyệt đơn hàng thành công! Đơn chuyển sang chuẩn bị hàng.' });
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      setPrinterMsg({ type: 'error', text: err.response?.data?.error || err.message || 'Lỗi khi duyệt đơn hàng.' });
+    } finally {
+      setApproving(false);
+    }
+  };
+
   const handleRejectOrder = async () => {
-    const reason = window.prompt('Nhập lý do từ chối đơn in này (ví dụ: File in bị vỡ, hết phôi):');
+    const promptText = isPodOrder
+      ? 'Nhập lý do từ chối đơn in này (ví dụ: File in bị vỡ, hết phôi):'
+      : 'Nhập lý do từ chối đơn hàng này (ví dụ: Tạm hết hàng tồn kho):';
+    const reason = window.prompt(promptText);
     if (!reason) return;
     setRejecting(true);
     setPrinterMsg(null);
@@ -83,16 +102,30 @@ export function OrderDetailModal({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="m-0 text-lg font-extrabold text-stone-900 font-jakarta">{order.orderCode}</h2>
-              <StatusBadge status={order.status} />
-              {isPendingApproval && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse" />
-                  Chờ duyệt in
+              {/* Phân loại hàng hóa gọn gàng */}
+              {isPodOrder ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                  <Printer size={12} />
+                  Hàng POD
                 </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-stone-100 text-stone-700 border border-stone-200">
+                  <Package size={12} />
+                  Hàng kho
+                </span>
+              )}
+              {/* Huy hiệu trạng thái duy nhất, chính xác */}
+              {isPendingApproval ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  {isPodOrder ? 'Chờ duyệt in' : 'Chờ duyệt đơn'}
+                </span>
+              ) : (
+                <StatusBadge status={order.status} />
               )}
             </div>
             <p className="m-0 mt-1 text-[12.5px] text-stone-500">
-              Đặt lúc {dateTime(order.createdAt)} · {STATUS_META[order.status].hint}
+              Đặt lúc {dateTime(order.createdAt)} · {isPodOrder ? 'Tiến độ được đồng bộ trực tiếp từ Printing Shop.' : STATUS_META[order.status]?.hint}
             </p>
           </div>
           <button
@@ -152,28 +185,96 @@ export function OrderDetailModal({
               ))}
             </ul>
 
-            {hasDesign && (
-              <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50/50 p-4">
+            {/* Khối hiển thị POD khi ĐANG CHỜ DUYỆT - Tinh gọn, rõ ràng */}
+            {isPodOrder && isPendingApproval && (
+              <div className="mt-4 rounded-xl border border-purple-200 bg-linear-to-r from-purple-50/70 via-white to-purple-50/40 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                    <Printer size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-bold text-purple-950">
+                        Đơn hàng POD chờ duyệt file & chuyển xưởng in
+                      </span>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                        Chưa gửi xưởng in
+                      </span>
+                    </div>
+                    <p className="m-0 mt-1 text-[12px] text-purple-900/80 leading-relaxed">
+                      Sản phẩm yêu cầu in ấn theo file thiết kế. Bạn hãy kiểm tra file in bên trên, sau đó bấm <strong>"Duyệt đơn & Đẩy sang xưởng"</strong> bên dưới để hệ thống tự động gửi đơn sang Printing Shop xử lý.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Khối hiển thị POD khi ĐÃ DUYỆT - Theo dõi tiến độ xưởng in thực tế */}
+            {isPodOrder && !isPendingApproval && (
+              <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50/40 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Printer size={16} className="text-purple-700" />
                     <span className="text-xs font-bold text-purple-950">
-                      Kết nối Xưởng In (POD Fulfillment)
+                      Tiến độ Xưởng In (POD Fulfillment)
                     </span>
                   </div>
-                  {isPendingApproval ? (
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-                      Chờ duyệt chuyển xưởng
-                    </span>
-                  ) : (order.supplierOrderId || order.printerInfo?.supplierOrderId) ? (
+                  {order.supplierOrderId || order.printerInfo?.supplierOrderId ? (
                     <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      Mã xưởng: {order.supplierOrderId || order.printerInfo?.supplierOrderId}
+                      Mã xưởng: #{order.supplierOrderId || order.printerInfo?.supplierOrderId}
                     </span>
-                  ) : null}
+                  ) : (
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                      Đã gửi xưởng in
+                    </span>
+                  )}
                 </div>
-                <div className="mt-2 text-xs text-purple-900/90 space-y-1">
-                  <p className="m-0">
-                    Trạng thái xưởng: <strong>{order.printerInfo?.printerStatus || (order.supplierOrderId ? 'ĐÃ TIẾP NHẬN' : 'CHƯA GỬI XƯỞNG')}</strong>
+
+                {/* Progress Stepper */}
+                <div className="mt-3 grid grid-cols-4 gap-1.5 pt-1">
+                  {[
+                    {
+                      key: 'RECEIVED',
+                      label: '1. Tiếp nhận',
+                      done: Boolean(order.printerInfo?.printerStatus) || ['PROCESSING', 'SHIPPING', 'DELIVERED'].includes(order.status),
+                    },
+                    {
+                      key: 'PRINTING',
+                      label: '2. Đang in ấn',
+                      done: ['PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.printerInfo?.printerStatus || '') || ['SHIPPING', 'DELIVERED'].includes(order.status),
+                    },
+                    {
+                      key: 'PACKAGED',
+                      label: '3. Đã đóng gói',
+                      done: ['PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.printerInfo?.printerStatus || '') || ['SHIPPING', 'DELIVERED'].includes(order.status),
+                    },
+                    {
+                      key: 'SHIPPED',
+                      label: '4. Đã xuất kho',
+                      done: ['SHIPPED', 'DELIVERED'].includes(order.printerInfo?.printerStatus || '') || ['SHIPPING', 'DELIVERED'].includes(order.status),
+                    },
+                  ].map(step => (
+                    <div
+                      key={step.key}
+                      className={`text-center py-1.5 px-1 rounded-lg text-[10.5px] font-bold border transition-colors ${
+                        step.done
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                          : 'bg-white/80 text-stone-400 border-purple-100'
+                      }`}
+                    >
+                      {step.label}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 text-xs text-purple-900/90 space-y-1">
+                  <p className="m-0 flex items-center justify-between">
+                    <span>Trạng thái xưởng: <strong className="text-purple-950">{order.status === 'DELIVERED' ? 'GIAO THÀNH CÔNG' : (order.printerInfo?.printerStatus || 'ĐÃ TIẾP NHẬN')}</strong></span>
+                    {order.status === 'DELIVERED' && (
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        Đơn hoàn tất
+                      </span>
+                    )}
                   </p>
                   {order.printerInfo?.printerName && (
                     <p className="m-0 text-[11.5px] text-purple-700">
@@ -185,15 +286,21 @@ export function OrderDetailModal({
                       Lý do xưởng báo lỗi: {order.printerInfo.rejectionReason}
                     </p>
                   )}
+                  <p className="m-0 text-[11px] text-purple-800/80 italic pt-0.5">
+                    * Đơn hàng này do xưởng in phụ trách sản xuất & vận chuyển. Trạng thái được đồng bộ trực tiếp.
+                  </p>
                 </div>
               </div>
             )}
 
-            {!hasDesign && (
-              <p className="mb-0 mt-2 flex items-center gap-1.5 text-[11.5px] text-stone-400">
-                <Package size={12} aria-hidden />
-                Đơn này không có hàng in theo yêu cầu.
-              </p>
+            {!isPodOrder && (
+              <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50/80 p-3.5 flex items-start gap-2.5">
+                <Package size={16} className="text-stone-500 shrink-0 mt-0.5" />
+                <div className="text-xs text-stone-600">
+                  <p className="m-0 font-bold text-stone-800">Đơn hàng có sẵn (Kho người bán)</p>
+                  <p className="m-0 mt-0.5">Sản phẩm có sẵn trong kho của bạn. Bạn tự đóng gói và bấm "Cập nhật trạng thái" bên dưới khi bàn giao cho vận chuyển.</p>
+                </div>
+              </div>
             )}
 
             <h3 className={`${SECTION_TITLE} mt-6`}>Nhật ký trạng thái</h3>
@@ -309,8 +416,16 @@ export function OrderDetailModal({
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[12px] text-stone-500">
-              {actions.length === 0
+              {isPendingApproval
+                ? (isPodOrder
+                    ? 'Đơn hàng POD đang chờ bạn duyệt file in để đẩy sang xưởng.'
+                    : 'Đơn hàng đang chờ bạn duyệt để chuẩn bị xuất kho.')
+                : order.status === 'SHIPPING'
+                ? 'Đơn hàng đang giao. Bạn có thể xác nhận đã giao khi đơn vị vận chuyển hoàn tất.'
+                : order.status === 'DELIVERED' || order.status === 'CANCELLED'
                 ? 'Đơn đã kết thúc — không còn thao tác nào.'
+                : isPodOrder
+                ? 'Đơn hàng POD do xưởng in phụ trách sản xuất & vận chuyển — Bạn theo dõi tiến độ.'
                 : 'Bước tiếp theo bạn có thể thực hiện:'}
             </span>
             <div className="flex flex-wrap items-center gap-2.5">
@@ -318,36 +433,39 @@ export function OrderDetailModal({
                 <>
                   <button
                     type="button"
-                    disabled={loading || rejecting || dispatchingPrinter}
+                    disabled={loading || rejecting || dispatchingPrinter || approving}
                     onClick={handleRejectOrder}
                     className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 px-3.5 py-2 text-[13.5px] font-semibold transition-colors disabled:opacity-50"
                   >
                     {rejecting ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
                     Từ chối duyệt
                   </button>
-                  <button
-                    type="button"
-                    disabled={loading || dispatchingPrinter || rejecting}
-                    onClick={handleDispatchPrinter}
-                    className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 text-[13.5px] font-bold transition-colors shadow-sm disabled:opacity-50"
-                    title="Duyệt đơn và chuyển dữ liệu in sang xưởng in"
-                  >
-                    {dispatchingPrinter ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                    Duyệt đơn & Đẩy sang xưởng
-                  </button>
+                  {isPodOrder ? (
+                    <button
+                      type="button"
+                      disabled={loading || dispatchingPrinter || rejecting}
+                      onClick={handleDispatchPrinter}
+                      className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 text-[13.5px] font-bold transition-colors shadow-sm disabled:opacity-50"
+                      title="Duyệt đơn và chuyển dữ liệu in sang xưởng in"
+                    >
+                      {dispatchingPrinter ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                      Duyệt đơn & Đẩy sang xưởng
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={loading || approving || rejecting}
+                      onClick={handleApproveStockOrder}
+                      className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl bg-[#007700] hover:bg-[#005B00] text-white px-4 py-2 text-[13.5px] font-bold transition-colors shadow-sm disabled:opacity-50"
+                      title="Duyệt đơn hàng và bắt đầu chuẩn bị đóng gói hàng hóa"
+                    >
+                      {approving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                      Duyệt đơn hàng
+                    </button>
+                  )}
                 </>
-              ) : ['ORDERED', 'PENDING_DESIGN', 'PROCESSING'].includes(order.status) && hasDesign && (
-                <button
-                  type="button"
-                  disabled={loading || dispatchingPrinter}
-                  onClick={handleDispatchPrinter}
-                  className="inline-flex items-center gap-1.5 cursor-pointer rounded-xl border border-violet-600 bg-violet-50 hover:bg-violet-100 text-violet-700 px-4 py-2 text-[13.5px] font-bold transition-colors disabled:opacity-50"
-                  title="Chuyển dữ liệu và file in sang hệ thống Printing Shop"
-                >
-                  {dispatchingPrinter ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                  {order.supplierOrderId ? 'Đẩy lại xưởng in' : 'Gửi xưởng in (POD)'}
-                </button>
-              )}
+              ) : null}
+
               <button
                 type="button"
                 onClick={onClose}
@@ -355,25 +473,45 @@ export function OrderDetailModal({
               >
                 Đóng
               </button>
-            {actions.map(action => (
-              <button
-                key={action.to}
-                type="button"
-                disabled={loading}
-                onClick={() => onAction(action)}
-                className={`cursor-pointer rounded-xl px-4 py-2 text-[13.5px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-55 motion-reduce:transition-none ${
-                  action.destructive
-                    ? 'border border-rose-200 bg-white text-[#BA1A1A] hover:bg-rose-50'
-                    : 'border border-[#007700] bg-[#007700] text-white hover:bg-[#005B00]'
-                }`}
-              >
-                {action.label}
-              </button>
-            ))}
+
+              {/* Khi đơn đang SHIPPING, cả hàng POD và hàng kho đều có thể bấm xác nhận đã giao */}
+              {!isPendingApproval && order.status === 'SHIPPING' && (
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() =>
+                    onAction({
+                      to: 'DELIVERED',
+                      label: 'Xác nhận đã giao',
+                      description: 'Chỉ xác nhận khi khách đã thực sự nhận hàng. Đơn COD sẽ được ghi nhận là đã thu tiền và chuyển về số dư ví.',
+                    })
+                  }
+                  className="cursor-pointer rounded-xl border border-[#007700] bg-[#007700] text-white px-4 py-2 text-[13.5px] font-bold transition-colors hover:bg-[#005B00] shadow-sm disabled:opacity-50"
+                >
+                  Xác nhận đã giao
+                </button>
+              )}
+
+              {/* Các thao tác khác cho đơn kho (không phải POD) */}
+              {!isPodOrder && !isPendingApproval && order.status !== 'SHIPPING' && actions.map(action => (
+                <button
+                  key={action.to}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => onAction(action)}
+                  className={`cursor-pointer rounded-xl px-4 py-2 text-[13.5px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-55 motion-reduce:transition-none ${
+                    action.destructive
+                      ? 'border border-rose-200 bg-white text-[#BA1A1A] hover:bg-rose-50'
+                      : 'border border-[#007700] bg-[#007700] text-white hover:bg-[#005B00]'
+                  }`}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </ModalOverlay>
-);
+    </ModalOverlay>
+  );
 }

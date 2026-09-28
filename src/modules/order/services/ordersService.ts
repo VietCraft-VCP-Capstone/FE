@@ -61,6 +61,10 @@ export const ordersService = {
   triggerCallback: async (orderId: string, status: 'success' | 'fail') => {
     const res = await api.post(`/orders/callback/${orderId}`, { status });
     return res.data;
+  },
+  confirmDelivery: async (orderId: string): Promise<{ success: boolean; message: string; order: any }> => {
+    const res = await api.post(`/orders/${encodeURIComponent(orderId)}/confirm-delivery`);
+    return res.data;
   }
 };
 

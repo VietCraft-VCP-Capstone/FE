@@ -21,10 +21,16 @@ export interface StatusMeta {
   dot: string;
 }
 
-export const STATUS_META: Record<SellerOrderStatus | 'PENDING_APPROVAL', StatusMeta> = {
+export const STATUS_META: Record<SellerOrderStatus | 'PENDING_APPROVAL' | 'POD_ORDERS', StatusMeta> = {
   PENDING_APPROVAL: {
-    label: 'Chờ duyệt in',
-    hint: 'Đơn hàng đang chờ người bán kiểm tra thiết kế và duyệt chuyển sang xưởng in.',
+    label: 'Chờ duyệt',
+    hint: 'Đơn hàng đang chờ bạn duyệt: hàng có sẵn duyệt chuẩn bị hàng, hàng POD duyệt đẩy sang xưởng in.',
+    badge: 'bg-amber-50 text-amber-900 border-amber-200',
+    dot: '#D97706',
+  },
+  POD_ORDERS: {
+    label: 'Đơn xưởng in',
+    hint: 'Theo dõi tiến độ các đơn hàng POD do xưởng in cập nhật trực tiếp.',
     badge: 'bg-purple-50 text-purple-800 border-purple-200',
     dot: '#7E22CE',
   },
@@ -66,6 +72,45 @@ export const STATUS_META: Record<SellerOrderStatus | 'PENDING_APPROVAL', StatusM
   },
 };
 
+export const PRINTER_STATUS_META: Record<string, { label: string; badge: string; dot: string; hint: string }> = {
+  RECEIVED: {
+    label: 'Xưởng đã nhận file',
+    hint: 'Xưởng in đã tiếp nhận file in và phôi chuẩn bị sản xuất.',
+    badge: 'bg-purple-50 text-purple-700 border-purple-200',
+    dot: '#9333ea',
+  },
+  PRINTING: {
+    label: 'Xưởng đang in ấn',
+    hint: 'Xưởng in đang tiến hành in ấn sản phẩm POD.',
+    badge: 'bg-amber-50 text-amber-700 border-amber-200',
+    dot: '#d97706',
+  },
+  PACKAGED: {
+    label: 'Xưởng đã đóng gói',
+    hint: 'Sản phẩm đã in xong, đang được đóng hộp chuẩn bị giao cho shipper.',
+    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    dot: '#059669',
+  },
+  SHIPPED: {
+    label: 'Xưởng đã xuất kho',
+    hint: 'Xưởng in đã bàn giao hàng cho đơn vị vận chuyển.',
+    badge: 'bg-blue-50 text-blue-700 border-blue-200',
+    dot: '#2563eb',
+  },
+  DELIVERED: {
+    label: 'Giao thành công',
+    hint: 'Đơn hàng xưởng in đã được giao thành công cho khách hàng.',
+    badge: 'bg-[#EAF0E2] text-[#005B00] border-[#c6d9bd]',
+    dot: '#007700',
+  },
+  REJECTED: {
+    label: 'Xưởng từ chối / Lỗi',
+    hint: 'Xưởng in báo lỗi kỹ thuật hoặc từ chối sản xuất.',
+    badge: 'bg-rose-50 text-rose-700 border-rose-200',
+    dot: '#e11d48',
+  },
+};
+
 export interface StatusAction {
   to: SellerOrderStatus;
   label: string;
@@ -88,8 +133,8 @@ export const NEXT_ACTIONS: Record<SellerOrderStatus, StatusAction[]> = {
   ORDERED: [
     {
       to: 'PROCESSING',
-      label: 'Nhận sản xuất',
-      description: 'Xác nhận bạn đã nhận đơn và bắt đầu in / đóng gói.',
+      label: 'Duyệt đơn',
+      description: 'Xác nhận duyệt đơn hàng và bắt đầu chuẩn bị đóng gói hàng hóa.',
     },
     CANCEL,
   ],
