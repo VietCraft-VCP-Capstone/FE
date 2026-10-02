@@ -112,6 +112,20 @@ export const productsService = {
     return res.data;
   },
 
+  /**
+   * % hoa hồng áp cho ĐÚNG phạm vi sản phẩm đang tạo (danh mục + loại), để form hiện đúng
+   * giá niêm yết mà BE sẽ lưu. Mức này khác nhau theo luật admin đặt, nên phải gọi lại mỗi
+   * khi người bán đổi danh mục.
+   */
+  getCommissionPercent: async (categoryId?: string | null, productType?: string | null): Promise<number> => {
+    const res = await api.get('/seller/settings/commission', {
+      params: { categoryId: categoryId || undefined, productType: productType || undefined },
+    });
+    const percent = Number(res.data?.percent);
+    if (!Number.isFinite(percent)) throw new Error('% hoa hồng không hợp lệ');
+    return percent;
+  },
+
   uploadDesign: async (file: File, name?: string) => {
     const form = new FormData();
     form.append('file', file);

@@ -148,6 +148,8 @@ export function CreateProductPage() {
     const [activeFace, setActiveFace] = useState<string>('front');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [selectedVariants, setSelectedVariants] = useState<Record<string, { on: boolean; markup: string; stock: string }>>({});
+    /** null = chưa tải được % hoa hồng; khi đó bảng giá không hiện giá niêm yết. */
+    const [commissionPercent, setCommissionPercent] = useState<number | null>(null);
     const [areaOverrides, setAreaOverrides] = useState<Record<string, { x?: number; y?: number; width?: number; height?: number }>>({});
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -174,6 +176,18 @@ export function CreateProductPage() {
             setLoadErr('Không thể kết nối đến máy chủ xưởng in, đã tự động tải phôi mặc định.');
         });
     }, []);
+
+    // Mức hoa hồng tra theo danh mục + loại; sản phẩm ở màn này luôn là POD_TEMPLATE.
+    // Người bán đổi danh mục ở bước 4 là mức có thể đổi theo, nên phải hỏi lại.
+    // Không đoán % khi gọi lỗi: thà để trống giá niêm yết còn hơn hiện số thấp hơn giá BE lưu.
+    useEffect(() => {
+        let alive = true;
+        productsService
+            .getCommissionPercent(categoryId, 'POD_TEMPLATE')
+            .then(p => alive && setCommissionPercent(p))
+            .catch(() => alive && setCommissionPercent(null));
+        return () => { alive = false; };
+    }, [categoryId]);
 
     const filteredBlanks = (blanks || []).filter((b: any) => {
         if (!b?._id) return false;
@@ -404,6 +418,7 @@ export function CreateProductPage() {
                         toApiLayer={toApiLayer}
                         selectedVariants={selectedVariants}
                         spaceOf={spaceOf}
+                        commissionPercent={commissionPercent}
                     />
                 )}
                 {step === 4 && blank && (
@@ -418,6 +433,7 @@ export function CreateProductPage() {
                         blank={blank}
                         selectedVariants={selectedVariants}
                         setSelectedVariants={setSelectedVariants}
+                        commissionPercent={commissionPercent}
                     />
                 )}
             </div>

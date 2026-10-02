@@ -4,6 +4,8 @@ import { ProductItem, ProductFormData, CatalogOption } from '../types/product';
 import { productsService } from '../services/productsService';
 import { ProductFormImageManager } from './ProductFormImageManager';
 import { ProductFormColorManager } from './ProductFormColorManager';
+import { commissionAmount, netFromGross, withCommission } from '../../../shared/utils/commission';
+import { money } from '../../../shared/utils/format';
 import {
   X,
   Bold,
@@ -55,6 +57,8 @@ export function ProductFormModal({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** % hoa hồng sàn. null = chưa tải được, khi đó không hiện giá niêm yết. */
+  const [commissionPercent, setCommissionPercent] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -141,6 +145,25 @@ export function ProductFormModal({
       tagIds: matchedTagIds,
     }));
   }, [product, categories, tags]);
+
+  // Mức hoa hồng phụ thuộc danh mục: đổi danh mục là mức có thể đổi theo, nên phải hỏi lại.
+  // Hàng ở form này luôn là READY_TO_SHIP.
+  useEffect(() => {
+    if (!isOpen) return;
+    let alive = true;
+    productsService
+      .getCommissionPercent(formData.categoryId, 'READY_TO_SHIP')
+      .then(p => alive && setCommissionPercent(p))
+      .catch(() => alive && setCommissionPercent(null));
+    return () => { alive = false; };
+  }, [isOpen, formData.categoryId]);
+
+  // API trả về giá NIÊM YẾT (đã gồm hoa hồng), còn ô "Giá bán" là giá người bán NHẬN.
+  // Không bóc lại thì mỗi lần lưu là hoa hồng cộng chồng thêm một lớp.
+  useEffect(() => {
+    if (!product || commissionPercent === null) return;
+    setFormData(prev => ({ ...prev, price: netFromGross(product.price || 0, commissionPercent) }));
+  }, [product, commissionPercent]);
 
   const toggleTag = (id: string) => {
     setFormData(prev => ({
@@ -330,6 +353,20 @@ export function ProductFormModal({
                 }`}
               />
               {errors.price && <p className="text-xs text-rose-500">{errors.price}</p>}
+              <p className="text-xs text-stone-500">
+                Đây là số tiền bạn nhận.{' '}
+                {commissionPercent === null ? (
+                  'Chưa tải được % hoa hồng sàn nên chưa tính được giá niêm yết.'
+                ) : formData.price > 0 ? (
+                  <>
+                    Cộng {commissionPercent}% hoa hồng sàn (+{money(commissionAmount(formData.price, commissionPercent))}),
+                    giá niêm yết người mua trả là{' '}
+                    <b className="text-[#007700]">{money(withCommission(formData.price, commissionPercent))}</b>.
+                  </>
+                ) : (
+                  `Giá niêm yết sẽ là số này cộng ${commissionPercent}% hoa hồng sàn.`
+                )}
+              </p>
             </div>
 
             {/* Stock */}

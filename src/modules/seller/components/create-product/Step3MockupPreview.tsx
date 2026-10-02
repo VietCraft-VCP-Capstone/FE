@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Loader2, Check } from 'lucide-react';
 import { productsService } from '../../../product/services/productsService';
 import { abs } from './useHTMLImage';
+import { withCommission } from '../../../../shared/utils/commission';
+import { money } from '../../../../shared/utils/format';
 
 interface Step3Props {
     blank: any;
@@ -9,9 +11,11 @@ interface Step3Props {
     toApiLayer: (layer: any) => any;
     selectedVariants: Record<string, { on: boolean; markup: string; stock: string }>;
     spaceOf?: (area: any) => { x: number; y: number; width: number; height: number };
+    /** % hoa hồng sàn. null = chưa tải được, khi đó không hiện giá dự kiến. */
+    commissionPercent: number | null;
 }
 
-export function Step3MockupPreview({ blank, faces, toApiLayer, selectedVariants, spaceOf }: Step3Props) {
+export function Step3MockupPreview({ blank, faces, toApiLayer, selectedVariants, spaceOf, commissionPercent }: Step3Props) {
     if (!blank) return null;
     const printAreas = blank.print_areas || [];
     const variations = blank.variations || [];
@@ -36,7 +40,9 @@ export function Step3MockupPreview({ blank, faces, toApiLayer, selectedVariants,
     const prices = (chosen.length ? chosen : variations.map((v: any) => [v.sku, { markup: '0' }]))
         .map(([sku, v]: any) => { const bv = variations.find((x: any) => x.sku === sku); return bv ? (bv.base_cost || 0) + (Number(v.markup) || 0) : 0; })
         .filter((n: number) => n > 0);
-    const minPrice = prices.length ? Math.min(...prices) : (variations.length ? Math.min(...variations.map((v: any) => v.base_cost || 0)) : 0);
+    const minNet = prices.length ? Math.min(...prices) : (variations.length ? Math.min(...variations.map((v: any) => v.base_cost || 0)) : 0);
+    // Giá người mua thấy, không phải giá người bán nhận — cùng công thức với bảng giá ở bước 4.
+    const minPrice = commissionPercent === null ? null : withCommission(minNet, commissionPercent);
 
     return (
         <div className="preview-step">
@@ -63,8 +69,8 @@ export function Step3MockupPreview({ blank, faces, toApiLayer, selectedVariants,
                         <div className="preview-info-badge"><Check size={13} /> Mockup thực tế từ sản phẩm</div>
                         <h2 className="preview-info-title">{blank.title}</h2>
                         <div className="preview-info-price">
-                            <span className="preview-info-from">Giá bán dự kiến từ</span>
-                            <span className="preview-info-amount">{minPrice.toLocaleString()}đ</span>
+                            <span className="preview-info-from">Giá niêm yết dự kiến từ</span>
+                            <span className="preview-info-amount">{minPrice === null ? '—' : money(minPrice)}</span>
                         </div>
                         <div className="preview-info-meta">
                             <div className="preview-info-row"><span>Loại phôi</span><b>{blank.title}</b></div>
