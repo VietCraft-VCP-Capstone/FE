@@ -31,6 +31,7 @@ export interface OrderResponse {
   paymentMethod?: string;
   shippingProvider: 'ghn' | 'ghtk';
   shippingCode?: string;
+  shopId?: string;
   shopName?: string;
   shopLogo?: string;
   paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';

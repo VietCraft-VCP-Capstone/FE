@@ -303,11 +303,23 @@ export function BuyerOrderDetailPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <button className="border border-emerald-500 hover:bg-emerald-50 text-emerald-600 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                        <button
+                            onClick={() => {
+                                if (order.shopId) {
+                                    window.dispatchEvent(new CustomEvent('vietcraft-open-chat', { detail: { shopId: order.shopId } }));
+                                } else {
+                                    showToast('Gian hàng này không còn hoạt động', 'error');
+                                }
+                            }}
+                            className="border border-emerald-500 hover:bg-emerald-50 text-emerald-600 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
+                        >
                             <MessageSquare size={12} />
                             <span>Chat với Shop</span>
                         </button>
-                        <button className="border border-gray-200 hover:bg-gray-50 text-gray-500 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                        <button
+                            onClick={() => order.shopId ? navigate(`/shop/${order.shopId}`) : showToast('Gian hàng này không còn hoạt động', 'error')}
+                            className="border border-gray-200 hover:bg-gray-50 text-gray-500 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
+                        >
                             <Store size={12} />
                             <span>Xem Shop</span>
                         </button>

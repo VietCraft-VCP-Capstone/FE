@@ -95,7 +95,9 @@ export function BuyerCheckoutPage() {
 
     const subtotal = items.reduce((acc, it) => acc + (it.price * it.quantity), 0);
     const shippingFee = 30000;
-    const finalTotal = Math.max(0, subtotal + shippingFee - discount);
+    const shippingDiscount = appliedCouponInfo?.target === 'SHIPPING' ? Math.min(discount, shippingFee) : 0;
+    const productDiscount = appliedCouponInfo?.target === 'PRODUCT' ? discount : 0;
+    const finalTotal = Math.max(0, subtotal - productDiscount + shippingFee - shippingDiscount);
 
     const hasPodItem = items.some(it => it.productType === 'POD_TEMPLATE');
     const codDisabled = hasPodItem;
