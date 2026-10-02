@@ -1,11 +1,4 @@
-/**
- * Chi tiết một đơn hàng, mở từ bảng danh sách.
- *
- * Bố cục hai cột theo đúng thứ tự người bán cần: BÊN TRÁI là thứ phải gói (hàng gì, mấy
- * cái, file in ở đâu), BÊN PHẢI là thứ phải điền vào phiếu gửi (ai nhận, ở đâu) rồi mới
- * tới tiền. Nhật ký trạng thái nằm cuối vì nó trả lời câu "vì sao đơn đang ở đây", chỉ
- * cần khi có gì đó bất thường.
- */
+
 
 import { useState } from 'react';
 import { ExternalLink, Package, X, Printer, Loader2, CheckCircle2 } from 'lucide-react';
@@ -239,9 +232,8 @@ export function OrderDetailModal({
         {/* --------------------------------------------------------- chân -- */}
         <div className="flex flex-col gap-2.5 border-t border-stone-100 bg-stone-50 px-6 py-4">
           {printerMsg && (
-            <div className={`w-full text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 ${
-              printerMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
-            }`}>
+            <div className={`w-full text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 ${printerMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+              }`}>
               {printerMsg.type === 'success' && <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />}
               <span>{printerMsg.text}</span>
             </div>
@@ -272,25 +264,24 @@ export function OrderDetailModal({
               >
                 Đóng
               </button>
-            {actions.map(action => (
-              <button
-                key={action.to}
-                type="button"
-                disabled={loading}
-                onClick={() => onAction(action)}
-                className={`cursor-pointer rounded-xl px-4 py-2 text-[13.5px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-55 motion-reduce:transition-none ${
-                  action.destructive
-                    ? 'border border-rose-200 bg-white text-[#BA1A1A] hover:bg-rose-50'
-                    : 'border border-[#007700] bg-[#007700] text-white hover:bg-[#005B00]'
-                }`}
-              >
-                {action.label}
-              </button>
-            ))}
+              {actions.map(action => (
+                <button
+                  key={action.to}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => onAction(action)}
+                  className={`cursor-pointer rounded-xl px-4 py-2 text-[13.5px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-55 motion-reduce:transition-none ${action.destructive
+                      ? 'border border-rose-200 bg-white text-[#BA1A1A] hover:bg-rose-50'
+                      : 'border border-[#007700] bg-[#007700] text-white hover:bg-[#005B00]'
+                    }`}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </ModalOverlay>
-);
+    </ModalOverlay>
+  );
 }
