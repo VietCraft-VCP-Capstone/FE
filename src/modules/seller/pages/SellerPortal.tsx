@@ -15,16 +15,6 @@ import { POD_CREATE_ENABLED } from '../featureFlags';
 import { SellerDesignsPage } from './SellerDesignsPage';
 import { SellerPromotionsPage } from './SellerPromotionsPage';
 
-function SellerAnalytics() {
-
-  return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-2 animate-fade-in">
-      <h2 className="text-2xl font-extrabold text-stone-900 font-jakarta">Analytics</h2>
-      <p className="text-sm text-stone-500">Phân tích chuyên sâu về tình hình kinh doanh, doanh số và xu hướng thị trường.</p>
-    </div>
-  );
-}
-
 function SellerPayouts() {
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-2 animate-fade-in">
@@ -60,20 +50,21 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
         <Route path="storefront" element={<SellerSettingsPage />} />
         <Route path="orders" element={<SellerOrdersPage />} />
         <Route path="chat" element={<SellerChatPage />} />
-        <Route path="analytics" element={<SellerAnalytics />} />
         <Route path="payouts" element={<SellerPayouts />} />
         <Route path="catalog" element={<SellerCatalogPage />} />
         <Route path="shipping" element={<Stub t="Vận chuyển" d="Quản lý phương thức và trạng thái giao hàng." />} />
         <Route path="promotions" element={<SellerPromotionsPage />} />
         <Route path="revenue" element={<Stub t="Doanh thu cửa hàng" d="Theo dõi doanh thu và dòng tiền." />} />
 
-        <Route path="product-status" element={<Stub t="Trạng thái sản phẩm" d="Tình trạng duyệt và hiển thị sản phẩm." />} />
-        <Route path="forecast" element={<Stub t="Dự báo nhu cầu" d="Dự báo nhu cầu thị trường từ AI." />} />
-        <Route path="golden-hour" element={<Stub t="Danh mục & giờ vàng" d="Khung giờ vàng để đẩy sản phẩm." />} />
-        <Route path="price-optimize" element={<Stub t="Tối ưu giá bán" d="Gợi ý giá bán tối ưu theo thị trường." />} />
-        <Route path="market-share" element={<Stub t="Thị phần & đối thủ" d="Phân tích thị phần và đối thủ cạnh tranh." />} />
-        <Route path="competitors" element={<SellerFollowedCompetitorsPage />} />
-        <Route path="competitors/:id" element={<SellerCompetitorDetailPage />} />
+        {/* Năm đường dẫn phân tích cũ đều là trang rỗng. Giờ chúng là trang thật trong khu
+            "Phân tích & AI", nên chuyển tiếp thay vì để người bán gặp trang trắng. Giữ
+            chuyển tiếp để đường dẫn cũ ai đã lưu vẫn dùng được. */}
+        <Route path="analytics" element={<Navigate to="/seller/insights/overview" replace />} />
+        <Route path="forecast" element={<Navigate to="/seller/insights/forecast" replace />} />
+        <Route path="golden-hour" element={<Navigate to="/seller/insights/categories" replace />} />
+        <Route path="price-optimize" element={<Navigate to="/seller/insights/pricing" replace />} />
+        <Route path="market-share" element={<Navigate to="/seller/insights/competitors" replace />} />
+        <Route path="product-status" element={<Navigate to="/seller/insights/listings" replace />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Routes>
     </SellerLayout>
