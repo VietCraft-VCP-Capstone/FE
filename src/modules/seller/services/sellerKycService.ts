@@ -34,7 +34,6 @@ export interface SellerKycStatusResponse {
             legal_rep_position?: string;
             front_id_url?: string;
             back_id_url?: string;
-            portrait_url?: string;
             business_license_url?: string;
         };
         shop_info: {
@@ -86,7 +85,7 @@ export interface SubmitApplicationPayload {
         tax_code?: string;
         front_id_image?: string;
         back_id_image?: string;
-        portrait_image?: string;
+
         company_name?: string;
         business_license_number?: string;
         business_license_image?: string;
@@ -153,5 +152,57 @@ export const sellerKycService = {
     async cancelOrDelete(): Promise<{ success: boolean; message: string }> {
         const res = await api.delete('/seller/kyc/cancel-or-delete');
         return res.data;
-    }
+    },
+
+    async scanCccd(filename: string, side: 'front' | 'back' = 'front'): Promise<CccdScanResponse> {
+        const res = await api.post('/seller/kyc/scan-cccd', { filename, side });
+        return res.data;
+    },
+
 };
+
+export interface CccdOcrData {
+    id_number?: string;
+    full_name?: string;
+    date_of_birth?: string;
+    gender?: string;
+    nationality?: string;
+    place_of_origin?: string;
+    place_of_residence?: string;
+    date_of_expiry?: string;
+    personal_identification?: string;
+    issue_date?: string;
+    issuing_authority?: string;
+    [key: string]: any;
+}
+
+export interface CccdVerification {
+    is_likely_authentic: boolean;
+    confidence_score: number;
+    checks: Record<string, boolean>;
+    warnings: string[];
+    details: {
+        image_quality?: {
+            resolution?: [number, number];
+            blur_score?: number;
+            brightness?: number;
+        };
+        layout?: {
+            keywords_found?: string[];
+            is_valid?: boolean;
+        };
+        screen_capture?: {
+            high_freq_energy?: number;
+            is_screen?: boolean;
+        };
+    };
+}
+
+export interface CccdScanResponse {
+    success: boolean;
+    side: 'front' | 'back';
+    ocr_data: CccdOcrData;
+    verification: CccdVerification;
+}
+
+

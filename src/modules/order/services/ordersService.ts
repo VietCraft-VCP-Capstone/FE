@@ -9,6 +9,15 @@ export interface OrderItemResponse {
   color?: string;
   size?: string;
   image?: string;
+  is_reviewed?: boolean;
+  review?: {
+    id?: string;
+    rating?: number;
+    comment?: string;
+    images?: string[];
+    createdAt?: string;
+    updatedAt?: string;
+  } | null;
 }
 
 export interface OrderResponse {
@@ -22,10 +31,12 @@ export interface OrderResponse {
   paymentMethod?: string;
   shippingProvider: 'ghn' | 'ghtk';
   shippingCode?: string;
+  shopId?: string;
   shopName?: string;
   shopLogo?: string;
   paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
   createdAt: string;
+  is_reviewed?: boolean;
   shippingAddress?: {
     recipient_name: string;
     phone: string;
@@ -50,6 +61,10 @@ export const ordersService = {
   },
   triggerCallback: async (orderId: string, status: 'success' | 'fail') => {
     const res = await api.post(`/orders/callback/${orderId}`, { status });
+    return res.data;
+  },
+  confirmDelivery: async (orderId: string): Promise<{ success: boolean; message: string; order: any }> => {
+    const res = await api.post(`/orders/${encodeURIComponent(orderId)}/confirm-delivery`);
     return res.data;
   }
 };

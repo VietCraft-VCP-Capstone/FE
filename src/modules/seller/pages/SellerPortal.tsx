@@ -4,9 +4,11 @@ import { ProductListingPage } from '../../product/pages/ProductListingPage';
 import { SellerSettingsPage } from './SellerSettingsPage';
 import { ShopOnboardingPage } from './ShopOnboardingPage';
 import { CreateProductPage } from './CreateProductPage';
-import { SellerCatalogPage } from './SellerCatalogPage';
 import { SellerDashboard } from './SellerDashboard';
 import { SellerOrdersPage } from './SellerOrdersPage';
+import { SellerCatalogPage } from './SellerCatalogPage';
+import { SellerFollowedCompetitorsPage } from './SellerFollowedCompetitorsPage';
+import { SellerCompetitorDetailPage } from './SellerCompetitorDetailPage';
 import { SellerChatPage } from './SellerChatPage';
 import { POD_CREATE_ENABLED } from '../featureFlags';
 
