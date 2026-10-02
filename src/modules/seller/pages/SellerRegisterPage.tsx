@@ -6,7 +6,7 @@ import {
     CreditCard, Lock, Sparkles, Clock, RefreshCw, Trash2, Check,
     Phone, Mail, AlertTriangle, FileCheck, Calendar
 } from 'lucide-react';
-import { sellerKycService, SellerKycStatusResponse } from '../services/sellerKycService';
+import { sellerKycService, SellerKycStatusResponse, CccdVerification } from '../services/sellerKycService';
 import { userService } from '../../user/services/userService';
 import { SUPPORTED_BANKS } from '../types/settings';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
@@ -105,8 +105,11 @@ export function SellerRegisterPage() {
     const [taxCode, setTaxCode] = useState('');
     const [frontIdFile, setFrontIdFile] = useState<{ filename: string; url: string } | null>(null);
     const [backIdFile, setBackIdFile] = useState<{ filename: string; url: string } | null>(null);
-    const [portraitFile, setPortraitFile] = useState<{ filename: string; url: string } | null>(null);
     const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+    const [scanningOcr, setScanningOcr] = useState<'front' | 'back' | null>(null);
+    const [frontVerification, setFrontVerification] = useState<CccdVerification | null>(null);
+    const [backVerification, setBackVerification] = useState<CccdVerification | null>(null);
+    const [ocrNotice, setOcrNotice] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(null);
 
     const [companyName, setCompanyName] = useState('');
     const [businessLicenseNumber, setBusinessLicenseNumber] = useState('');
@@ -189,10 +192,7 @@ export function SellerRegisterPage() {
                         const fn = app.kyc_data.back_id_url.split('/files/')[1]?.split('?')[0] || 'back.jpg';
                         setBackIdFile({ filename: fn, url: app.kyc_data.back_id_url });
                     }
-                    if (app.kyc_data.portrait_url) {
-                        const fn = app.kyc_data.portrait_url.split('/files/')[1]?.split('?')[0] || 'portrait.jpg';
-                        setPortraitFile({ filename: fn, url: app.kyc_data.portrait_url });
-                    }
+
                     if (app.kyc_data.business_license_url) {
                         const fn = app.kyc_data.business_license_url.split('/files/')[1]?.split('?')[0] || 'license.jpg';
                         setBusinessLicenseFile({ filename: fn, url: app.kyc_data.business_license_url });
@@ -274,7 +274,71 @@ export function SellerRegisterPage() {
         }
     };
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back' | 'portrait' | 'license') => {
+    const triggerOcrScan = async (filename: string, side: 'front' | 'back') => {
+        setScanningOcr(side);
+        setOcrNotice(null);
+        try {
+            const res = await sellerKycService.scanCccd(filename, side);
+            if (res && res.ocr_data) {
+                if (side === 'front') {
+                    setFrontVerification(res.verification);
+                    if (res.ocr_data.full_name) {
+                        setFullName(res.ocr_data.full_name);
+                        setSignature(res.ocr_data.full_name);
+                    }
+                    if (res.ocr_data.id_number) {
+                        setIdCardNumber(res.ocr_data.id_number);
+                    }
+                    if (res.ocr_data.date_of_birth) {
+                        setDateOfBirth(toDisplayDate(res.ocr_data.date_of_birth));
+                    }
+
+                    if (res.verification?.warnings && res.verification.warnings.length > 0) {
+                        setOcrNotice({
+                            type: 'warning',
+                            message: `Đã trích xuất thông tin, nhưng có cảnh báo: ${res.verification.warnings.join('; ')}`
+                        });
+                    } else {
+                        setOcrNotice({
+                            type: 'success',
+                            message: `AI đã quét thành công mặt trước CCCD (${res.verification?.confidence_score || 95}% tin cậy) và tự động điền họ tên, số CCCD, ngày sinh.`
+                        });
+                    }
+                } else if (side === 'back') {
+                    setBackVerification(res.verification);
+                    if (res.ocr_data.issue_date) {
+                        setIdIssueDate(toDisplayDate(res.ocr_data.issue_date));
+                    }
+                    if (res.ocr_data.issuing_authority) {
+                        setIdIssuePlace(res.ocr_data.issuing_authority);
+                    }
+
+                    if (res.verification?.warnings && res.verification.warnings.length > 0) {
+                        setOcrNotice({
+                            type: 'warning',
+                            message: `Đã trích xuất mặt sau, có cảnh báo: ${res.verification.warnings.join('; ')}`
+                        });
+                    } else {
+                        setOcrNotice({
+                            type: 'success',
+                            message: `AI đã quét thành công mặt sau CCCD và tự động điền ngày cấp, nơi cấp.`
+                        });
+                    }
+                }
+            }
+        } catch (err: any) {
+            console.error('OCR scan failed:', err);
+            setOcrNotice({
+                type: 'error',
+                message: getApiErrorMessage(err, 'Không thể tự động đọc ảnh CCCD. Bạn vui lòng tự nhập các trường thông tin.')
+            });
+        } finally {
+            setScanningOcr(null);
+        }
+    };
+
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back' | 'license') => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 10 * 1024 * 1024) {
@@ -286,9 +350,15 @@ export function SellerRegisterPage() {
         setUploadingDoc(type);
         try {
             const res = await sellerKycService.uploadDocument(file);
-            if (type === 'front') setFrontIdFile({ filename: res.filename, url: res.secureUrl });
-            if (type === 'back') setBackIdFile({ filename: res.filename, url: res.secureUrl });
-            if (type === 'portrait') setPortraitFile({ filename: res.filename, url: res.secureUrl });
+            if (type === 'front') {
+                setFrontIdFile({ filename: res.filename, url: res.secureUrl });
+                triggerOcrScan(res.filename, 'front');
+            }
+            if (type === 'back') {
+                setBackIdFile({ filename: res.filename, url: res.secureUrl });
+                triggerOcrScan(res.filename, 'back');
+            }
+
             if (type === 'license') setBusinessLicenseFile({ filename: res.filename, url: res.secureUrl });
         } catch (err: any) {
             setError(getApiErrorMessage(err, 'Tải file lên thất bại.'));
@@ -332,7 +402,7 @@ export function SellerRegisterPage() {
                     tax_code: taxCode,
                     front_id_image: frontIdFile?.filename,
                     back_id_image: backIdFile?.filename,
-                    portrait_image: portraitFile?.filename,
+
                     company_name: sellerType === 'BUSINESS' ? companyName : undefined,
                     business_license_number: sellerType === 'BUSINESS' ? businessLicenseNumber : undefined,
                     business_license_image: sellerType === 'BUSINESS' ? businessLicenseFile?.filename : undefined,
@@ -722,8 +792,11 @@ export function SellerRegisterPage() {
                         <div className="space-y-6">
                             <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-lg font-extrabold text-slate-900">
+                                    <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
                                         Bước 3: Thu thập thông tin định danh (KYC)
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-[#007700]">
+                                            <Sparkles size={12} /> AI OCR Hỗ trợ
+                                        </span>
                                     </h3>
                                     <p className="text-xs text-slate-500 mt-1">
                                         Đối tượng: <strong className="text-[#007700]">{sellerType === 'INDIVIDUAL' ? 'Cá nhân' : 'Hộ kinh doanh / Doanh nghiệp'}</strong>
@@ -734,124 +807,390 @@ export function SellerRegisterPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700">
-                                        Họ và tên trên CCCD <span className="text-rose-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="NGUYỄN VĂN A"
-                                        value={fullName}
-                                        onChange={(e) => setFullName(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm uppercase focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700">
-                                        Số Căn cước công dân (12 số) <span className="text-rose-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        maxLength={12}
-                                        placeholder="079200001234"
-                                        value={idCardNumber}
-                                        onChange={(e) => setIdCardNumber(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-xs font-bold text-slate-700">Ngày sinh</label>
-                                        <span className="text-[10.5px] text-slate-400 font-medium">Định dạng: Ngày/Tháng/Năm</span>
+                            {/* AI Helper Banner */}
+                            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50/80 via-teal-50/50 to-slate-50 border border-emerald-200/80 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-xs font-extrabold text-[#007700]">
+                                        <Sparkles size={16} className="text-[#007700] animate-pulse" />
+                                        <span>Trợ lý AI EasyOCR & Thẩm định eKYC</span>
                                     </div>
-                                    <div className="relative flex items-center">
+                                    <span className="text-[11px] text-slate-500">Chính xác • Tự động • Bảo mật</span>
+                                </div>
+                                <p className="text-xs text-slate-600 leading-relaxed">
+                                    Tải lên ảnh <strong>Mặt trước & Mặt sau CCCD</strong> để hệ thống tự động nhận diện chữ (OCR), điền form nhanh chóng và phân tích tính xác thực (kiểm tra lóa, mờ, bố cục chuẩn và chống ảnh chụp màn hình).
+                                </p>
+                                {ocrNotice && (
+                                    <div className={`p-3 rounded-xl text-xs font-medium flex items-start gap-2 ${
+                                        ocrNotice.type === 'success' ? 'bg-emerald-100/90 text-emerald-900 border border-emerald-300' :
+                                        ocrNotice.type === 'warning' ? 'bg-amber-100/90 text-amber-900 border border-amber-300' :
+                                        'bg-rose-100/90 text-rose-900 border border-rose-300'
+                                    }`}>
+                                        {ocrNotice.type === 'success' && <CheckCircle2 size={16} className="text-emerald-700 shrink-0 mt-0.5" />}
+                                        {ocrNotice.type === 'warning' && <AlertTriangle size={16} className="text-amber-700 shrink-0 mt-0.5" />}
+                                        {ocrNotice.type === 'error' && <AlertCircle size={16} className="text-rose-700 shrink-0 mt-0.5" />}
+                                        <div className="flex-1">{ocrNotice.message}</div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Section 1: Upload Documents (Placed First for Smooth Auto-fill UX) */}
+                            <div className="space-y-4">
+                                <h4 className="font-extrabold text-sm text-slate-900 flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5">
+                                        <FileCheck size={16} /> 1. Tải lên tài liệu định danh (Ảnh rõ nét, không lóa sáng)
+                                    </span>
+                                    <span className="text-[11px] font-normal text-slate-400">JPG, PNG hoặc WebP (tối đa 10MB)</span>
+                                </h4>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    {/* Front CCCD */}
+                                    <div className="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center justify-between text-center space-y-3 min-h-[190px]">
+                                        <div className="w-full flex items-center justify-between text-xs">
+                                            <span className="font-bold text-slate-800">Mặt trước CCCD *</span>
+                                            {scanningOcr === 'front' && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#007700] animate-pulse">
+                                                    <RefreshCw size={10} className="animate-spin" /> Đang quét AI...
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {frontIdFile ? (
+                                            <div className="text-center space-y-2 w-full">
+                                                <div className="relative group mx-auto w-32 h-20 rounded-lg overflow-hidden border border-slate-200 shadow-2xs">
+                                                    <img src={frontIdFile.url} alt="Mặt trước CCCD" className="w-full h-full object-cover" />
+                                                    <label className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[11px] font-bold cursor-pointer">
+                                                        Đổi ảnh
+                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'front')} />
+                                                    </label>
+                                                </div>
+
+                                                {/* Verification badge */}
+                                                {frontVerification && (
+                                                    <div className={`px-2 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
+                                                        frontVerification.is_likely_authentic
+                                                            ? 'bg-emerald-100 text-[#007700]'
+                                                            : 'bg-amber-100 text-amber-800'
+                                                    }`}>
+                                                        {frontVerification.is_likely_authentic ? (
+                                                            <>
+                                                                <CheckCircle2 size={12} /> Hợp lệ ({frontVerification.confidence_score}%)
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <AlertTriangle size={12} /> Cảnh báo ({frontVerification.confidence_score}%)
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center justify-center gap-2 pt-1">
+                                                    <button
+                                                        type="button"
+                                                        disabled={scanningOcr === 'front'}
+                                                        onClick={() => triggerOcrScan(frontIdFile.filename, 'front')}
+                                                        className="text-[11px] font-bold text-[#007700] hover:underline inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        <Sparkles size={11} /> {scanningOcr === 'front' ? 'Đang quét...' : 'Quét lại AI'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <label className="cursor-pointer flex flex-col items-center justify-center flex-1 w-full py-4">
+                                                <UploadCloud className="text-slate-400 mb-1" size={28} />
+                                                <span className="text-xs font-bold text-[#007700] hover:underline">
+                                                    {uploadingDoc === 'front' ? 'Đang tải ảnh...' : 'Chọn ảnh mặt trước'}
+                                                </span>
+                                                <span className="text-[10.5px] text-slate-400 mt-0.5">Tự quét & điền thông tin</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'front')} />
+                                            </label>
+                                        )}
+                                    </div>
+
+                                    {/* Back CCCD */}
+                                    <div className="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center justify-between text-center space-y-3 min-h-[190px]">
+                                        <div className="w-full flex items-center justify-between text-xs">
+                                            <span className="font-bold text-slate-800">Mặt sau CCCD *</span>
+                                            {scanningOcr === 'back' && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#007700] animate-pulse">
+                                                    <RefreshCw size={10} className="animate-spin" /> Đang quét AI...
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {backIdFile ? (
+                                            <div className="text-center space-y-2 w-full">
+                                                <div className="relative group mx-auto w-32 h-20 rounded-lg overflow-hidden border border-slate-200 shadow-2xs">
+                                                    <img src={backIdFile.url} alt="Mặt sau CCCD" className="w-full h-full object-cover" />
+                                                    <label className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[11px] font-bold cursor-pointer">
+                                                        Đổi ảnh
+                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'back')} />
+                                                    </label>
+                                                </div>
+
+                                                {/* Verification badge */}
+                                                {backVerification && (
+                                                    <div className={`px-2 py-1 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ${
+                                                        backVerification.is_likely_authentic
+                                                            ? 'bg-emerald-100 text-[#007700]'
+                                                            : 'bg-amber-100 text-amber-800'
+                                                    }`}>
+                                                        {backVerification.is_likely_authentic ? (
+                                                            <>
+                                                                <CheckCircle2 size={12} /> Hợp lệ ({backVerification.confidence_score}%)
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <AlertTriangle size={12} /> Cảnh báo ({backVerification.confidence_score}%)
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center justify-center gap-2 pt-1">
+                                                    <button
+                                                        type="button"
+                                                        disabled={scanningOcr === 'back'}
+                                                        onClick={() => triggerOcrScan(backIdFile.filename, 'back')}
+                                                        className="text-[11px] font-bold text-[#007700] hover:underline inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        <Sparkles size={11} /> {scanningOcr === 'back' ? 'Đang quét...' : 'Quét lại AI'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <label className="cursor-pointer flex flex-col items-center justify-center flex-1 w-full py-4">
+                                                <UploadCloud className="text-slate-400 mb-1" size={28} />
+                                                <span className="text-xs font-bold text-[#007700] hover:underline">
+                                                    {uploadingDoc === 'back' ? 'Đang tải ảnh...' : 'Chọn ảnh mặt sau'}
+                                                </span>
+                                                <span className="text-[10.5px] text-slate-400 mt-0.5">Tự quét ngày cấp, nơi cấp</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'back')} />
+                                            </label>
+                                        )}
+                                    </div>
+
+
+                                </div>
+
+                                {sellerType === 'BUSINESS' && (
+                                    <div className="p-4 rounded-2xl border border-dashed border-purple-300 bg-purple-50/30 flex flex-col items-center justify-center text-center space-y-2">
+                                        <span className="text-xs font-bold text-purple-900">Giấy phép ĐKKD (Ảnh chụp hoặc PDF) *</span>
+                                        {businessLicenseFile ? (
+                                            <span className="text-xs font-bold text-[#007700]">✓ Giấy phép kinh doanh đã tải lên</span>
+                                        ) : (
+                                            <label className="cursor-pointer flex flex-col items-center">
+                                                <UploadCloud className="text-purple-400 mb-1" size={24} />
+                                                <span className="text-[11px] font-bold text-[#330033] hover:underline">
+                                                    {uploadingDoc === 'license' ? 'Đang tải...' : 'Tải lên Giấy phép kinh doanh (PDF/JPG/PNG)'}
+                                                </span>
+                                                <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, 'license')} />
+                                            </label>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* AI Verification Details Card (Shows when at least one side is scanned) */}
+                                {(frontVerification || backVerification) && (
+                                    <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                                                <ShieldCheck size={15} className="text-[#007700]" /> Báo cáo kiểm định ảnh thật/giả bởi AI
+                                            </span>
+                                            <span className="text-[11px] text-slate-500">Mô hình EasyOCR + Anti-spoofing</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
+                                                <span className="text-[10.5px] text-slate-500 block">Độ sắc nét</span>
+                                                <span className={`font-bold block ${
+                                                    (frontVerification?.checks?.blur_check ?? true) ? 'text-[#007700]' : 'text-amber-600'
+                                                }`}>
+                                                    {(frontVerification?.checks?.blur_check ?? true) ? '✓ Đạt chuẩn' : '⚠ Ảnh hơi mờ'}
+                                                </span>
+                                            </div>
+                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
+                                                <span className="text-[10.5px] text-slate-500 block">Bố cục thẻ</span>
+                                                <span className={`font-bold block ${
+                                                    (frontVerification?.checks?.layout_check ?? true) ? 'text-[#007700]' : 'text-amber-600'
+                                                }`}>
+                                                    {(frontVerification?.checks?.layout_check ?? true) ? '✓ Chuẩn Quốc huy' : '⚠ Bố cục lạ'}
+                                                </span>
+                                            </div>
+                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
+                                                <span className="text-[10.5px] text-slate-500 block">Chống chụp màn hình</span>
+                                                <span className={`font-bold block ${
+                                                    (frontVerification?.checks?.screen_capture_check ?? true) ? 'text-[#007700]' : 'text-rose-600'
+                                                }`}>
+                                                    {(frontVerification?.checks?.screen_capture_check ?? true) ? '✓ Thẻ vật lý' : '⚠ Nghi chụp màn hình'}
+                                                </span>
+                                            </div>
+                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
+                                                <span className="text-[10.5px] text-slate-500 block">Cấu trúc 12 số</span>
+                                                <span className={`font-bold block ${
+                                                    (frontVerification?.checks?.id_number_format ?? true) ? 'text-[#007700]' : 'text-amber-600'
+                                                }`}>
+                                                    {(frontVerification?.checks?.id_number_format ?? true) ? '✓ Quy chuẩn BCA' : '⚠ Cần đối soát'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Warnings List */}
+                                        {((frontVerification?.warnings && frontVerification.warnings.length > 0) ||
+                                          (backVerification?.warnings && backVerification.warnings.length > 0)) && (
+                                            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11.5px] space-y-1">
+                                                <span className="font-bold flex items-center gap-1">
+                                                    <AlertTriangle size={13} className="text-amber-700" /> Lưu ý khi thẩm định:
+                                                </span>
+                                                <ul className="list-disc list-inside space-y-0.5 text-slate-700 pl-1">
+                                                    {frontVerification?.warnings?.map((w, idx) => (
+                                                        <li key={`f-${idx}`}>Mặt trước: {w}</li>
+                                                    ))}
+                                                    {backVerification?.warnings?.map((w, idx) => (
+                                                        <li key={`b-${idx}`}>Mặt sau: {w}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Section 2: Personal Identity Form Fields */}
+                            <div className="pt-4 border-t border-slate-200 space-y-4">
+                                <h4 className="font-extrabold text-sm text-slate-900 flex items-center justify-between">
+                                    <span>2. Xác nhận & Hoàn thiện thông tin định danh cá nhân</span>
+                                    <span className="text-[11px] font-normal text-slate-400">Có thể chỉnh sửa nếu cần</span>
+                                </h4>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-slate-700">
+                                                Họ và tên trên CCCD <span className="text-rose-500">*</span>
+                                            </label>
+                                            {fullName && frontVerification && (
+                                                <span className="text-[10px] text-[#007700] font-semibold">✓ Điền tự động</span>
+                                            )}
+                                        </div>
                                         <input
                                             type="text"
-                                            inputMode="numeric"
-                                            placeholder="DD/MM/YYYY"
-                                            maxLength={10}
-                                            value={dateOfBirth}
-                                            onChange={(e) => setDateOfBirth(formatMaskedDateInput(e.target.value))}
-                                            className="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 font-mono"
+                                            placeholder="NGUYỄN VĂN A"
+                                            value={fullName}
+                                            onChange={(e) => setFullName(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm uppercase focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
+                                            required
                                         />
-                                        <div className="absolute right-3 flex items-center justify-center">
-                                            <Calendar size={17} className="text-slate-400 hover:text-[#007700] transition-colors pointer-events-none" />
-                                            <input
-                                                type="date"
-                                                tabIndex={-1}
-                                                max={new Date().toISOString().split('T')[0]}
-                                                value={toIsoDate(dateOfBirth)}
-                                                onChange={(e) => {
-                                                    if (e.target.value) {
-                                                        setDateOfBirth(toDisplayDate(e.target.value));
-                                                    }
-                                                }}
-                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                                title="Mở lịch chọn ngày sinh"
-                                            />
-                                        </div>
                                     </div>
-                                </div>
 
-                                <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-xs font-bold text-slate-700">Ngày cấp CCCD</label>
-                                        <span className="text-[10.5px] text-slate-400 font-medium">Định dạng: Ngày/Tháng/Năm</span>
-                                    </div>
-                                    <div className="relative flex items-center">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-slate-700">
+                                                Số Căn cước công dân (12 số) <span className="text-rose-500">*</span>
+                                            </label>
+                                            {idCardNumber && frontVerification && (
+                                                <span className="text-[10px] text-[#007700] font-semibold">✓ Điền tự động</span>
+                                            )}
+                                        </div>
                                         <input
                                             type="text"
-                                            inputMode="numeric"
-                                            placeholder="DD/MM/YYYY"
-                                            maxLength={10}
-                                            value={idIssueDate}
-                                            onChange={(e) => setIdIssueDate(formatMaskedDateInput(e.target.value))}
-                                            className="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 font-mono"
+                                            maxLength={12}
+                                            placeholder="079200001234"
+                                            value={idCardNumber}
+                                            onChange={(e) => setIdCardNumber(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 font-mono"
+                                            required
                                         />
-                                        <div className="absolute right-3 flex items-center justify-center">
-                                            <Calendar size={17} className="text-slate-400 hover:text-[#007700] transition-colors pointer-events-none" />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-slate-700">Ngày sinh</label>
+                                            <span className="text-[10.5px] text-slate-400 font-medium">Định dạng: Ngày/Tháng/Năm</span>
+                                        </div>
+                                        <div className="relative flex items-center">
                                             <input
-                                                type="date"
-                                                tabIndex={-1}
-                                                max={new Date().toISOString().split('T')[0]}
-                                                value={toIsoDate(idIssueDate)}
-                                                onChange={(e) => {
-                                                    if (e.target.value) {
-                                                        setIdIssueDate(toDisplayDate(e.target.value));
-                                                    }
-                                                }}
-                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                                title="Mở lịch chọn ngày cấp CCCD"
+                                                type="text"
+                                                inputMode="numeric"
+                                                placeholder="DD/MM/YYYY"
+                                                maxLength={10}
+                                                value={dateOfBirth}
+                                                onChange={(e) => setDateOfBirth(formatMaskedDateInput(e.target.value))}
+                                                className="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 font-mono"
                                             />
+                                            <div className="absolute right-3 flex items-center justify-center">
+                                                <Calendar size={17} className="text-slate-400 hover:text-[#007700] transition-colors pointer-events-none" />
+                                                <input
+                                                    type="date"
+                                                    tabIndex={-1}
+                                                    max={new Date().toISOString().split('T')[0]}
+                                                    value={toIsoDate(dateOfBirth)}
+                                                    onChange={(e) => {
+                                                        if (e.target.value) {
+                                                            setDateOfBirth(toDisplayDate(e.target.value));
+                                                        }
+                                                    }}
+                                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                    title="Mở lịch chọn ngày sinh"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700">Nơi cấp </label>
-                                    <input
-                                        type="text"
-                                        placeholder="Cục Cảnh sát QLHC về TTXH"
-                                        value={idIssuePlace}
-                                        onChange={(e) => setIdIssuePlace(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
-                                    />
-                                </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-slate-700">Ngày cấp CCCD</label>
+                                            <span className="text-[10.5px] text-slate-400 font-medium">Định dạng: Ngày/Tháng/Năm</span>
+                                        </div>
+                                        <div className="relative flex items-center">
+                                            <input
+                                                type="text"
+                                                inputMode="numeric"
+                                                placeholder="DD/MM/YYYY"
+                                                maxLength={10}
+                                                value={idIssueDate}
+                                                onChange={(e) => setIdIssueDate(formatMaskedDateInput(e.target.value))}
+                                                className="w-full px-4 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 font-mono"
+                                            />
+                                            <div className="absolute right-3 flex items-center justify-center">
+                                                <Calendar size={17} className="text-slate-400 hover:text-[#007700] transition-colors pointer-events-none" />
+                                                <input
+                                                    type="date"
+                                                    tabIndex={-1}
+                                                    max={new Date().toISOString().split('T')[0]}
+                                                    value={toIsoDate(idIssueDate)}
+                                                    onChange={(e) => {
+                                                        if (e.target.value) {
+                                                            setIdIssueDate(toDisplayDate(e.target.value));
+                                                        }
+                                                    }}
+                                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                    title="Mở lịch chọn ngày cấp CCCD"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-700">Mã số thuế cá nhân</label>
-                                    <input
-                                        type="text"
-                                        placeholder="8012345678"
-                                        value={taxCode}
-                                        onChange={(e) => setTaxCode(e.target.value)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
-                                    />
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-700">Nơi cấp </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Cục Cảnh sát QLHC về TTXH"
+                                            value={idIssuePlace}
+                                            onChange={(e) => setIdIssuePlace(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-700">Mã số thuế cá nhân</label>
+                                        <input
+                                            type="text"
+                                            placeholder="8012345678"
+                                            value={taxCode}
+                                            onChange={(e) => setTaxCode(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -908,85 +1247,6 @@ export function SellerRegisterPage() {
                                     </div>
                                 </div>
                             )}
-
-                            <div className="pt-4 border-t border-slate-200 space-y-4">
-                                <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
-                                    <FileCheck size={16} /> Tải lên tài liệu định danh (Ảnh rõ nét, không lóa sáng)
-                                </h4>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div className="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center text-center space-y-2">
-                                        <span className="text-xs font-bold text-slate-700">Mặt trước CCCD *</span>
-                                        {frontIdFile ? (
-                                            <div className="text-center space-y-1">
-                                                <img src={frontIdFile.url} alt="Mặt trước" className="w-24 h-16 object-cover rounded-lg border mx-auto" />
-                                                <span className="text-[11px] font-bold text-[#007700] block">✓ Đã tải lên</span>
-                                            </div>
-                                        ) : (
-                                            <label className="cursor-pointer flex flex-col items-center">
-                                                <UploadCloud className="text-slate-400 mb-1" size={24} />
-                                                <span className="text-[11px] font-bold text-[#007700] hover:underline">
-                                                    {uploadingDoc === 'front' ? 'Đang tải...' : 'Chọn ảnh'}
-                                                </span>
-                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'front')} />
-                                            </label>
-                                        )}
-                                    </div>
-
-                                    <div className="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center text-center space-y-2">
-                                        <span className="text-xs font-bold text-slate-700">Mặt sau CCCD *</span>
-                                        {backIdFile ? (
-                                            <div className="text-center space-y-1">
-                                                <img src={backIdFile.url} alt="Mặt sau" className="w-24 h-16 object-cover rounded-lg border mx-auto" />
-                                                <span className="text-[11px] font-bold text-[#007700] block">✓ Đã tải lên</span>
-                                            </div>
-                                        ) : (
-                                            <label className="cursor-pointer flex flex-col items-center">
-                                                <UploadCloud className="text-slate-400 mb-1" size={24} />
-                                                <span className="text-[11px] font-bold text-[#007700] hover:underline">
-                                                    {uploadingDoc === 'back' ? 'Đang tải...' : 'Chọn ảnh'}
-                                                </span>
-                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'back')} />
-                                            </label>
-                                        )}
-                                    </div>
-
-                                    <div className="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center text-center space-y-2">
-                                        <span className="text-xs font-bold text-slate-700">Ảnh chân dung</span>
-                                        {portraitFile ? (
-                                            <div className="text-center space-y-1">
-                                                <img src={portraitFile.url} alt="Chân dung" className="w-16 h-16 object-cover rounded-full border mx-auto" />
-                                                <span className="text-[11px] font-bold text-[#007700] block">✓ Đã tải lên</span>
-                                            </div>
-                                        ) : (
-                                            <label className="cursor-pointer flex flex-col items-center">
-                                                <UploadCloud className="text-slate-400 mb-1" size={24} />
-                                                <span className="text-[11px] font-bold text-[#007700] hover:underline">
-                                                    {uploadingDoc === 'portrait' ? 'Đang tải...' : 'Chọn ảnh'}
-                                                </span>
-                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'portrait')} />
-                                            </label>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {sellerType === 'BUSINESS' && (
-                                    <div className="p-4 rounded-2xl border border-dashed border-purple-300 bg-purple-50/30 flex flex-col items-center justify-center text-center space-y-2">
-                                        <span className="text-xs font-bold text-purple-900">Giấy phép ĐKKD (Ảnh chụp hoặc PDF) *</span>
-                                        {businessLicenseFile ? (
-                                            <span className="text-xs font-bold text-[#007700]">✓ Giấy phép kinh doanh đã tải lên</span>
-                                        ) : (
-                                            <label className="cursor-pointer flex flex-col items-center">
-                                                <UploadCloud className="text-purple-400 mb-1" size={24} />
-                                                <span className="text-[11px] font-bold text-[#330033] hover:underline">
-                                                    {uploadingDoc === 'license' ? 'Đang tải...' : 'Tải lên Giấy phép kinh doanh (PDF/JPG/PNG)'}
-                                                </span>
-                                                <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleFileUpload(e, 'license')} />
-                                            </label>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
 
                             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                 <button

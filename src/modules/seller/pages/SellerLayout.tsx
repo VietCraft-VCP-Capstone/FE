@@ -4,20 +4,49 @@ import '../../../shared/components/layouts.css';
 import { POD_CREATE_ENABLED, POD_CREATE_PATH } from '../featureFlags';
 import {
   LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Palette, Ticket,
-  Wallet, Banknote, BarChart2, TrendingUp, LineChart, Flame, Tag, PieChart, Rocket,
-  Settings, Bell, Mail, PanelLeft, ExternalLink, LogOut, ChevronDown, MessageSquare
+  Wallet, Banknote, Rocket,
+  Settings, Bell, Mail, PanelLeft, LogOut, ChevronDown, MessageSquare
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { chatService } from '../../chat/services/chatService';
 import { notificationService } from '../../notification/services/notificationService';
 import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
+import { WorkspaceSwitcher, rememberSellerPath } from '../../analytics/components/WorkspaceSwitcher';
+
+export interface SellerNavItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  /** Mã tính năng trong SRS, chỉ hiện ở khu phân tích. */
+  feature?: string;
+}
+
+export interface SellerNavGroup {
+  label?: string;
+  hint?: string;
+  items: SellerNavItem[];
+}
 
 interface SellerLayoutProps {
   children: React.ReactNode;
   user: any;
   onLogout: () => void;
+  /**
+   * Thanh bên theo nhóm. Bỏ trống thì dùng danh sách vận hành mặc định.
+   * Khu "Phân tích & AI" truyền nhóm riêng của nó (analytics/nav.ts).
+   */
+  groups?: SellerNavGroup[];
 }
 
-const NAV_ITEMS = [
+/**
+ * Thanh bên khu VẬN HÀNH: việc làm hằng ngày với đơn, sản phẩm, khách.
+ *
+ * Năm mục phân tích trước đây nằm lẫn ở đây (Phân tích thị trường, Dự báo nhu cầu,
+ * Danh mục & giờ vàng, Tối ưu giá bán, Thị phần & đối thủ) đều là trang rỗng và đã
+ * chuyển thành trang thật trong khu "Phân tích & AI". Trộn hai loại việc trong một
+ * thanh 18 mục làm người bán phải đọc hết mới tìm được thứ cần.
+ */
+const OPS_NAV: SellerNavItem[] = [
   { to: '/seller/dashboard', icon: LayoutGrid, label: 'Trang chủ' },
   { to: '/seller/catalog', icon: Archive, label: 'Danh mục sản phẩm' },
   { to: '/seller/storefront', icon: Store, label: 'Thông tin cửa hàng' },
@@ -30,19 +59,14 @@ const NAV_ITEMS = [
   { to: '/seller/promotions', icon: Ticket, label: 'Khuyến mãi' },
   { to: '/seller/revenue', icon: Wallet, label: 'Doanh thu cửa hàng' },
   { to: '/seller/payouts', icon: Banknote, label: 'Đối soát & rút tiền' },
-  { to: '/seller/product-status', icon: BarChart2, label: 'Trạng thái sản phẩm' },
-  { to: '/seller/analytics', icon: TrendingUp, label: 'Phân tích thị trường' },
-  { to: '/seller/forecast', icon: LineChart, label: 'Dự báo nhu cầu' },
-  { to: '/seller/golden-hour', icon: Flame, label: 'Danh mục & giờ vàng' },
-  { to: '/seller/price-optimize', icon: Tag, label: 'Tối ưu giá bán' },
-  { to: '/seller/market-share', icon: PieChart, label: 'Thị phần & đối thủ' },
   { to: '/seller/onboarding', icon: Rocket, label: 'Thiết lập gian hàng' },
 ];
 
+const OPS_GROUPS: SellerNavGroup[] = [
+  { items: OPS_NAV.filter(item => POD_CREATE_ENABLED || item.to !== POD_CREATE_PATH) },
+];
 
-const VISIBLE_NAV_ITEMS = NAV_ITEMS.filter(item => POD_CREATE_ENABLED || item.to !== POD_CREATE_PATH);
-
-export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
+export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -104,7 +128,14 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [menuOpen]);
 
+  // Nhớ trang cuối của từng khu để bộ chuyển khu quay về đúng chỗ đang làm.
+  useEffect(() => {
+    rememberSellerPath(location.pathname, location.search);
+  }, [location.pathname, location.search]);
+
   const currentPath = location.pathname === '/seller/product-listing' ? '/seller/products' : location.pathname;
+  const navGroups = groups ?? OPS_GROUPS;
+  const isActive = (to: string) => currentPath === to || currentPath.startsWith(`${to}/`);
 
   return (
     <div className="seller-layout">
@@ -116,16 +147,37 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
           </button>
         </div>
         <nav className="seller-nav">
-          {VISIBLE_NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-            <Link key={to} to={to} className={`seller-nav-item ${currentPath === to ? 'active' : ''}`} title={collapsed ? label : undefined}>
-              <Icon size={19} />
-              {!collapsed && <span>{label}</span>}
-              {to === '/seller/chat' && unreadChatCount > 0 && (
-                <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold bg-red-500 text-white rounded-full">
-                  {unreadChatCount}
-                </span>
+          {navGroups.map((group, gi) => (
+            <div key={group.label ?? `group-${gi}`} className={gi > 0 ? 'mt-4' : undefined}>
+              {group.label && !collapsed && (
+                <p className="m-0 mb-1.5 px-3.5 text-[10.5px] font-bold uppercase tracking-wider text-stone-400">
+                  {group.label}
+                  {group.hint && <span className="ml-1 font-medium normal-case tracking-normal text-stone-400">· {group.hint}</span>}
+                </p>
               )}
-            </Link>
+              {/* Thu gọn thì tiêu đề nhóm biến mất, nên tách nhóm bằng một đường kẻ mảnh
+                  để thanh bên không thành một cột icon liền khối. */}
+              {group.label && collapsed && gi > 0 && <span className="mx-auto mb-2 block h-px w-6 bg-stone-200" aria-hidden />}
+              <div className="flex flex-col gap-1">
+                {group.items.map(({ to, icon: Icon, label, feature }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={`seller-nav-item ${isActive(to) ? 'active' : ''}`}
+                    title={collapsed ? `${label}${feature ? ` (${feature})` : ''}` : undefined}
+                    aria-current={isActive(to) ? 'page' : undefined}
+                  >
+                    <Icon size={19} />
+                    {!collapsed && <span>{label}</span>}
+                    {to === '/seller/chat' && unreadChatCount > 0 && (
+                      <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold bg-red-500 text-white rounded-full">
+                        {unreadChatCount}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
         <div className="seller-sidebar-footer">
@@ -145,8 +197,7 @@ export function SellerLayout({ children, user, onLogout }: SellerLayoutProps) {
             </span>
           </div>
           <div className="seller-header-center">
-            <button className="seller-trending-btn">Xu hướng mua sắm<Flame size={16} className="seller-fire-icon" /></button>
-            <Link to="/seller/analytics" className="seller-market-btn">Phân tích thị trường<ExternalLink size={14} /></Link>
+            <WorkspaceSwitcher />
           </div>
           <div className="seller-header-actions">
             <Link to="/seller/chat" className="seller-icon-btn relative" title="Tin nhắn khách hàng">
