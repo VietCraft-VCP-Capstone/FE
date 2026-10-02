@@ -40,11 +40,13 @@ const EMPTY: SellerOrderList = {
   page: 1,
   pageSize: PAGE_SIZE,
   totalPages: 0,
-  counts: { all: 0, ORDERED: 0, PENDING_DESIGN: 0, PROCESSING: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 },
+  counts: { all: 0, PENDING_APPROVAL: 0, POD_ORDERS: 0, ORDERED: 0, PENDING_DESIGN: 0, PROCESSING: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 },
   revenue: { settled: 0, pending: 0 },
 };
 
 const TAB_ORDER: SellerOrderStatusFilter[] = [
+  'PENDING_APPROVAL',
+  'POD_ORDERS',
   'TODO',
   'ORDERED',
   'PENDING_DESIGN',
@@ -67,6 +69,18 @@ function emptyCopy(status: SellerOrderStatusFilter, searching: boolean) {
     return {
       title: 'Không tìm thấy đơn nào khớp',
       hint: 'Thử tìm bằng mã đơn, tên người nhận, số điện thoại hoặc mã vận đơn.',
+    };
+  }
+  if (status === 'PENDING_APPROVAL') {
+    return {
+      title: 'Không có đơn nào chờ duyệt',
+      hint: 'Mọi đơn hàng (đơn trong kho và đơn xưởng in) đều đã được duyệt xử lý.',
+    };
+  }
+  if (status === 'POD_ORDERS') {
+    return {
+      title: 'Chưa có đơn xưởng in nào',
+      hint: 'Các đơn hàng in ấn theo yêu cầu (POD) do Printing Shop phụ trách sẽ hiển thị tiến độ tại đây.',
     };
   }
   if (status === 'ALL') {
@@ -180,6 +194,27 @@ export function SellerOrdersPage() {
       }
     },
     [detail, pendingAction, filter, load, showToast]
+  );
+
+  const handleQuickApprove = useCallback(
+    async (order: SellerOrder, e: React.MouseEvent) => {
+      e.stopPropagation();
+      const isPod = Boolean(order.isPod || order.orderType === 'POD' || order.items.some(it => it.designFileUrl));
+      try {
+        showToast(`Đang duyệt đơn #${order.orderCode}...`, 'info');
+        if (isPod) {
+          const res = await sellerOrdersService.dispatchToPrinter(order.orderCode);
+          showToast(res.message || 'Đã duyệt đơn và chuyển sang xưởng in!', 'success');
+        } else {
+          const res = await sellerOrdersService.approveOrder(order.orderCode);
+          showToast(res.message || 'Đã duyệt đơn hàng thành công!', 'success');
+        }
+        void load(filter, true);
+      } catch (err: any) {
+        showToast(getApiErrorMessage(err, 'Lỗi khi duyệt đơn.'), 'error');
+      }
+    },
+    [filter, load, showToast]
   );
 
   const searching = Boolean(filter.search.trim());
@@ -314,6 +349,7 @@ export function SellerOrdersPage() {
             orders={data.items}
             loading={loading}
             onOpen={order => void openDetail(order)}
+            onQuickApprove={handleQuickApprove}
             emptyTitle={empty.title}
             emptyHint={empty.hint}
           />
@@ -339,6 +375,7 @@ export function SellerOrdersPage() {
           setPendingAction(null);
         }}
         onAction={setPendingAction}
+        onRefresh={() => void load(filter, true)}
       />
 
       {/* Update Status Modal */}

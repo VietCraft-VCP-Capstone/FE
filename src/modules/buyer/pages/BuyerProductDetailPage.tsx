@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
+import { reviewService } from '../../product/services/reviewService';
 import { cartService } from '../../order/services/cartService';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
@@ -139,6 +140,12 @@ export function BuyerProductDetailPage() {
     }
   });
 
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [avgRating, setAvgRating] = useState(5.0);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [starBreakdown, setStarBreakdown] = useState<Record<string, { count: number; pct: string }>>({});
+
   const triggerToast = useCallback((msg: string, type: 'success' | 'info' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -167,6 +174,39 @@ export function BuyerProductDetailPage() {
   // ── Load product ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
+
+    // Load real reviews from API
+    setIsLoadingReviews(true);
+    reviewService.getProductReviews(id)
+      .then((data: any) => {
+        const items = data.items || [];
+        setReviews(items);
+        if (data.summary) {
+          const avg = Number(data.summary.averageRating) || 5.0;
+          const total = Number(data.summary.totalReviews ?? data.summary.reviewCount ?? items.length) || 0;
+          setAvgRating(avg);
+          setReviewCount(total);
+          const breakdown: Record<string, { count: number; pct: string }> = {};
+          [1, 2, 3, 4, 5].forEach(s => {
+            const count = data.summary.breakdown?.[String(s)] || 0;
+            const pct = data.summary.percentages?.[String(s)] || (total > 0 ? `${Math.round((count / total) * 100)}%` : '0%');
+            breakdown[String(s)] = { count, pct };
+          });
+          setStarBreakdown(breakdown);
+        } else {
+          setReviewCount(items.length);
+          if (items.length > 0) {
+            const sum = items.reduce((acc: number, cur: any) => acc + (Number(cur.rating) || 5), 0);
+            setAvgRating(sum / items.length);
+          }
+        }
+      })
+      .catch((err: any) => {
+        console.warn('Could not load reviews:', err);
+      })
+      .finally(() => {
+        setIsLoadingReviews(false);
+      });
 
     if (productDetailCache.has(id)) {
       const cached = productDetailCache.get(id);
@@ -250,20 +290,20 @@ export function BuyerProductDetailPage() {
           try {
             const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
             setIsFav(favs.includes(id!));
-          } catch {}
+          } catch { }
         });
     }
   }, [id]);
 
   // Derive unique option sets from variants
   const colors = [...new Set((product?.variants || []).map(v => v.color).filter(Boolean))] as string[];
-  const sizes  = [...new Set((product?.variants || []).map(v => v.size).filter(Boolean))] as string[];
+  const sizes = [...new Set((product?.variants || []).map(v => v.size).filter(Boolean))] as string[];
   const materials = [...new Set((product?.variants || []).map(v => v.material).filter(Boolean))] as string[];
 
   // Resolve active variant by selected options
   const activeVariant = product?.variants.find(v =>
     (!selectedColor || v.color === selectedColor) &&
-    (!selectedSize  || v.size  === selectedSize)  &&
+    (!selectedSize || v.size === selectedSize) &&
     (!selectedMaterial || v.material === selectedMaterial)
   ) || selectedVariant || product?.variants[0] || null;
 
@@ -462,7 +502,7 @@ export function BuyerProductDetailPage() {
         localStorage.setItem('vietcraft_favorites', JSON.stringify(next));
         setIsFav(!isFav);
         window.dispatchEvent(new CustomEvent('wishlist-updated'));
-      } catch {}
+      } catch { }
     }
   };
 
@@ -570,12 +610,18 @@ export function BuyerProductDetailPage() {
           <div>
             {/* Shop badge */}
             {product.shopInfo && (
-              <div style={S.shopRow}>
-                <Store size={14} color="#008000" />
-                <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
-                  <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                  <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || '4.8'}</span>
+              <div style={{ ...S.shopRow, justifyContent: 'space-between' }}>
+                <div
+                  onClick={() => product.shopInfo?.id && navigate(`/shop/${product.shopInfo.id}`)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                  title="Xem trang gian hàng"
+                >
+                  <Store size={14} color="#008000" />
+                  <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                    <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
+                    <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || avgRating.toFixed(1)}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -780,54 +826,74 @@ export function BuyerProductDetailPage() {
 
         {/* ── Reviews ───────────────────────────────────────────────────────── */}
         <section style={S.reviewSection}>
-          <h2 style={S.sectionTitle}>Đánh giá sản phẩm</h2>
-          {product?.reviews && product.reviews.length > 0 ? (
-            <>
-              <div style={S.reviewSummary}>
-                <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
-                  <div style={S.ratingBig}>{product.rating ? product.rating.toFixed(1) : '5.0'}</div>
-                  <StarRow rating={Math.round(product.rating || 5)} size={18} />
-                  <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{product.reviews.length} đánh giá</div>
-                </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <h2 style={{ ...S.sectionTitle, marginBottom: 0 }}>Đánh giá sản phẩm</h2>
+          </div>
+          <div style={S.reviewSummary}>
+            <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
+              <div style={S.ratingBig}>{reviewCount > 0 ? avgRating.toFixed(1) : '0.0'}</div>
+              <StarRow rating={Math.round(avgRating)} size={18} />
+              <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>
+                {reviewCount > 0 ? `${reviewCount} đánh giá` : 'Chưa có đánh giá'}
               </div>
-              {product.reviews.map(rv => (
-                <div key={rv.id} style={S.reviewCard}>
-                  {rv.avatar ? (
-                    <img src={rv.avatar} alt={rv.name} style={S.avatar} />
-                  ) : (
-                    <div style={{ ...S.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e5e7eb', color: '#4b5563', fontWeight: 'bold' }}>
-                      {rv.name?.[0]?.toUpperCase() || 'U'}
+            </div>
+            <div style={{ flex: 1, paddingLeft: 16 }}>
+              {[5, 4, 3, 2, 1].map(star => {
+                const pctStr = starBreakdown?.[String(star)]?.pct || '0%';
+                return (
+                  <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <StarRow rating={star} size={12} />
+                    <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', background: '#f59e0b', borderRadius: 4, width: pctStr }} />
                     </div>
-                  )}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <span style={{ fontWeight: 700, fontSize: 14 }}>{rv.name}</span>
-                      <StarRow rating={rv.rating} size={12} />
-                      <span style={{ fontSize: 12, color: '#aaa', marginLeft: 'auto' }}>{rv.date}</span>
-                    </div>
-                    <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{rv.text}</p>
-                    {rv.images && rv.images.length > 0 && (
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {rv.images.map((img, i) => (
-                          <img key={i} src={img} alt="review" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
-                        ))}
-                      </div>
-                    )}
+                    <span style={{ fontSize: 12, color: '#888', width: 32 }}>{pctStr}</span>
                   </div>
-                </div>
-              ))}
-            </>
+                );
+              })}
+            </div>
+          </div>
+
+          {isLoadingReviews ? (
+            <div style={{ padding: '36px 0', textAlign: 'center' }}>
+              <div style={{ display: 'inline-block', width: 28, height: 28, border: '3px solid #e5e7eb', borderTopColor: '#008000', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: 8 }} />
+              <p style={{ fontSize: 13, color: '#888', margin: 0 }}>Đang tải đánh giá sản phẩm...</p>
+            </div>
+          ) : reviews.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', background: '#fafafa', borderRadius: 12, border: '1px dashed #e2e8f0', marginTop: 16 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>Sản phẩm này chưa có đánh giá nào.</p>
+              <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>Hãy là người đầu tiên mua hàng và để lại nhận xét nhé!</p>
+            </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '32px 16px', background: '#fafafa', borderRadius: 12, border: '1px dashed #e5e7eb' }}>
-              <div style={{ display: 'inline-flex', marginBottom: 8 }}>
-                <StarRow rating={product?.rating ? Math.round(product.rating) : 5} size={20} />
-              </div>
-              <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#374151', fontSize: 14 }}>
-                Chưa có đánh giá nào cho sản phẩm này
-              </p>
-              <p style={{ margin: 0, fontSize: 12.5, color: '#6b7280' }}>
-                Khách hàng mua sản phẩm có thể để lại nhận xét và đánh giá tại đây.
-              </p>
+            <div style={{ marginTop: 8 }}>
+              {reviews.map((rv, idx) => {
+                const authorName = rv.name || rv.buyer?.name || 'Khách hàng ẩn danh';
+                const authorAvatar = rv.avatar || rv.buyer?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100';
+                const reviewDate = rv.date || (rv.createdAt ? new Date(rv.createdAt).toLocaleDateString('vi-VN') : '');
+                const reviewText = rv.text || rv.comment || '';
+                const reviewImages = Array.isArray(rv.images) ? rv.images : [];
+                const ratingVal = typeof rv.rating === 'number' ? rv.rating : 5;
+
+                return (
+                  <div key={rv.id || rv._id || idx} style={S.reviewCard}>
+                    <img src={authorAvatar} alt={authorName} style={S.avatar} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{authorName}</span>
+                        <StarRow rating={ratingVal} size={12} />
+                        <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 'auto' }}>{reviewDate}</span>
+                      </div>
+                      <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{reviewText}</p>
+                      {reviewImages.length > 0 && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {reviewImages.map((img: string, i: number) => (
+                            <img key={i} src={img} alt={`review-img-${i}`} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

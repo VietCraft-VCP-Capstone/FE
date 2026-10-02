@@ -12,14 +12,14 @@ import { ChevronLeft, ChevronRight, Package, Truck } from 'lucide-react';
 
 import { count as fmtCount, dateTime, money, timeAgo } from '../../../../shared/utils/format';
 import type { SellerOrder, SellerOrderStatus, SellerOrderStatusFilter } from '../../types/order';
-import { CARRIER_LABEL, PAYMENT_LABEL, PAYMENT_STATUS_LABEL, STATUS_META } from './orderStatusMeta';
+import { CARRIER_LABEL, PAYMENT_LABEL, PAYMENT_STATUS_LABEL, STATUS_META, PRINTER_STATUS_META } from './orderStatusMeta';
 
 export const SELLER_BRAND = '#007700';
 
 /* ------------------------------------------------------------ huy hiệu ----- */
 
-export function StatusBadge({ status, size = 'md' }: { status: SellerOrderStatus; size?: 'sm' | 'md' }) {
-  const meta = STATUS_META[status];
+export function StatusBadge({ status, size = 'md' }: { status: SellerOrderStatus | 'PENDING_APPROVAL'; size?: 'sm' | 'md' }) {
+  const meta = STATUS_META[status] || STATUS_META.ORDERED;
   return (
     <span
       title={meta.hint}
@@ -140,12 +140,14 @@ export function OrdersTable({
   orders,
   loading,
   onOpen,
+  onQuickApprove,
   emptyTitle,
   emptyHint,
 }: {
   orders: SellerOrder[];
   loading: boolean;
   onOpen: (order: SellerOrder) => void;
+  onQuickApprove?: (order: SellerOrder, e: React.MouseEvent) => void;
   emptyTitle: string;
   emptyHint: string;
 }) {
@@ -202,7 +204,14 @@ export function OrdersTable({
               className="cursor-pointer border-b border-stone-100 transition-colors duration-150 last:border-b-0 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#007700] motion-reduce:transition-none"
             >
               <td className={TD}>
-                <span className="block text-[13px] font-bold text-stone-900">{order.orderCode}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="block text-[13px] font-bold text-stone-900">{order.orderCode}</span>
+                  {(order.isPod || order.orderType === 'POD' || order.items?.some(it => it.designFileUrl)) && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-purple-50 text-purple-700 border border-purple-200">
+                      POD
+                    </span>
+                  )}
+                </div>
                 {order.shipping.trackingNumber ? (
                   <span className="mt-0.5 flex items-center gap-1 text-[11px] text-stone-500">
                     <Truck size={11} aria-hidden />
@@ -260,7 +269,62 @@ export function OrdersTable({
               </td>
 
               <td className={TD}>
-                <StatusBadge status={order.status} />
+                {order.status === 'DELIVERED' ? (
+                  <div className="flex flex-col gap-0.5 items-start">
+                    <StatusBadge status="DELIVERED" />
+                    {order.isPod && (
+                      <span className="text-[10px] font-medium text-stone-400">
+                        {order.printerInfo?.supplierOrderId ? `Xưởng #${order.printerInfo.supplierOrderId}` : 'Xưởng hoàn tất'}
+                      </span>
+                    )}
+                  </div>
+                ) : order.status === 'CANCELLED' ? (
+                  <StatusBadge status="CANCELLED" />
+                ) : order.approvalStatus === 'PENDING_APPROVAL' || order.fulfillmentStatus === 'PENDING_APPROVAL' ? (
+                  <div className="flex flex-col gap-1.5 items-start">
+                    <StatusBadge status="PENDING_APPROVAL" />
+                    {onQuickApprove && (
+                      <button
+                        type="button"
+                        onClick={(e) => onQuickApprove(order, e)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-white shadow-xs transition-colors cursor-pointer ${
+                          order.isPod || order.orderType === 'POD'
+                            ? 'bg-purple-600 hover:bg-purple-700'
+                            : 'bg-[#007700] hover:bg-[#005B00]'
+                        }`}
+                        title={
+                          order.isPod || order.orderType === 'POD'
+                            ? 'Duyệt đơn và chuyển file in sang xưởng in'
+                            : 'Duyệt đơn hàng và bắt đầu chuẩn bị hàng'
+                        }
+                      >
+                        {order.isPod || order.orderType === 'POD' ? 'Duyệt in ngay' : 'Duyệt đơn ngay'}
+                      </button>
+                    )}
+                  </div>
+                ) : order.status === 'SHIPPING' ? (
+                  <div className="flex flex-col gap-0.5 items-start">
+                    <StatusBadge status="SHIPPING" />
+                    <span className="text-[10.5px] font-medium text-stone-400">
+                      {order.shipping?.trackingNumber ? `Vận đơn: ${order.shipping.trackingNumber}` : 'Đang giao hàng'}
+                    </span>
+                  </div>
+                ) : order.status === 'PROCESSING' && order.printerInfo?.printerStatus && PRINTER_STATUS_META[order.printerInfo.printerStatus] && order.printerInfo.printerStatus !== 'SHIPPED' && order.printerInfo.printerStatus !== 'DELIVERED' ? (
+                  <div className="flex flex-col gap-1 items-start">
+                    <span
+                      title={PRINTER_STATUS_META[order.printerInfo.printerStatus].hint}
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${PRINTER_STATUS_META[order.printerInfo.printerStatus].badge}`}
+                    >
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: PRINTER_STATUS_META[order.printerInfo.printerStatus].dot }} aria-hidden />
+                      {PRINTER_STATUS_META[order.printerInfo.printerStatus].label}
+                    </span>
+                    <span className="text-[10.5px] font-medium text-stone-400">
+                      {order.printerInfo.supplierOrderId ? `Mã xưởng: ${order.printerInfo.supplierOrderId}` : 'Xưởng in xử lý'}
+                    </span>
+                  </div>
+                ) : (
+                  <StatusBadge status={order.status} />
+                )}
               </td>
 
               <td className={`${TD} text-right`}>
