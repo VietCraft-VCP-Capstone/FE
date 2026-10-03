@@ -35,6 +35,7 @@ export interface OrderResponse {
   shopName?: string;
   shopLogo?: string;
   paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
+  isStatusSimulation?: boolean;
   createdAt: string;
   is_reviewed?: boolean;
   shippingAddress?: {
@@ -65,6 +66,13 @@ export const ordersService = {
   },
   confirmDelivery: async (orderId: string): Promise<{ success: boolean; message: string; order: any }> => {
     const res = await api.post(`/orders/${encodeURIComponent(orderId)}/confirm-delivery`);
+    return res.data;
+  },
+  simulateStatus: async (orderId: string, target: 'ORDERED' | 'SHIPPING' | 'DELIVERED'): Promise<{
+    success: boolean;
+    data: { order_id: string; order_code: string; order_status: string; payment_status: 'PENDING' };
+  }> => {
+    const res = await api.post(`/orders/${encodeURIComponent(orderId)}/status-simulation`, { target });
     return res.data;
   }
 };

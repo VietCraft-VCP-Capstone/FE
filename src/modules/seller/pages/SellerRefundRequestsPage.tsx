@@ -8,7 +8,7 @@ import { filterRefundRequests } from '../components/refunds/filterRefundRequests
 
 const TABS: { value: 'ALL' | RefundStatus; label: string }[] = [
   { value: 'ALL', label: 'Tất cả' }, { value: 'PENDING_SELLER', label: 'Chờ xử lý' },
-  { value: 'PENDING_PRINTER', label: 'Chờ Printer' }, { value: 'DISPUTED', label: 'Tranh chấp' },
+  { value: 'PENDING_PRINTER', label: 'Chờ xưởng in' }, { value: 'PRINTER_REJECTED', label: 'Xưởng in từ chối' }, { value: 'PRINTER_APPROVED', label: 'Xưởng in chấp thuận' }, { value: 'DISPUTED', label: 'Tranh chấp' },
   { value: 'SELLER_APPROVED', label: 'Đã duyệt' }, { value: 'SELLER_REJECTED', label: 'Đã từ chối' },
   { value: 'TIMEOUT_ESCALATED', label: 'Quá hạn' },
 ];
@@ -30,12 +30,12 @@ export function SellerRefundRequestsPage() {
   }, [status]);
   useEffect(() => { void load(); }, [load]);
   const visible = useMemo(() => filterRefundRequests(items, status, search), [items, status, search]);
-  const pendingCount = items.filter(item => item.status === 'PENDING_SELLER').length;
+  const pendingCount = items.filter(item => item.product_type === 'NORMAL' && item.status === 'PENDING_SELLER').length;
   const disputeCount = items.filter(item => item.status === 'DISPUTED' || item.status === 'TIMEOUT_ESCALATED').length;
 
   return <main className="mx-auto w-full max-w-[1500px] space-y-5 p-4 sm:p-6 lg:p-8">
     <header className="flex flex-wrap items-start justify-between gap-4">
-      <div><div className="flex items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EAF0E2] text-[#007700]"><ShieldCheck size={20} /></span><h1 className="m-0 text-2xl font-extrabold tracking-tight text-stone-900">Trả hàng / Hoàn tiền</h1></div><p className="mb-0 mt-2 max-w-[68ch] text-sm leading-relaxed text-stone-600">Xem yêu cầu, bằng chứng và hạn phản hồi. Với đơn POD, hãy phân loại trách nhiệm trước khi quyết định.</p></div>
+      <div><div className="flex items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EAF0E2] text-[#007700]"><ShieldCheck size={20} /></span><h1 className="m-0 text-2xl font-extrabold tracking-tight text-stone-900">Trả hàng / Hoàn tiền</h1></div><p className="mb-0 mt-2 max-w-[68ch] text-sm leading-relaxed text-stone-600">Xem yêu cầu, bằng chứng và hạn phản hồi. Đơn POD được xử lý trực tiếp bởi xưởng in; Seller chỉ theo dõi trạng thái.</p></div>
       <button type="button" onClick={() => void load(true)} disabled={loading || refreshing} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"><RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} /> Làm mới</button>
     </header>
 
