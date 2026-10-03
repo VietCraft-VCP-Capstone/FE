@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { refundService, type RefundRequest } from '../../order/services/refundService';
 import { DisputeReasonModal } from './refund/DisputeReasonModal';
+import { BuyerReturnItemList } from '../../returns/BuyerReturnItemList';
+import { OrderStatusSimulator } from './OrderStatusSimulator';
 import { ImagePlus, Video, X } from 'lucide-react';
 
 const reasons = [
@@ -148,6 +150,7 @@ export function RefundRequestPanel({ orderId, orderStatus }: { orderId: string; 
     {request?.product_type === 'POD' && request.status === 'PRINTER_REJECTED' && <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900"><strong className="block text-xs uppercase tracking-wide">Lý do từ xưởng in</strong><span className="mt-1 block">{request.printer_response?.note || 'Xưởng in chưa cung cấp ghi chú.'}</span></div>}
     {request?.admin_decision && <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">Quyết định quản trị viên: <strong>{request.admin_decision.decision === 'APPROVE' ? `${request.admin_decision.refund_type === 'FULL' ? 'chấp thuận hoàn toàn bộ' : `chấp thuận hoàn ${Number(request.refund_amount || 0).toLocaleString('vi-VN')} ₫`} · bên chịu phí: ${request.admin_decision.cost_bearer}` : 'không chấp thuận'}</strong><br />{request.admin_decision.note}</p>}
     {error && <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+    <BuyerReturnItemList orderId={orderId} delivered={orderStatus === 'completed'} />
     {open && <form onSubmit={submit} className="mt-5 grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-2">
       <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Lý do yêu cầu <span className="text-rose-600">*</span><select required value={reason} onChange={e => setReason(e.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100"><option value="" disabled>Chọn lý do</option>{reasons.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Hình thức hoàn<select value={partial ? 'PARTIAL' : 'FULL'} onChange={e => setPartial(e.target.value === 'PARTIAL')} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100"><option value="FULL">Hoàn toàn bộ</option><option value="PARTIAL">Hoàn một phần</option></select></label>

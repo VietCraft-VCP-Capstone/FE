@@ -20,6 +20,7 @@ import { BuyerOrdersPage } from '../modules/buyer/pages/BuyerOrdersPage';
 import { BuyerOrderDetailPage } from '../modules/buyer/pages/BuyerOrderDetailPage';
 import { BuyerShopPage } from '../modules/buyer/pages/BuyerShopPage';
 import { BuyerProductDetailPage } from '../modules/buyer/pages/BuyerProductDetailPage';
+import { BuyerReturnPage } from '../modules/returns/BuyerReturnPage';
 import { BuyerVouchersPage } from '../modules/buyer/pages/BuyerVouchersPage';
 import { useAuth } from '../modules/auth/hooks/useAuth';
 
@@ -120,6 +121,8 @@ export function AppRouter() {
           <Route path="/followed-shops" element={<BuyerFollowedShopsPage />} />
           <Route path="/orders" element={<BuyerOrdersPage />} />
           <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
+          <Route path="/returns/new" element={<BuyerReturnPage />} />
+          <Route path="/returns/:requestId" element={<BuyerReturnPage />} />
           <Route path="/notifications" element={<Navigate to="/" replace />} />
         </Route>
       </Route>
