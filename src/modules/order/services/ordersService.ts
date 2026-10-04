@@ -1,6 +1,7 @@
 import api from '../../../infrastructure/api/interceptors';
 
 export interface OrderItemResponse {
+  order_item_id?: string;
   productId: string;
   variantId: string;
   quantity: number;

@@ -123,8 +123,8 @@ export function RefundRequestPanel({ orderId, orderStatus }: { orderId: string; 
           <span aria-hidden="true" className="text-lg font-bold">↺</span>
         </span>
         <div className="min-w-0">
-          <h3 className="text-sm font-extrabold text-slate-900">Trả hàng / Hoàn tiền</h3>
-          {request ? <p className="mt-1 text-xs leading-5 text-slate-500">Mã yêu cầu <span className="font-mono font-semibold text-slate-700">{request._id.slice(-8)}</span>{requestOrderCode ? ` · Đơn ${requestOrderCode}` : ''}</p> : <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">Bạn có thể gửi yêu cầu trong vòng 7 ngày kể từ khi nhận hàng.</p>}
+          <h3 className="text-sm font-extrabold text-slate-900">Hoàn tiền theo đơn hàng <span className="ml-1 rounded bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Refund hiện có</span></h3>
+          {request ? <p className="mt-1 text-xs leading-5 text-slate-500">Mã yêu cầu <span className="font-mono font-semibold text-slate-700">{request._id.slice(-8)}</span>{requestOrderCode ? ` · Đơn ${requestOrderCode}` : ''}</p> : <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">Biểu mẫu này tạo yêu cầu hoàn tiền theo đơn hàng. Muốn đổi/trả một sản phẩm POD, dùng mục Return v3 riêng bên dưới.</p>}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -139,7 +139,7 @@ export function RefundRequestPanel({ orderId, orderStatus }: { orderId: string; 
           }}
         />
         {orderStatus === 'pending' && <button type="button" disabled={testBusy} onClick={() => setTestConfirmOpen(true)} className="min-h-10 rounded-xl border border-amber-300 bg-amber-50 px-3 text-xs font-bold text-amber-900 transition hover:bg-amber-100 disabled:opacity-50">{testBusy ? 'Đang tạo đơn test...' : 'Tạo flow Refund test'}</button>}
-        {canRequest && <button type="button" onClick={() => setOpen(v => !v)} className="min-h-10 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">{open ? 'Đóng biểu mẫu' : 'Tạo yêu cầu'}</button>}
+        {canRequest && <button type="button" onClick={() => setOpen(v => !v)} className="min-h-10 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">{open ? 'Đóng biểu mẫu hoàn tiền' : 'Tạo yêu cầu hoàn tiền'}</button>}
         {canDispute && <button type="button" disabled={busy} onClick={() => setDisputeOpen(true)} className="min-h-10 rounded-xl bg-rose-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-rose-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2">Mở tranh chấp</button>}
       </div>
     </div>
@@ -150,8 +150,8 @@ export function RefundRequestPanel({ orderId, orderStatus }: { orderId: string; 
     {request?.product_type === 'POD' && request.status === 'PRINTER_REJECTED' && <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900"><strong className="block text-xs uppercase tracking-wide">Lý do từ xưởng in</strong><span className="mt-1 block">{request.printer_response?.note || 'Xưởng in chưa cung cấp ghi chú.'}</span></div>}
     {request?.admin_decision && <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">Quyết định quản trị viên: <strong>{request.admin_decision.decision === 'APPROVE' ? `${request.admin_decision.refund_type === 'FULL' ? 'chấp thuận hoàn toàn bộ' : `chấp thuận hoàn ${Number(request.refund_amount || 0).toLocaleString('vi-VN')} ₫`} · bên chịu phí: ${request.admin_decision.cost_bearer}` : 'không chấp thuận'}</strong><br />{request.admin_decision.note}</p>}
     {error && <p role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
-    <BuyerReturnItemList orderId={orderId} delivered={orderStatus === 'completed'} />
     {open && <form onSubmit={submit} className="mt-5 grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-2">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 md:col-span-2"><p className="text-sm font-extrabold text-amber-950">Biểu mẫu hoàn tiền theo đơn hàng</p><p className="mt-1 text-xs leading-5 text-amber-900">Đây là luồng Refund hiện có. Nó không tạo yêu cầu đổi/trả Return v3 cho từng sản phẩm — dùng mục riêng bên dưới nếu cần đổi/trả một sản phẩm POD.</p></div>
       <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Lý do yêu cầu <span className="text-rose-600">*</span><select required value={reason} onChange={e => setReason(e.target.value)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100"><option value="" disabled>Chọn lý do</option>{reasons.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Hình thức hoàn<select value={partial ? 'PARTIAL' : 'FULL'} onChange={e => setPartial(e.target.value === 'PARTIAL')} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100"><option value="FULL">Hoàn toàn bộ</option><option value="PARTIAL">Hoàn một phần</option></select></label>
       {partial && <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Số tiền đề nghị (₫)<input required type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)} className="min-h-11 rounded-xl border border-slate-300 px-3 text-sm font-medium focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100" /></label>}
@@ -181,6 +181,7 @@ export function RefundRequestPanel({ orderId, orderStatus }: { orderId: string; 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 md:col-span-2"><p className="text-xs text-slate-500"><span className="text-rose-600">*</span> Thông tin bắt buộc</p><button type="submit" disabled={busy || uploadingEvidence} className="min-h-11 rounded-xl bg-emerald-700 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-50">{busy ? 'Đang gửi yêu cầu…' : uploadingEvidence ? 'Đang tải minh chứng…' : 'Gửi yêu cầu hoàn tiền'}</button></div>
     </form>}
   </section>
+  <BuyerReturnItemList orderId={orderId} delivered={orderStatus === 'completed'} />
   {testConfirmOpen && <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setTestConfirmOpen(false); }}>
     <section role="alertdialog" aria-modal="true" aria-labelledby="refund-test-title" aria-describedby="refund-test-description" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
       <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-amber-700"><span aria-hidden="true" className="text-xl font-bold">!</span></div>

@@ -17,6 +17,7 @@ const idOf = (request: ReturnRequest) => request.id || request._id || '';
 
 export const returnService = {
   create: async (payload: ReturnRequestInput): Promise<ReturnRequest> => unwrap(await api.post('/returns/v3/requests', payload)),
+  eligibility: async (orderId:string): Promise<any[]> => unwrap(await api.get('/returns/v3/eligibility',{params:{orderId}})).items || [],
   list: async (status?: string): Promise<ReturnRequest[]> => {
     const result = unwrap<{ items: ReturnRequest[] }>(await api.get('/returns/v3/requests', { params: status ? { status } : undefined }));
     return result.items || [];
