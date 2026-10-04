@@ -5,6 +5,7 @@ export interface PrinterPartnerInfo {
   printer_name: string;
   api_url: string;
   api_key?: string;
+  seller_printing_email?: string;
   webhook_secret?: string;
   is_connected: boolean;
   connected_at?: string;
@@ -13,13 +14,16 @@ export interface PrinterPartnerInfo {
 
 export interface PrinterSettingsResponse {
   printer: PrinterPartnerInfo;
+  printers?: PrinterPartnerInfo[];
   defaultApiUrl: string;
 }
 
 export interface ConnectPrinterPayload {
-  printer_name: string;
+  printer_name?: string;
   api_url: string;
-  api_key?: string;
+  api_key: string;
+  printing_email?: string;
+  printing_password?: string;
   auto_approve?: boolean;
 }
 
@@ -37,13 +41,13 @@ export const sellerPrinterService = {
     return res.data;
   },
 
-  async connect(payload: ConnectPrinterPayload): Promise<{ message: string; printer: PrinterPartnerInfo }> {
+  async connect(payload: ConnectPrinterPayload): Promise<{ message: string; printer: any }> {
     const res = await api.post('/seller/printer/connect', payload);
     return res.data;
   },
 
-  async disconnect(): Promise<{ success: boolean; message: string }> {
-    const res = await api.post('/seller/printer/disconnect');
+  async disconnect(printerId?: string): Promise<{ success: boolean; message: string; printers?: PrinterPartnerInfo[] }> {
+    const res = await api.post('/seller/printer/disconnect', { printer_id: printerId });
     return res.data;
   },
 };

@@ -32,7 +32,7 @@ export function Step1PrinterAndBlank({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     {(printers || []).map((p: any) => {
-                        const isSel = selectedPrinter === p.id;
+                        const isSel = selectedPrinter === p.id || (printers.length === 1 && p.id !== 'all') || (selectedPrinter === 'all' && p.id === 'all');
                         return (
                             <div
                                 key={p.id}
@@ -77,7 +77,14 @@ export function Step1PrinterAndBlank({
                             <button type="button" key={b._id} className={`blank-pick-card ${blank?._id === b._id ? 'selected' : ''}`} onClick={() => chooseBlank(b)}>
                                 <img src={abs(b.default_image || '')} alt={b.title || ''} />
                                 <span className="blank-pick-title">{b.title}</span>
-                                <span className="blank-pick-cost">Giá phôi từ {safeCost.toLocaleString()}đ</span>
+                                <div className="flex items-center justify-between text-[11px] text-stone-500 w-full mt-1">
+                                    <span className="blank-pick-cost font-semibold text-[#1a6b1a]">Từ {safeCost.toLocaleString()}đ</span>
+                                    {b.printer_name && (
+                                        <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded font-medium truncate max-w-[120px]">
+                                            {b.printer_name}
+                                        </span>
+                                    )}
+                                </div>
                                 {faceCount > 1 && <span className="blank-pick-faces">{faceCount} mặt in</span>}
                             </button>
                         );
@@ -85,8 +92,20 @@ export function Step1PrinterAndBlank({
                 </div>
 
                 {(!blanks || blanks.length === 0) && (
-                    <div className="py-8 text-center text-xs text-stone-500 bg-stone-50 rounded-lg border border-dashed border-stone-200">
-                        Chưa có phôi nào khả dụng từ xưởng in này. Vui lòng chọn xưởng in khác hoặc chọn phôi mặc định trên sàn.
+                    <div className="py-10 text-center text-xs text-stone-500 bg-stone-50 rounded-xl border border-dashed border-stone-300 p-6 space-y-3">
+                        <Building2 className="w-8 h-8 text-stone-400 mx-auto" />
+                        <div className="font-bold text-stone-800 text-sm">
+                            Chưa tìm thấy phôi sản phẩm từ xưởng in đã khai báo
+                        </div>
+                        <p className="max-w-md mx-auto text-stone-500 leading-relaxed">
+                            Chỉ những phôi in từ xưởng mà bạn đã thỏa thuận và khai báo API Key thành công mới hiển thị tại đây. Vui lòng kiểm tra lại trạng thái kết nối xưởng in.
+                        </p>
+                        <a
+                            href="/seller/settings"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1a6b1a] text-white rounded-lg font-semibold text-xs shadow-sm hover:bg-[#145214] transition-colors"
+                        >
+                            Đến Cài Đặt Xưởng In (POD)
+                        </a>
                     </div>
                 )}
             </div>
