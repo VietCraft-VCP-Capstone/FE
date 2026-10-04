@@ -150,7 +150,9 @@ export function CreateProductPage() {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [connectedPrinter, setConnectedPrinter] = useState<any>(null);
     const [connectedPrinters, setConnectedPrinters] = useState<any[]>([]);
-    const [selectedVariants, setSelectedVariants] = useState<Record<string, { on: boolean; markup: string; stock: string }>>({});
+    const [selectedVariants, setSelectedVariants] = useState<Record<string, { on: boolean; markup: string; stock: string; color?: string; size?: string; base_cost?: number }>>({});
+    const [selectedImages, setSelectedImages] = useState<string[]>([]);
+    const [coverImage, setCoverImage] = useState<string>('');
     const [areaOverrides, setAreaOverrides] = useState<Record<string, { x?: number; y?: number; width?: number; height?: number }>>({});
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -242,10 +244,23 @@ export function CreateProductPage() {
 
     const chooseBlank = (b: any) => {
         if (!b) return;
-        setBlank(b);
+        let normalized = { ...b };
+        if (!normalized.print_areas || normalized.print_areas.length === 0) {
+            normalized.print_areas = [{
+                key: 'front',
+                label: 'Mặt trước',
+                image: normalized.default_image,
+                x: 275,
+                y: 220,
+                width: 250,
+                height: 330,
+                surface: 'flat'
+            }];
+        }
+        setBlank(normalized);
         setAreaOverrides({});
         const initV: Record<string, any> = {};
-        (b.variations || []).forEach((v: any) => {
+        (normalized.variations || []).forEach((v: any) => {
             if (!v?.sku) return;
             initV[v.sku] = {
                 on: true,
@@ -257,10 +272,12 @@ export function CreateProductPage() {
             };
         });
         setSelectedVariants(initV);
+        setSelectedImages([]);
+        setCoverImage('');
         const initF: Record<string, L[]> = {};
-        (b.print_areas || []).forEach((a: any) => { if (a?.key) initF[a.key] = []; });
+        (normalized.print_areas || []).forEach((a: any) => { if (a?.key) initF[a.key] = []; });
         setFaces(initF);
-        setActiveFace(b.print_areas?.[0]?.key || 'front');
+        setActiveFace(normalized.print_areas?.[0]?.key || 'front');
         setSelectedId(null);
     };
 
@@ -333,7 +350,14 @@ export function CreateProductPage() {
     };
 
     const toApiLayer = (l: L) => ({
-        type: 'image', design_id: l.design._id, width: l.baseW, x: l.x, y: l.y, scale: l.scale, rotation: l.rotation
+        type: 'image',
+        design_id: l.design?._id,
+        designUrl: l.design?.file_url,
+        width: l.baseW,
+        x: l.x,
+        y: l.y,
+        scale: l.scale,
+        rotation: l.rotation
     });
 
     const submit = async () => {
@@ -356,6 +380,13 @@ export function CreateProductPage() {
                 layers: ls.map(toApiLayer)
             };
         });
+        let finalImages = Array.from(new Set(selectedImages.filter(Boolean)));
+        if (coverImage && finalImages.includes(coverImage)) {
+            finalImages = [coverImage, ...finalImages.filter(img => img !== coverImage)];
+        } else if (coverImage) {
+            finalImages = [coverImage, ...finalImages];
+        }
+
         try {
             await productsService.create({ 
                 title, 
@@ -364,6 +395,8 @@ export function CreateProductPage() {
                 blankId: blank._id, 
                 printerId: blank.printer_id || connectedPrinter?.printer_id || 'vietcraft-direct',
                 printerName: blank.printer_name || connectedPrinter?.printer_name || 'Xưởng in đối tác',
+                images: finalImages,
+                thumbnail: coverImage || finalImages[0],
                 variants, 
                 designPlacements 
             });
@@ -446,6 +479,11 @@ export function CreateProductPage() {
                         faces={faces}
                         toApiLayer={toApiLayer}
                         selectedVariants={selectedVariants}
+                        setSelectedVariants={setSelectedVariants}
+                        selectedImages={selectedImages}
+                        setSelectedImages={setSelectedImages}
+                        coverImage={coverImage}
+                        setCoverImage={setCoverImage}
                         spaceOf={spaceOf}
                     />
                 )}
@@ -461,6 +499,8 @@ export function CreateProductPage() {
                         blank={blank}
                         selectedVariants={selectedVariants}
                         setSelectedVariants={setSelectedVariants}
+                        selectedImages={selectedImages}
+                        coverImage={coverImage}
                     />
                 )}
             </div>
