@@ -2,22 +2,29 @@ import { useState, useEffect } from 'react';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle, Star, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle, CheckCircle } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
-import { RefundRequestPanel } from '../components/RefundRequestPanel';
 import ReviewModal from '../components/profile/ReviewModal';
+import { OrderItemsList } from '../components/OrderItemsList';
+import { OrderSupportSection } from '../components/OrderSupportSection';
+import { returnService, type ReturnEligibilityItem } from '../../returns/services/returnService';
+import { refundService } from '../../order/services/refundService';
+import type { OrderItemResponse, OrderResponse } from '../../order/services/ordersService';
 
 export function BuyerOrderDetailPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
-    const [order, setOrder] = useState<any>(null);
+    const [order, setOrder] = useState<OrderResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [copySuccess, setCopySuccess] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [targetReviewProductId, setTargetReviewProductId] = useState<string | undefined>(undefined);
+    const [eligibilityItems, setEligibilityItems] = useState<ReturnEligibilityItem[]>([]);
+    const [hasLegacyRefund, setHasLegacyRefund] = useState(false);
+    const [reorderItems, setReorderItems] = useState<OrderItemResponse[] | null>(null);
 
     const handleOpenReview = (productId?: string) => {
         setTargetReviewProductId(productId);
@@ -39,20 +46,38 @@ export function BuyerOrderDetailPage() {
     };
 
     useEffect(() => {
+        let cancelled = false;
         const fetchOrderDetails = async () => {
             if (!id) return;
             setLoading(true);
             try {
                 const res = await ordersService.getById(id);
-                setOrder(res);
+                if (!cancelled) setOrder(res);
             } catch (err) {
                 console.error('Failed to load order detail', err);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
-        fetchOrderDetails();
+        void fetchOrderDetails();
+        return () => { cancelled = true; };
     }, [id]);
+
+    useEffect(() => {
+        if (!order?.id) return;
+        let cancelled = false;
+        setHasLegacyRefund(false);
+        void Promise.all([
+            refundService.getForOrder(order.id).catch(() => null),
+            order.status === 'completed' ? returnService.eligibility(order.id).catch(() => []) : Promise.resolve([]),
+        ]).then(([legacyRefund, eligibility]) => {
+            if (cancelled) return;
+            setHasLegacyRefund(legacyRefund !== null);
+            setEligibilityItems(eligibility);
+        });
+        return () => { cancelled = true; };
+    }, [order?.id, order?.status]);
+
 
     const handleCopyCode = () => {
         if (!order?.id) return;
@@ -61,12 +86,13 @@ export function BuyerOrderDetailPage() {
         setTimeout(() => setCopySuccess(false), 2000);
     };
 
-    const handleReorder = () => {
+    const handleReorder = (item?: OrderItemResponse) => {
         if (!order) return;
+        setReorderItems(item ? [item] : null);
         setIsReorderModalOpen(true);
     };
 
-    const handleConfirmReorder = async (selectedItems: any[]) => {
+    const handleConfirmReorder = async (selectedItems: OrderItemResponse[]) => {
         if (!order) return;
         const failures: string[] = [];
         for (const it of selectedItems) {
@@ -144,7 +170,7 @@ export function BuyerOrderDetailPage() {
         return `${day} Thg ${month} ${year}, ${hour}:${min}`;
     };
 
-    const getPaymentMethodLabel = (method: string) => {
+    const getPaymentMethodLabel = (method: string | undefined) => {
         switch (method?.toLowerCase()) {
             case 'momo': return 'Ví MoMo';
             case 'vnpay': return 'VNPay';
@@ -211,8 +237,8 @@ export function BuyerOrderDetailPage() {
         iconBg: 'bg-gray-500'
     };
 
-    const orderItems: any[] = Array.isArray(order.items) ? order.items : [];
-    const subtotal = orderItems.reduce((acc: number, it: any) => acc + ((it.price || 0) * (it.quantity || 0)), 0);
+    const orderItems: OrderItemResponse[] = Array.isArray(order.items) ? order.items : [];
+    const subtotal = orderItems.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
     const shippingFee = Number(order.shippingFee ?? 0);
     const totalAmount = Number(order.totalAmount ?? (subtotal + shippingFee));
 
@@ -328,103 +354,38 @@ export function BuyerOrderDetailPage() {
                 </div>
 
                 {/* Items */}
-                <div className="divide-y divide-gray-50 p-4">
-                    {orderItems.map((item: any, idx: number) => (
-                        <div key={idx} className="flex gap-4 py-3 first:pt-0 last:pb-0">
-                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                <img
-                                    src={item.image || '/image-not-found.jpg'}
-                                    alt={item.title}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).src = '/image-not-found.jpg';
-                                    }}
-                                />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="font-extrabold text-gray-900 text-sm leading-snug line-clamp-1">{item.title}</h4>
-                                <p className="text-[11px] text-gray-400 mt-1">Phân loại: {item.color || 'Trắng'}</p>
-                                <p className="text-xs font-semibold text-gray-500 mt-0.5">x{item.quantity}</p>
-                            </div>
-                            <div className="text-right flex flex-col items-end justify-between">
-                                <span className="font-extrabold text-gray-900 text-sm">
-                                    {(item.price * item.quantity).toLocaleString('vi-VN')}đ
-                                </span>
-                                {order.status === 'completed' && (
-                                    <div className="mt-2">
-                                        {item.is_reviewed ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleOpenReview(item.productId)}
-                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-amber-200/70 shadow-2xs"
-                                                title="Xem và chỉnh sửa đánh giá cho sản phẩm này"
-                                            >
-                                                <Star size={11} className="fill-amber-500 text-amber-500" />
-                                                <span>Chỉnh sửa đánh giá</span>
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleOpenReview(item.productId)}
-                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-emerald-200/70 shadow-2xs"
-                                                title="Đánh giá sản phẩm này"
-                                            >
-                                                <Star size={11} />
-                                                <span>Đánh giá</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                <OrderItemsList
+                    orderId={order.id}
+                    items={orderItems}
+                    eligibilityItems={eligibilityItems}
+                    completed={order.status === 'completed'}
+                    onReview={handleOpenReview}
+                    onReorder={handleReorder}
+                />
 
-                {/* Item Card Actions */}
-                <div className="p-4 bg-gray-50/10 border-t border-gray-50 flex justify-end gap-2">
-
-                    <RefundRequestPanel orderId={order.id} orderStatus={order.status} />
-                    {order.status === 'shipping' && (
-                        <button
-                            type="button"
-                            onClick={handleConfirmReceived}
-                            disabled={confirmingDelivery}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer disabled:opacity-60"
-                            title="Xác nhận bạn đã nhận được kiện hàng từ shipper"
-                        >
-                            <CheckCircle size={14} />
-                            <span>{confirmingDelivery ? 'Đang xử lý...' : 'Đã nhận được hàng'}</span>
-                        </button>
-                    )}
-                    {order.status === 'completed' && (
-                        order.is_reviewed || (orderItems.length > 0 && orderItems.every((it: any) => it.is_reviewed)) ? (
-                            <button
-                                onClick={() => handleOpenReview()}
-                                className="border border-amber-500 text-amber-700 hover:bg-amber-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
-                                title="Xem và chỉnh sửa đánh giá của đơn hàng này"
-                            >
-                                <Star size={14} className="fill-amber-500 text-amber-500" />
-                                <span>Chỉnh sửa đánh giá</span>
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => handleOpenReview()}
-                                className="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
-                                title="Đánh giá sản phẩm trong đơn hàng"
-                            >
-                                <Star size={14} />
-                                <span>Đánh giá</span>
-                            </button>
-                        )
-                    )}
+                {order.status === 'shipping' && <div className="flex justify-end border-t border-gray-50 p-4">
                     <button
-                        onClick={handleReorder}
-                        className="border border-emerald-600 hover:bg-emerald-50 text-emerald-600 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                        type="button"
+                        onClick={handleConfirmReceived}
+                        disabled={confirmingDelivery}
+                        className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95 disabled:opacity-60"
+                        title="Xác nhận bạn đã nhận được kiện hàng từ shipper"
                     >
-                        <span>Mua lại</span>
+                        <CheckCircle size={14} />
+                        <span>{confirmingDelivery ? 'Đang xử lý...' : 'Đã nhận được hàng'}</span>
                     </button>
-                </div>
+                </div>}
             </div>
+
+            {(hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID') || import.meta.env.DEV) && <OrderSupportSection
+                orderId={order.id}
+                orderStatus={order.status}
+                showLegacyRefund={hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID')}
+                isDevelopment={import.meta.env.DEV}
+                isSimulationOrder={order.id.startsWith('TEST-STATUS-')}
+                onError={message => showToast(message, 'error')}
+                onSimulated={async orderCode => { navigate(`/orders/${encodeURIComponent(orderCode)}`); }}
+            />}
 
             {/* Bottom Payment details */}
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row justify-between gap-8 divide-y md:divide-y-0 md:divide-x divide-gray-100">
@@ -486,7 +447,7 @@ export function BuyerOrderDetailPage() {
                     isOpen={isReorderModalOpen}
                     onClose={() => setIsReorderModalOpen(false)}
                     shopName={order.shopName || 'VietCraft Shop'}
-                    items={orderItems}
+                    items={reorderItems || orderItems}
                     onConfirm={handleConfirmReorder}
                 />
             )}

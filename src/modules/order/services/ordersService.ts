@@ -37,6 +37,9 @@ export interface OrderResponse {
   shopLogo?: string;
   paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
   isStatusSimulation?: boolean;
+  isPod?: boolean;
+  orderType?: string;
+  fulfillmentStatus?: string;
   createdAt: string;
   is_reviewed?: boolean;
   shippingAddress?: {
