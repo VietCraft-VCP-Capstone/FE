@@ -8,6 +8,8 @@ import { SellerDashboard } from './SellerDashboard';
 import { SellerOrdersPage } from './SellerOrdersPage';
 import { SellerRefundRequestsPage } from './SellerRefundRequestsPage';
 import { SellerCatalogPage } from './SellerCatalogPage';
+import { SellerFollowedCompetitorsPage } from './SellerFollowedCompetitorsPage';
+import { SellerCompetitorDetailPage } from './SellerCompetitorDetailPage';
 import { SellerChatPage } from './SellerChatPage';
 import { POD_CREATE_ENABLED } from '../featureFlags';
 
