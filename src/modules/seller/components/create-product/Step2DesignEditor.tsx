@@ -83,16 +83,50 @@ export function Step2DesignEditor({
     const areas = blank?.print_areas || [];
     const area = areaOf(activeFace);
     const isWrap = area?.surface === 'wrap';
-    const isTshirt = blank?._id ? blank._id.includes('tshirt') : false;
-    const isFrame = blank?._id ? blank._id.includes('frame') : false;
-    const isTote = blank?._id ? blank._id.includes('tote') : false;
-    const isMug = blank?._id ? blank._id.includes('mug') : false;
+
+    // Phân loại thông minh loại phôi từ cả mẫu VietCraft và xưởng in thực tế
+    const textToMatch = `${blank?._id || ''} ${blank?.title || ''} ${blank?.category || ''}`.toLowerCase();
+
+    const isTshirt = textToMatch.includes('tshirt') ||
+                     textToMatch.includes('t-shirt') ||
+                     textToMatch.includes('áo') ||
+                     textToMatch.includes('shirt') ||
+                     textToMatch.includes('hoodie') ||
+                     textToMatch.includes('sweater') ||
+                     textToMatch.includes('polo') ||
+                     textToMatch.includes('thời trang') ||
+                     textToMatch.includes('trang phục');
+
+    const isFrame = textToMatch.includes('frame') ||
+                    textToMatch.includes('canvas') ||
+                    textToMatch.includes('tranh') ||
+                    textToMatch.includes('khung') ||
+                    textToMatch.includes('poster');
+
+    const isTote = textToMatch.includes('tote') ||
+                   textToMatch.includes('túi') ||
+                   textToMatch.includes('bag') ||
+                   textToMatch.includes('balo');
+
+    const isMug = textToMatch.includes('mug') ||
+                  textToMatch.includes('ly') ||
+                  textToMatch.includes('cốc') ||
+                  textToMatch.includes('bình') ||
+                  textToMatch.includes('bottle') ||
+                  textToMatch.includes('cup') ||
+                  textToMatch.includes('vase') ||
+                  textToMatch.includes('drinkware') ||
+                  textToMatch.includes('đồ gia dụng') ||
+                  isWrap;
+
+    const isGeneric = !isTshirt && !isFrame && !isTote && !isMug;
     const sp = spaceOf(area);
 
     const [isAreaSelected, setIsAreaSelected] = useState(false);
     const [showGuides, setShowGuides] = useState(true);
 
-    const blankImg = useHTMLImage(area?.image || blank?.default_image);
+    const areaImgUrl = (area?.image && typeof area.image === 'string' && area.image.trim() !== '') ? area.image : blank?.default_image;
+    const blankImg = useHTMLImage(areaImgUrl);
     const trRef = useRef<any>(null);
     const areaRectRef = useRef<any>(null);
     const areaTrRef = useRef<any>(null);
@@ -297,7 +331,8 @@ export function Step2DesignEditor({
                             <li>Tối đa 100 MiB (JPG/PNG) hoặc 20 MiB (SVG)</li>
                             <li>Vùng in đang chọn: <b>{(sp.width * 0.1).toFixed(1)} × {(sp.height * 0.1).toFixed(1)} cm</b></li>
                             {isTshirt && <li>Cách gờ cổ áo: <b className="text-[#1a6b1a]">{distFromCollarCm} cm</b></li>}
-                            <li>Kích thước phôi: <b>{blank.dimensions_info || 'Dài 72cm × Rộng 54cm'}</b></li>
+                            <li>Kích thước phôi: <b>{blank.dimensions_info || (isTshirt ? 'Dài 72cm × Rộng 54cm' : (isMug ? 'Dung tích tiêu chuẩn' : (isFrame ? '30 × 40 cm' : 'Kích thước tiêu chuẩn xưởng in')))}</b></li>
+                            {blank.printer_name && <li>Xưởng in đối tác: <b className="text-[#1a6b1a]">{blank.printer_name}</b></li>}
                         </ul>
                     </div>
                 </div>
@@ -382,16 +417,20 @@ export function Step2DesignEditor({
                             <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
                                 <div className="flex items-center gap-1">
                                     <span className="text-stone-400 font-medium">Khổ:</span>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 250, height: 330, x: 275, y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Thân chuẩn (25×33)</button>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 210, height: 300, x: 295, y: 235 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 280, height: 380, x: 260, y: 205 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A3 (28×38)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 250, height: 330, x: Math.round(400 - 125), y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Thân chuẩn (25×33)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 210, height: 300, x: Math.round(400 - 105), y: 235 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 280, height: 380, x: Math.round(400 - 140), y: 205 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A3 (28×38)</button>
                                     <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 100, height: 100, x: 450, y: 240 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Ngực trái (10×10)</button>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <span className="text-stone-400 font-medium">Vị trí:</span>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 275, y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: Math.round(400 - sp.width / 2) })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm</button>
                                     <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 450, y: 240 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Ngực trái</button>
-                                    <button type="button" onClick={() => { resetAreaOverride(activeFace); applyAreaOverride(activeFace, { x: 275, y: 220, width: 250, height: 330 }); }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
+                                    <button type="button" onClick={() => {
+                                        resetAreaOverride(activeFace);
+                                        const orig = areaOf(activeFace);
+                                        applyAreaOverride(activeFace, { x: orig?.x ?? 275, y: orig?.y ?? 220, width: orig?.width ?? 250, height: orig?.height ?? 330 });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
                                 </div>
                             </div>
                         )}
@@ -400,14 +439,21 @@ export function Step2DesignEditor({
                             <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
                                 <div className="flex items-center gap-1">
                                     <span className="text-stone-400 font-medium">Khổ:</span>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 390, height: 520, x: 205, y: 140 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Lòng tranh (30×40)</button>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 273, height: 390, x: 263, y: 205 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 390, height: 390, x: 205, y: 205 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Vuông (30×30)</button>
+                                    <button type="button" onClick={() => {
+                                        const orig = areaOf(activeFace);
+                                        applyAreaOverride(activeFace, { width: orig?.width ?? 390, height: orig?.height ?? 520, x: orig?.x ?? 205, y: orig?.y ?? 140 });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Lòng tranh tối đa</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 273, height: 390, x: Math.round(400 - 136.5), y: 205 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 350, height: 350, x: Math.round(400 - 175), y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Vuông (35×35)</button>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <span className="text-stone-400 font-medium">Vị trí:</span>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 205, y: 140, width: 390, height: 520 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm tranh</button>
-                                    <button type="button" onClick={() => { resetAreaOverride(activeFace); applyAreaOverride(activeFace, { x: 205, y: 140, width: 390, height: 520 }); }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: Math.round(400 - sp.width / 2) })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm</button>
+                                    <button type="button" onClick={() => {
+                                        resetAreaOverride(activeFace);
+                                        const orig = areaOf(activeFace);
+                                        applyAreaOverride(activeFace, { x: orig?.x ?? 205, y: orig?.y ?? 140, width: orig?.width ?? 390, height: orig?.height ?? 520 });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
                                 </div>
                             </div>
                         )}
@@ -416,14 +462,21 @@ export function Step2DesignEditor({
                             <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
                                 <div className="flex items-center gap-1">
                                     <span className="text-stone-400 font-medium">Khổ:</span>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 300, height: 330, x: 250, y: 320 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Thân túi (30×33)</button>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 210, height: 300, x: 295, y: 335 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 150, height: 150, x: 325, y: 410 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Logo nhỏ (15×15)</button>
+                                    <button type="button" onClick={() => {
+                                        const orig = areaOf(activeFace);
+                                        applyAreaOverride(activeFace, { width: orig?.width ?? 300, height: orig?.height ?? 330, x: orig?.x ?? 250, y: orig?.y ?? 320 });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Thân túi tối đa</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 210, height: 300, x: Math.round(400 - 105), y: 335 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">A4 (21×30)</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 150, height: 150, x: Math.round(400 - 75), y: 410 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Logo nhỏ (15×15)</button>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <span className="text-stone-400 font-medium">Vị trí:</span>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 250, y: 320, width: 300, height: 330 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm túi</button>
-                                    <button type="button" onClick={() => { resetAreaOverride(activeFace); applyAreaOverride(activeFace, { x: 250, y: 320, width: 300, height: 330 }); }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: Math.round(400 - sp.width / 2) })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm</button>
+                                    <button type="button" onClick={() => {
+                                        resetAreaOverride(activeFace);
+                                        const orig = areaOf(activeFace);
+                                        applyAreaOverride(activeFace, { x: orig?.x ?? 250, y: orig?.y ?? 320, width: orig?.width ?? 300, height: orig?.height ?? 330 });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
                                 </div>
                             </div>
                         )}
@@ -432,13 +485,64 @@ export function Step2DesignEditor({
                             <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
                                 <div className="flex items-center gap-1">
                                     <span className="text-stone-400 font-medium">Khổ:</span>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 440, height: 340, x: 180, y: 220 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Toàn thân ly (44×34)</button>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { width: 200, height: 200, x: 300, y: 290 })} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Logo 1 mặt (20×20)</button>
+                                    <button type="button" onClick={() => {
+                                        const orig = areaOf(activeFace);
+                                        applyAreaOverride(activeFace, { width: orig?.width ?? 440, height: orig?.height ?? 340, x: orig?.x ?? 180, y: orig?.y ?? 220 });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Toàn thân cuộn (3D Wrap)</button>
+                                    <button type="button" onClick={() => {
+                                        const orig = areaOf(activeFace);
+                                        const w = Math.round((orig?.width ?? 440) * 0.5);
+                                        const h = Math.round((orig?.height ?? 340) * 0.6);
+                                        applyAreaOverride(activeFace, { width: w, height: h, x: Math.round(400 - w / 2), y: Math.round((orig?.y ?? 220) + ((orig?.height ?? 340) - h) / 2) });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Logo 1 mặt</button>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <span className="text-stone-400 font-medium">Vị trí:</span>
-                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: 180, y: 220, width: 440, height: 340 })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Chính diện ly</button>
-                                    <button type="button" onClick={() => { resetAreaOverride(activeFace); applyAreaOverride(activeFace, { x: 180, y: 220, width: 440, height: 340 }); }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: Math.round(400 - sp.width / 2) })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Chính diện</button>
+                                    <button type="button" onClick={() => {
+                                        resetAreaOverride(activeFace);
+                                        const orig = areaOf(activeFace);
+                                        applyAreaOverride(activeFace, { x: orig?.x ?? 180, y: orig?.y ?? 220, width: orig?.width ?? 440, height: orig?.height ?? 340 });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {isGeneric && (
+                            <div className="flex items-center justify-between gap-1 overflow-x-auto text-[11px]">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Khổ:</span>
+                                    <button type="button" onClick={() => {
+                                        const orig = areaOf(activeFace);
+                                        applyAreaOverride(activeFace, { width: orig?.width ?? 300, height: orig?.height ?? 300, x: orig?.x ?? 250, y: orig?.y ?? 250 });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Toàn vùng in</button>
+                                    <button type="button" onClick={() => {
+                                        const orig = areaOf(activeFace);
+                                        const w = Math.round((orig?.width ?? 300) * 0.8);
+                                        const h = Math.round((orig?.height ?? 300) * 0.8);
+                                        applyAreaOverride(activeFace, { width: w, height: h, x: Math.round(400 - w / 2), y: Math.round(400 - h / 2) });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Lớn (80%)</button>
+                                    <button type="button" onClick={() => {
+                                        const orig = areaOf(activeFace);
+                                        const w = Math.round((orig?.width ?? 300) * 0.5);
+                                        const h = Math.round((orig?.height ?? 300) * 0.5);
+                                        applyAreaOverride(activeFace, { width: w, height: h, x: Math.round(400 - w / 2), y: Math.round(400 - h / 2) });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Vừa (50%)</button>
+                                    <button type="button" onClick={() => {
+                                        const orig = areaOf(activeFace);
+                                        const w = Math.round((orig?.width ?? 300) * 0.25);
+                                        const h = Math.round((orig?.height ?? 300) * 0.25);
+                                        applyAreaOverride(activeFace, { width: w, height: h, x: Math.round(400 - w / 2), y: Math.round(400 - h / 2) });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 font-medium">Logo (25%)</button>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-stone-400 font-medium">Vị trí:</span>
+                                    <button type="button" onClick={() => applyAreaOverride(activeFace, { x: Math.round(400 - sp.width / 2) })} className="px-2 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-medium">Trung tâm</button>
+                                    <button type="button" onClick={() => {
+                                        resetAreaOverride(activeFace);
+                                        const orig = areaOf(activeFace);
+                                        applyAreaOverride(activeFace, { x: orig?.x ?? 250, y: orig?.y ?? 250, width: orig?.width ?? 300, height: orig?.height ?? 300 });
+                                    }} className="px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:text-stone-800 font-semibold flex items-center gap-1"><RefreshCw size={10} /> Mặc định</button>
                                 </div>
                             </div>
                         )}
@@ -470,7 +574,7 @@ export function Step2DesignEditor({
                                         opacity={0.8}
                                     />
                                     <KText
-                                        text="— Gờ cổ áo"
+                                        text={activeFace === 'back' ? '— Gờ gáy áo sau' : '— Gờ cổ áo trước'}
                                         x={offX + 655 * ratio}
                                         y={offY + COLLAR_Y_PX * ratio - 6}
                                         fill="#ef4444"

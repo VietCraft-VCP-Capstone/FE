@@ -17,7 +17,6 @@ export interface SellerNavItem {
   to: string;
   label: string;
   icon: LucideIcon;
-  /** Mã tính năng trong SRS, chỉ hiện ở khu phân tích. */
   feature?: string;
 }
 
@@ -31,21 +30,9 @@ interface SellerLayoutProps {
   children: React.ReactNode;
   user: any;
   onLogout: () => void;
-  /**
-   * Thanh bên theo nhóm. Bỏ trống thì dùng danh sách vận hành mặc định.
-   * Khu "Phân tích & AI" truyền nhóm riêng của nó (analytics/nav.ts).
-   */
   groups?: SellerNavGroup[];
 }
 
-/**
- * Thanh bên khu VẬN HÀNH: việc làm hằng ngày với đơn, sản phẩm, khách.
- *
- * Năm mục phân tích trước đây nằm lẫn ở đây (Phân tích thị trường, Dự báo nhu cầu,
- * Danh mục & giờ vàng, Tối ưu giá bán, Thị phần & đối thủ) đều là trang rỗng và đã
- * chuyển thành trang thật trong khu "Phân tích & AI". Trộn hai loại việc trong một
- * thanh 18 mục làm người bán phải đọc hết mới tìm được thứ cần.
- */
 const OPS_NAV: SellerNavItem[] = [
   { to: '/seller/dashboard', icon: LayoutGrid, label: 'Trang chủ' },
   { to: '/seller/catalog', icon: Archive, label: 'Danh mục sản phẩm' },
@@ -128,7 +115,6 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
     return () => document.removeEventListener('mousedown', onDoc);
   }, [menuOpen]);
 
-  // Nhớ trang cuối của từng khu để bộ chuyển khu quay về đúng chỗ đang làm.
   useEffect(() => {
     rememberSellerPath(location.pathname, location.search);
   }, [location.pathname, location.search]);
@@ -155,8 +141,6 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
                   {group.hint && <span className="ml-1 font-medium normal-case tracking-normal text-stone-400">· {group.hint}</span>}
                 </p>
               )}
-              {/* Thu gọn thì tiêu đề nhóm biến mất, nên tách nhóm bằng một đường kẻ mảnh
-                  để thanh bên không thành một cột icon liền khối. */}
               {group.label && collapsed && gi > 0 && <span className="mx-auto mb-2 block h-px w-6 bg-stone-200" aria-hidden />}
               <div className="flex flex-col gap-1">
                 {group.items.map(({ to, icon: Icon, label, feature }) => (
