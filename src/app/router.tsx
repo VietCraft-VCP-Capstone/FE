@@ -121,6 +121,7 @@ export function AppRouter() {
           <Route path="/followed-shops" element={<BuyerFollowedShopsPage />} />
           <Route path="/orders" element={<BuyerOrdersPage />} />
           <Route path="/orders/:id" element={<BuyerOrderDetailPage />} />
+          <Route path="/returns" element={<Navigate to="/orders?tab=returns" replace />} />
           <Route path="/returns/new" element={<BuyerReturnPage />} />
           <Route path="/returns/:requestId" element={<BuyerReturnPage />} />
           <Route path="/notifications" element={<Navigate to="/" replace />} />

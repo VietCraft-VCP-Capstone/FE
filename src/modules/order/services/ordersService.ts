@@ -23,6 +23,7 @@ export interface OrderItemResponse {
 
 export interface OrderResponse {
   id: string;
+  _id: string;
   buyerId: string;
   items: OrderItemResponse[];
   totalAmount: number;

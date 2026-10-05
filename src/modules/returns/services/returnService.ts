@@ -26,6 +26,8 @@ export interface ReturnRequest {
   status: ReturnRequestStatus;
   deadline_at: string | null;
   linked_refund_status?: string | null;
+  replacement_order_id?: string | null;
+  replacement_order_code?: string | null;
   created_at: string;
   updated_at: string;
 }

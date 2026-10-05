@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../../infrastructure/api/interceptors';
-import { ArrowLeft, CalendarClock, Check, Clock3, FileText, ImagePlus, Loader2, PackageCheck, Scale, ShieldAlert, UploadCloud, Video } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarClock, Check, Clock3, FileText, ImagePlus, Loader2, PackageCheck, Scale, ShieldAlert, UploadCloud, Video } from 'lucide-react';
 import { returnService, type ReturnDetail, type ReturnEvidence, type ReturnResolution } from './services/returnService';
 
 const reasons = [
@@ -52,7 +52,11 @@ export function BuyerReturnPage() {
     try { setDetail(await returnService.detail(requestId)); }
     catch (e) { setError(errorText(e)); }
   };
-  useEffect(() => { void load(); }, [requestId]);
+  useEffect(() => {
+    void load();
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
+  }, [requestId]);
 
   const upload = async (files: FileList | null) => {
     const selected = Array.from(files || []);
@@ -97,7 +101,7 @@ export function BuyerReturnPage() {
     const request = detail?.request;
     return <main className="min-h-[70vh] bg-[#f6f8f6] px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-5xl space-y-6">
-        <button className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-emerald-800" onClick={() => navigate(-1)}><ArrowLeft size={17} /> Quay lại</button>
+        <button className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-emerald-800 cursor-pointer" onClick={() => navigate('/orders?tab=returns')}><ArrowLeft size={17} /> Danh sách đổi/trả & đơn hàng</button>
         <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5">
           <div><p className="text-xs font-bold uppercase tracking-[.16em] text-emerald-800">Hỗ trợ đơn hàng · POD</p><h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Chi tiết yêu cầu</h1><p className="mt-1 text-sm text-slate-600">Theo dõi tiến độ xử lý và trao đổi với đội ngũ hỗ trợ.</p></div>
           {request && <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 text-sm font-bold text-emerald-900"><span className="h-2 w-2 rounded-full bg-emerald-600" />{labels[request.status || ''] || request.status}</span>}
@@ -109,8 +113,113 @@ export function BuyerReturnPage() {
             {request.deadline_at && <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><CalendarClock size={15} /> Hạn xử lý</div><p className="mt-3 text-sm font-semibold text-slate-900">{new Date(request.deadline_at).toLocaleString('vi-VN')}</p></div>}
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><PackageCheck size={15} /> Phương án</div><p className="mt-3 text-sm font-semibold text-slate-900">{request.requested_resolution === 'EXCHANGE' ? 'Đổi hàng' : 'Hoàn tiền'}</p><p className="mt-1 text-xs text-slate-500">Lý do {request.reason_code || '—'} · Số lượng {request.quantity ?? '—'}</p></div>
           </section>
+
+          {/* Product Snapshot & Details Card */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-4 min-w-0">
+              <img 
+                src={(request.item_snapshot as any)?.image || '/image-not-found.jpg'} 
+                alt={(request.item_snapshot as any)?.title || 'Sản phẩm'} 
+                className="w-16 h-16 rounded-xl object-cover border border-slate-200 flex-shrink-0"
+                onError={e => { (e.target as HTMLImageElement).src = '/image-not-found.jpg'; }}
+              />
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm truncate">
+                  {(request.item_snapshot as any)?.title || 'Sản phẩm in ấn theo yêu cầu'}
+                </h3>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1">
+                  {(request.item_snapshot as any)?.color && <span>Màu: <b>{(request.item_snapshot as any).color}</b></span>}
+                  {(request.item_snapshot as any)?.size && <span>Size: <b>{(request.item_snapshot as any).size}</b></span>}
+                  <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
+                    SL khiếu nại: {request.quantity || 1}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Lý do: <strong className="text-slate-800">{reasons.find(r => r.code === request.reason_code)?.label || request.reason_code}</strong>
+                </p>
+              </div>
+            </div>
+            {request.order_id && (
+              <button
+                type="button"
+                onClick={() => navigate(`/orders/${encodeURIComponent(request.order_id)}`)}
+                className="text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition border border-emerald-200 flex-shrink-0 flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Xem đơn hàng #{request.order_id}</span>
+                <ArrowLeft size={13} className="rotate-180" />
+              </button>
+            )}
+          </section>
+
+          {request.reason_description && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-xs text-slate-700 leading-relaxed shadow-2xs">
+              <span className="font-bold text-slate-900 block mb-1">Mô tả phản ánh của bạn:</span>
+              <p className="italic m-0">"{request.reason_description}"</p>
+            </div>
+          )}
+
+          {request.status === 'PENDING_PRINTER' && (
+            <section className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+              <Clock3 className="mt-0.5 shrink-0 text-amber-600" size={19} />
+              <div>
+                <p className="font-bold text-sm">Yêu cầu đang chờ xưởng in thẩm định kỹ thuật</p>
+                <p className="mt-1 text-xs text-amber-900 leading-relaxed">
+                  Đội ngũ kỹ thuật xưởng in đang kiểm tra đối soát ảnh/video minh chứng và thông số kỹ thuật in ấn để phê duyệt đơn in bù hoặc hoàn tiền cho bạn.
+                </p>
+              </div>
+            </section>
+          )}
+
           {(request.linked_refund_status === 'PENDING_INTEGRATION' || request.status === 'CONVERTED_TO_REFUND') && <section className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950"><Clock3 className="mt-0.5 shrink-0" size={19} /><div><p className="font-bold">Đã duyệt — tiền chưa được chuyển</p><p className="mt-1 text-sm leading-6">Hồ sơ hoàn tiền đang chờ tích hợp thanh toán (`PENDING_INTEGRATION`). Quyết định duyệt chưa đồng nghĩa giao dịch đã thực hiện.</p></div></section>}
-          {request.status === 'APPROVED' && request.requested_resolution === 'EXCHANGE' && <section className="flex gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sky-950"><PackageCheck className="mt-0.5 shrink-0" size={19} /><div><p className="font-bold">Yêu cầu đổi hàng đã được duyệt</p><p className="mt-1 text-sm">Demo: chưa có giao hàng thay thế.</p></div></section>}
+          {request.status === 'REPLACEMENT_CREATED' && (
+            <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-emerald-300 bg-emerald-50/80 p-5 text-emerald-950 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <Check className="mt-0.5 shrink-0 text-emerald-700 bg-emerald-200/80 rounded-full p-1.5" size={26} />
+                <div className="space-y-1">
+                  <p className="font-bold text-base text-emerald-950">Đơn in bù 0đ đã được tạo thành công!</p>
+                  <p className="text-xs text-emerald-900 leading-relaxed">
+                    Xưởng in đã duyệt yêu cầu. Hệ thống đã tự động tạo đơn hàng in bù 0đ mã <strong className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300 text-emerald-900">{request.replacement_order_code || request.replacement_order_id}</strong> và chuyển vào hàng đợi in ấn.
+                  </p>
+                </div>
+              </div>
+              {(request.replacement_order_code || request.replacement_order_id) && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/orders/${encodeURIComponent(request.replacement_order_code || request.replacement_order_id || '')}`)}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 px-5 text-xs font-bold text-white shadow-sm transition flex-shrink-0 cursor-pointer"
+                >
+                  <span>Theo dõi đơn in bù</span>
+                  <ArrowRight size={14} />
+                </button>
+              )}
+            </section>
+          )}
+
+          {request.status === 'APPROVED' && request.requested_resolution === 'EXCHANGE' && (
+            <section className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-950 shadow-xs">
+              <Check className="mt-0.5 shrink-0 text-emerald-700 bg-emerald-100 rounded-full p-1" size={22} />
+              <div className="space-y-1">
+                <p className="font-bold text-sm text-emerald-900">Yêu cầu đổi hàng (in bù) đã được xưởng in phê duyệt thành công</p>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  Xưởng in đã thẩm định và xác nhận lỗi in ấn. Đơn in bù 0đ đã được chấp thuận sản xuất và đưa vào quy trình in lại để giao sản phẩm mới đến bạn.
+                </p>
+              </div>
+            </section>
+          )}
+
+          {request.status === 'COMPLETED' && (
+            <section className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-950 shadow-xs">
+              <Check className="mt-0.5 shrink-0 text-emerald-700 bg-emerald-100 rounded-full p-1" size={22} />
+              <div className="space-y-1">
+                <p className="font-bold text-sm text-emerald-900">Yêu cầu đã được xử lý hoàn tất</p>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  {request.final_resolution === 'REFUND' || request.requested_resolution === 'REFUND'
+                    ? 'Khoản tiền hoàn đã được xử lý thành công về phương thức thanh toán của bạn.'
+                    : 'Đơn hàng in bù thay thế đã được giao thành công đến bạn.'}
+                </p>
+              </div>
+            </section>
+          )}
           <div className="grid items-start gap-5 lg:grid-cols-[1.1fr_.9fr]">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><div className="flex items-center gap-3 border-b border-slate-100 pb-4"><span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-800"><Clock3 size={19} /></span><div><h2 className="font-bold text-slate-950">Diễn biến</h2><p className="text-xs text-slate-500">Lịch sử cập nhật yêu cầu</p></div></div>
               {(detail?.timeline || []).length ? <ol className="mt-5 space-y-0">{(detail?.timeline || []).map((event: any, index: number) => <li key={event.event_id || index} className="relative flex gap-4 pb-6 last:pb-0"><span className="relative z-10 mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800">{index === 0 ? <Check size={13} /> : <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />}{index < (detail?.timeline.length || 0) - 1 && <span className="absolute top-6 h-full w-px bg-slate-200" />}</span><div className="min-w-0"><p className="text-sm font-semibold text-slate-900">{labels[event.to_status] || event.to_status || event.reason || 'Cập nhật'}</p><p className="mt-1 text-xs text-slate-500">{event.created_at ? new Date(event.created_at).toLocaleString('vi-VN') : ''}</p>{event.reason && <p className="mt-2 text-sm leading-6 text-slate-600">{event.reason}</p>}</div></li>)}</ol> : <p className="py-6 text-sm text-slate-500">Chưa có cập nhật mới.</p>}

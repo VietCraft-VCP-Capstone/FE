@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle, CheckCircle, RotateCcw, ArrowRight, PackageCheck, X, Loader2 } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
@@ -69,7 +70,7 @@ export function BuyerOrderDetailPage() {
         setHasLegacyRefund(false);
         void Promise.all([
             refundService.getForOrder(order.id).catch(() => null),
-            order.status === 'completed' ? returnService.eligibility(order.id).catch(() => []) : Promise.resolve([]),
+            order.status === 'completed' && order._id ? returnService.eligibility(order._id).catch(() => []) : Promise.resolve([]),
         ]).then(([legacyRefund, eligibility]) => {
             if (cancelled) return;
             setHasLegacyRefund(legacyRefund !== null);
@@ -117,15 +118,14 @@ export function BuyerOrderDetailPage() {
     };
 
     const [confirmingDelivery, setConfirmingDelivery] = useState(false);
+    const [confirmDeliveryModalOpen, setConfirmDeliveryModalOpen] = useState(false);
 
     const handleConfirmReceived = async () => {
         if (!order?.id) return;
-        const ok = window.confirm('Bạn xác nhận đã nhận được kiện hàng và kiểm tra đầy đủ sản phẩm?');
-        if (!ok) return;
-
         setConfirmingDelivery(true);
         try {
             await ordersService.confirmDelivery(order.id);
+            setConfirmDeliveryModalOpen(false);
             showToast('Xác nhận nhận hàng thành công! Đơn hàng đã hoàn tất.');
             const res = await ordersService.getById(order.id);
             setOrder(res);
@@ -264,6 +264,38 @@ export function BuyerOrderDetailPage() {
                 </div>
             </div>
 
+            {/* Active Return Alert Banner */}
+            {eligibilityItems.find(it => it.activeRequestId)?.activeRequestId && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                            <RotateCcw size={18} />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-extrabold text-sm text-indigo-950">
+                                    Đơn hàng đang có yêu cầu đổi trả / hoàn tiền
+                                </h3>
+                                <span className="bg-indigo-200/70 text-indigo-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                    Return v3
+                                </span>
+                            </div>
+                            <p className="text-xs text-indigo-700 mt-0.5">
+                                Yêu cầu #{eligibilityItems.find(it => it.activeRequestId)?.activeRequestId} đang trong tiến trình xử lý POD. Bạn có thể bấm theo dõi tiến độ chi tiết.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => navigate(`/returns/${encodeURIComponent(eligibilityItems.find(it => it.activeRequestId)!.activeRequestId!)}`)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 flex-shrink-0 cursor-pointer"
+                    >
+                        <span>Theo dõi tiến độ yêu cầu</span>
+                        <ArrowRight size={13} />
+                    </button>
+                </div>
+            )}
+
             {/* Info Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Delivery Address */}
@@ -355,7 +387,7 @@ export function BuyerOrderDetailPage() {
 
                 {/* Items */}
                 <OrderItemsList
-                    orderId={order.id}
+                    orderId={order._id}
                     items={orderItems}
                     eligibilityItems={eligibilityItems}
                     completed={order.status === 'completed'}
@@ -366,7 +398,7 @@ export function BuyerOrderDetailPage() {
                 {order.status === 'shipping' && <div className="flex justify-end border-t border-gray-50 p-4">
                     <button
                         type="button"
-                        onClick={handleConfirmReceived}
+                        onClick={() => setConfirmDeliveryModalOpen(true)}
                         disabled={confirmingDelivery}
                         className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95 disabled:opacity-60"
                         title="Xác nhận bạn đã nhận được kiện hàng từ shipper"
@@ -470,6 +502,80 @@ export function BuyerOrderDetailPage() {
                     initialProductId={targetReviewProductId}
                     onSuccess={handleReviewSuccess}
                 />
+            )}
+
+            {/* Confirm Received In-App Modal */}
+            {confirmDeliveryModalOpen && createPortal(
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+                    onMouseDown={e => {
+                        if (e.target === e.currentTarget && !confirmingDelivery) {
+                            setConfirmDeliveryModalOpen(false);
+                        }
+                    }}
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="confirm-delivery-title"
+                        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200"
+                    >
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                                <PackageCheck size={24} />
+                            </div>
+                            <button
+                                type="button"
+                                disabled={confirmingDelivery}
+                                onClick={() => setConfirmDeliveryModalOpen(false)}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <h3 id="confirm-delivery-title" className="mt-4 text-base font-extrabold text-slate-900">
+                            Xác nhận đã nhận hàng
+                        </h3>
+                        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                            Bạn xác nhận đã nhận được kiện hàng từ đơn vị vận chuyển và kiểm tra đầy đủ các sản phẩm bên trong?
+                        </p>
+
+                        <div className="mt-3.5 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-xs leading-5 text-emerald-900">
+                            Sau khi xác nhận, đơn hàng sẽ chuyển sang trạng thái <strong>"Đã giao"</strong>. Bạn có thể đánh giá sản phẩm hoặc tạo yêu cầu <strong>Đổi/trả hàng</strong> nếu phát hiện sản phẩm có lỗi.
+                        </div>
+
+                        <div className="mt-6 flex flex-col-reverse justify-end gap-2.5 sm:flex-row">
+                            <button
+                                type="button"
+                                disabled={confirmingDelivery}
+                                onClick={() => setConfirmDeliveryModalOpen(false)}
+                                className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                            >
+                                Huỷ
+                            </button>
+                            <button
+                                type="button"
+                                disabled={confirmingDelivery}
+                                onClick={handleConfirmReceived}
+                                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                {confirmingDelivery ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin" />
+                                        <span>Đang xử lý...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle size={16} />
+                                        <span>Xác nhận đã nhận</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
 
             {/* Toast Notification */}
