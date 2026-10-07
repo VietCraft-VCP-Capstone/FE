@@ -24,6 +24,17 @@ const toPaginated = (data: any): PaginatedProductsResult => {
   return { items: [], total: 0, page: 1, limit: 6, totalPages: 1 };
 };
 
+export interface MockupColorPreview {
+  color: string;
+  color_hex?: string;
+  images: string[];
+}
+
+export interface PreviewMockupResult {
+  images: string[];
+  byColor: MockupColorPreview[];
+}
+
 export const productsService = {
   getAll: async (filter?: Partial<ProductFilterState>): Promise<PaginatedProductsResult> => {
     try {
@@ -140,9 +151,22 @@ export const productsService = {
   },
 
 
-  previewMockup: async (blankId: string, designPlacements: any[]): Promise<string[]> => {
-    const res = await api.post('/products/preview-mockup', { blankId, designPlacements });
-    return (res.data.images as string[]).map(absImg);
+  previewMockup: async (
+    blankId: string,
+    designPlacements: any[],
+    options?: { colorHex?: string; colors?: any[] }
+  ): Promise<PreviewMockupResult> => {
+    const res = await api.post('/products/preview-mockup', { blankId, designPlacements, ...options });
+    const rawImages: string[] = Array.isArray(res.data?.images) ? res.data.images : [];
+    const images = rawImages.map(absImg);
+    const byColor: MockupColorPreview[] = Array.isArray(res.data?.byColor)
+      ? res.data.byColor.map((c: any) => ({
+          color: c.color,
+          color_hex: c.color_hex,
+          images: (Array.isArray(c.images) ? c.images : []).map(absImg)
+        }))
+      : [];
+    return { images, byColor };
   },
 
   resetDefaults: (): ProductItem[] => {
