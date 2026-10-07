@@ -21,10 +21,11 @@ const labels: Record<string, string> = {
 
 interface RefundRequestPanelProps {
   orderId: string;
+  refundOrderId: string;
   orderStatus: string;
 }
 
-export function RefundRequestPanel({ orderId, orderStatus }: RefundRequestPanelProps) {
+export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: RefundRequestPanelProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [testBusy, setTestBusy] = useState(false);
@@ -232,7 +233,7 @@ export function RefundRequestPanel({ orderId, orderStatus }: RefundRequestPanelP
       {open && (
         <RefundFormModal
           isOpen={open}
-          orderId={orderId}
+          orderId={refundOrderId}
           orderCode={requestOrderCode}
           onClose={() => setOpen(false)}
           onSuccess={newRequest => {

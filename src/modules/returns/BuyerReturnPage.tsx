@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../../infrastructure/api/interceptors';
 import { ArrowLeft, ArrowRight, CalendarClock, Check, Clock3, FileText, ImagePlus, Loader2, PackageCheck, Scale, ShieldAlert, UploadCloud, Video } from 'lucide-react';
 import { returnService, type ReturnDetail, type ReturnEvidence, type ReturnResolution } from './services/returnService';
+import { allowedReturnResolutions, returnRefundMessage } from './return-workflow-policy';
 
 const reasons = [
   { code: 'R01', label: 'In sai, lệch, mờ hoặc sai màu' },
@@ -29,7 +30,7 @@ export function BuyerReturnPage() {
   const [reasonCode, setReasonCode] = useState('R01');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [resolution, setResolution] = useState<ReturnResolution>('EXCHANGE');
+  const [resolution, setResolution] = useState<ReturnResolution>('REFUND');
   const [evidence, setEvidence] = useState<ReturnEvidence[]>([]);
   const [disputeReason, setDisputeReason] = useState('');
   const [error, setError] = useState('');
@@ -43,7 +44,7 @@ export function BuyerReturnPage() {
   const orderColor = params.get('color') || '';
   const orderSize = params.get('size') || '';
   const backendDeadline = params.get('deadline');
-  const allowedReasons: Record<string, ReturnResolution[]> = { R01: ['EXCHANGE', 'REFUND'], R01A: ['REFUND'], R02: ['EXCHANGE', 'REFUND'], R03: ['EXCHANGE', 'REFUND'], R04: ['EXCHANGE', 'REFUND'], R05: ['EXCHANGE', 'REFUND'], R06: ['REFUND'], R07: ['REFUND'], R08: [], R09: ['REFUND'] };
+  const allowedReasons = allowedReturnResolutions;
   const resolutionOptions = allowedReasons[reasonCode] || [];
   const exchangeEnabled = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_RETURN_TOOLS === 'true';
 
@@ -60,8 +61,9 @@ export function BuyerReturnPage() {
 
   const upload = async (files: FileList | null) => {
     const selected = Array.from(files || []);
-    if (evidence.length + selected.length > 4 || evidence.filter(x => x.kind === 'IMAGE').length + selected.filter(x => x.type.startsWith('image/')).length > 3 || evidence.filter(x => x.kind === 'VIDEO').length + selected.filter(x => x.type.startsWith('video/')).length > 1) {
-      setError('Tối đa 3 ảnh và 1 video.'); return;
+    const existing = requestId ? detail?.evidence || [] : [];
+    if (existing.length + evidence.length + selected.length > 4 || existing.filter(x => x.kind === 'PHOTO').length + evidence.filter(x => x.kind === 'IMAGE').length + selected.filter(x => x.type.startsWith('image/')).length > 3 || existing.filter(x => x.kind === 'VIDEO').length + evidence.filter(x => x.kind === 'VIDEO').length + selected.filter(x => x.type.startsWith('video/')).length > 1) {
+      setError('Mỗi yêu cầu có tối đa 3 ảnh và 1 video, gồm các tệp đã gửi.'); return;
     }
     setUploading(true); setError('');
     try {
@@ -79,7 +81,7 @@ export function BuyerReturnPage() {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault(); setError('');
     if (!orderId || !orderItemId) { setError('Thiếu mã đơn hoặc mã sản phẩm trong đơn.'); return; }
-    if (!description.trim()) { setError('Mô tả là bắt buộc.'); return; }
+    if (description.trim().length < 5) { setError('Mô tả cần ít nhất 5 ký tự.'); return; }
     if (!evidence.length) { setError('Cần ít nhất một ảnh hoặc video minh chứng.'); return; }
     setBusy(true);
     try {
@@ -94,6 +96,17 @@ export function BuyerReturnPage() {
     setBusy(true); setError('');
     try { await returnService.dispute(returnService.idOf(detail.request), disputeReason); await load(); }
     catch (e) { setError(errorText(e)); }
+    finally { setBusy(false); }
+  };
+
+  const supplementEvidence = async () => {
+    if (!detail || !evidence.length || uploading || busy) return;
+    setBusy(true); setError('');
+    try {
+      await returnService.addEvidence(returnService.idOf(detail.request), evidence);
+      setEvidence([]);
+      await load();
+    } catch (e) { setError(errorText(e)); }
     finally { setBusy(false); }
   };
 
@@ -170,7 +183,7 @@ export function BuyerReturnPage() {
             </section>
           )}
 
-          {(request.linked_refund_status === 'PENDING_INTEGRATION' || request.status === 'CONVERTED_TO_REFUND') && <section className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950"><Clock3 className="mt-0.5 shrink-0" size={19} /><div><p className="font-bold">Đã duyệt — tiền chưa được chuyển</p><p className="mt-1 text-sm leading-6">Hồ sơ hoàn tiền đang chờ tích hợp thanh toán (`PENDING_INTEGRATION`). Quyết định duyệt chưa đồng nghĩa giao dịch đã thực hiện.</p></div></section>}
+          {request.status === 'CONVERTED_TO_REFUND' && <section className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950"><Clock3 className="mt-0.5 shrink-0" size={19} /><div><p className="font-bold">Tiến độ hoàn tiền</p><p className="mt-1 text-sm leading-6">{returnRefundMessage(request.linked_refund_status)}</p></div></section>}
           {request.status === 'REPLACEMENT_CREATED' && (
             <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-emerald-300 bg-emerald-50/80 p-5 text-emerald-950 shadow-xs">
               <div className="flex items-start gap-3.5">
@@ -214,7 +227,7 @@ export function BuyerReturnPage() {
                 <p className="font-bold text-sm text-emerald-900">Yêu cầu đã được xử lý hoàn tất</p>
                 <p className="text-xs text-emerald-800 leading-relaxed">
                   {request.final_resolution === 'REFUND' || request.requested_resolution === 'REFUND'
-                    ? 'Khoản tiền hoàn đã được xử lý thành công về phương thức thanh toán của bạn.'
+                    ? returnRefundMessage(request.linked_refund_status)
                     : 'Đơn hàng in bù thay thế đã được giao thành công đến bạn.'}
                 </p>
               </div>
@@ -229,6 +242,14 @@ export function BuyerReturnPage() {
               {!(detail?.evidence || []).length && <p className="py-6 text-sm text-slate-500">Không có tệp minh chứng.</p>}
             </section>
           </div>
+          {request.status === 'PENDING_PRINTER' && request.evidence_requested_at && request.evidence_deadline_at && !request.buyer_evidence_submitted_at && (
+            <section className="space-y-4 rounded-2xl border border-amber-200 bg-white p-5 sm:p-6">
+              <div><h2 className="font-bold text-slate-950">Bổ sung minh chứng theo yêu cầu xưởng in</h2><p className="mt-1 text-sm text-slate-600">Gửi một lần trước {new Date(request.evidence_deadline_at).toLocaleString('vi-VN')}. Tổng minh chứng của yêu cầu tối đa 3 ảnh và 1 video.</p></div>
+              <input aria-label="Chọn minh chứng bổ sung" type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" disabled={uploading || busy} onChange={event => { void upload(event.target.files); event.target.value = ''; }} />
+              {evidence.length > 0 && <ul className="space-y-2">{evidence.map(item => <li key={item.id} className="flex items-center justify-between gap-3 text-sm"><a href={item.uri} target="_blank" rel="noreferrer" className="truncate text-emerald-800 underline">{item.kind === 'VIDEO' ? 'Video bổ sung' : 'Ảnh bổ sung'}</a><button type="button" disabled={busy || uploading} onClick={() => setEvidence(current => current.filter(entry => entry.id !== item.id))} className="text-rose-700">Xóa</button></li>)}</ul>}
+              <button type="button" disabled={busy || uploading || !evidence.length} onClick={() => void supplementEvidence()} className="rounded-xl bg-emerald-800 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{uploading ? 'Đang tải tệp…' : busy ? 'Đang gửi…' : 'Gửi minh chứng bổ sung'}</button>
+            </section>
+          )}
           {request.status === 'REJECTED' && <section className="rounded-2xl border border-rose-200 bg-white p-5 sm:p-6"><div className="flex gap-3"><Scale className="mt-0.5 text-rose-700" size={20} /><div><h2 className="font-bold text-slate-950">Bạn chưa đồng ý với kết quả?</h2><p className="mt-1 text-sm text-slate-600">Gửi lý do để quản trị viên xem xét lại yêu cầu.</p></div></div><label className="mt-4 block text-sm font-semibold text-slate-800">Lý do tranh chấp<textarea className={`${field} min-h-24 rounded-xl border-slate-300`} value={disputeReason} onChange={e => setDisputeReason(e.target.value)} placeholder="Mô tả ngắn gọn điều bạn muốn được xem xét…" /></label><button disabled={busy || !disputeReason.trim()} onClick={() => void dispute()} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-bold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"><Scale size={16} />{busy ? 'Đang gửi…' : 'Gửi tranh chấp'}</button></section>}
         </>}
       </div>
@@ -245,8 +266,8 @@ export function BuyerReturnPage() {
       <div className="grid items-start gap-5 lg:grid-cols-[1fr_280px]">
         <form onSubmit={submit} className="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <section><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-sm font-extrabold text-emerald-900">01</span><div><h2 className="font-bold text-slate-950">Thông tin yêu cầu</h2><p className="mt-1 text-sm text-slate-500">Chọn lý do phù hợp và mô tả tình trạng nhận được.</p></div></div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold text-slate-800">Lý do<select className={`${field} min-h-11 rounded-xl border-slate-300 bg-white`} value={reasonCode} onChange={e => { const nextReason = e.target.value; setReasonCode(nextReason); const nextOptions = allowedReasons[nextReason] || []; if (nextOptions.length && !nextOptions.includes(resolution)) setResolution(nextOptions[0]); if (!nextOptions.length) setResolution('REFUND'); }}>{reasons.map(reason => <option key={reason.code} value={reason.code}>{reason.label}</option>)}</select></label><label className="text-sm font-semibold text-slate-800">Số lượng<input type="number" min={1} max={maxQuantity} required className={`${field} min-h-11 rounded-xl border-slate-300`} value={quantity} onChange={e => setQuantity(Number(e.target.value))} /></label></div>
-            <label className="mt-4 block text-sm font-semibold text-slate-800">Mô tả <span className="text-rose-600">*</span><textarea required minLength={1} maxLength={3000} className={`${field} min-h-28 rounded-xl border-slate-300`} value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Nêu rõ vấn đề bạn gặp phải…" /><span className="mt-1 block text-right text-xs font-normal text-slate-500">{description.length}/3000</span></label>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold text-slate-800">Lý do<select className={`${field} min-h-11 rounded-xl border-slate-300 bg-white`} value={reasonCode} onChange={e => { const nextReason = e.target.value; setReasonCode(nextReason); const nextOptions = allowedReasons[nextReason] || []; if (nextOptions.length && !nextOptions.includes(resolution)) setResolution(nextOptions[0]); if (!nextOptions.length) setResolution('REFUND'); }}>{reasons.map(reason => <option key={reason.code} value={reason.code} disabled={!allowedReasons[reason.code]?.length}>{reason.label}{!allowedReasons[reason.code]?.length ? " (chưa hỗ trợ)" : ""}</option>)}</select></label><label className="text-sm font-semibold text-slate-800">Số lượng<input type="number" min={1} max={maxQuantity} required className={`${field} min-h-11 rounded-xl border-slate-300`} value={quantity} onChange={e => setQuantity(Number(e.target.value))} /></label></div>
+            <label className="mt-4 block text-sm font-semibold text-slate-800">Mô tả <span className="text-rose-600">*</span><textarea required minLength={5} maxLength={3000} className={`${field} min-h-28 rounded-xl border-slate-300`} value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Nêu rõ vấn đề bạn gặp phải…" /><span className="mt-1 block text-right text-xs font-normal text-slate-500">{description.length}/3000</span></label>
           </section>
           <section className="border-t border-slate-100 pt-5"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-sm font-extrabold text-emerald-900">02</span><div><h2 className="font-bold text-slate-950">Phương án mong muốn</h2><p className="mt-1 text-sm text-slate-500">Tùy lý do, một số phương án có thể không khả dụng.</p></div></div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${resolution === 'REFUND' ? 'border-emerald-500 bg-emerald-50/70 ring-1 ring-emerald-500' : 'border-slate-200 hover:border-slate-300'}`}><input type="radio" name="resolution" disabled={!resolutionOptions.includes('REFUND')} className="mt-1 accent-emerald-700 disabled:cursor-not-allowed" checked={resolution === 'REFUND'} onChange={() => setResolution('REFUND')} /><span><strong className="block text-sm text-slate-900">Hoàn tiền</strong><small className="mt-1 block text-xs leading-5 text-slate-600">Yêu cầu hoàn tiền theo kết quả xử lý.</small></span></label><label className={`flex items-start gap-3 rounded-xl border p-4 transition ${!resolutionOptions.includes('EXCHANGE') || !exchangeEnabled ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-60' : resolution === 'EXCHANGE' ? 'cursor-pointer border-emerald-500 bg-emerald-50/70 ring-1 ring-emerald-500' : 'cursor-pointer border-slate-200 hover:border-slate-300'}`}><input type="radio" name="resolution" disabled={!resolutionOptions.includes('EXCHANGE') || !exchangeEnabled} className="mt-1 accent-emerald-700" checked={resolution === 'EXCHANGE'} onChange={() => setResolution('EXCHANGE')} /><span><strong className="block text-sm text-slate-900">Đổi hàng</strong><small className="mt-1 block text-xs leading-5 text-slate-600">{exchangeEnabled ? 'Khả dụng theo chính sách hiện tại.' : 'Sắp hỗ trợ.'}</small></span></label></div>

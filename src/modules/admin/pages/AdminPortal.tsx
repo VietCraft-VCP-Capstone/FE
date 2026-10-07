@@ -165,6 +165,7 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="categories" element={<AdminCategories />} />
         <Route path="tags" element={<AdminTags />} />
         <Route path="disputes" element={<AdminDisputes />} />
+        <Route path="refund-requests" element={<Navigate to="/admin/disputes" replace />} />
         <Route path="returns" element={<AdminReturnsPage />} />
         <Route path="returns/printer" element={<PrinterReturnsPage />} />
         <Route path="marketing" element={<AdminPromotionsPage />} />

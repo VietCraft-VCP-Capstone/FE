@@ -35,6 +35,7 @@ interface OrderItem {
 
 interface Order {
     id: string;
+    _id?: string;
     shopName: string;
     shopLogo: string;
     items: OrderItem[];
@@ -87,6 +88,8 @@ export function BuyerOrdersPage() {
 
     const [orders, setOrders] = useState<Order[]>([]);
     const [returnsList, setReturnsList] = useState<ReturnRequest[]>([]);
+    const [returnsPage, setReturnsPage] = useState(1);
+    const [returnsError, setReturnsError] = useState('');
     const [loading, setLoading] = useState(true);
     const [loadingReturns, setLoadingReturns] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -173,12 +176,13 @@ export function BuyerOrdersPage() {
     // Tải danh sách yêu cầu đổi trả / hoàn tiền
     const fetchReturns = async () => {
         setLoadingReturns(true);
+        setReturnsError('');
         try {
             const list = await returnService.list();
             setReturnsList(Array.isArray(list) ? list : []);
         } catch (err) {
             console.error('Failed to fetch return requests', err);
-            setReturnsList([]);
+            setReturnsError(getApiErrorMessage(err, 'Không tải được yêu cầu đổi trả.'));
         } finally {
             setLoadingReturns(false);
         }
@@ -200,7 +204,7 @@ export function BuyerOrdersPage() {
     const activeReturnByOrderId = useMemo(() => {
         const map = new Map<string, ReturnRequest>();
         for (const req of returnsList) {
-            if (req.order_id) {
+            if (req.order_id && !map.has(String(req.order_id)) && !['COMPLETED', 'CANCELLED', 'EXPIRED', 'ADMIN_REJECTED'].includes(req.status)) {
                 map.set(String(req.order_id), req);
             }
         }
@@ -274,6 +278,11 @@ export function BuyerOrdersPage() {
         });
     }, [returnsList, searchQuery]);
 
+    const returnsPageCount = Math.max(1, Math.ceil(filteredReturns.length / 20));
+    const currentReturnsPage = Math.min(returnsPage, returnsPageCount);
+    const visibleReturns = filteredReturns.slice((currentReturnsPage - 1) * 20, currentReturnsPage * 20);
+    useEffect(() => { setReturnsPage(1); }, [searchQuery]);
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
             {/* Tabs and Search row */}
@@ -317,6 +326,7 @@ export function BuyerOrdersPage() {
             </div>
 
             {/* TAB: ĐỔI TRẢ & HOÀN TIỀN */}
+            {activeTab === 'returns' && returnsError && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{returnsError} <button type="button" onClick={() => void fetchReturns()} className="font-bold underline">Thử lại</button></p>}
             {activeTab === 'returns' ? (
                 loadingReturns ? (
                     <div className="text-center py-16">
@@ -340,9 +350,9 @@ export function BuyerOrdersPage() {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {filteredReturns.map(req => {
+                        {visibleReturns.map(req => {
                             const reqId = req.id || req._id || '';
-                            const isExchange = req.requested_resolution === 'EXCHANGE' || req.reason_code?.includes('R01') || req.reason_code?.includes('R02');
+                            const isExchange = (req.final_resolution || req.requested_resolution) === 'EXCHANGE';
                             const statusCfg = RETURN_STATUS_CONFIG[req.status] || { label: req.status, badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' };
                             const reasonText = RETURN_REASON_LABELS[req.reason_code] || req.reason_code || 'Vấn đề sản phẩm';
                             const snapshot = (req.item_snapshot || {}) as any;
@@ -465,7 +475,7 @@ export function BuyerOrdersPage() {
                 ) : (
                     <div className="space-y-4">
                         {filteredOrders.map((order) => {
-                            const activeReturn = activeReturnByOrderId.get(order.id);
+                            const activeReturn = activeReturnByOrderId.get(order._id || order.id);
 
                             return (
                                 <div key={order.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -654,6 +664,8 @@ export function BuyerOrdersPage() {
                     onSuccess={handleReviewSuccess}
                 />
             )}
+
+            {activeTab === 'returns' && !loadingReturns && returnsPageCount > 1 && <nav aria-label="Trang yêu cầu đổi trả" className="flex flex-wrap items-center justify-end gap-4 text-sm"><button type="button" disabled={currentReturnsPage <= 1} onClick={() => setReturnsPage(currentReturnsPage - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Trang trước</button><span>Trang {currentReturnsPage}/{returnsPageCount} · {filteredReturns.length} yêu cầu</span><button type="button" disabled={currentReturnsPage >= returnsPageCount} onClick={() => setReturnsPage(currentReturnsPage + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Trang sau</button></nav>}
 
             {/* Toast Notification */}
             {toast && (

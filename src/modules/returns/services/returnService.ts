@@ -1,6 +1,7 @@
 import api from '../../../infrastructure/api/interceptors';
 import type { AxiosResponse } from 'axios';
 import { refundService } from '../../order/services/refundService';
+import { collectRequestPages } from '../return-pagination';
 
 export type ReturnResolution = 'EXCHANGE' | 'REFUND';
 export type EvidenceKind = 'IMAGE' | 'VIDEO';
@@ -26,6 +27,12 @@ export interface ReturnRequest {
   status: ReturnRequestStatus;
   deadline_at: string | null;
   linked_refund_status?: string | null;
+  evidence_requested_at?: string | null;
+  evidence_deadline_at?: string | null;
+  buyer_evidence_submitted_at?: string | null;
+  fault_party?: FaultParty | null;
+  refund_amount_minor?: number | null;
+  refund_currency?: string | null;
   replacement_order_id?: string | null;
   replacement_order_code?: string | null;
   created_at: string;
@@ -67,7 +74,8 @@ export interface ReturnEligibilityItem {
   activeRequestId?: string;
 }
 export interface PrinterDecision { action: ReturnAction; reason: string; proposedFault?: FaultParty; proposedClassification?: string }
-export interface AdminDecision { resolution: ReturnResolution; faultParty: FaultParty; reason: string; amountMinor: number; currency: string }
+export interface AdminDecision { resolution: ReturnResolution | null; faultParty: FaultParty | null; reason: string; amountMinor?: number; currency?: string }
+export interface ReturnRequestPage { items: ReturnRequest[]; total: number; page: number; pageSize: number }
 
 const idOf = (request: ReturnRequest) => request.id || request._id || '';
 
@@ -77,12 +85,11 @@ export const returnService = {
     const result = unwrap<{ items: ReturnEligibilityItem[] }>(await api.get<{ items: ReturnEligibilityItem[] }>('/returns/v3/eligibility', { params: { orderId } }));
     return result.items || [];
   },
-  list: async (status?: string): Promise<ReturnRequest[]> => {
-    const result = unwrap<{ items: ReturnRequest[] }>(await api.get<{ items: ReturnRequest[] }>('/returns/v3/requests', { params: status ? { status } : undefined }));
-    return result.items || [];
-  },
+  listPage: async (status?: string, page = 1, pageSize = 20): Promise<ReturnRequestPage> => unwrap(await api.get('/returns/v3/requests', { params: { status: status || undefined, page, pageSize } })),
+  list: async (status?: string): Promise<ReturnRequest[]> => collectRequestPages(page => returnService.listPage(status, page, 100)),
   detail: async (id: string): Promise<ReturnDetail> => unwrap(await api.get<ReturnDetail>(`/returns/v3/requests/${encodeURIComponent(id)}`)),
   dispute: async (id: string, reason: string): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/dispute`, { reason })),
+  addEvidence: async (id: string, evidence: ReturnEvidence[]): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/evidence`, { evidence })),
   printerDecision: async (id: string, payload: PrinterDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/printer-decision`, payload)),
   requestEvidence: async (id: string, reason: string): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/printer-evidence-request`, { reason })),
   adminDecision: async (id: string, payload: AdminDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/admin/decision`, payload)),

@@ -411,6 +411,7 @@ export function BuyerOrderDetailPage() {
 
             {(hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID') || import.meta.env.DEV) && <OrderSupportSection
                 orderId={order.id}
+                refundOrderId={order._id}
                 orderStatus={order.status}
                 showLegacyRefund={hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID')}
                 isDevelopment={import.meta.env.DEV}

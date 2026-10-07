@@ -21,6 +21,7 @@ import { BuyerOrderDetailPage } from '../modules/buyer/pages/BuyerOrderDetailPag
 import { BuyerShopPage } from '../modules/buyer/pages/BuyerShopPage';
 import { BuyerProductDetailPage } from '../modules/buyer/pages/BuyerProductDetailPage';
 import { BuyerReturnPage } from '../modules/returns/BuyerReturnPage';
+import { LegacyRefundRedirect } from '../modules/returns/LegacyRefundRedirect';
 import { BuyerVouchersPage } from '../modules/buyer/pages/BuyerVouchersPage';
 import { useAuth } from '../modules/auth/hooks/useAuth';
 
@@ -124,6 +125,7 @@ export function AppRouter() {
           <Route path="/returns" element={<Navigate to="/orders?tab=returns" replace />} />
           <Route path="/returns/new" element={<BuyerReturnPage />} />
           <Route path="/returns/:requestId" element={<BuyerReturnPage />} />
+          <Route path="/refund-requests/:requestId" element={<LegacyRefundRedirect />} />
           <Route path="/notifications" element={<Navigate to="/" replace />} />
         </Route>
       </Route>

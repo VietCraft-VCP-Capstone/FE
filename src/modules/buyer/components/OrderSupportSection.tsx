@@ -4,6 +4,7 @@ import { OrderStatusSimulator } from './OrderStatusSimulator';
 
 interface Props {
   orderId: string;
+  refundOrderId: string;
   orderStatus: string;
   showLegacyRefund: boolean;
   isDevelopment: boolean;
@@ -14,6 +15,7 @@ interface Props {
 
 export function OrderSupportSection({
   orderId,
+  refundOrderId,
   orderStatus,
   showLegacyRefund,
   isDevelopment,
@@ -44,7 +46,7 @@ export function OrderSupportSection({
 
       {showLegacyRefund && (
         <div className="mt-4 border-t border-slate-100 pt-4">
-          <RefundRequestPanel orderId={orderId} orderStatus={orderStatus} />
+          <RefundRequestPanel orderId={orderId} refundOrderId={refundOrderId} orderStatus={orderStatus} />
         </div>
       )}
 
