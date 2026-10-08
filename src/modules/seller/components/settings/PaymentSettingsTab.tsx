@@ -36,18 +36,25 @@ export const PaymentSettingsTab: React.FC<PaymentSettingsTabProps> = ({
   const [formData, setFormData] = useState<SellerPaymentSettings>(initialData);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const isMinPayoutInvalid = formData.autoWithdraw && (!formData.minPayoutAmount || formData.minPayoutAmount < 50000);
+  React.useEffect(() => {
+    setFormData(initialData);
+  }, [initialData]);
+
+  const isMinPayoutInvalid = formData.autoWithdraw && (!formData.minPayoutAmount || formData.minPayoutAmount < 500);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.autoWithdraw && isMinPayoutInvalid) {
-      showToast('Hạn mức rút tiền tối thiểu phải từ 50.000 VNĐ trở lên.', 'error');
+      showToast('Hạn mức rút tiền tối thiểu phải từ 500 VNĐ trở lên.', 'error');
       return;
     }
-    onSave(formData);
+    onSave({
+      ...formData,
+      bankAccounts: initialData.bankAccounts
+    });
   };
 
-  const payoutPresets = [50000, 200000, 500000, 1000000, 2000000];
+  const payoutPresets = [500, 1000, 5000, 10000, 50000];
 
   const maskAccountNumber = (acc: string) => {
     if (acc.length <= 4) return acc;
@@ -55,9 +62,10 @@ export const PaymentSettingsTab: React.FC<PaymentSettingsTabProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 animate-fade-in font-sans">
-      {/* Section 1: Bank Accounts */}
-      <div className="bg-white rounded-2xl border border-stone-200 shadow-xs p-6 space-y-6">
+    <div className="space-y-8 animate-fade-in font-sans">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Section 1: Bank Accounts */}
+        <div className="bg-white rounded-2xl border border-stone-200 shadow-xs p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-extrabold text-stone-900 font-jakarta flex items-center gap-2">
@@ -79,74 +87,96 @@ export const PaymentSettingsTab: React.FC<PaymentSettingsTabProps> = ({
           </button>
         </div>
 
-        {/* Bank Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {initialData.bankAccounts.map((account) => (
-            <div
-              key={account.id}
-              className={`p-5 rounded-2xl border transition-all relative overflow-hidden ${
-                account.isDefault
-                  ? 'border-[#007700] bg-emerald-50/30 ring-2 ring-[#007700]/10 shadow-xs'
-                  : 'border-stone-200 bg-stone-50/50 hover:border-stone-300'
-              }`}
-            >
-              {/* Card Top */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white border border-stone-200 flex items-center justify-center font-bold text-xs text-[#007700] shadow-2xs">
-                    {account.bankCode || 'BANK'}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-stone-900 font-jakarta leading-tight">
-                      {account.bankName}
-                    </h4>
-                    <p className="text-xs text-stone-500 mt-0.5">{account.branch}</p>
-                  </div>
-                </div>
-
-                {account.isDefault && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EAF0E2] text-[#007700] border border-[#BECAB6]/50 flex items-center gap-1 font-jakarta">
-                    <CheckCircle2 size={11} /> Mặc định
-                  </span>
-                )}
-              </div>
-
-              {/* Card Details */}
-              <div className="mt-4 pt-4 border-t border-stone-200/60 flex items-end justify-between">
-                <div>
-                  <p className="text-xs font-mono font-bold text-stone-800 tracking-wider">
-                    {maskAccountNumber(account.accountNumber)}
-                  </p>
-                  <p className="text-[11px] font-semibold text-stone-600 uppercase mt-0.5">
-                    {account.accountHolder}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {!account.isDefault && (
-                    <button
-                      type="button"
-                      onClick={() => onSetDefaultBank(account.id)}
-                      className="text-xs font-semibold text-[#007700] hover:underline cursor-pointer"
-                    >
-                      Đặt mặc định
-                    </button>
-                  )}
-                  {initialData.bankAccounts.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => onDeleteBank(account.id)}
-                      className="p-1.5 text-stone-400 hover:text-[#BA1A1A] hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="Xóa tài khoản"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
+        {/* Bank Cards Grid or Empty State */}
+        {initialData.bankAccounts.length === 0 ? (
+          <div className="p-8 border-2 border-dashed border-stone-200 rounded-2xl bg-stone-50/50 flex flex-col items-center justify-center text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#007700]">
+              <Landmark size={24} />
             </div>
-          ))}
-        </div>
+            <div>
+              <p className="text-sm font-bold text-stone-800 font-jakarta">Chưa có tài khoản ngân hàng nào</p>
+              <p className="text-xs text-stone-500 mt-0.5 max-w-sm">
+                Vui lòng liên kết ít nhất 1 tài khoản ngân hàng chính chủ để nhận tiền thanh toán và đối soát tự động.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="px-4 py-2 bg-[#007700] hover:bg-[#005B00] text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 font-jakarta cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>Thêm tài khoản ngay</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {initialData.bankAccounts.map((account) => (
+              <div
+                key={account.id}
+                className={`p-5 rounded-2xl border transition-all relative overflow-hidden ${
+                  account.isDefault
+                    ? 'border-[#007700] bg-emerald-50/30 ring-2 ring-[#007700]/10 shadow-xs'
+                    : 'border-stone-200 bg-stone-50/50 hover:border-stone-300'
+                }`}
+              >
+                {/* Card Top */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-stone-200 flex items-center justify-center font-bold text-xs text-[#007700] shadow-2xs">
+                      {account.bankCode || 'BANK'}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-stone-900 font-jakarta leading-tight">
+                        {account.bankName}
+                      </h4>
+                      <p className="text-xs text-stone-500 mt-0.5">{account.branch}</p>
+                    </div>
+                  </div>
+
+                  {account.isDefault && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EAF0E2] text-[#007700] border border-[#BECAB6]/50 flex items-center gap-1 font-jakarta">
+                      <CheckCircle2 size={11} /> Mặc định
+                    </span>
+                  )}
+                </div>
+
+                {/* Card Details */}
+                <div className="mt-4 pt-4 border-t border-stone-200/60 flex items-end justify-between">
+                  <div>
+                    <p className="text-xs font-mono font-bold text-stone-800 tracking-wider">
+                      {maskAccountNumber(account.accountNumber)}
+                    </p>
+                    <p className="text-[11px] font-semibold text-stone-600 uppercase mt-0.5">
+                      {account.accountHolder}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {!account.isDefault && (
+                      <button
+                        type="button"
+                        onClick={() => onSetDefaultBank(account.id)}
+                        className="text-xs font-semibold text-[#007700] hover:underline cursor-pointer"
+                      >
+                        Đặt mặc định
+                      </button>
+                    )}
+                    {initialData.bankAccounts.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteBank(account.id)}
+                        className="p-1.5 text-stone-400 hover:text-[#BA1A1A] hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Xóa tài khoản"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Section 2: Payout & Auto Withdrawal Settings */}
@@ -217,12 +247,12 @@ export const PaymentSettingsTab: React.FC<PaymentSettingsTabProps> = ({
               <CreditCard size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${!formData.autoWithdraw ? 'text-stone-300' : isMinPayoutInvalid ? 'text-rose-500' : 'text-stone-400'}`} />
               <input
                 type="number"
-                step="10000"
-                min="50000"
+                step="500"
+                min="500"
                 disabled={!formData.autoWithdraw}
                 value={formData.minPayoutAmount || ''}
                 onChange={e => setFormData({ ...formData, minPayoutAmount: Number(e.target.value) })}
-                placeholder="50000"
+                placeholder="500"
                 className={`w-full pl-10 pr-16 py-2.5 rounded-xl text-sm font-bold font-jakarta focus:outline-none transition-colors ${
                   !formData.autoWithdraw
                     ? 'bg-stone-100 border border-stone-200 text-stone-400 cursor-not-allowed select-none'
@@ -242,7 +272,7 @@ export const PaymentSettingsTab: React.FC<PaymentSettingsTabProps> = ({
               isMinPayoutInvalid ? (
                 <p className="text-xs text-rose-600 flex items-center gap-1 font-semibold animate-fade-in pt-0.5">
                   <AlertCircle size={13} className="shrink-0" />
-                  <span>Hạn mức rút tiền tối thiểu phải từ 50.000 ₫ trở lên.</span>
+                  <span>Hạn mức rút tiền tối thiểu phải từ 500 ₫ trở lên.</span>
                 </p>
               ) : (
                 <p className="text-[11px] text-stone-500 pt-0.5">
@@ -307,6 +337,7 @@ export const PaymentSettingsTab: React.FC<PaymentSettingsTabProps> = ({
           </button>
         </div>
       </div>
+      </form>
 
       {/* Add Bank Account Modal */}
       <AddBankAccountModal
@@ -315,6 +346,6 @@ export const PaymentSettingsTab: React.FC<PaymentSettingsTabProps> = ({
         onAdd={onAddBank}
         loading={loading}
       />
-    </form>
+    </div>
   );
 }

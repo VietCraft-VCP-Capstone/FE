@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Truck, Check, CreditCard, MessageSquare, Store, Copy, AlertCircle, CheckCircle, RotateCcw, ArrowRight, PackageCheck, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Truck, Check, CreditCard, MessageSquare, Store, Copy, AlertCircle, CheckCircle, RotateCcw, ArrowRight, PackageCheck, X, Loader2, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
@@ -161,6 +161,28 @@ export function BuyerOrderDetailPage() {
         }
     };
 
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+    const [cancellingOrder, setCancellingOrder] = useState(false);
+    const [cancelReason, setCancelReason] = useState('Đổi ý không muốn mua nữa');
+    const [customCancelReason, setCustomCancelReason] = useState('');
+
+    const handleCancelOrder = async () => {
+        if (!order?.id) return;
+        setCancellingOrder(true);
+        try {
+            const finalReason = cancelReason === 'Khác' ? (customCancelReason.trim() || 'Lý do khác') : cancelReason;
+            await ordersService.cancelOrder(order.id, finalReason);
+            setIsCancelModalOpen(false);
+            showToast('Hủy đơn hàng thành công!', 'success');
+            const res = await ordersService.getById(order.id);
+            setOrder(res);
+        } catch (err: any) {
+            showToast(getApiErrorMessage(err, 'Lỗi khi hủy đơn hàng.'), 'error');
+        } finally {
+            setCancellingOrder(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
@@ -300,17 +322,49 @@ export function BuyerOrderDetailPage() {
     const subtotal = orderItems.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
     const shippingFee = Number(order.shippingFee ?? 0);
     const totalAmount = Number(order.totalAmount ?? (subtotal + shippingFee));
+    const canCancelOrder = order && 
+        (order.status === 'pending' || order.paymentStatus === 'PENDING') &&
+        order.status !== 'cancelled' &&
+        order.status !== 'shipping' &&
+        order.status !== 'completed' &&
+        !['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.fulfillmentStatus || '');
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-            {/* Back Button */}
-            <button
-                onClick={() => navigate('/orders')}
-                className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors uppercase"
-            >
-                <ArrowLeft size={14} />
-                <span>Trở lại</span>
-            </button>
+            {/* Top Bar: Back & Actions */}
+            <div className="flex items-center justify-between gap-4">
+                <button
+                    onClick={() => navigate('/orders')}
+                    className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors uppercase"
+                >
+                    <ArrowLeft size={14} />
+                    <span>Trở lại</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                    {canCancelOrder && (
+                        <button
+                            type="button"
+                            onClick={() => setIsCancelModalOpen(true)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-xs transition hover:bg-red-50 hover:border-red-300 active:scale-95 cursor-pointer"
+                        >
+                            <XCircle size={14} />
+                            <span>Hủy đơn hàng</span>
+                        </button>
+                    )}
+
+                    {order.status === 'cancelled' && (
+                        <button
+                            type="button"
+                            onClick={() => handleReorder()}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#008000] hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold shadow-sm transition active:scale-95 cursor-pointer"
+                        >
+                            <RefreshCw size={14} />
+                            <span>Mua lại</span>
+                        </button>
+                    )}
+                </div>
+            </div>
 
             {/* Status Banner */}
             <div className={`border rounded-2xl p-5 flex items-center gap-4 ${statusBanner.bg}`}>
@@ -321,17 +375,19 @@ export function BuyerOrderDetailPage() {
                     <h2 className="font-extrabold text-gray-900 text-sm">{statusBanner.title}</h2>
                     <p className="text-xs text-gray-500 font-medium">{statusBanner.desc}</p>
                 </div>
-                {awaitingPayment && !returnedPaid && (
-                    <button
-                        type="button"
-                        onClick={() => void handleRepay()}
-                        disabled={repaying}
-                        className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-60"
-                    >
-                        {repaying ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
-                        <span>{repaying ? 'Đang mở payOS...' : 'Thanh toán lại'}</span>
-                    </button>
-                )}
+                <div className="ml-auto flex items-center gap-2">
+                    {awaitingPayment && !returnedPaid && (
+                        <button
+                            type="button"
+                            onClick={() => void handleRepay()}
+                            disabled={repaying}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-60"
+                        >
+                            {repaying ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                            <span>{repaying ? 'Đang mở payOS...' : 'Thanh toán lại'}</span>
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Active Return Alert Banner */}
@@ -645,6 +701,138 @@ export function BuyerOrderDetailPage() {
                                     <>
                                         <CheckCircle size={16} />
                                         <span>Xác nhận đã nhận</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Cancel Order Modal */}
+            {isCancelModalOpen && createPortal(
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+                    onMouseDown={e => {
+                        if (e.target === e.currentTarget && !cancellingOrder) {
+                            setIsCancelModalOpen(false);
+                        }
+                    }}
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="cancel-order-title"
+                        className="relative w-full max-w-lg rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200"
+                    >
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-center gap-3.5">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500/10 to-rose-500/20 text-red-600 border border-red-200/60 shadow-xs">
+                                    <AlertTriangle size={24} className="stroke-[2.2]" />
+                                </div>
+                                <div>
+                                    <h3 id="cancel-order-title" className="text-lg font-extrabold text-slate-900 tracking-tight">
+                                        Xác nhận hủy đơn hàng
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Mã đơn: <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">#{order.id}</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                disabled={cancellingOrder}
+                                onClick={() => setIsCancelModalOpen(false)}
+                                className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Notice Banner */}
+                        <div className="mt-4.5 rounded-2xl bg-amber-50/90 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-xs text-amber-900 leading-relaxed">
+                            <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                            <span>
+                                Sau khi hủy đơn, lượt dùng mã giảm giá và số lượng tồn kho sản phẩm sẽ được <strong>hoàn lại tự động</strong>.
+                                {order.paymentStatus === 'PAID' ? ' Do đơn hàng đã thanh toán trước, số tiền sẽ được hoàn lại theo quy định.' : ''}
+                            </span>
+                        </div>
+
+                        {/* Reason Selection */}
+                        <div className="mt-4.5 space-y-2.5">
+                            <label className="text-xs font-bold text-slate-800 block uppercase tracking-wider">
+                                Vui lòng chọn lý do hủy:
+                            </label>
+                            <div className="space-y-2">
+                                {[
+                                    'Đổi ý không muốn mua nữa',
+                                    'Muốn thay đổi địa chỉ / số điện thoại nhận hàng',
+                                    'Muốn thay đổi phân loại / kích thước / màu sắc',
+                                    'Tìm thấy giá tốt hơn ở nơi khác',
+                                    'Khác'
+                                ].map((r) => {
+                                    const isSelected = cancelReason === r;
+                                    return (
+                                        <div
+                                            key={r}
+                                            onClick={() => setCancelReason(r)}
+                                            className={`flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition-all duration-150 ${
+                                                isSelected
+                                                    ? 'border-red-500 bg-red-50/40 text-red-950 font-semibold shadow-xs ring-1 ring-red-500/20'
+                                                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50/70 font-medium'
+                                            }`}
+                                        >
+                                            <span className="leading-snug">{r}</span>
+                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all shrink-0 ${
+                                                isSelected ? 'border-red-600 bg-red-600' : 'border-slate-300 bg-white'
+                                            }`}>
+                                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {cancelReason === 'Khác' && (
+                                <div className="pt-1 animate-in fade-in duration-200">
+                                    <textarea
+                                        value={customCancelReason}
+                                        onChange={e => setCustomCancelReason(e.target.value)}
+                                        placeholder="Vui lòng chia sẻ thêm lý do hủy đơn của bạn..."
+                                        rows={2}
+                                        className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none transition-all placeholder:text-slate-400"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                            <button
+                                type="button"
+                                disabled={cancellingOrder}
+                                onClick={() => setIsCancelModalOpen(false)}
+                                className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                            >
+                                Không hủy nữa
+                            </button>
+                            <button
+                                type="button"
+                                disabled={cancellingOrder}
+                                onClick={handleCancelOrder}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-red-500/20 transition hover:from-red-700 hover:to-rose-700 active:scale-95 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+                            >
+                                {cancellingOrder ? (
+                                    <>
+                                        <Loader2 size={15} className="animate-spin" />
+                                        <span>Đang hủy đơn...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <XCircle size={15} />
+                                        <span>Xác nhận hủy</span>
                                     </>
                                 )}
                             </button>

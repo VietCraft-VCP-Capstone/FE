@@ -220,7 +220,7 @@ export const SelectVariantModal: React.FC<SelectVariantModalProps> = ({
     selectedColor,
     selectedSize,
     selectedMaterial
-  ].filter(Boolean).join(' - ') || selectedVariant?.name || 'Mặc định';
+  ].filter(Boolean).join(' - ') || selectedVariant?.name || 'Tiêu chuẩn';
 
   const handleSubmit = async () => {
     if (!productId) return;

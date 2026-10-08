@@ -14,7 +14,8 @@ import {
     ArrowRightLeft, 
     DollarSign, 
     ExternalLink, 
-    RotateCcw
+    RotateCcw,
+    XCircle
 } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import { returnService, type ReturnRequest } from '../../returns/services/returnService';
@@ -43,6 +44,7 @@ interface Order {
     status: 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled';
     paymentMethod?: string;
     paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
+    fulfillmentStatus?: string;
     createdAt: string;
     is_reviewed?: boolean;
 }
@@ -599,6 +601,32 @@ export function BuyerOrdersPage() {
                                                 <Eye size={14} />
                                                 <span>Xem chi tiết</span>
                                             </button>
+
+                                            {order.status !== 'cancelled' &&
+                                                order.status !== 'shipping' &&
+                                                order.status !== 'completed' &&
+                                                (order.status === 'pending' || order.paymentStatus === 'PENDING') &&
+                                                !['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.fulfillmentStatus || '') && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navigate(`/orders/${order.id}`)}
+                                                    className="border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                                                >
+                                                    <XCircle size={14} />
+                                                    <span>Hủy đơn</span>
+                                                </button>
+                                            )}
+
+                                            {order.status === 'cancelled' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleReorder(order)}
+                                                    className="bg-[#008000] hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm cursor-pointer active:scale-95"
+                                                >
+                                                    <RefreshCw size={14} />
+                                                    <span>Mua lại</span>
+                                                </button>
+                                            )}
 
                                             {order.status === 'shipping' && (
                                                 <button

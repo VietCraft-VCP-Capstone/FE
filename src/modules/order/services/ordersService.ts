@@ -83,6 +83,10 @@ export const ordersService = {
   confirmDelivery: async (orderId: string): Promise<{ success: boolean; message: string; order: any }> => {
     const res = await api.post(`/orders/${encodeURIComponent(orderId)}/confirm-delivery`);
     return res.data;
+  },
+  cancelOrder: async (orderId: string, reason?: string): Promise<OrderResponse> => {
+    const res = await api.post(`/orders/${encodeURIComponent(orderId)}/cancel`, { reason });
+    return res.data;
   }
 };
 

@@ -56,7 +56,7 @@ export const INITIAL_SELLER_SETTINGS: SellerSettingsState = {
     bankAccounts: [],
     autoWithdraw: false,
     payoutCycle: 'WEEKLY_MON',
-    minPayoutAmount: 50000
+    minPayoutAmount: 500
   },
   notifications: {
     orders: {
@@ -192,14 +192,23 @@ export const sellerSettingsService = {
   addBankAccount: async (account: Omit<BankAccountItem, 'id'>): Promise<SellerSettingsState> => {
     const current = await sellerSettingsService.getSettings();
     const newId = `bank_${Date.now()}`;
-    const newAccount: BankAccountItem = { ...account, id: newId };
     let bankAccounts = [...(current.payment.bankAccounts || [])];
-    if (newAccount.isDefault) {
+    const isFirstBank = bankAccounts.length === 0;
+    const isDefault = isFirstBank || account.isDefault;
+
+    const newAccount: BankAccountItem = { ...account, id: newId, isDefault };
+    if (isDefault) {
       bankAccounts = bankAccounts.map(b => ({ ...b, isDefault: false }));
     }
     bankAccounts.push(newAccount);
+
+    const safeMinPayout = (!current.payment.minPayoutAmount || current.payment.minPayoutAmount < 500)
+      ? 500
+      : current.payment.minPayoutAmount;
+
     return sellerSettingsService.updatePayment({
       ...current.payment,
+      minPayoutAmount: safeMinPayout,
       bankAccounts
     });
   },

@@ -49,14 +49,17 @@ const resolveCartItemImage = (variant: any, prod: any): string => {
 
 const parseMongooseDecimal = (val: any): number => {
     if (val === null || val === undefined) return 0;
-    if (typeof val === 'number') return val;
-    if (typeof val === 'string') return Number(val) || 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (typeof val === 'string') {
+        const parsed = parseFloat(val);
+        return isNaN(parsed) ? 0 : parsed;
+    }
     if (typeof val === 'object') {
         if ('$numberDecimal' in val) {
-            return Number(val.$numberDecimal) || 0;
+            return parseFloat(val.$numberDecimal) || 0;
         }
         if ('value' in val) {
-            return Number(val.value) || 0;
+            return parseFloat(val.value) || 0;
         }
     }
     const num = Number(val);
@@ -73,25 +76,32 @@ const mapBackendCart = (cartData: any): CartItem[] => {
         
         const shopName = prod.shop_id?.shop_name || 'VietCraft Selection';
         
-        let variantName = 'Mặc định';
+        let variantName = '';
         if (variant.color || variant.size || variant.material) {
             variantName = [variant.color, variant.size, variant.material].filter(Boolean).join(' - ');
         } else if (variant.name) {
             variantName = variant.name;
+        } else if (item.color || item.size) {
+            variantName = [item.color, item.size].filter(Boolean).join(' - ');
+        }
+        if (!variantName) {
+            variantName = 'Tiêu chuẩn';
         }
 
         let price = 0;
-        if (variant.retail_price) {
+        if (variant.retail_price !== undefined && variant.retail_price !== null) {
             price = parseMongooseDecimal(variant.retail_price);
-        } else if (variant.price) {
+        } else if (variant.price !== undefined && variant.price !== null) {
             price = parseMongooseDecimal(variant.price);
-        } else if (prod.retail_price) {
+        } else if (prod.retail_price !== undefined && prod.retail_price !== null) {
             price = parseMongooseDecimal(prod.retail_price);
-        } else if (prod.price) {
+        } else if (prod.price !== undefined && prod.price !== null) {
             price = parseMongooseDecimal(prod.price);
+        } else if (item.price !== undefined && item.price !== null) {
+            price = parseMongooseDecimal(item.price);
         } else if (Array.isArray(prod.variants) && prod.variants.length > 0) {
             const firstV = prod.variants[0];
-            price = parseMongooseDecimal(firstV?.retail_price || firstV?.price || 0);
+            price = parseMongooseDecimal(firstV?.retail_price ?? firstV?.price ?? 0);
         }
 
         const image = resolveCartItemImage(variant, prod);
