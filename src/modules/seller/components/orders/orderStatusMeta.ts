@@ -168,7 +168,7 @@ export const NEXT_ACTIONS: Record<SellerOrderStatus, StatusAction[]> = {
 
 export const PAYMENT_LABEL: Record<string, string> = {
   VNPAY: 'VNPay',
-  MOMO: 'MoMo',
+  PAYOS: 'payOS (QR ngân hàng)',
   COD: 'Thu hộ (COD)',
 };
 

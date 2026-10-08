@@ -44,7 +44,7 @@ export function BuyerCheckoutPage() {
     const [items, setItems] = useState<CheckoutItem[]>([]);
     const authed = isLoggedIn();
 
-    const [paymentMethod, setPaymentMethod] = useState<'momo' | 'card' | 'bank' | 'cod'>('momo');
+    const [paymentMethod, setPaymentMethod] = useState<'payos' | 'card' | 'bank' | 'cod'>('payos');
     const [couponCode, setCouponCode] = useState('');
     const [discount, setDiscount] = useState(0);
     const [couponApplied, setCouponApplied] = useState(false);
@@ -103,7 +103,7 @@ export function BuyerCheckoutPage() {
     const codDisabled = hasPodItem;
 
     useEffect(() => {
-        if (codDisabled && paymentMethod === 'cod') setPaymentMethod('momo');
+        if (codDisabled && paymentMethod === 'cod') setPaymentMethod('payos');
     }, [codDisabled, paymentMethod]);
 
     // Fetch available coupons when opening modal or on initial items load
@@ -192,7 +192,7 @@ export function BuyerCheckoutPage() {
                     size: it.size || 'L',
                     image: it.image
                 })),
-                paymentGateway: paymentMethod === 'cod' ? 'cod' : paymentMethod === 'momo' ? 'momo' : 'vnpay',
+                paymentGateway: paymentMethod === 'cod' ? 'cod' : paymentMethod === 'payos' ? 'payos' : 'vnpay',
                 shippingProvider: 'ghn',
                 shopName: items[0]?.shopName || 'VietCraft Shop',
                 shippingAddress: {
@@ -234,8 +234,20 @@ export function BuyerCheckoutPage() {
                 setCartCount(0);
             }
 
+            const orderPath = createdOrder?.id ? `/orders/${createdOrder.id}` : '/orders';
+
+            if (paymentMethod === 'payos' && createdOrder?.id) {
+                try {
+                    const { checkoutUrl } = await ordersService.createPayosPayment(createdOrder.id);
+                    window.location.href = checkoutUrl;
+                    return;
+                } catch (payosErr: any) {
+                    showToast(getApiErrorMessage(payosErr, 'Không thể mở cổng payOS. Vui lòng thanh toán lại từ chi tiết đơn hàng.'), 'error');
+                }
+            }
+
             setTimeout(() => {
-                navigate(createdOrder?.id ? `/orders/${createdOrder.id}` : '/orders');
+                navigate(orderPath);
             }, 1500);
         } catch (error: any) {
             showToast(getApiErrorMessage(error, 'Có lỗi xảy ra trong quá trình đặt hàng. Vui lòng thử lại.'), 'error');
@@ -389,17 +401,17 @@ export function BuyerCheckoutPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button
                                 type="button"
-                                onClick={() => setPaymentMethod('momo')}
+                                onClick={() => setPaymentMethod('payos')}
                                 className={`p-4 rounded-xl border text-left flex items-center gap-3 transition ${
-                                    paymentMethod === 'momo'
+                                    paymentMethod === 'payos'
                                         ? 'border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500'
                                         : 'border-gray-200 hover:border-gray-300'
                                 }`}
                             >
-                                <Wallet className={paymentMethod === 'momo' ? 'text-pink-600' : 'text-gray-400'} size={20} />
+                                <Wallet className={paymentMethod === 'payos' ? 'text-emerald-600' : 'text-gray-400'} size={20} />
                                 <div>
-                                    <p className="text-xs font-bold">Ví điện tử MoMo</p>
-                                    <p className="text-[11px] text-gray-400 mt-0.5">Quét mã QR tiện lợi</p>
+                                    <p className="text-xs font-bold">Chuyển khoản QR (payOS)</p>
+                                    <p className="text-[11px] text-gray-400 mt-0.5">Quét mã VietQR bằng app ngân hàng</p>
                                 </div>
                             </button>
 

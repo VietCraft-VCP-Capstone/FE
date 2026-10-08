@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { to: '/admin/categories', icon: Tag, label: 'Danh mục' },
   { to: '/admin/tags', icon: Tag, label: 'Thẻ' },
   { to: '/admin/disputes', icon: Scale, label: 'Tranh chấp' },
+  { to: '/admin/returns', icon: Scale, label: 'Return v3' },
   { to: '/admin/marketing', icon: Megaphone, label: 'Marketing' },
   { to: '/admin/revenue', icon: Wallet, label: 'Thống kê thu nhập' },
   { to: '/admin/commission', icon: Percent, label: 'Cấu hình lợi nhuận' },

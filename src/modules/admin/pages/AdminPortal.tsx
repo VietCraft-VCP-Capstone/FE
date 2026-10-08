@@ -11,6 +11,8 @@ import { AdminRevenue } from './AdminRevenue';
 import { Search, Edit, Lock, Unlock } from 'lucide-react';
 import { authService } from '../../auth/services/authService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { AdminRefundRequests } from './AdminRefundRequests';
+import { AdminReturnsPage, PrinterReturnsPage } from '../../returns/ReturnPages';
 
 function AdminUsers() {
   const [users, setUsers] = useState<any[]>([]);
@@ -145,7 +147,7 @@ import { AdminPromotionsPage } from './AdminPromotionsPage';
 
 /* ------------------------------------------------------------- Admin Disputes Page */
 function AdminDisputes() {
-  return <div><h2 className="m-0 text-[24px] font-extrabold tracking-[-0.02em] text-admin-ink">Tranh chấp</h2><p className="mt-1.5 mb-0 text-[13.5px] leading-normal text-admin-muted">Xử lý và giải quyết các tranh chấp giữa người mua và người bán.</p></div>;
+  return <AdminRefundRequests />;
 }
 
 interface AdminPortalProps {
@@ -165,6 +167,9 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="categories" element={<AdminCategories />} />
         <Route path="tags" element={<AdminTags />} />
         <Route path="disputes" element={<AdminDisputes />} />
+        <Route path="refund-requests" element={<Navigate to="/admin/disputes" replace />} />
+        <Route path="returns" element={<AdminReturnsPage />} />
+        <Route path="returns/printer" element={<PrinterReturnsPage />} />
         <Route path="marketing" element={<AdminPromotionsPage />} />
         <Route path="promotions" element={<AdminPromotionsPage />} />
         <Route path="revenue" element={<AdminRevenue />} />
