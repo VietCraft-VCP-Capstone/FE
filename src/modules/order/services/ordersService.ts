@@ -37,6 +37,8 @@ export interface OrderResponse {
   shopName?: string;
   shopLogo?: string;
   paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
+  /** Thời điểm cổng thanh toán xác nhận tiền về (null nếu chưa trả hoặc đơn cũ). */
+  paidAt?: string | null;
   isStatusSimulation?: boolean;
   isPod?: boolean;
   orderType?: string;
@@ -69,19 +71,17 @@ export const ordersService = {
     const res = await api.post(`/orders/callback/${orderId}`, { status });
     return res.data;
   },
+  /** Nhờ BE hỏi lại payOS trạng thái thanh toán của đơn (khi webhook chưa tới). */
+  syncPayosPayment: async (orderId: string): Promise<{ paymentStatus: string }> => {
+    const res = await api.post('/payment/payos/sync', { orderId });
+    return res.data.data;
+  },
   createPayosPayment: async (orderId: string): Promise<{ checkoutUrl: string }> => {
     const res = await api.post('/payment/payos/create', { orderId });
     return res.data.data;
   },
   confirmDelivery: async (orderId: string): Promise<{ success: boolean; message: string; order: any }> => {
     const res = await api.post(`/orders/${encodeURIComponent(orderId)}/confirm-delivery`);
-    return res.data;
-  },
-  simulateStatus: async (orderId: string, target: 'ORDERED' | 'SHIPPING' | 'DELIVERED'): Promise<{
-    success: boolean;
-    data: { order_id: string; order_code: string; order_status: string; payment_status: 'PENDING' };
-  }> => {
-    const res = await api.post(`/orders/${encodeURIComponent(orderId)}/status-simulation`, { target });
     return res.data;
   }
 };

@@ -21,7 +21,17 @@ export interface RefundRequest {
   admin_decision?: { decision: 'APPROVE' | 'REJECT'; refund_type: 'FULL' | 'PARTIAL'; cost_bearer: 'SELLER' | 'PRINTER' | 'PLATFORM'; note: string };
   sla_deadlines?: { seller_deadline: string; printer_deadline?: string };
   execution_status?: string;
+  /** Lý do lần chuyển tiền hoàn gần nhất thất bại hoặc chưa chạy được. */
+  execution_error?: string;
   created_at: string;
+}
+
+/** Thông tin để người bán tự chuyển khoản hoàn cho khách. */
+export interface ManualRefundInfo {
+  amount: number;
+  paymentMethod?: string;
+  transferContent: string;
+  destination: { bin: string; bankName?: string; accountNo: string; accountName?: string } | null;
 }
 
 function unwrap<T>(response: any): T { return response.data && Object.prototype.hasOwnProperty.call(response.data, 'data') ? response.data.data : response.data; }
@@ -33,12 +43,16 @@ export const refundService = {
     const url = response.data.url as string;
     return url.startsWith('/uploads/') ? new URL(url, api.defaults.baseURL || window.location.origin).toString() : url;
   },
-  createTestFlow: async (orderId: string) => unwrap<{ order_id: string; refund_request_id: string; payment_status: string }>(await api.post(`/orders/${encodeURIComponent(orderId)}/refund-test-flow`)),
   create: async (orderId: string, payload: { reason_category: string; description: string; evidence: string[]; refund_type: 'FULL' | 'PARTIAL'; refund_amount?: number }) => unwrap<RefundRequest>(await api.post(`/orders/${encodeURIComponent(orderId)}/refund-requests`, payload)),
   get: async (id: string) => unwrap<RefundRequest>(await api.get(`/refund-requests/${encodeURIComponent(id)}`)),
   getForOrder: async (orderId: string) => unwrap<RefundRequest | null>(await api.get(`/orders/${encodeURIComponent(orderId)}/refund-requests`)),
   dispute: async (id: string, reason: string) => unwrap<RefundRequest>(await api.post(`/refund-requests/${encodeURIComponent(id)}/dispute`, { reason })),
   sellerList: async (status?: RefundStatus | 'ALL') => unwrap<RefundRequest[]>(await api.get('/seller/refund-requests', { params: status && status !== 'ALL' ? { status } : undefined })),
+  sellerManualInfo: async (id: string) => unwrap<ManualRefundInfo>(await api.get(`/seller/refund-requests/${encodeURIComponent(id)}/manual-info`)),
+  /** Seller xác nhận đã tự chuyển khoản hoàn, kèm mã giao dịch ngân hàng. */
+  sellerManualSettle: async (id: string, reference: string, note?: string) => unwrap<RefundRequest>(await api.post(`/seller/refund-requests/${encodeURIComponent(id)}/manual-settle`, { reference, note })),
+  /** Seller chạy lại việc chuyển tiền hoàn khi lần trước lỗi. */
+  sellerRetryExecution: async (id: string) => unwrap<RefundRequest>(await api.post(`/seller/refund-requests/${encodeURIComponent(id)}/retry-execution`)),
   sellerDecision: async (id: string, decision: 'APPROVE' | 'REJECT', note: string) => unwrap<RefundRequest>(await api.post(`/seller/refund-requests/${encodeURIComponent(id)}/decision`, { decision, note })),
   adminList: async () => unwrap<RefundRequest[]>(await api.get('/admin/refund-requests', { params: { status: 'DISPUTED' } })),
   adminResolve: async (id: string, payload: { decision: 'APPROVE' | 'REJECT'; cost_bearer: 'SELLER' | 'PRINTER' | 'PLATFORM'; refund_amount?: number; note: string }) => unwrap<RefundRequest>(await api.post(`/admin/refund-requests/${encodeURIComponent(id)}/resolve`, payload)),

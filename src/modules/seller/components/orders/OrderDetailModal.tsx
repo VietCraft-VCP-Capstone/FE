@@ -39,6 +39,8 @@ export function OrderDetailModal({
   const hasDesign = order.items.some(it => it.designFileUrl);
   const isPodOrder = Boolean(order.isPod || order.orderType === 'POD' || hasDesign || order.supplierOrderId || order.printerInfo?.supplierOrderId);
   const isPendingApproval = order.approvalStatus === 'PENDING_APPROVAL' || (isPodOrder && order.fulfillmentStatus === 'PENDING_APPROVAL');
+  // Đơn trả trước (payOS/VNPay) chưa nhận tiền: chưa được duyệt, BE cũng chặn.
+  const awaitingBuyerPayment = order.paymentMethod !== 'COD' && order.paymentStatus === 'PENDING';
 
   const handleDispatchPrinter = async () => {
     setDispatchingPrinter(true);
@@ -311,7 +313,7 @@ export function OrderDetailModal({
                     </span>
                     <span className="block text-[11.5px] text-stone-500">
                       {dateTime(h.changedAt)}
-                      {h.note ? ` — ${h.note}` : ''}
+                      {h.note ? `: ${h.note}` : ''}
                     </span>
                   </span>
                 </li>
@@ -331,7 +333,7 @@ export function OrderDetailModal({
                   {order.shippingAddress.recipientName || order.buyer.name}
                 </p>
                 <p className="m-0 mt-0.5 text-[12.5px] tabular-nums text-stone-600">
-                  {order.shippingAddress.phone || '—'}
+                  {order.shippingAddress.phone || 'Chưa có SĐT'}
                 </p>
                 <p className="m-0 mt-1.5 text-[12.5px] leading-relaxed text-stone-600">
                   {order.shippingAddress.addressDetail || 'Chưa có địa chỉ chi tiết'}
@@ -408,16 +410,18 @@ export function OrderDetailModal({
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[12px] text-stone-500">
-              {isPendingApproval
+              {isPendingApproval && awaitingBuyerPayment
+                ? 'Khách chưa thanh toán đơn này. Bạn chỉ duyệt được sau khi tiền đã về.'
+                : isPendingApproval
                 ? (isPodOrder
                     ? 'Đơn hàng POD đang chờ bạn duyệt file in để đẩy sang xưởng.'
                     : 'Đơn hàng đang chờ bạn duyệt để chuẩn bị xuất kho.')
                 : order.status === 'SHIPPING'
                 ? 'Đơn hàng đang giao. Bạn có thể xác nhận đã giao khi đơn vị vận chuyển hoàn tất.'
                 : order.status === 'DELIVERED' || order.status === 'CANCELLED'
-                ? 'Đơn đã kết thúc — không còn thao tác nào.'
+                ? 'Đơn đã kết thúc, không còn thao tác nào.'
                 : isPodOrder
-                ? 'Đơn hàng POD do xưởng in phụ trách sản xuất & vận chuyển — Bạn theo dõi tiến độ.'
+                ? 'Đơn hàng POD do xưởng in phụ trách sản xuất và vận chuyển. Bạn theo dõi tiến độ tại đây.'
                 : 'Bước tiếp theo bạn có thể thực hiện:'}
             </span>
             <div className="flex flex-wrap items-center gap-2.5">
@@ -432,7 +436,7 @@ export function OrderDetailModal({
                     {rejecting ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
                     Từ chối duyệt
                   </button>
-                  {isPodOrder ? (
+                  {awaitingBuyerPayment ? null : isPodOrder ? (
                     <button
                       type="button"
                       disabled={loading || dispatchingPrinter || rejecting}

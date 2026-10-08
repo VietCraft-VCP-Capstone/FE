@@ -165,7 +165,7 @@ export function ProductListingPage() {
       setEditingProduct(null);
       await fetchProducts(filter);
     } catch (err: any) {
-      showToast('Lỗi khi lưu sản phẩm: ' + err.message, 'error');
+      showToast('Lỗi khi lưu sản phẩm: ' + getApiErrorMessage(err, err.message), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -184,7 +184,7 @@ export function ProductListingPage() {
       setSelectedIds((prev) => prev.filter((id) => id !== deletingProduct.id));
       await fetchProducts(filter);
     } catch (err: any) {
-      showToast('Không thể xóa sản phẩm: ' + err.message, 'error');
+      showToast('Không thể xóa sản phẩm: ' + getApiErrorMessage(err, err.message), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -206,7 +206,7 @@ export function ProductListingPage() {
       setIsBatchDeleteOpen(false);
       await fetchProducts(filter);
     } catch (err: any) {
-      showToast('Lỗi khi xóa hàng loạt: ' + err.message, 'error');
+      showToast('Lỗi khi xóa hàng loạt: ' + getApiErrorMessage(err, err.message), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -224,7 +224,7 @@ export function ProductListingPage() {
       setSelectedIds([]);
       await fetchProducts(filter);
     } catch (err: any) {
-      showToast('Lỗi cập nhật trạng thái: ' + err.message, 'error');
+      showToast('Lỗi cập nhật trạng thái: ' + getApiErrorMessage(err, err.message), 'error');
     } finally {
       setActionLoading(false);
     }

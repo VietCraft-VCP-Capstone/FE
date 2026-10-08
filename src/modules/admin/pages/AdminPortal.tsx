@@ -6,6 +6,8 @@ import { AdminModeration } from './AdminModeration';
 import { AdminCategories } from './AdminCategories';
 import { AdminTags } from './AdminTags';
 import { AdminSellers } from './AdminSellers';
+import { AdminCommission } from './AdminCommission';
+import { AdminRevenue } from './AdminRevenue';
 import { Search, Edit, Lock, Unlock } from 'lucide-react';
 import { authService } from '../../auth/services/authService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
@@ -170,7 +172,9 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="returns/printer" element={<PrinterReturnsPage />} />
         <Route path="marketing" element={<AdminPromotionsPage />} />
         <Route path="promotions" element={<AdminPromotionsPage />} />
-        <Route path="*" element={<Navigate to="dashboard" replace />} />
+        <Route path="revenue" element={<AdminRevenue />} />
+        <Route path="commission" element={<AdminCommission />} />
+        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
     </AdminLayout>
   );

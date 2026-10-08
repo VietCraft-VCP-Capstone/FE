@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Star, Filter } from 'lucide-react';
 import { abs } from './useHTMLImage';
+import { commissionAmount, withCommission } from '../../../../shared/utils/commission';
+import { money } from '../../../../shared/utils/format';
 
 interface Step4Props {
     title: string;
@@ -15,6 +17,8 @@ interface Step4Props {
     setSelectedVariants: React.Dispatch<React.SetStateAction<Record<string, { on: boolean; markup: string; stock: string }>>>;
     selectedImages?: string[];
     coverImage?: string;
+    /** % hoa hồng sàn. null = chưa tải được, khi đó không hiện giá niêm yết dự kiến. */
+    commissionPercent: number | null;
 }
 
 export function Step4ProductDetails({
@@ -23,7 +27,8 @@ export function Step4ProductDetails({
     categories, categoryId, setCategoryId,
     blank, selectedVariants, setSelectedVariants,
     selectedImages = [],
-    coverImage = ''
+    coverImage = '',
+    commissionPercent,
 }: Step4Props) {
     const [colorFilter, setColorFilter] = useState('all');
     const [onlySelectedFilter, setOnlySelectedFilter] = useState(false);
@@ -248,7 +253,9 @@ export function Step4ProductDetails({
                                 <th>Biến thể</th>
                                 <th>Tiền phôi</th>
                                 <th>Lợi nhuận Markup (đ)</th>
-                                <th>Giá bán công bố</th>
+                                <th>Bạn nhận</th>
+                                <th>Hoa hồng sàn{commissionPercent === null ? '' : ` ${commissionPercent}%`}</th>
+                                <th>Giá niêm yết</th>
                                 <th>Tồn kho</th>
                             </tr>
                         </thead>
@@ -256,7 +263,9 @@ export function Step4ProductDetails({
                             {displayedVariations.map((v: any) => {
                                 const sv = selectedVariants[v.sku] || { on: false, markup: '0', stock: '0' };
                                 const baseCost = v.base_cost || 0;
-                                const retail = baseCost + (Number(sv.markup) || 0);
+                                const net = baseCost + (Number(sv.markup) || 0);
+                                const fee = commissionPercent === null ? null : commissionAmount(net, commissionPercent);
+                                const listPrice = commissionPercent === null ? null : withCommission(net, commissionPercent);
                                 return (
                                     <tr key={v.sku} className={sv.on ? 'bg-white' : 'bg-stone-50/60 opacity-60'}>
                                         <td>
@@ -289,7 +298,9 @@ export function Step4ProductDetails({
                                                 }`}
                                             />
                                         </td>
-                                        <td className="font-bold text-[#1a6b1a] text-sm">{retail.toLocaleString()}đ</td>
+                                        <td className="text-stone-700 font-semibold">{money(net)}</td>
+                                        <td className="text-stone-500 font-medium">{fee === null ? '—' : `+${money(fee)}`}</td>
+                                        <td className="font-bold text-[#1a6b1a] text-sm">{listPrice === null ? '—' : money(listPrice)}</td>
                                         <td>
                                             <input
                                                 type="number"

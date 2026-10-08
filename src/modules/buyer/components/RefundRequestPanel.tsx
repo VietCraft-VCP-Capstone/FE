@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { refundService, type RefundRequest } from '../../order/services/refundService';
 import { DisputeReasonModal } from './refund/DisputeReasonModal';
@@ -7,16 +7,16 @@ import { RefundFormModal } from './refund/RefundFormModal';
 
 const labels: Record<string, string> = {
   PENDING_SELLER: 'Chờ người bán phản hồi',
-  SELLER_APPROVED: 'Đã duyệt — chờ xử lý hoàn tiền',
+  SELLER_APPROVED: 'Đã duyệt, đang hoàn tiền',
   SELLER_REJECTED: 'Người bán từ chối',
   PENDING_PRINTER: 'Đang chờ xưởng in phản hồi',
-  PRINTER_APPROVED: 'Xưởng in chấp thuận — gateway hoàn tiền chưa tích hợp',
-  PRINTER_REJECTED: 'Xưởng in từ chối — xem lý do và mở dispute',
+  PRINTER_APPROVED: 'Xưởng in chấp thuận, đang hoàn tiền',
+  PRINTER_REJECTED: 'Xưởng in từ chối, xem lý do và mở dispute',
   DISPUTED: 'Đang tranh chấp',
-  ADMIN_APPROVED: 'Quản trị viên chấp thuận — chờ xử lý hoàn tiền',
+  ADMIN_APPROVED: 'Quản trị viên chấp thuận, đang hoàn tiền',
   ADMIN_REJECTED: 'Quản trị viên từ chối',
   REFUNDED: 'Đã hoàn tiền',
-  TIMEOUT_ESCALATED: 'Quá hạn — có thể mở tranh chấp',
+  TIMEOUT_ESCALATED: 'Quá hạn, có thể mở tranh chấp',
 };
 
 interface RefundRequestPanelProps {
@@ -26,10 +26,7 @@ interface RefundRequestPanelProps {
 }
 
 export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: RefundRequestPanelProps) {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [testBusy, setTestBusy] = useState(false);
-  const [testConfirmOpen, setTestConfirmOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,20 +51,6 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
     return () => window.removeEventListener('focus', load);
   }, [orderId, searchParams]);
 
-  const createTestFlow = async () => {
-    setTestBusy(true);
-    setError('');
-    setTestConfirmOpen(false);
-    try {
-      const result = await refundService.createTestFlow(orderId);
-      navigate(`/orders/${encodeURIComponent(result.order_id)}?refundRequestId=${encodeURIComponent(result.refund_request_id)}`);
-    } catch (e) {
-      setError(getApiErrorMessage(e));
-    } finally {
-      setTestBusy(false);
-    }
-  };
-
   const submitDispute = async (reasonText: string) => {
     if (!request) return;
     setBusy(true);
@@ -89,6 +72,13 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
     : request?.status === 'TIMEOUT_ESCALATED'
     ? 'Bên xử lý quá thời hạn phản hồi'
     : 'Chưa có phản hồi';
+
+  // Sau khi được duyệt, tiến trình chuyển tiền thật nằm ở execution_status.
+  const approvedMessage = request?.status === 'REFUNDED' || request?.execution_status === 'SUCCEEDED'
+    ? 'Tiền đã được hoàn về tài khoản bạn dùng để thanh toán.'
+    : request?.execution_status === 'FAILED' || request?.execution_status === 'NOT_STARTED'
+    ? 'Yêu cầu được chấp thuận nhưng chưa chuyển được tiền hoàn. Người bán hoặc quản trị viên đang xử lý lại.'
+    : 'Yêu cầu được chấp thuận. Hệ thống đang chuyển tiền hoàn về tài khoản bạn dùng để thanh toán.';
 
   const requestOrderCode = typeof request?.order_id === 'object' ? request.order_id.order_code : undefined;
 
@@ -124,19 +114,10 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
                   ? 'bg-amber-50 text-amber-800'
                   : 'bg-emerald-50 text-emerald-800'
               }`}>
-                {labels[request.status] || request.status}
+                {request.status.endsWith('APPROVED') && (request.execution_status === 'FAILED' || request.execution_status === 'NOT_STARTED')
+                  ? 'Đã duyệt, chưa hoàn được tiền'
+                  : request.execution_status === 'SUCCEEDED' ? 'Đã hoàn tiền' : labels[request.status] || request.status}
               </span>
-            )}
-
-            {import.meta.env.DEV && orderStatus === 'pending' && (
-              <button
-                type="button"
-                disabled={testBusy}
-                onClick={() => setTestConfirmOpen(true)}
-                className="min-h-10 rounded-xl border border-amber-300 bg-amber-50 px-3 text-xs font-bold text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
-              >
-                {testBusy ? 'Đang tạo đơn test...' : 'Tạo flow hoàn tiền thử nghiệm'}
-              </button>
             )}
 
             {canRequest && (
@@ -170,7 +151,7 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
                 : request.status === 'PRINTER_REJECTED'
                 ? 'Xưởng in đã từ chối. Xem lý do bên dưới; bạn có thể mở tranh chấp nếu cần.'
                 : request.status === 'PRINTER_APPROVED' || request.status === 'ADMIN_APPROVED'
-                ? 'Yêu cầu được chấp thuận. Việc hoàn tiền thật chưa được thực hiện vì cổng thanh toán chưa tích hợp.'
+                ? approvedMessage
                 : request.status === 'DISPUTED'
                 ? 'Tranh chấp đã được chuyển đến quản trị viên để xem xét.'
                 : 'Yêu cầu đang được xử lý theo quy trình POD.'
@@ -179,7 +160,7 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
               : request.status === 'DISPUTED'
               ? 'Tranh chấp đã được chuyển đến quản trị viên để xem xét.'
               : request.status.includes('APPROVED')
-              ? 'Yêu cầu được chấp thuận. Việc hoàn tiền thật chưa được thực hiện vì cổng thanh toán chưa tích hợp.'
+              ? approvedMessage
               : 'Yêu cầu đang được xử lý.'}
           </div>
         )}
@@ -241,51 +222,6 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
             setOpen(false);
           }}
         />
-      )}
-
-      {/* Test Flow Dialog */}
-      {testConfirmOpen && (
-        <div
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/50 p-4"
-          onMouseDown={event => {
-            if (event.target === event.currentTarget) setTestConfirmOpen(false);
-          }}
-        >
-          <section
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="refund-test-title"
-            aria-describedby="refund-test-description"
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
-          >
-            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-              <span aria-hidden="true" className="text-xl font-bold">!</span>
-            </div>
-            <h2 id="refund-test-title" className="m-0 text-lg font-bold text-slate-900">
-              Tạo đơn Refund test?
-            </h2>
-            <p id="refund-test-description" className="mb-0 mt-2 text-sm leading-6 text-slate-600">
-              Hệ thống sẽ tạo một bản sao của đơn hàng để thử luồng Refund. Đơn test giữ trạng thái thanh toán <strong>PENDING</strong>; không thu hoặc hoàn tiền thật.
-            </p>
-            <div className="mt-6 flex flex-col-reverse justify-end gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => setTestConfirmOpen(false)}
-                className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Huỷ
-              </button>
-              <button
-                type="button"
-                onClick={() => void createTestFlow()}
-                disabled={testBusy}
-                className="min-h-11 rounded-lg bg-amber-700 px-4 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50"
-              >
-                {testBusy ? 'Đang tạo...' : 'Tạo đơn test'}
-              </button>
-            </div>
-          </section>
-        </div>
       )}
 
       {/* Dispute Modal */}

@@ -50,7 +50,7 @@ export function InsightsPortal({ user, onLogout }: { user: any; onLogout: () => 
         <Route path="niches" element={<NichesPage />} />
         <Route path="radar" element={<RadarPage />} />
 
-        <Route path="*" element={<Navigate to="overview" replace />} />
+        <Route path="*" element={<Navigate to="/seller/insights/overview" replace />} />
       </Routes>
     </SellerLayout>
   );
