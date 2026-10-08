@@ -38,6 +38,7 @@ const OPS_NAV: SellerNavItem[] = [
   { to: '/seller/catalog', icon: Archive, label: 'Danh mục sản phẩm' },
   { to: '/seller/storefront', icon: Store, label: 'Thông tin cửa hàng' },
   { to: '/seller/orders', icon: ShoppingCart, label: 'Đơn hàng' },
+  { to: '/seller/refund-requests', icon: Package, label: 'Hoàn tiền' },
   { to: '/seller/chat', icon: MessageSquare, label: 'Tin nhắn khách hàng' },
   { to: '/seller/products', icon: Package, label: 'Quản lí sản phẩm' },
   { to: '/seller/products/new', icon: PlusCircle, label: 'Tạo sản phẩm POD' },
@@ -52,22 +53,27 @@ const OPS_GROUPS: SellerNavGroup[] = [
   { items: OPS_NAV.filter(item => POD_CREATE_ENABLED || item.to !== POD_CREATE_PATH) },
 ];
 
+const SIDEBAR_COLLAPSED_KEY = 'vietcraft:seller-sidebar-collapsed';
+
 export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
+  // Sidebar chỉ đóng/mở khi người bán bấm, và giữ lựa chọn đó giữa các trang lẫn lần mở sau.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
+  });
+  const toggleCollapsed = () => {
+    setCollapsed(prev => {
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, prev ? '0' : '1'); } catch { /* storage bị chặn: chỉ không nhớ được */ }
+      return !prev;
+    });
+  };
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
-
-  useEffect(() => {
-    if (location.pathname.startsWith('/seller/chat')) {
-      setCollapsed(true);
-    }
-  }, [location.pathname]);
 
   useEffect(() => {
     chatService.getUnreadCount()
@@ -127,7 +133,7 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
       {/* Sidebar Navigation */}
       <aside className={`seller-sidebar ${collapsed ? 'collapsed' : ''}`}>
         <div className="seller-sidebar-top">
-          <button className="seller-collapse-btn" onClick={() => setCollapsed(!collapsed)} title={collapsed ? 'Mở rộng' : 'Thu gọn'}>
+          <button className="seller-collapse-btn" onClick={toggleCollapsed} title={collapsed ? 'Mở rộng' : 'Thu gọn'}>
             <PanelLeft size={18} />
           </button>
         </div>

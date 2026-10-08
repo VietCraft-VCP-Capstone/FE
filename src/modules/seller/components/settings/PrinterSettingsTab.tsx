@@ -430,7 +430,7 @@ export function PrinterSettingsTab() {
                   Tự động chuyển xưởng (Auto-dispatch)
                 </span>
                 <span className="text-[11.5px] text-stone-500 mt-0.5 block leading-relaxed">
-                  Ngay khi khách thanh toán thành công (VNPAY/MOMO), hệ thống sẽ tự động kích hoạt đẩy file và đơn sang xưởng in ngay lập tức.
+                  Ngay khi khách thanh toán thành công (VNPAY/PAYOS), hệ thống sẽ tự động kích hoạt đẩy file và đơn sang xưởng in ngay lập tức.
                 </span>
               </div>
             </label>

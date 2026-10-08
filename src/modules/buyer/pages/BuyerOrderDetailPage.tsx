@@ -1,22 +1,33 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle, Star, CheckCircle } from 'lucide-react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Truck, Check, CreditCard, MessageSquare, Store, Copy, AlertCircle, CheckCircle, RotateCcw, ArrowRight, PackageCheck, X, Loader2 } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
+import { OrderItemsList } from '../components/OrderItemsList';
+import { OrderSupportSection } from '../components/OrderSupportSection';
+import { returnService, type ReturnEligibilityItem } from '../../returns/services/returnService';
+import { refundService } from '../../order/services/refundService';
+import type { OrderItemResponse, OrderResponse } from '../../order/services/ordersService';
 
 export function BuyerOrderDetailPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
-    const [order, setOrder] = useState<any>(null);
+    const [searchParams] = useSearchParams();
+    const [repaying, setRepaying] = useState(false);
+    const [order, setOrder] = useState<OrderResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [copySuccess, setCopySuccess] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [targetReviewProductId, setTargetReviewProductId] = useState<string | undefined>(undefined);
+    const [eligibilityItems, setEligibilityItems] = useState<ReturnEligibilityItem[]>([]);
+    const [hasLegacyRefund, setHasLegacyRefund] = useState(false);
+    const [reorderItems, setReorderItems] = useState<OrderItemResponse[] | null>(null);
 
     const handleOpenReview = (productId?: string) => {
         setTargetReviewProductId(productId);
@@ -38,20 +49,61 @@ export function BuyerOrderDetailPage() {
     };
 
     useEffect(() => {
+        let cancelled = false;
         const fetchOrderDetails = async () => {
             if (!id) return;
             setLoading(true);
             try {
                 const res = await ordersService.getById(id);
-                setOrder(res);
+                if (!cancelled) setOrder(res);
             } catch (err) {
                 console.error('Failed to load order detail', err);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
-        fetchOrderDetails();
+        void fetchOrderDetails();
+        return () => { cancelled = true; };
     }, [id]);
+
+    // Đơn payOS còn PENDING: nhờ BE hỏi lại payOS thay vì chỉ chờ webhook (webhook có thể
+    // không tới, ví dụ BE chạy local). Vừa quay về với status=PAID thì hỏi lặp vài lần vì
+    // payOS cần vài giây để chốt giao dịch.
+    const returnedPaid = searchParams.get('status') === 'PAID';
+    useEffect(() => {
+        if (!id || order?.paymentMethod !== 'PAYOS' || order?.paymentStatus !== 'PENDING') return;
+        let stopped = false;
+        let attempts = 0;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const check = async () => {
+            attempts += 1;
+            const result = await ordersService.syncPayosPayment(id).catch(() => null);
+            if (stopped) return;
+            if (result && result.paymentStatus !== 'PENDING') {
+                ordersService.getById(id).then(setOrder).catch(() => {});
+                return;
+            }
+            if (returnedPaid && attempts < 10) timer = setTimeout(() => void check(), 3000);
+        };
+        void check();
+        return () => { stopped = true; if (timer) clearTimeout(timer); };
+    }, [id, returnedPaid, order?.paymentMethod, order?.paymentStatus]);
+
+    useEffect(() => {
+        if (!order?.id) return;
+        let cancelled = false;
+        setHasLegacyRefund(false);
+        void Promise.all([
+            refundService.getForOrder(order.id).catch(() => null),
+            order.status === 'completed' && order._id ? returnService.eligibility(order._id).catch(() => []) : Promise.resolve([]),
+        ]).then(([legacyRefund, eligibility]) => {
+            if (cancelled) return;
+            setHasLegacyRefund(legacyRefund !== null);
+            setEligibilityItems(eligibility);
+        });
+        return () => { cancelled = true; };
+    }, [order?.id, order?.status]);
+
 
     const handleCopyCode = () => {
         if (!order?.id) return;
@@ -60,12 +112,13 @@ export function BuyerOrderDetailPage() {
         setTimeout(() => setCopySuccess(false), 2000);
     };
 
-    const handleReorder = () => {
+    const handleReorder = (item?: OrderItemResponse) => {
         if (!order) return;
+        setReorderItems(item ? [item] : null);
         setIsReorderModalOpen(true);
     };
 
-    const handleConfirmReorder = async (selectedItems: any[]) => {
+    const handleConfirmReorder = async (selectedItems: OrderItemResponse[]) => {
         if (!order) return;
         const failures: string[] = [];
         for (const it of selectedItems) {
@@ -90,15 +143,14 @@ export function BuyerOrderDetailPage() {
     };
 
     const [confirmingDelivery, setConfirmingDelivery] = useState(false);
+    const [confirmDeliveryModalOpen, setConfirmDeliveryModalOpen] = useState(false);
 
     const handleConfirmReceived = async () => {
         if (!order?.id) return;
-        const ok = window.confirm('Bạn xác nhận đã nhận được kiện hàng và kiểm tra đầy đủ sản phẩm?');
-        if (!ok) return;
-
         setConfirmingDelivery(true);
         try {
             await ordersService.confirmDelivery(order.id);
+            setConfirmDeliveryModalOpen(false);
             showToast('Xác nhận nhận hàng thành công! Đơn hàng đã hoàn tất.');
             const res = await ordersService.getById(order.id);
             setOrder(res);
@@ -143,9 +195,9 @@ export function BuyerOrderDetailPage() {
         return `${day} Thg ${month} ${year}, ${hour}:${min}`;
     };
 
-    const getPaymentMethodLabel = (method: string) => {
+    const getPaymentMethodLabel = (method: string | undefined) => {
         switch (method?.toLowerCase()) {
-            case 'momo': return 'Ví MoMo';
+            case 'payos': return 'payOS (QR ngân hàng)';
             case 'vnpay': return 'VNPay';
             case 'cod': return 'Thanh toán khi nhận hàng (COD)';
             default: return 'Ví điện tử';
@@ -160,8 +212,18 @@ export function BuyerOrderDetailPage() {
         }
     };
 
+    // Đơn trả trước (payOS/VNPay) đã nhận tiền nhưng shop chưa duyệt: khách phải thấy rõ là đã trả.
+    const isPrepaidPaid = order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID';
+    const paidAmountText = `${Number(order.totalAmount || 0).toLocaleString('vi-VN')}đ`;
+
     const statusBannerMap: Record<string, { title: string; desc: string; bg: string; iconBg: string }> = {
-        pending: {
+        pending: isPrepaidPaid ? {
+            title: order.isPod ? 'Đã thanh toán · Đơn POD chờ duyệt in' : 'Đã thanh toán · Chờ shop xác nhận',
+            desc: `Bạn đã thanh toán ${paidAmountText} qua ${getPaymentMethodLabel(order.paymentMethod)}${order.paidAt ? ` lúc ${formatDate(order.paidAt)}` : ''}. `
+                + (order.isPod ? 'Đơn in theo yêu cầu đang được kiểm tra trước khi chuyển xưởng in.' : 'Shop sẽ xác nhận và chuẩn bị hàng cho bạn.'),
+            bg: 'bg-emerald-50 border-emerald-100',
+            iconBg: 'bg-emerald-600'
+        } : {
             title: order.isPod ? 'Đơn hàng POD đang chờ xác nhận' : 'Đơn hàng đang chờ xác nhận',
             desc: order.isPod ? 'Đơn hàng in theo yêu cầu đang được kiểm tra trước khi chuyển xưởng in.' : 'Shop đang chuẩn bị xác nhận đơn hàng của bạn.',
             bg: 'bg-amber-50 border-amber-100',
@@ -203,15 +265,39 @@ export function BuyerOrderDetailPage() {
         }
     };
 
-    const statusBanner = statusBannerMap[order.status] || {
+    // Đơn payOS chưa trả tiền: huỷ ở trang payOS hay link hết hạn đều giữ đơn ở đây để trả lại.
+    const awaitingPayment = order.paymentMethod === 'PAYOS' && order.paymentStatus === 'PENDING' && order.status === 'pending';
+    const paymentCancelled = searchParams.get('payment') === 'cancelled' || searchParams.get('cancel') === 'true';
+
+    const handleRepay = async () => {
+        setRepaying(true);
+        try {
+            const { checkoutUrl } = await ordersService.createPayosPayment(order._id || order.id);
+            window.location.href = checkoutUrl;
+        } catch (err) {
+            showToast(getApiErrorMessage(err, 'Không thể mở cổng thanh toán payOS. Vui lòng thử lại.'), 'error');
+            setRepaying(false);
+        }
+    };
+
+    const statusBanner = awaitingPayment ? {
+        title: returnedPaid ? 'Đang xác nhận thanh toán' : 'Đơn hàng chờ thanh toán',
+        desc: returnedPaid
+            ? 'payOS đã nhận thanh toán, hệ thống đang xác nhận. Trang sẽ tự cập nhật trong giây lát.'
+            : paymentCancelled
+            ? 'Bạn đã huỷ thanh toán. Đơn hàng vẫn được giữ, bấm "Thanh toán lại" để hoàn tất.'
+            : 'Đơn hàng chưa được thanh toán. Shop chỉ xử lý đơn sau khi bạn thanh toán thành công.',
+        bg: 'bg-orange-50 border-orange-100',
+        iconBg: 'bg-orange-500'
+    } : statusBannerMap[order.status] || {
         title: 'Đơn hàng',
         desc: 'Đơn hàng đang được cập nhật.',
         bg: 'bg-gray-50 border-gray-200',
         iconBg: 'bg-gray-500'
     };
 
-    const orderItems: any[] = Array.isArray(order.items) ? order.items : [];
-    const subtotal = orderItems.reduce((acc: number, it: any) => acc + ((it.price || 0) * (it.quantity || 0)), 0);
+    const orderItems: OrderItemResponse[] = Array.isArray(order.items) ? order.items : [];
+    const subtotal = orderItems.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
     const shippingFee = Number(order.shippingFee ?? 0);
     const totalAmount = Number(order.totalAmount ?? (subtotal + shippingFee));
 
@@ -229,13 +315,56 @@ export function BuyerOrderDetailPage() {
             {/* Status Banner */}
             <div className={`border rounded-2xl p-5 flex items-center gap-4 ${statusBanner.bg}`}>
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white ${statusBanner.iconBg}`}>
-                    <Truck size={22} />
+                    {awaitingPayment ? <CreditCard size={22} /> : isPrepaidPaid && order.status === 'pending' ? <CheckCircle size={22} /> : <Truck size={22} />}
                 </div>
                 <div className="space-y-0.5">
                     <h2 className="font-extrabold text-gray-900 text-sm">{statusBanner.title}</h2>
                     <p className="text-xs text-gray-500 font-medium">{statusBanner.desc}</p>
                 </div>
+                {awaitingPayment && !returnedPaid && (
+                    <button
+                        type="button"
+                        onClick={() => void handleRepay()}
+                        disabled={repaying}
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-60"
+                    >
+                        {repaying ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                        <span>{repaying ? 'Đang mở payOS...' : 'Thanh toán lại'}</span>
+                    </button>
+                )}
             </div>
+
+            {/* Active Return Alert Banner */}
+            {eligibilityItems.find(it => it.activeRequestId)?.activeRequestId && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                            <RotateCcw size={18} />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-extrabold text-sm text-indigo-950">
+                                    Đơn hàng đang có yêu cầu đổi trả / hoàn tiền
+                                </h3>
+                                <span className="bg-indigo-200/70 text-indigo-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                    Return v3
+                                </span>
+                            </div>
+                            <p className="text-xs text-indigo-700 mt-0.5">
+                                Yêu cầu #{eligibilityItems.find(it => it.activeRequestId)?.activeRequestId} đang trong tiến trình xử lý POD. Bạn có thể bấm theo dõi tiến độ chi tiết.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => navigate(`/returns/${encodeURIComponent(eligibilityItems.find(it => it.activeRequestId)!.activeRequestId!)}`)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 flex-shrink-0 cursor-pointer"
+                    >
+                        <span>Theo dõi tiến độ yêu cầu</span>
+                        <ArrowRight size={13} />
+                    </button>
+                </div>
+            )}
 
             {/* Info Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -327,107 +456,34 @@ export function BuyerOrderDetailPage() {
                 </div>
 
                 {/* Items */}
-                <div className="divide-y divide-gray-50 p-4">
-                    {orderItems.map((item: any, idx: number) => (
-                        <div key={idx} className="flex gap-4 py-3 first:pt-0 last:pb-0">
-                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                <img
-                                    src={item.image || '/image-not-found.jpg'}
-                                    alt={item.title}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).src = '/image-not-found.jpg';
-                                    }}
-                                />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="font-extrabold text-gray-900 text-sm leading-snug line-clamp-1">{item.title}</h4>
-                                <p className="text-[11px] text-gray-400 mt-1">Phân loại: {item.color || 'Trắng'}</p>
-                                <p className="text-xs font-semibold text-gray-500 mt-0.5">x{item.quantity}</p>
-                            </div>
-                            <div className="text-right flex flex-col items-end justify-between">
-                                <span className="font-extrabold text-gray-900 text-sm">
-                                    {(item.price * item.quantity).toLocaleString('vi-VN')}đ
-                                </span>
-                                {order.status === 'completed' && (
-                                    <div className="mt-2">
-                                        {item.is_reviewed ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleOpenReview(item.productId)}
-                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-amber-200/70 shadow-2xs"
-                                                title="Xem và chỉnh sửa đánh giá cho sản phẩm này"
-                                            >
-                                                <Star size={11} className="fill-amber-500 text-amber-500" />
-                                                <span>Chỉnh sửa đánh giá</span>
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleOpenReview(item.productId)}
-                                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-emerald-200/70 shadow-2xs"
-                                                title="Đánh giá sản phẩm này"
-                                            >
-                                                <Star size={11} />
-                                                <span>Đánh giá</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                <OrderItemsList
+                    orderId={order._id}
+                    items={orderItems}
+                    eligibilityItems={eligibilityItems}
+                    completed={order.status === 'completed'}
+                    onReview={handleOpenReview}
+                    onReorder={handleReorder}
+                />
 
-                {/* Item Card Actions */}
-                <div className="p-4 bg-gray-50/10 border-t border-gray-50 flex justify-end gap-2">
+                {order.status === 'shipping' && <div className="flex justify-end border-t border-gray-50 p-4">
                     <button
-                        disabled
-                        className="border border-gray-200 text-gray-300 bg-gray-50 text-xs font-bold px-4 py-2 rounded-lg cursor-not-allowed"
+                        type="button"
+                        onClick={() => setConfirmDeliveryModalOpen(true)}
+                        disabled={confirmingDelivery}
+                        className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95 disabled:opacity-60"
+                        title="Xác nhận bạn đã nhận được kiện hàng từ shipper"
                     >
-                        Yêu cầu Trả hàng/Hoàn tiền
+                        <CheckCircle size={14} />
+                        <span>{confirmingDelivery ? 'Đang xử lý...' : 'Đã nhận được hàng'}</span>
                     </button>
-                    {order.status === 'shipping' && (
-                        <button
-                            type="button"
-                            onClick={handleConfirmReceived}
-                            disabled={confirmingDelivery}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer disabled:opacity-60"
-                            title="Xác nhận bạn đã nhận được kiện hàng từ shipper"
-                        >
-                            <CheckCircle size={14} />
-                            <span>{confirmingDelivery ? 'Đang xử lý...' : 'Đã nhận được hàng'}</span>
-                        </button>
-                    )}
-                    {order.status === 'completed' && (
-                        order.is_reviewed || (orderItems.length > 0 && orderItems.every((it: any) => it.is_reviewed)) ? (
-                            <button
-                                onClick={() => handleOpenReview()}
-                                className="border border-amber-500 text-amber-700 hover:bg-amber-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
-                                title="Xem và chỉnh sửa đánh giá của đơn hàng này"
-                            >
-                                <Star size={14} className="fill-amber-500 text-amber-500" />
-                                <span>Chỉnh sửa đánh giá</span>
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => handleOpenReview()}
-                                className="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
-                                title="Đánh giá sản phẩm trong đơn hàng"
-                            >
-                                <Star size={14} />
-                                <span>Đánh giá</span>
-                            </button>
-                        )
-                    )}
-                    <button
-                        onClick={handleReorder}
-                        className="border border-emerald-600 hover:bg-emerald-50 text-emerald-600 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
-                    >
-                        <span>Mua lại</span>
-                    </button>
-                </div>
+                </div>}
             </div>
+
+            {!awaitingPayment && (hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID')) && <OrderSupportSection
+                orderId={order.id}
+                refundOrderId={order._id}
+                orderStatus={order.status}
+            />}
 
             {/* Bottom Payment details */}
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row justify-between gap-8 divide-y md:divide-y-0 md:divide-x divide-gray-100">
@@ -473,8 +529,18 @@ export function BuyerOrderDetailPage() {
                             <span className="text-gray-900 font-semibold">{formatDate(order.createdAt)}</span>
                         </div>
                         <div className="flex justify-between">
+                            <span>Trạng thái thanh toán</span>
+                            {order.paymentStatus === 'PAID' ? (
+                                <span className="inline-flex items-center gap-1 font-bold text-emerald-700"><CheckCircle size={13} /> Đã thanh toán</span>
+                            ) : order.paymentStatus === 'REFUNDED' ? (
+                                <span className="font-bold text-indigo-700">Đã hoàn tiền</span>
+                            ) : (
+                                <span className="font-bold text-orange-600">{order.paymentMethod === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chưa thanh toán'}</span>
+                            )}
+                        </div>
+                        <div className="flex justify-between">
                             <span>Thời gian thanh toán</span>
-                            <span className="text-gray-900 font-semibold">{formatDate(order.createdAt)}</span>
+                            <span className="text-gray-900 font-semibold">{order.paidAt ? formatDate(order.paidAt) : '—'}</span>
                         </div>
                         <div className="flex justify-between">
                             <span>Phương thức thanh toán</span>
@@ -489,7 +555,7 @@ export function BuyerOrderDetailPage() {
                     isOpen={isReorderModalOpen}
                     onClose={() => setIsReorderModalOpen(false)}
                     shopName={order.shopName || 'VietCraft Shop'}
-                    items={orderItems}
+                    items={reorderItems || orderItems}
                     onConfirm={handleConfirmReorder}
                 />
             )}
@@ -512,6 +578,80 @@ export function BuyerOrderDetailPage() {
                     initialProductId={targetReviewProductId}
                     onSuccess={handleReviewSuccess}
                 />
+            )}
+
+            {/* Confirm Received In-App Modal */}
+            {confirmDeliveryModalOpen && createPortal(
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+                    onMouseDown={e => {
+                        if (e.target === e.currentTarget && !confirmingDelivery) {
+                            setConfirmDeliveryModalOpen(false);
+                        }
+                    }}
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="confirm-delivery-title"
+                        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200"
+                    >
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                                <PackageCheck size={24} />
+                            </div>
+                            <button
+                                type="button"
+                                disabled={confirmingDelivery}
+                                onClick={() => setConfirmDeliveryModalOpen(false)}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <h3 id="confirm-delivery-title" className="mt-4 text-base font-extrabold text-slate-900">
+                            Xác nhận đã nhận hàng
+                        </h3>
+                        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                            Bạn xác nhận đã nhận được kiện hàng từ đơn vị vận chuyển và kiểm tra đầy đủ các sản phẩm bên trong?
+                        </p>
+
+                        <div className="mt-3.5 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-xs leading-5 text-emerald-900">
+                            Sau khi xác nhận, đơn hàng sẽ chuyển sang trạng thái <strong>"Đã giao"</strong>. Bạn có thể đánh giá sản phẩm hoặc tạo yêu cầu <strong>Đổi/trả hàng</strong> nếu phát hiện sản phẩm có lỗi.
+                        </div>
+
+                        <div className="mt-6 flex flex-col-reverse justify-end gap-2.5 sm:flex-row">
+                            <button
+                                type="button"
+                                disabled={confirmingDelivery}
+                                onClick={() => setConfirmDeliveryModalOpen(false)}
+                                className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                            >
+                                Huỷ
+                            </button>
+                            <button
+                                type="button"
+                                disabled={confirmingDelivery}
+                                onClick={handleConfirmReceived}
+                                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                {confirmingDelivery ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin" />
+                                        <span>Đang xử lý...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle size={16} />
+                                        <span>Xác nhận đã nhận</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
 
             {/* Toast Notification */}

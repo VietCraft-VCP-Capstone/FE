@@ -42,7 +42,7 @@ export const STATUS_META: Record<SellerOrderStatus | 'PENDING_APPROVAL' | 'POD_O
   },
   PENDING_DESIGN: {
     label: 'Chờ thiết kế',
-    hint: 'Thiếu file in — bổ sung thiết kế rồi mới nhận sản xuất được.',
+    hint: 'Thiếu file in. Bổ sung thiết kế rồi mới nhận sản xuất được.',
     badge: 'bg-violet-50 text-violet-800 border-violet-200',
     dot: '#6D28D9',
   },
@@ -168,7 +168,7 @@ export const NEXT_ACTIONS: Record<SellerOrderStatus, StatusAction[]> = {
 
 export const PAYMENT_LABEL: Record<string, string> = {
   VNPAY: 'VNPay',
-  MOMO: 'MoMo',
+  PAYOS: 'payOS (QR ngân hàng)',
   COD: 'Thu hộ (COD)',
 };
 

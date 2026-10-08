@@ -20,6 +20,9 @@ export function isLoggedIn(): boolean {
 
 export function getApiErrorMessage(err: any, fallback = 'Đã có lỗi xảy ra, vui lòng thử lại.'): string {
     const data = err?.response?.data;
+    // Lỗi validate của BE: { error: 'Dữ liệu không hợp lệ', errors: [...] } — lý do thật nằm trong errors.
+    const details = Array.isArray(data?.errors) ? data.errors.filter((e: unknown) => typeof e === 'string' && e) : [];
+    if (details.length) return `${typeof data.error === 'string' && data.error ? data.error + ': ' : ''}${details.join('; ')}`;
     if (data && typeof data.error === 'string' && data.error) return data.error;
     if (data && typeof data.message === 'string' && data.message) return data.message;
     if (typeof data === 'string' && data) return data;
