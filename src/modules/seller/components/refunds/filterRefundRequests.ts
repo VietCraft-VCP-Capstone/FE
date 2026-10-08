@@ -7,7 +7,7 @@ export function filterRefundRequests(items: RefundRequest[], status: 'ALL' | Ref
     if (!term) return true;
     const order = typeof item.order_id === 'object' ? item.order_id : null;
     const buyer = typeof item.buyer_id === 'object' ? item.buyer_id : null;
-    return [order?.order_code, buyer?.name, buyer?.email, item.reason_category, item.description]
+    return [order?.order_code, buyer?.full_name, buyer?.name, buyer?.email, item.reason_category, item.description]
       .some(value => String(value || '').toLocaleLowerCase('vi').includes(term));
   });
 }
