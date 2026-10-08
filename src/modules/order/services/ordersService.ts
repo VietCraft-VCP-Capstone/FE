@@ -29,7 +29,7 @@ export interface OrderResponse {
   totalAmount: number;
   shippingFee?: number;
   status: 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled';
-  paymentGateway: 'vnpay' | 'momo' | 'cod';
+  paymentGateway: 'vnpay' | 'payos' | 'cod';
   paymentMethod?: string;
   shippingProvider: 'ghn' | 'ghtk';
   shippingCode?: string;
@@ -68,6 +68,10 @@ export const ordersService = {
   triggerCallback: async (orderId: string, status: 'success' | 'fail') => {
     const res = await api.post(`/orders/callback/${orderId}`, { status });
     return res.data;
+  },
+  createPayosPayment: async (orderId: string): Promise<{ checkoutUrl: string }> => {
+    const res = await api.post('/payment/payos/create', { orderId });
+    return res.data.data;
   },
   confirmDelivery: async (orderId: string): Promise<{ success: boolean; message: string; order: any }> => {
     const res = await api.post(`/orders/${encodeURIComponent(orderId)}/confirm-delivery`);

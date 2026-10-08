@@ -172,7 +172,7 @@ export function BuyerOrderDetailPage() {
 
     const getPaymentMethodLabel = (method: string | undefined) => {
         switch (method?.toLowerCase()) {
-            case 'momo': return 'Ví MoMo';
+            case 'payos': return 'payOS (QR ngân hàng)';
             case 'vnpay': return 'VNPay';
             case 'cod': return 'Thanh toán khi nhận hàng (COD)';
             default: return 'Ví điện tử';
