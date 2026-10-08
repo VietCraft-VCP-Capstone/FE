@@ -6,6 +6,7 @@ import { AdminModeration } from './AdminModeration';
 import { AdminCategories } from './AdminCategories';
 import { AdminTags } from './AdminTags';
 import { AdminSellers } from './AdminSellers';
+import { AdminFinanceSimulationPage } from './AdminFinanceSimulationPage';
 import { AdminCommission } from './AdminCommission';
 import { AdminRevenue } from './AdminRevenue';
 import { Search, Edit, Lock, Unlock } from 'lucide-react';
@@ -161,6 +162,7 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
     <AdminLayout user={user} onLogout={onLogout}>
       <Routes>
         <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="finance" element={<AdminFinanceSimulationPage />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="moderation" element={<AdminModeration />} />
         <Route path="sellers" element={<AdminSellers />} />
