@@ -363,9 +363,9 @@ export function BuyerProductDetailPage() {
     ? parseFloat(rawBasePrice.$numberDecimal)
     : Number(rawBasePrice) || 0;
 
-  // Active promotion (Flash Sale or Specific Product Voucher)
+  // Active promotion: CHỈ áp dụng Flash Sale trực tiếp nếu đủ điều kiện đơn tối thiểu
   const activePromotion = useMemo(() => {
-    if (!id || !availableCoupons.length) return null;
+    if (!id || !availableCoupons.length || basePrice <= 0) return null;
     const now = new Date();
 
     const isActive = (c: any) => {
@@ -403,40 +403,20 @@ export function BuyerProductDetailPage() {
         ? parseFloat(raw.$numberDecimal)
         : parseFloat(raw || 0);
 
-    // 1. Flash Sale: ưu tiên SPECIFIC_PRODUCTS trước, sau đó scope ALL
-    const flashSale = availableCoupons.find(c =>
-      isActive(c) && c.discount_type === 'FLASH_SALE' && appliesToProduct(c)
-    );
+    // Chỉ áp dụng Flash Sale trực tiếp vào giá sản phẩm nếu đạt đơn tối thiểu
+    const flashSale = availableCoupons.find(c => {
+      if (!isActive(c) || c.discount_type !== 'FLASH_SALE' || !appliesToProduct(c)) return false;
+      const minVal = parseVal(c.min_order_value);
+      if (minVal > 0 && basePrice < minVal) return false;
+      return true;
+    });
+
     if (flashSale) {
       return { type: 'FLASH_SALE' as const, coupon: flashSale, discountVal: parseVal(flashSale.discount_value) };
     }
 
-    // 2. Coupon chỉ định sản phẩm cụ thể (ưu tiên cao hơn scope ALL)
-    const specificCoupon = availableCoupons.find(c =>
-      isActive(c) &&
-      c.discount_type !== 'FLASH_SALE' &&
-      c.discount_type !== 'FREE_SHIPPING' &&
-      c.applicable_scope === 'SPECIFIC_PRODUCTS' &&
-      (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id)
-    );
-    if (specificCoupon) {
-      return { type: specificCoupon.discount_type, coupon: specificCoupon, discountVal: parseVal(specificCoupon.discount_value) };
-    }
-
-    // 3. Coupon scope ALL (toàn shop hoặc toàn sàn) – chỉ PERCENTAGE / FIXED_AMOUNT
-    const allScopeCoupon = availableCoupons.find(c =>
-      isActive(c) &&
-      c.discount_type !== 'FLASH_SALE' &&
-      c.discount_type !== 'FREE_SHIPPING' &&
-      c.applicable_scope === 'ALL' &&
-      appliesToProduct(c)
-    );
-    if (allScopeCoupon) {
-      return { type: allScopeCoupon.discount_type, coupon: allScopeCoupon, discountVal: parseVal(allScopeCoupon.discount_value) };
-    }
-
     return null;
-  }, [id, availableCoupons, product]);
+  }, [id, availableCoupons, product, basePrice]);
 
   let finalPrice = basePrice;
   let strikePrice = 0;
@@ -447,24 +427,14 @@ export function BuyerProductDetailPage() {
   if (activePromotion) {
     strikePrice = basePrice;
     const val = activePromotion.discountVal;
-    if (activePromotion.type === 'FLASH_SALE') {
-      isFlashSale = true;
-      if (val <= 100) {
-        // val là % giảm
-        finalPrice = Math.round(basePrice * (1 - val / 100));
-        discountPct = Math.round(val);
-        discountBadgeText = `-${discountPct}%`;
-      } else {
-        // val là số tiền giảm (VNĐ)
-        finalPrice = Math.max(0, basePrice - val);
-        discountPct = Math.round((val / basePrice) * 100);
-        discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
-      }
-    } else if (activePromotion.type === 'PERCENTAGE') {
+    isFlashSale = true;
+    if (val <= 100) {
+      // val là % giảm
       finalPrice = Math.round(basePrice * (1 - val / 100));
       discountPct = Math.round(val);
       discountBadgeText = `-${discountPct}%`;
-    } else if (activePromotion.type === 'FIXED_AMOUNT') {
+    } else {
+      // val là số tiền giảm (VNĐ)
       finalPrice = Math.max(0, basePrice - val);
       discountPct = Math.round((val / basePrice) * 100);
       discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
@@ -547,16 +517,46 @@ export function BuyerProductDetailPage() {
     }
   };
 
-  // Chỉ sang giỏ khi thêm THÀNH CÔNG, tránh đưa người dùng tới giỏ trống mà không rõ lý do.
+  // "Mua ngay" chuyển thẳng tới trang /checkout với sản phẩm được chọn
   const buyNow = async () => {
+    if (!product) return;
     if (!validateVariantSelection()) return;
-    // "Mua ngay" dẫn thẳng tới luồng thanh toán → bắt đăng nhập tại đây.
     if (!isLoggedIn()) {
-      navigate('/login');
+      navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
-    const ok = await addToCart();
-    if (ok) navigate('/cart');
+
+    const targetVariantId = activeVariant?.id || (activeVariant as any)?._id || selectedVariant?.id || (selectedVariant as any)?._id;
+    const currentImg = (product.images && product.images[selectedImage]) || (product.variants && selectedVariant?.mockupImage) || (product as any)?.thumbnail || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600';
+    const variantName = [selectedColor, selectedSize, selectedMaterial].filter(Boolean).join(' - ') || activeVariant?.name || 'Tiêu chuẩn';
+
+    const checkoutItem = {
+      productId: product.id || (product as any)._id,
+      variantId: targetVariantId ? String(targetVariantId) : '',
+      title: product.title || 'Sản phẩm VietCraft',
+      shopName: product.shopInfo?.name || (product as any)?.shop_id?.shop_name || 'VietCraft Shop',
+      variantName,
+      price: basePrice,
+      quantity: qty,
+      image: currentImg,
+      color: selectedColor || undefined,
+      size: selectedSize || undefined,
+      productType: (product as any)?.product_type || 'NORMAL'
+    };
+
+    try {
+      await cartService.addToCart({
+        productId: product.id || (product as any)._id,
+        variantId: targetVariantId ? String(targetVariantId) : undefined,
+        quantity: qty,
+        customNotes: customText || undefined
+      });
+    } catch (e) {
+      console.warn('Sync buy-now item into cart background:', e);
+    }
+
+    localStorage.setItem('vietcraft_checkout', JSON.stringify([checkoutItem]));
+    navigate('/checkout');
   };
 
   const handleChatWithSeller = () => {
