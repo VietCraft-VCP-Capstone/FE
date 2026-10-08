@@ -329,7 +329,8 @@ export function BuyerProductDetailPage() {
       return null;
     };
 
-    const currentProductShopId = getShopId(product?.shopInfo?.id) || getShopId(product?.shop_id) || getShopId(product?.sellerId);
+    const pAny = product as any;
+    const currentProductShopId = getShopId(pAny?.shopInfo?.id) || getShopId(pAny?.shop_id) || getShopId(pAny?.sellerId);
 
     const appliesToProduct = (c: any): boolean => {
       if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
@@ -423,7 +424,8 @@ export function BuyerProductDetailPage() {
   const productVouchers = useMemo(() => {
     if (!availableCoupons.length) return [];
     const now = new Date();
-    const currentProductShopId = product?.shopInfo?.id || product?.shop_id?._id?.toString() || product?.shop_id?.toString() || product?.sellerId?.toString();
+    const pAny = product as any;
+    const currentProductShopId = pAny?.shopInfo?.id || pAny?.shop_id?._id?.toString() || pAny?.shop_id?.toString() || pAny?.sellerId?.toString();
     return availableCoupons.filter(c => {
       if (!c.is_active) return false;
       if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
@@ -431,7 +433,8 @@ export function BuyerProductDetailPage() {
         return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
       }
       if (c.is_platform || !c.shop_id) return true;
-      const cShopId = c.shop_id?._id?.toString() || c.shop_id?.id?.toString() || (typeof c.shop_id === 'string' ? c.shop_id : null);
+      const sId = c.shop_id as any;
+      const cShopId = sId?._id?.toString() || sId?.id?.toString() || (typeof sId === 'string' ? sId : null);
       if (cShopId && currentProductShopId && cShopId === currentProductShopId) return true;
       return false;
     });
