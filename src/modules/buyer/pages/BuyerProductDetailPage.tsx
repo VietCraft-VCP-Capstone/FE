@@ -300,14 +300,68 @@ export function BuyerProductDetailPage() {
   const sizes = [...new Set((product?.variants || []).map(v => v.size).filter(Boolean))] as string[];
   const materials = [...new Set((product?.variants || []).map(v => v.material).filter(Boolean))] as string[];
 
-  // Resolve active variant by selected options
-  const activeVariant = product?.variants.find(v =>
-    (!selectedColor || v.color === selectedColor) &&
-    (!selectedSize || v.size === selectedSize) &&
-    (!selectedMaterial || v.material === selectedMaterial)
-  ) || selectedVariant || product?.variants[0] || null;
+  const hasColors = colors.length > 0;
+  const hasSizes = sizes.length > 0;
+  const hasMaterials = materials.length > 0;
 
-  const basePrice = activeVariant?.price || product?.price || 0;
+  // Resolve active variant by selected options
+  const activeVariant = useMemo(() => {
+    if (!product?.variants || product.variants.length === 0) return null;
+    const exact = product.variants.find(v =>
+      (!selectedColor || v.color === selectedColor) &&
+      (!selectedSize || v.size === selectedSize) &&
+      (!selectedMaterial || v.material === selectedMaterial)
+    );
+    if (exact) return exact;
+    return selectedVariant || product.variants[0] || null;
+  }, [product?.variants, selectedColor, selectedSize, selectedMaterial, selectedVariant]);
+
+  const handleSelectColor = (c: string) => {
+    setSelectedColor(c);
+    const match = product?.variants?.find(v =>
+      v.color === c &&
+      (!selectedSize || v.size === selectedSize) &&
+      (!selectedMaterial || v.material === selectedMaterial)
+    ) || product?.variants?.find(v => v.color === c);
+    if (match) {
+      setSelectedVariant(match);
+      if (match.size && !selectedSize) setSelectedSize(match.size);
+      if (match.material && !selectedMaterial) setSelectedMaterial(match.material);
+    }
+  };
+
+  const handleSelectSize = (sz: string) => {
+    setSelectedSize(sz);
+    const match = product?.variants?.find(v =>
+      v.size === sz &&
+      (!selectedColor || v.color === selectedColor) &&
+      (!selectedMaterial || v.material === selectedMaterial)
+    ) || product?.variants?.find(v => v.size === sz);
+    if (match) {
+      setSelectedVariant(match);
+      if (match.color && !selectedColor) setSelectedColor(match.color);
+      if (match.material && !selectedMaterial) setSelectedMaterial(match.material);
+    }
+  };
+
+  const handleSelectMaterial = (m: string) => {
+    setSelectedMaterial(m);
+    const match = product?.variants?.find(v =>
+      v.material === m &&
+      (!selectedColor || v.color === selectedColor) &&
+      (!selectedSize || v.size === selectedSize)
+    ) || product?.variants?.find(v => v.material === m);
+    if (match) {
+      setSelectedVariant(match);
+      if (match.color && !selectedColor) setSelectedColor(match.color);
+      if (match.size && !selectedSize) setSelectedSize(match.size);
+    }
+  };
+
+  const rawBasePrice = activeVariant?.price ?? (activeVariant as any)?.retail_price ?? product?.price ?? (product as any)?.retail_price ?? 0;
+  const basePrice = typeof rawBasePrice === 'object' && rawBasePrice?.$numberDecimal
+    ? parseFloat(rawBasePrice.$numberDecimal)
+    : Number(rawBasePrice) || 0;
 
   // Active promotion (Flash Sale or Specific Product Voucher)
   const activePromotion = useMemo(() => {
@@ -448,13 +502,39 @@ export function BuyerProductDetailPage() {
     'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?auto=format&fit=crop&w=600',
   ];
 
+  // ── Validation chọn phân loại ───────────────────────────────────────────────
+  const validateVariantSelection = (): boolean => {
+    if (!product) return false;
+    if (hasColors && !selectedColor) {
+      triggerToast('Vui lòng chọn Màu sắc sản phẩm trước khi tiếp tục.', 'info');
+      return false;
+    }
+    if (hasSizes && !selectedSize) {
+      triggerToast('Vui lòng chọn Kích cỡ sản phẩm trước khi tiếp tục.', 'info');
+      return false;
+    }
+    if (hasMaterials && !selectedMaterial) {
+      triggerToast('Vui lòng chọn Loại sản phẩm / Chất liệu trước khi tiếp tục.', 'info');
+      return false;
+    }
+    if (product.variants?.length > 0 && !activeVariant) {
+      triggerToast('Vui lòng chọn phân loại sản phẩm hợp lệ.', 'info');
+      return false;
+    }
+    return true;
+  };
+
   // ── Add to cart ──────────────────────────────────────────────────────────────
   const addToCart = async (): Promise<boolean> => {
     if (!product) return false;
+    if (!validateVariantSelection()) return false;
+
+    const targetVariantId = activeVariant?.id || (activeVariant as any)?._id || selectedVariant?.id || (selectedVariant as any)?._id;
+
     try {
       await cartService.addToCart({
-        productId: product.id,
-        variantId: activeVariant?.id,
+        productId: product.id || (product as any)._id,
+        variantId: targetVariantId ? String(targetVariantId) : undefined,
         quantity: qty,
         customNotes: customText || undefined
       });
@@ -469,6 +549,7 @@ export function BuyerProductDetailPage() {
 
   // Chỉ sang giỏ khi thêm THÀNH CÔNG, tránh đưa người dùng tới giỏ trống mà không rõ lý do.
   const buyNow = async () => {
+    if (!validateVariantSelection()) return;
     // "Mua ngay" dẫn thẳng tới luồng thanh toán → bắt đăng nhập tại đây.
     if (!isLoggedIn()) {
       navigate('/login');
@@ -731,10 +812,12 @@ export function BuyerProductDetailPage() {
             {/* Material tabs (if variants have material) */}
             {materials.length > 0 && (
               <>
-                <p style={S.sectionLabel}>Loại sản phẩm</p>
+                <p style={S.sectionLabel}>
+                  Loại sản phẩm: <span style={{ fontWeight: 600, color: selectedMaterial ? '#008000' : '#dc2626' }}>{selectedMaterial || '(Chưa chọn)'}</span>
+                </p>
                 <div style={S.optionGroup}>
                   {materials.map(m => (
-                    <button key={m} style={S.optionBtn(selectedMaterial === m)} onClick={() => setSelectedMaterial(m)}>{m}</button>
+                    <button key={m} style={S.optionBtn(selectedMaterial === m)} onClick={() => handleSelectMaterial(m)}>{m}</button>
                   ))}
                 </div>
               </>
@@ -743,12 +826,14 @@ export function BuyerProductDetailPage() {
             {/* Color swatches */}
             {colors.length > 0 && (
               <>
-                <p style={S.sectionLabel}>Màu sắc: <span style={{ fontWeight: 400, color: '#555' }}>{selectedColor}</span></p>
+                <p style={S.sectionLabel}>
+                  Màu sắc: <span style={{ fontWeight: 600, color: selectedColor ? '#008000' : '#dc2626' }}>{selectedColor || '(Chưa chọn)'}</span>
+                </p>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   {colors.map(c => {
                     const css = resolveColorCss(c, product.colors);
                     return (
-                      <button key={c} title={c} style={S.colorDot(css, selectedColor === c)} onClick={() => setSelectedColor(c)} />
+                      <button key={c} title={c} style={S.colorDot(css, selectedColor === c)} onClick={() => handleSelectColor(c)} />
                     );
                   })}
                 </div>
@@ -758,10 +843,12 @@ export function BuyerProductDetailPage() {
             {/* Size grid */}
             {sizes.length > 0 && (
               <>
-                <p style={S.sectionLabel}>Kích cỡ</p>
+                <p style={S.sectionLabel}>
+                  Kích cỡ: <span style={{ fontWeight: 600, color: selectedSize ? '#008000' : '#dc2626' }}>{selectedSize || '(Chưa chọn)'}</span>
+                </p>
                 <div style={S.optionGroup}>
                   {sizes.map(sz => (
-                    <button key={sz} style={S.optionBtn(selectedSize === sz)} onClick={() => setSelectedSize(sz)}>{sz}</button>
+                    <button key={sz} style={S.optionBtn(selectedSize === sz)} onClick={() => handleSelectSize(sz)}>{sz}</button>
                   ))}
                 </div>
               </>

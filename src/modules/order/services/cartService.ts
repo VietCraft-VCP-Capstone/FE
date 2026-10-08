@@ -74,11 +74,28 @@ const clearGuestStorage = () => {
   } catch { }
 };
 
+const extractNumberPrice = (val: any): number => {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (typeof val === 'string') {
+    const parsed = parseFloat(val);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  if (typeof val === 'object') {
+    if ('$numberDecimal' in val) return parseFloat(val.$numberDecimal) || 0;
+    if ('value' in val) return parseFloat(val.value) || 0;
+  }
+  const n = Number(val);
+  return isNaN(n) ? 0 : n;
+};
+
 const buildGuestItem = (entry: GuestCartEntry, product: any) => {
   const variants: any[] = Array.isArray(product?.variants) ? product.variants : [];
   const variant = entry.variantId 
-    ? variants.find((v: any) => String(v.id || v._id) === entry.variantId) 
+    ? (variants.find((v: any) => String(v.id || v._id) === String(entry.variantId)) || variants[0])
     : (variants[0] || undefined);
+
+  const priceVal = extractNumberPrice(variant?.price ?? variant?.retail_price ?? product?.price ?? product?.retail_price ?? 0);
 
   return {
     _id: guestItemId(entry),
@@ -87,8 +104,8 @@ const buildGuestItem = (entry: GuestCartEntry, product: any) => {
       title: product?.title,
       images: Array.isArray(product?.images) ? product.images : [],
       thumbnail: product?.thumbnail,
-      retail_price: product?.price || variant?.price || variant?.retail_price,
-      price: product?.price || variant?.price || variant?.retail_price,
+      retail_price: priceVal,
+      price: priceVal,
       shop_id: product?.shopInfo
         ? {
           _id: product.shopInfo.id,
@@ -100,13 +117,13 @@ const buildGuestItem = (entry: GuestCartEntry, product: any) => {
     variant_id: variant
       ? {
         _id: variant.id || variant._id,
-        name: variant.name,
+        name: variant.name || [variant.color, variant.size, variant.material].filter(Boolean).join(' - ') || 'Tiêu chuẩn',
         color: variant.color,
         size: variant.size,
         material: variant.material,
-        retail_price: variant.price || variant.retail_price,
-        price: variant.price || variant.retail_price,
-        stock_quantity: variant.stock || variant.stock_quantity,
+        retail_price: priceVal,
+        price: priceVal,
+        stock_quantity: variant.stock ?? variant.stock_quantity ?? 99,
         mockup_image: absImg(variant.mockupImage || variant.mockup_image),
       }
       : undefined,
