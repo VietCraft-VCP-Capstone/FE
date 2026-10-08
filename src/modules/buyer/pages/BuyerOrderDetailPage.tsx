@@ -66,19 +66,28 @@ export function BuyerOrderDetailPage() {
         return () => { cancelled = true; };
     }, [id]);
 
-    // payOS gắn status=PAID vào returnUrl ngay khi khách trả xong, nhưng đơn chỉ chuyển PAID khi
-    // webhook tới (thường vài giây). Tải lại vài lần để khách không thấy "chờ thanh toán" sai.
+    // Đơn payOS còn PENDING: nhờ BE hỏi lại payOS thay vì chỉ chờ webhook (webhook có thể
+    // không tới, ví dụ BE chạy local). Vừa quay về với status=PAID thì hỏi lặp vài lần vì
+    // payOS cần vài giây để chốt giao dịch.
     const returnedPaid = searchParams.get('status') === 'PAID';
     useEffect(() => {
-        if (!id || !returnedPaid || order?.paymentStatus !== 'PENDING') return;
+        if (!id || order?.paymentMethod !== 'PAYOS' || order?.paymentStatus !== 'PENDING') return;
+        let stopped = false;
         let attempts = 0;
-        const timer = setInterval(() => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const check = async () => {
             attempts += 1;
-            ordersService.getById(id).then(setOrder).catch(() => {});
-            if (attempts >= 10) clearInterval(timer);
-        }, 3000);
-        return () => clearInterval(timer);
-    }, [id, returnedPaid, order?.paymentStatus]);
+            const result = await ordersService.syncPayosPayment(id).catch(() => null);
+            if (stopped) return;
+            if (result && result.paymentStatus !== 'PENDING') {
+                ordersService.getById(id).then(setOrder).catch(() => {});
+                return;
+            }
+            if (returnedPaid && attempts < 10) timer = setTimeout(() => void check(), 3000);
+        };
+        void check();
+        return () => { stopped = true; if (timer) clearTimeout(timer); };
+    }, [id, returnedPaid, order?.paymentMethod, order?.paymentStatus]);
 
     useEffect(() => {
         if (!order?.id) return;

@@ -69,6 +69,11 @@ export const ordersService = {
     const res = await api.post(`/orders/callback/${orderId}`, { status });
     return res.data;
   },
+  /** Nhờ BE hỏi lại payOS trạng thái thanh toán của đơn (khi webhook chưa tới). */
+  syncPayosPayment: async (orderId: string): Promise<{ paymentStatus: string }> => {
+    const res = await api.post('/payment/payos/sync', { orderId });
+    return res.data.data;
+  },
   createPayosPayment: async (orderId: string): Promise<{ checkoutUrl: string }> => {
     const res = await api.post('/payment/payos/create', { orderId });
     return res.data.data;
