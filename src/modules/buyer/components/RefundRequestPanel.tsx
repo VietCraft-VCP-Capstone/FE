@@ -7,16 +7,16 @@ import { RefundFormModal } from './refund/RefundFormModal';
 
 const labels: Record<string, string> = {
   PENDING_SELLER: 'Chờ người bán phản hồi',
-  SELLER_APPROVED: 'Đã duyệt — chờ xử lý hoàn tiền',
+  SELLER_APPROVED: 'Đã duyệt, đang hoàn tiền',
   SELLER_REJECTED: 'Người bán từ chối',
   PENDING_PRINTER: 'Đang chờ xưởng in phản hồi',
-  PRINTER_APPROVED: 'Xưởng in chấp thuận — gateway hoàn tiền chưa tích hợp',
-  PRINTER_REJECTED: 'Xưởng in từ chối — xem lý do và mở dispute',
+  PRINTER_APPROVED: 'Xưởng in chấp thuận, đang hoàn tiền',
+  PRINTER_REJECTED: 'Xưởng in từ chối, xem lý do và mở dispute',
   DISPUTED: 'Đang tranh chấp',
-  ADMIN_APPROVED: 'Quản trị viên chấp thuận — chờ xử lý hoàn tiền',
+  ADMIN_APPROVED: 'Quản trị viên chấp thuận, đang hoàn tiền',
   ADMIN_REJECTED: 'Quản trị viên từ chối',
   REFUNDED: 'Đã hoàn tiền',
-  TIMEOUT_ESCALATED: 'Quá hạn — có thể mở tranh chấp',
+  TIMEOUT_ESCALATED: 'Quá hạn, có thể mở tranh chấp',
 };
 
 interface RefundRequestPanelProps {
@@ -73,6 +73,13 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
     ? 'Bên xử lý quá thời hạn phản hồi'
     : 'Chưa có phản hồi';
 
+  // Sau khi được duyệt, tiến trình chuyển tiền thật nằm ở execution_status.
+  const approvedMessage = request?.status === 'REFUNDED' || request?.execution_status === 'SUCCEEDED'
+    ? 'Tiền đã được hoàn về tài khoản bạn dùng để thanh toán.'
+    : request?.execution_status === 'FAILED' || request?.execution_status === 'NOT_STARTED'
+    ? 'Yêu cầu được chấp thuận nhưng chưa chuyển được tiền hoàn. Người bán hoặc quản trị viên đang xử lý lại.'
+    : 'Yêu cầu được chấp thuận. Hệ thống đang chuyển tiền hoàn về tài khoản bạn dùng để thanh toán.';
+
   const requestOrderCode = typeof request?.order_id === 'object' ? request.order_id.order_code : undefined;
 
   return (
@@ -107,7 +114,9 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
                   ? 'bg-amber-50 text-amber-800'
                   : 'bg-emerald-50 text-emerald-800'
               }`}>
-                {labels[request.status] || request.status}
+                {request.status.endsWith('APPROVED') && (request.execution_status === 'FAILED' || request.execution_status === 'NOT_STARTED')
+                  ? 'Đã duyệt, chưa hoàn được tiền'
+                  : request.execution_status === 'SUCCEEDED' ? 'Đã hoàn tiền' : labels[request.status] || request.status}
               </span>
             )}
 
@@ -142,7 +151,7 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
                 : request.status === 'PRINTER_REJECTED'
                 ? 'Xưởng in đã từ chối. Xem lý do bên dưới; bạn có thể mở tranh chấp nếu cần.'
                 : request.status === 'PRINTER_APPROVED' || request.status === 'ADMIN_APPROVED'
-                ? 'Yêu cầu được chấp thuận. Việc hoàn tiền thật chưa được thực hiện vì cổng thanh toán chưa tích hợp.'
+                ? approvedMessage
                 : request.status === 'DISPUTED'
                 ? 'Tranh chấp đã được chuyển đến quản trị viên để xem xét.'
                 : 'Yêu cầu đang được xử lý theo quy trình POD.'
@@ -151,7 +160,7 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
               : request.status === 'DISPUTED'
               ? 'Tranh chấp đã được chuyển đến quản trị viên để xem xét.'
               : request.status.includes('APPROVED')
-              ? 'Yêu cầu được chấp thuận. Việc hoàn tiền thật chưa được thực hiện vì cổng thanh toán chưa tích hợp.'
+              ? approvedMessage
               : 'Yêu cầu đang được xử lý.'}
           </div>
         )}

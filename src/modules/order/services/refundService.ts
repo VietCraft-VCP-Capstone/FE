@@ -21,6 +21,8 @@ export interface RefundRequest {
   admin_decision?: { decision: 'APPROVE' | 'REJECT'; refund_type: 'FULL' | 'PARTIAL'; cost_bearer: 'SELLER' | 'PRINTER' | 'PLATFORM'; note: string };
   sla_deadlines?: { seller_deadline: string; printer_deadline?: string };
   execution_status?: string;
+  /** Lý do lần chuyển tiền hoàn gần nhất thất bại hoặc chưa chạy được. */
+  execution_error?: string;
   created_at: string;
 }
 
@@ -38,6 +40,8 @@ export const refundService = {
   getForOrder: async (orderId: string) => unwrap<RefundRequest | null>(await api.get(`/orders/${encodeURIComponent(orderId)}/refund-requests`)),
   dispute: async (id: string, reason: string) => unwrap<RefundRequest>(await api.post(`/refund-requests/${encodeURIComponent(id)}/dispute`, { reason })),
   sellerList: async (status?: RefundStatus | 'ALL') => unwrap<RefundRequest[]>(await api.get('/seller/refund-requests', { params: status && status !== 'ALL' ? { status } : undefined })),
+  /** Seller chạy lại việc chuyển tiền hoàn khi lần trước lỗi. */
+  sellerRetryExecution: async (id: string) => unwrap<RefundRequest>(await api.post(`/seller/refund-requests/${encodeURIComponent(id)}/retry-execution`)),
   sellerDecision: async (id: string, decision: 'APPROVE' | 'REJECT', note: string) => unwrap<RefundRequest>(await api.post(`/seller/refund-requests/${encodeURIComponent(id)}/decision`, { decision, note })),
   adminList: async () => unwrap<RefundRequest[]>(await api.get('/admin/refund-requests', { params: { status: 'DISPUTED' } })),
   adminResolve: async (id: string, payload: { decision: 'APPROVE' | 'REJECT'; cost_bearer: 'SELLER' | 'PRINTER' | 'PLATFORM'; refund_amount?: number; note: string }) => unwrap<RefundRequest>(await api.post(`/admin/refund-requests/${encodeURIComponent(id)}/resolve`, payload)),
