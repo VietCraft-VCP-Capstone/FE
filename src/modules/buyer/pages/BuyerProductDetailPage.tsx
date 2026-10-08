@@ -320,13 +320,24 @@ export function BuyerProductDetailPage() {
       return true;
     };
 
+    const getShopId = (obj: any): string | null => {
+      if (!obj) return null;
+      if (typeof obj === 'string') return obj;
+      if (typeof obj === 'object') {
+        return obj._id?.toString() || obj.id?.toString() || null;
+      }
+      return null;
+    };
+
+    const currentProductShopId = getShopId(product?.shopInfo?.id) || getShopId(product?.shop_id) || getShopId(product?.sellerId);
+
     const appliesToProduct = (c: any): boolean => {
       if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
         return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
       }
       if (c.applicable_scope === 'ALL') {
-        // Nếu có shop_id thì chỉ áp dụng cho shop đó; nếu không thì toàn sàn
-        if (c.shop_id) return product?.shopInfo?.id === c.shop_id;
+        const cShopId = getShopId(c.shop_id);
+        if (cShopId) return currentProductShopId === cShopId;
         return true; // platform-wide
       }
       return false;
@@ -370,7 +381,7 @@ export function BuyerProductDetailPage() {
     }
 
     return null;
-  }, [id, availableCoupons, product?.shopInfo?.id]);
+  }, [id, availableCoupons, product]);
 
   let finalPrice = basePrice;
   let strikePrice = 0;
@@ -412,17 +423,19 @@ export function BuyerProductDetailPage() {
   const productVouchers = useMemo(() => {
     if (!availableCoupons.length) return [];
     const now = new Date();
+    const currentProductShopId = product?.shopInfo?.id || product?.shop_id?._id?.toString() || product?.shop_id?.toString() || product?.sellerId?.toString();
     return availableCoupons.filter(c => {
       if (!c.is_active) return false;
       if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
       if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
         return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
       }
-      if (c.is_platform) return true;
-      if (c.shop_id && product?.shopInfo?.id && c.shop_id === product.shopInfo.id) return true;
+      if (c.is_platform || !c.shop_id) return true;
+      const cShopId = c.shop_id?._id?.toString() || c.shop_id?.id?.toString() || (typeof c.shop_id === 'string' ? c.shop_id : null);
+      if (cShopId && currentProductShopId && cShopId === currentProductShopId) return true;
       return false;
     });
-  }, [availableCoupons, id, product?.shopInfo?.id]);
+  }, [availableCoupons, id, product]);
 
 
   // Images list

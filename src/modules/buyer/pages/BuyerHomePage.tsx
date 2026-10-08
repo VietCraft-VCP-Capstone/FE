@@ -213,6 +213,21 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       couponTitle?: string;
     }> = [];
 
+    // Helper chuẩn hoá Shop ID
+    const getShopId = (obj: any): string | null => {
+      if (!obj) return null;
+      if (typeof obj === 'string') return obj;
+      if (typeof obj === 'object') {
+        return obj._id?.toString() || obj.id?.toString() || null;
+      }
+      return null;
+    };
+
+    const getProductShopId = (p: any): string | null => {
+      if (!p) return null;
+      return getShopId(p.shop_id) || getShopId(p.shopInfo?.id || p.shopInfo?._id) || getShopId(p.sellerId) || null;
+    };
+
     const addedProductIds = new Set<string>();
 
     // 1. Sản phẩm thuộc chương trình FLASH SALE thật
@@ -231,11 +246,9 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
             let dealPrice = basePrice;
             let discountText = '';
             if (discountVal <= 100) {
-              // val là %
               dealPrice = Math.round(basePrice * (1 - discountVal / 100));
               discountText = `-${discountVal}%`;
             } else {
-              // val là số tiền VNĐ
               dealPrice = Math.max(0, basePrice - discountVal);
               discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
             }
@@ -254,21 +267,20 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           }
         }
       } else if (coupon.applicable_scope === 'ALL') {
-        const matchingProds = coupon.shop_id
-          ? allProducts.filter((p: any) => (p.sellerId === coupon.shop_id || p.shop_id === coupon.shop_id))
+        const couponShopId = getShopId(coupon.shop_id);
+        const matchingProds = couponShopId
+          ? allProducts.filter((p: any) => getProductShopId(p) === couponShopId)
           : allProducts;
-        for (const p of matchingProds.slice(0, 4)) {
+        for (const p of matchingProds.slice(0, 8)) {
           const idStr = (p.id || p._id)?.toString();
           if (!idStr || addedProductIds.has(idStr)) continue;
           const basePrice = p.price;
           let dealPrice = basePrice;
           let discountText = '';
           if (discountVal <= 100) {
-            // val là %
             dealPrice = Math.round(basePrice * (1 - discountVal / 100));
             discountText = `-${discountVal}%`;
           } else {
-            // val là số tiền VNĐ
             dealPrice = Math.max(0, basePrice - discountVal);
             discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
           }
@@ -288,13 +300,13 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       }
     }
 
-    // 2. Sản phẩm thuộc các voucher giảm giá chỉ định khác
+    // 2. Sản phẩm thuộc các voucher giảm giá chỉ định khác hoặc toàn shop
     for (const coupon of otherCoupons) {
-      if (coupon.applicable_scope === 'SPECIFIC_PRODUCTS' && Array.isArray(coupon.applicable_product_ids)) {
-        const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
-          ? parseFloat(coupon.discount_value.$numberDecimal)
-          : parseFloat(coupon.discount_value || 0);
+      const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
+        ? parseFloat(coupon.discount_value.$numberDecimal)
+        : parseFloat(coupon.discount_value || 0);
 
+      if (coupon.applicable_scope === 'SPECIFIC_PRODUCTS' && Array.isArray(coupon.applicable_product_ids)) {
         for (const prodId of coupon.applicable_product_ids) {
           const idStr = (prodId?._id || prodId)?.toString();
           if (!idStr || addedProductIds.has(idStr)) continue;
@@ -323,6 +335,37 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
             });
             addedProductIds.add(idStr);
           }
+        }
+      } else if (coupon.applicable_scope === 'ALL' && coupon.discount_type !== 'FREE_SHIPPING') {
+        const couponShopId = getShopId(coupon.shop_id);
+        const matchingProds = couponShopId
+          ? allProducts.filter((p: any) => getProductShopId(p) === couponShopId)
+          : allProducts;
+        for (const p of matchingProds.slice(0, 6)) {
+          const idStr = (p.id || p._id)?.toString();
+          if (!idStr || addedProductIds.has(idStr)) continue;
+          const basePrice = p.price;
+          let dealPrice = basePrice;
+          let discountText = '';
+          if (coupon.discount_type === 'PERCENTAGE') {
+            dealPrice = Math.round(basePrice * (1 - discountVal / 100));
+            discountText = `-${discountVal}%`;
+          } else {
+            dealPrice = Math.max(0, basePrice - discountVal);
+            discountText = `-${Math.round((discountVal / basePrice) * 100)}%`;
+          }
+          deals.push({
+            id: p.id || p._id,
+            title: p.title || p.name,
+            price: dealPrice,
+            oldPrice: basePrice,
+            discount: discountText,
+            image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
+            badge: 'ƯU ĐÃI SHOP',
+            couponCode: coupon.code,
+            couponTitle: coupon.title
+          });
+          addedProductIds.add(idStr);
         }
       }
     }
