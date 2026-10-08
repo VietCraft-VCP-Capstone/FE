@@ -39,6 +39,8 @@ export function OrderDetailModal({
   const hasDesign = order.items.some(it => it.designFileUrl);
   const isPodOrder = Boolean(order.isPod || order.orderType === 'POD' || hasDesign || order.supplierOrderId || order.printerInfo?.supplierOrderId);
   const isPendingApproval = order.approvalStatus === 'PENDING_APPROVAL' || (isPodOrder && order.fulfillmentStatus === 'PENDING_APPROVAL');
+  // Đơn trả trước (payOS/VNPay) chưa nhận tiền: chưa được duyệt, BE cũng chặn.
+  const awaitingBuyerPayment = order.paymentMethod !== 'COD' && order.paymentStatus === 'PENDING';
 
   const handleDispatchPrinter = async () => {
     setDispatchingPrinter(true);
@@ -408,7 +410,9 @@ export function OrderDetailModal({
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[12px] text-stone-500">
-              {isPendingApproval
+              {isPendingApproval && awaitingBuyerPayment
+                ? 'Khách chưa thanh toán đơn này. Bạn chỉ duyệt được sau khi tiền đã về.'
+                : isPendingApproval
                 ? (isPodOrder
                     ? 'Đơn hàng POD đang chờ bạn duyệt file in để đẩy sang xưởng.'
                     : 'Đơn hàng đang chờ bạn duyệt để chuẩn bị xuất kho.')
@@ -432,7 +436,7 @@ export function OrderDetailModal({
                     {rejecting ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
                     Từ chối duyệt
                   </button>
-                  {isPodOrder ? (
+                  {awaitingBuyerPayment ? null : isPodOrder ? (
                     <button
                       type="button"
                       disabled={loading || dispatchingPrinter || rejecting}

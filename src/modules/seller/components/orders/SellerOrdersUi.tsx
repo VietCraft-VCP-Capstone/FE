@@ -283,7 +283,11 @@ export function OrdersTable({
                 ) : order.approvalStatus === 'PENDING_APPROVAL' || order.fulfillmentStatus === 'PENDING_APPROVAL' ? (
                   <div className="flex flex-col gap-1.5 items-start">
                     <StatusBadge status="PENDING_APPROVAL" />
-                    {onQuickApprove && (
+                    {order.paymentMethod !== 'COD' && order.paymentStatus === 'PENDING' ? (
+                      <span className="text-[10.5px] font-semibold text-orange-600" title="Đơn trả trước: chỉ duyệt được khi khách đã thanh toán">
+                        Chờ khách thanh toán
+                      </span>
+                    ) : onQuickApprove && (
                       <button
                         type="button"
                         onClick={(e) => onQuickApprove(order, e)}
