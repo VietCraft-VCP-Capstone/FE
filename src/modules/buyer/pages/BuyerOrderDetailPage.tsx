@@ -212,8 +212,18 @@ export function BuyerOrderDetailPage() {
         }
     };
 
+    // Đơn trả trước (payOS/VNPay) đã nhận tiền nhưng shop chưa duyệt: khách phải thấy rõ là đã trả.
+    const isPrepaidPaid = order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID';
+    const paidAmountText = `${Number(order.totalAmount || 0).toLocaleString('vi-VN')}đ`;
+
     const statusBannerMap: Record<string, { title: string; desc: string; bg: string; iconBg: string }> = {
-        pending: {
+        pending: isPrepaidPaid ? {
+            title: order.isPod ? 'Đã thanh toán · Đơn POD chờ duyệt in' : 'Đã thanh toán · Chờ shop xác nhận',
+            desc: `Bạn đã thanh toán ${paidAmountText} qua ${getPaymentMethodLabel(order.paymentMethod)}${order.paidAt ? ` lúc ${formatDate(order.paidAt)}` : ''}. `
+                + (order.isPod ? 'Đơn in theo yêu cầu đang được kiểm tra trước khi chuyển xưởng in.' : 'Shop sẽ xác nhận và chuẩn bị hàng cho bạn.'),
+            bg: 'bg-emerald-50 border-emerald-100',
+            iconBg: 'bg-emerald-600'
+        } : {
             title: order.isPod ? 'Đơn hàng POD đang chờ xác nhận' : 'Đơn hàng đang chờ xác nhận',
             desc: order.isPod ? 'Đơn hàng in theo yêu cầu đang được kiểm tra trước khi chuyển xưởng in.' : 'Shop đang chuẩn bị xác nhận đơn hàng của bạn.',
             bg: 'bg-amber-50 border-amber-100',
@@ -305,7 +315,7 @@ export function BuyerOrderDetailPage() {
             {/* Status Banner */}
             <div className={`border rounded-2xl p-5 flex items-center gap-4 ${statusBanner.bg}`}>
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white ${statusBanner.iconBg}`}>
-                    <Truck size={22} />
+                    {awaitingPayment ? <CreditCard size={22} /> : isPrepaidPaid && order.status === 'pending' ? <CheckCircle size={22} /> : <Truck size={22} />}
                 </div>
                 <div className="space-y-0.5">
                     <h2 className="font-extrabold text-gray-900 text-sm">{statusBanner.title}</h2>
@@ -519,8 +529,18 @@ export function BuyerOrderDetailPage() {
                             <span className="text-gray-900 font-semibold">{formatDate(order.createdAt)}</span>
                         </div>
                         <div className="flex justify-between">
+                            <span>Trạng thái thanh toán</span>
+                            {order.paymentStatus === 'PAID' ? (
+                                <span className="inline-flex items-center gap-1 font-bold text-emerald-700"><CheckCircle size={13} /> Đã thanh toán</span>
+                            ) : order.paymentStatus === 'REFUNDED' ? (
+                                <span className="font-bold text-indigo-700">Đã hoàn tiền</span>
+                            ) : (
+                                <span className="font-bold text-orange-600">{order.paymentMethod === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chưa thanh toán'}</span>
+                            )}
+                        </div>
+                        <div className="flex justify-between">
                             <span>Thời gian thanh toán</span>
-                            <span className="text-gray-900 font-semibold">{order.paymentStatus === 'PENDING' ? 'Chưa thanh toán' : formatDate(order.createdAt)}</span>
+                            <span className="text-gray-900 font-semibold">{order.paidAt ? formatDate(order.paidAt) : '—'}</span>
                         </div>
                         <div className="flex justify-between">
                             <span>Phương thức thanh toán</span>

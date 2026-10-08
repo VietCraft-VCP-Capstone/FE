@@ -37,6 +37,8 @@ export interface OrderResponse {
   shopName?: string;
   shopLogo?: string;
   paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
+  /** Thời điểm cổng thanh toán xác nhận tiền về (null nếu chưa trả hoặc đơn cũ). */
+  paidAt?: string | null;
   isStatusSimulation?: boolean;
   isPod?: boolean;
   orderType?: string;

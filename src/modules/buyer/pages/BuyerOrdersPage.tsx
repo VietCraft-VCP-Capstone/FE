@@ -220,7 +220,14 @@ export function BuyerOrdersPage() {
         }
         switch (order.status) {
             case 'pending':
-                return <span className="bg-amber-50 text-amber-700 font-bold border border-amber-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">CHỜ XÁC NHẬN</span>;
+                return (
+                    <>
+                        {order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID' && (
+                            <span className="bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">ĐÃ THANH TOÁN</span>
+                        )}
+                        <span className="bg-amber-50 text-amber-700 font-bold border border-amber-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">CHỜ XÁC NHẬN</span>
+                    </>
+                );
             case 'paid':
                 return <span className="bg-indigo-50 text-indigo-700 font-bold border border-indigo-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">ĐANG XỬ LÝ</span>;
             case 'shipping':
