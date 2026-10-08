@@ -6,7 +6,10 @@ import { ShopOnboardingPage } from './ShopOnboardingPage';
 import { CreateProductPage } from './CreateProductPage';
 import { SellerDashboard } from './SellerDashboard';
 import { SellerOrdersPage } from './SellerOrdersPage';
+import { SellerRefundRequestsPage } from './SellerRefundRequestsPage';
 import { SellerCatalogPage } from './SellerCatalogPage';
+import { SellerFollowedCompetitorsPage } from './SellerFollowedCompetitorsPage';
+import { SellerCompetitorDetailPage } from './SellerCompetitorDetailPage';
 import { SellerChatPage } from './SellerChatPage';
 import { POD_CREATE_ENABLED } from '../featureFlags';
 
@@ -47,6 +50,9 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
         <Route path="onboarding" element={<ShopOnboardingPage />} />
         <Route path="storefront" element={<SellerSettingsPage />} />
         <Route path="orders" element={<SellerOrdersPage />} />
+        <Route path="refund-requests" element={<SellerRefundRequestsPage />} />
+        <Route path="competitors" element={<SellerFollowedCompetitorsPage />} />
+        <Route path="competitors/:id" element={<SellerCompetitorDetailPage />} />
         <Route path="chat" element={<SellerChatPage />} />
         <Route path="payouts" element={<SellerPayouts />} />
         <Route path="catalog" element={<SellerCatalogPage />} />
