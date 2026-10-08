@@ -33,7 +33,6 @@ export const refundService = {
     const url = response.data.url as string;
     return url.startsWith('/uploads/') ? new URL(url, api.defaults.baseURL || window.location.origin).toString() : url;
   },
-  createTestFlow: async (orderId: string) => unwrap<{ order_id: string; refund_request_id: string; payment_status: string }>(await api.post(`/orders/${encodeURIComponent(orderId)}/refund-test-flow`)),
   create: async (orderId: string, payload: { reason_category: string; description: string; evidence: string[]; refund_type: 'FULL' | 'PARTIAL'; refund_amount?: number }) => unwrap<RefundRequest>(await api.post(`/orders/${encodeURIComponent(orderId)}/refund-requests`, payload)),
   get: async (id: string) => unwrap<RefundRequest>(await api.get(`/refund-requests/${encodeURIComponent(id)}`)),
   getForOrder: async (orderId: string) => unwrap<RefundRequest | null>(await api.get(`/orders/${encodeURIComponent(orderId)}/refund-requests`)),

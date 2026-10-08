@@ -409,15 +409,10 @@ export function BuyerOrderDetailPage() {
                 </div>}
             </div>
 
-            {(hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID') || import.meta.env.DEV) && <OrderSupportSection
+            {(hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID')) && <OrderSupportSection
                 orderId={order.id}
                 refundOrderId={order._id}
                 orderStatus={order.status}
-                showLegacyRefund={hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID')}
-                isDevelopment={import.meta.env.DEV}
-                isSimulationOrder={order.id.startsWith('TEST-STATUS-')}
-                onError={message => showToast(message, 'error')}
-                onSimulated={async orderCode => { navigate(`/orders/${encodeURIComponent(orderCode)}`); }}
             />}
 
             {/* Bottom Payment details */}
