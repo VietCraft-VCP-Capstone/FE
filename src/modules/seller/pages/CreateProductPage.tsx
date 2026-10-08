@@ -144,6 +144,7 @@ export function CreateProductPage() {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [categoryId, setCategoryId] = useState('');
+    const [commissionPercent, setCommissionPercent] = useState<number | null>(null);
     const [blank, setBlank] = useState<any | null>(null);
     const [faces, setFaces] = useState<Record<string, L[]>>({});
     const [activeFace, setActiveFace] = useState<string>('front');
@@ -158,6 +159,16 @@ export function CreateProductPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const fileRef = useRef<HTMLInputElement>(null);
+
+    // Hoa hồng phụ thuộc danh mục + loại sản phẩm; hàng ở form này luôn là POD_TEMPLATE.
+    useEffect(() => {
+        let alive = true;
+        productsService
+            .getCommissionPercent(categoryId || null, 'POD_TEMPLATE')
+            .then(p => alive && setCommissionPercent(p))
+            .catch(() => alive && setCommissionPercent(null));
+        return () => { alive = false; };
+    }, [categoryId]);
 
     useEffect(() => {
         Promise.allSettled([
@@ -485,7 +496,6 @@ export function CreateProductPage() {
                         coverImage={coverImage}
                         setCoverImage={setCoverImage}
                         spaceOf={spaceOf}
-                        commissionPercent={commissionPercent}
                     />
                 )}
                 {step === 4 && blank && (
@@ -502,6 +512,7 @@ export function CreateProductPage() {
                         setSelectedVariants={setSelectedVariants}
                         selectedImages={selectedImages}
                         coverImage={coverImage}
+                        commissionPercent={commissionPercent}
                     />
                 )}
             </div>

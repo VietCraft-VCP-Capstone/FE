@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Star, Filter } from 'lucide-react';
 import { abs } from './useHTMLImage';
+import { commissionAmount, withCommission } from '../../../../shared/utils/commission';
+import { money } from '../../../../shared/utils/format';
 
 interface Step4Props {
     title: string;
@@ -15,6 +17,8 @@ interface Step4Props {
     setSelectedVariants: React.Dispatch<React.SetStateAction<Record<string, { on: boolean; markup: string; stock: string }>>>;
     selectedImages?: string[];
     coverImage?: string;
+    /** % hoa hồng sàn. null = chưa tải được, khi đó không hiện giá niêm yết dự kiến. */
+    commissionPercent: number | null;
 }
 
 export function Step4ProductDetails({
@@ -23,7 +27,8 @@ export function Step4ProductDetails({
     categories, categoryId, setCategoryId,
     blank, selectedVariants, setSelectedVariants,
     selectedImages = [],
-    coverImage = ''
+    coverImage = '',
+    commissionPercent,
 }: Step4Props) {
     const [colorFilter, setColorFilter] = useState('all');
     const [onlySelectedFilter, setOnlySelectedFilter] = useState(false);

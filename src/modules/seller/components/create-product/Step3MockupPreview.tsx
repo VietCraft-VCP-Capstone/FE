@@ -2,8 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Loader2, Check, Star, Palette, Image as ImageIcon, Eye, Layers } from 'lucide-react';
 import { productsService, MockupColorPreview } from '../../../product/services/productsService';
 import { abs } from './useHTMLImage';
-import { withCommission } from '../../../../shared/utils/commission';
-import { money } from '../../../../shared/utils/format';
 
 interface ColorGroup {
     color: string;
@@ -24,8 +22,6 @@ interface Step3Props {
     coverImage: string;
     setCoverImage: React.Dispatch<React.SetStateAction<string>>;
     spaceOf?: (area: any) => { x: number; y: number; width: number; height: number };
-    /** % hoa hồng sàn. null = chưa tải được, khi đó không hiện giá dự kiến. */
-    commissionPercent: number | null;
 }
 
 const COLOR_HEX_MAP: Record<string, string> = {
