@@ -26,6 +26,14 @@ export interface RefundRequest {
   created_at: string;
 }
 
+/** Thông tin để người bán tự chuyển khoản hoàn cho khách. */
+export interface ManualRefundInfo {
+  amount: number;
+  paymentMethod?: string;
+  transferContent: string;
+  destination: { bin: string; bankName?: string; accountNo: string; accountName?: string } | null;
+}
+
 function unwrap<T>(response: any): T { return response.data && Object.prototype.hasOwnProperty.call(response.data, 'data') ? response.data.data : response.data; }
 export const refundService = {
   uploadEvidence: async (file: File): Promise<string> => {
@@ -40,6 +48,9 @@ export const refundService = {
   getForOrder: async (orderId: string) => unwrap<RefundRequest | null>(await api.get(`/orders/${encodeURIComponent(orderId)}/refund-requests`)),
   dispute: async (id: string, reason: string) => unwrap<RefundRequest>(await api.post(`/refund-requests/${encodeURIComponent(id)}/dispute`, { reason })),
   sellerList: async (status?: RefundStatus | 'ALL') => unwrap<RefundRequest[]>(await api.get('/seller/refund-requests', { params: status && status !== 'ALL' ? { status } : undefined })),
+  sellerManualInfo: async (id: string) => unwrap<ManualRefundInfo>(await api.get(`/seller/refund-requests/${encodeURIComponent(id)}/manual-info`)),
+  /** Seller xác nhận đã tự chuyển khoản hoàn, kèm mã giao dịch ngân hàng. */
+  sellerManualSettle: async (id: string, reference: string, note?: string) => unwrap<RefundRequest>(await api.post(`/seller/refund-requests/${encodeURIComponent(id)}/manual-settle`, { reference, note })),
   /** Seller chạy lại việc chuyển tiền hoàn khi lần trước lỗi. */
   sellerRetryExecution: async (id: string) => unwrap<RefundRequest>(await api.post(`/seller/refund-requests/${encodeURIComponent(id)}/retry-execution`)),
   sellerDecision: async (id: string, decision: 'APPROVE' | 'REJECT', note: string) => unwrap<RefundRequest>(await api.post(`/seller/refund-requests/${encodeURIComponent(id)}/decision`, { decision, note })),

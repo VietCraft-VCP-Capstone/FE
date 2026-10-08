@@ -4,6 +4,7 @@ import { CheckCircle2, ExternalLink, Printer, RotateCcw, XCircle } from 'lucide-
 
 import { refundService, type RefundRequest } from '../../../order/services/refundService';
 import { getApiErrorMessage } from '../../../../infrastructure/api/interceptors';
+import { ManualRefundPanel } from './ManualRefundPanel';
 import {
   EXECUTION_LABEL,
   ORDER_STATUS_LABEL,
@@ -164,11 +165,22 @@ export function SellerRefundRequestDrawer({
             }
           />
         ) : execution === 'PROCESSING' ? (
-          <Alert type="info" showIcon title="Đang chuyển tiền hoàn cho khách" description="Kết quả sẽ cập nhật khi cổng thanh toán xác nhận." />
+          <Alert
+            type="info"
+            showIcon
+            title="Đang chờ cổng thanh toán xác nhận"
+            description={item.execution_error || 'Kết quả sẽ cập nhật khi cổng thanh toán xác nhận.'}
+            action={
+              <Button size="small" icon={<RotateCcw size={13} />} loading={busy === 'RETRY'} onClick={() => void retry()}>
+                Kiểm tra lại
+              </Button>
+            }
+          />
         ) : item.status === 'REFUNDED' || item.execution_status === 'SUCCEEDED' ? (
           <Alert type="success" showIcon title="Đã hoàn tiền cho khách" />
         ) : null}
         {!canDecide && error && <p role="alert" className="m-0 text-[13px] font-medium text-red-700">{error}</p>}
+        {execution && <ManualRefundPanel key={item._id} item={item} onDone={onUpdated} />}
 
         {pod && (
           <Alert
