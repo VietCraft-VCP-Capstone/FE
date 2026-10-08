@@ -26,6 +26,9 @@ export function AddBankAccountModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    setError('');
+
     if (!accountNumber.trim()) {
       setError('Vui lòng nhập số tài khoản');
       return;
@@ -46,6 +49,9 @@ export function AddBankAccountModal({
       isDefault
     });
 
+    setAccountNumber('');
+    setAccountHolder('');
+    setIsDefault(false);
     onClose();
   };
 

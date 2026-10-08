@@ -15,15 +15,7 @@ import { POD_CREATE_ENABLED } from '../featureFlags';
 
 import { SellerDesignsPage } from './SellerDesignsPage';
 import { SellerPromotionsPage } from './SellerPromotionsPage';
-
-function SellerPayouts() {
-  return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-2 animate-fade-in">
-      <h2 className="text-2xl font-extrabold text-stone-900 font-jakarta">Payouts</h2>
-      <p className="text-sm text-stone-500">Quản lý dòng tiền rút và lịch sử đối soát giao dịch thanh toán ngân hàng.</p>
-    </div>
-  );
-}
+import { SellerRevenuePage } from './SellerRevenuePage';
 
 interface SellerPortalProps {
   user: any;
@@ -54,11 +46,11 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
         <Route path="competitors" element={<SellerFollowedCompetitorsPage />} />
         <Route path="competitors/:id" element={<SellerCompetitorDetailPage />} />
         <Route path="chat" element={<SellerChatPage />} />
-        <Route path="payouts" element={<SellerPayouts />} />
+        <Route path="payouts" element={<SellerRevenuePage />} />
         <Route path="catalog" element={<SellerCatalogPage />} />
         <Route path="shipping" element={<Stub t="Vận chuyển" d="Quản lý phương thức và trạng thái giao hàng." />} />
         <Route path="promotions" element={<SellerPromotionsPage />} />
-        <Route path="revenue" element={<Stub t="Doanh thu cửa hàng" d="Theo dõi doanh thu và dòng tiền." />} />
+        <Route path="revenue" element={<SellerRevenuePage />} />
 
         {/* Năm đường dẫn phân tích cũ đều là trang rỗng. Giờ chúng là trang thật trong khu
             "Phân tích & AI", nên chuyển tiếp thay vì để người bán gặp trang trắng. Giữ
