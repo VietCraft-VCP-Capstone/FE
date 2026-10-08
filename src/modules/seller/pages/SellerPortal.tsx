@@ -69,7 +69,7 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
         <Route path="price-optimize" element={<Navigate to="/seller/insights/pricing" replace />} />
         <Route path="market-share" element={<Navigate to="/seller/insights/competitors" replace />} />
         <Route path="product-status" element={<Navigate to="/seller/insights/listings" replace />} />
-        <Route path="*" element={<Navigate to="dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/seller/dashboard" replace />} />
       </Routes>
     </SellerLayout>
   );
