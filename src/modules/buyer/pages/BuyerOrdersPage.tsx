@@ -41,6 +41,8 @@ interface Order {
     items: OrderItem[];
     totalAmount: number;
     status: 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled';
+    paymentMethod?: string;
+    paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
     createdAt: string;
     is_reviewed?: boolean;
 }
@@ -211,8 +213,12 @@ export function BuyerOrdersPage() {
         return map;
     }, [returnsList]);
 
-    const getStatusBadge = (status: Order['status']) => {
-        switch (status) {
+    const getStatusBadge = (order: Order) => {
+        // Đơn payOS chưa trả tiền: shop chưa xử lý, khách cần vào đơn để thanh toán lại.
+        if (order.status === 'pending' && order.paymentMethod === 'PAYOS' && order.paymentStatus === 'PENDING') {
+            return <span className="bg-orange-50 text-orange-700 font-bold border border-orange-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">CHỜ THANH TOÁN</span>;
+        }
+        switch (order.status) {
             case 'pending':
                 return <span className="bg-amber-50 text-amber-700 font-bold border border-amber-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">CHỜ XÁC NHẬN</span>;
             case 'paid':
@@ -492,7 +498,7 @@ export function BuyerOrdersPage() {
                                                     <ArrowRightLeft size={10} /> Đang yêu cầu đổi/trả
                                                 </span>
                                             )}
-                                            {getStatusBadge(order.status)}
+                                            {getStatusBadge(order)}
                                         </div>
                                     </div>
 

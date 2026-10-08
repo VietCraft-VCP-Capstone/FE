@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Truck, Check, MessageSquare, Store, Copy, AlertCircle, CheckCircle, RotateCcw, ArrowRight, PackageCheck, X, Loader2 } from 'lucide-react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Truck, Check, CreditCard, MessageSquare, Store, Copy, AlertCircle, CheckCircle, RotateCcw, ArrowRight, PackageCheck, X, Loader2 } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
@@ -16,6 +16,8 @@ import type { OrderItemResponse, OrderResponse } from '../../order/services/orde
 export function BuyerOrderDetailPage() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
+    const [searchParams] = useSearchParams();
+    const [repaying, setRepaying] = useState(false);
     const [order, setOrder] = useState<OrderResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [copySuccess, setCopySuccess] = useState(false);
@@ -63,6 +65,20 @@ export function BuyerOrderDetailPage() {
         void fetchOrderDetails();
         return () => { cancelled = true; };
     }, [id]);
+
+    // payOS gắn status=PAID vào returnUrl ngay khi khách trả xong, nhưng đơn chỉ chuyển PAID khi
+    // webhook tới (thường vài giây). Tải lại vài lần để khách không thấy "chờ thanh toán" sai.
+    const returnedPaid = searchParams.get('status') === 'PAID';
+    useEffect(() => {
+        if (!id || !returnedPaid || order?.paymentStatus !== 'PENDING') return;
+        let attempts = 0;
+        const timer = setInterval(() => {
+            attempts += 1;
+            ordersService.getById(id).then(setOrder).catch(() => {});
+            if (attempts >= 10) clearInterval(timer);
+        }, 3000);
+        return () => clearInterval(timer);
+    }, [id, returnedPaid, order?.paymentStatus]);
 
     useEffect(() => {
         if (!order?.id) return;
@@ -230,7 +246,31 @@ export function BuyerOrderDetailPage() {
         }
     };
 
-    const statusBanner = statusBannerMap[order.status] || {
+    // Đơn payOS chưa trả tiền: huỷ ở trang payOS hay link hết hạn đều giữ đơn ở đây để trả lại.
+    const awaitingPayment = order.paymentMethod === 'PAYOS' && order.paymentStatus === 'PENDING' && order.status === 'pending';
+    const paymentCancelled = searchParams.get('payment') === 'cancelled' || searchParams.get('cancel') === 'true';
+
+    const handleRepay = async () => {
+        setRepaying(true);
+        try {
+            const { checkoutUrl } = await ordersService.createPayosPayment(order._id || order.id);
+            window.location.href = checkoutUrl;
+        } catch (err) {
+            showToast(getApiErrorMessage(err, 'Không thể mở cổng thanh toán payOS. Vui lòng thử lại.'), 'error');
+            setRepaying(false);
+        }
+    };
+
+    const statusBanner = awaitingPayment ? {
+        title: returnedPaid ? 'Đang xác nhận thanh toán' : 'Đơn hàng chờ thanh toán',
+        desc: returnedPaid
+            ? 'payOS đã nhận thanh toán, hệ thống đang xác nhận. Trang sẽ tự cập nhật trong giây lát.'
+            : paymentCancelled
+            ? 'Bạn đã huỷ thanh toán. Đơn hàng vẫn được giữ, bấm "Thanh toán lại" để hoàn tất.'
+            : 'Đơn hàng chưa được thanh toán. Shop chỉ xử lý đơn sau khi bạn thanh toán thành công.',
+        bg: 'bg-orange-50 border-orange-100',
+        iconBg: 'bg-orange-500'
+    } : statusBannerMap[order.status] || {
         title: 'Đơn hàng',
         desc: 'Đơn hàng đang được cập nhật.',
         bg: 'bg-gray-50 border-gray-200',
@@ -262,6 +302,17 @@ export function BuyerOrderDetailPage() {
                     <h2 className="font-extrabold text-gray-900 text-sm">{statusBanner.title}</h2>
                     <p className="text-xs text-gray-500 font-medium">{statusBanner.desc}</p>
                 </div>
+                {awaitingPayment && !returnedPaid && (
+                    <button
+                        type="button"
+                        onClick={() => void handleRepay()}
+                        disabled={repaying}
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-60"
+                    >
+                        {repaying ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                        <span>{repaying ? 'Đang mở payOS...' : 'Thanh toán lại'}</span>
+                    </button>
+                )}
             </div>
 
             {/* Active Return Alert Banner */}
@@ -409,7 +460,7 @@ export function BuyerOrderDetailPage() {
                 </div>}
             </div>
 
-            {(hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID')) && <OrderSupportSection
+            {!awaitingPayment && (hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID')) && <OrderSupportSection
                 orderId={order.id}
                 refundOrderId={order._id}
                 orderStatus={order.status}
@@ -460,7 +511,7 @@ export function BuyerOrderDetailPage() {
                         </div>
                         <div className="flex justify-between">
                             <span>Thời gian thanh toán</span>
-                            <span className="text-gray-900 font-semibold">{formatDate(order.createdAt)}</span>
+                            <span className="text-gray-900 font-semibold">{order.paymentStatus === 'PENDING' ? 'Chưa thanh toán' : formatDate(order.createdAt)}</span>
                         </div>
                         <div className="flex justify-between">
                             <span>Phương thức thanh toán</span>
