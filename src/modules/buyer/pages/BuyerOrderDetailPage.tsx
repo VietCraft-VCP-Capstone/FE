@@ -323,7 +323,7 @@ export function BuyerOrderDetailPage() {
     const shippingFee = Number(order.shippingFee ?? 0);
     const totalAmount = Number(order.totalAmount ?? (subtotal + shippingFee));
     const canCancelOrder = order && 
-        (order.status === 'pending' || order.paymentStatus === 'PENDING') &&
+        (order.status === 'pending' || order.status === 'paid' || order.paymentStatus === 'PENDING') &&
         order.status !== 'cancelled' &&
         order.status !== 'shipping' &&
         order.status !== 'completed' &&

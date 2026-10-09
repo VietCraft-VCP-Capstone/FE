@@ -605,7 +605,7 @@ export function BuyerOrdersPage() {
                                             {order.status !== 'cancelled' &&
                                                 order.status !== 'shipping' &&
                                                 order.status !== 'completed' &&
-                                                (order.status === 'pending' || order.paymentStatus === 'PENDING') &&
+                                                (order.status === 'pending' || order.status === 'paid' || order.paymentStatus === 'PENDING') &&
                                                 !['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.fulfillmentStatus || '') && (
                                                 <button
                                                     type="button"
