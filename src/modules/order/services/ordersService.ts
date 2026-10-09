@@ -43,6 +43,7 @@ export interface OrderResponse {
   isPod?: boolean;
   orderType?: string;
   fulfillmentStatus?: string;
+  sellerApprovalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   createdAt: string;
   is_reviewed?: boolean;
   shippingAddress?: {

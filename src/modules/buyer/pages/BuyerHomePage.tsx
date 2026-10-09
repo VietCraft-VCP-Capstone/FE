@@ -235,6 +235,9 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
         ? parseFloat(coupon.discount_value.$numberDecimal)
         : parseFloat(coupon.discount_value || 0);
+      const minVal = typeof coupon.min_order_value === 'object' && coupon.min_order_value?.$numberDecimal
+        ? parseFloat(coupon.min_order_value.$numberDecimal)
+        : parseFloat(coupon.min_order_value || 0);
 
       if (coupon.applicable_scope === 'SPECIFIC_PRODUCTS' && Array.isArray(coupon.applicable_product_ids)) {
         for (const prodId of coupon.applicable_product_ids) {
@@ -243,6 +246,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
           if (p && p.price > 0) {
             const basePrice = p.price;
+            if (minVal > 0 && basePrice < minVal) continue;
             let dealPrice = basePrice;
             let discountText = '';
             if (discountVal <= 100) {
@@ -275,6 +279,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           const idStr = (p.id || p._id)?.toString();
           if (!idStr || addedProductIds.has(idStr)) continue;
           const basePrice = p.price;
+          if (minVal > 0 && basePrice < minVal) continue;
           let dealPrice = basePrice;
           let discountText = '';
           if (discountVal <= 100) {
@@ -300,51 +305,24 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       }
     }
 
-    // 2. Sản phẩm thuộc các voucher giảm giá chỉ định khác hoặc toàn shop
+    // 2. Sản phẩm thuộc các voucher chỉ định sản phẩm cụ thể (SPECIFIC_PRODUCTS) thỏa mãn điều kiện đơn tối thiểu
     for (const coupon of otherCoupons) {
+      if (coupon.applicable_scope !== 'SPECIFIC_PRODUCTS' || !Array.isArray(coupon.applicable_product_ids)) continue;
+
       const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
         ? parseFloat(coupon.discount_value.$numberDecimal)
         : parseFloat(coupon.discount_value || 0);
+      const minVal = typeof coupon.min_order_value === 'object' && coupon.min_order_value?.$numberDecimal
+        ? parseFloat(coupon.min_order_value.$numberDecimal)
+        : parseFloat(coupon.min_order_value || 0);
 
-      if (coupon.applicable_scope === 'SPECIFIC_PRODUCTS' && Array.isArray(coupon.applicable_product_ids)) {
-        for (const prodId of coupon.applicable_product_ids) {
-          const idStr = (prodId?._id || prodId)?.toString();
-          if (!idStr || addedProductIds.has(idStr)) continue;
-          const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
-          if (p && p.price > 0) {
-            const basePrice = p.price;
-            let dealPrice = basePrice;
-            let discountText = '';
-            if (coupon.discount_type === 'PERCENTAGE') {
-              dealPrice = Math.round(basePrice * (1 - discountVal / 100));
-              discountText = `-${discountVal}%`;
-            } else {
-              dealPrice = Math.max(0, basePrice - discountVal);
-              discountText = `-${Math.round((discountVal / basePrice) * 100)}%`;
-            }
-            deals.push({
-              id: p.id || p._id,
-              title: p.title || p.name,
-              price: dealPrice,
-              oldPrice: basePrice,
-              discount: discountText,
-              image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
-              badge: 'ƯU ĐÃI',
-              couponCode: coupon.code,
-              couponTitle: coupon.title
-            });
-            addedProductIds.add(idStr);
-          }
-        }
-      } else if (coupon.applicable_scope === 'ALL' && coupon.discount_type !== 'FREE_SHIPPING') {
-        const couponShopId = getShopId(coupon.shop_id);
-        const matchingProds = couponShopId
-          ? allProducts.filter((p: any) => getProductShopId(p) === couponShopId)
-          : allProducts;
-        for (const p of matchingProds.slice(0, 6)) {
-          const idStr = (p.id || p._id)?.toString();
-          if (!idStr || addedProductIds.has(idStr)) continue;
+      for (const prodId of coupon.applicable_product_ids) {
+        const idStr = (prodId?._id || prodId)?.toString();
+        if (!idStr || addedProductIds.has(idStr)) continue;
+        const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
+        if (p && p.price > 0) {
           const basePrice = p.price;
+          if (minVal > 0 && basePrice < minVal) continue;
           let dealPrice = basePrice;
           let discountText = '';
           if (coupon.discount_type === 'PERCENTAGE') {
@@ -352,7 +330,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
             discountText = `-${discountVal}%`;
           } else {
             dealPrice = Math.max(0, basePrice - discountVal);
-            discountText = `-${Math.round((discountVal / basePrice) * 100)}%`;
+            discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
           }
           deals.push({
             id: p.id || p._id,
@@ -361,7 +339,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
             oldPrice: basePrice,
             discount: discountText,
             image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
-            badge: 'ƯU ĐÃI SHOP',
+            badge: 'ƯU ĐÃI',
             couponCode: coupon.code,
             couponTitle: coupon.title
           });

@@ -45,6 +45,8 @@ interface Order {
     paymentMethod?: string;
     paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
     fulfillmentStatus?: string;
+    isPod?: boolean;
+    sellerApprovalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
     createdAt: string;
     is_reviewed?: boolean;
 }
@@ -78,6 +80,28 @@ const RETURN_REASON_LABELS: Record<string, string> = {
     R09: 'Vấn đề khác cần hỗ trợ',
     R13: 'Cần đội ngũ hỗ trợ phân loại',
 };
+
+function canCancelOrder(order: Order): boolean {
+    if (order.status === 'cancelled' || order.status === 'shipping' || order.status === 'completed') {
+        return false;
+    }
+    if (['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.fulfillmentStatus || '')) {
+        return false;
+    }
+    // Chưa thanh toán (COD hoặc pending): luôn có thể hủy
+    if (order.status === 'pending' || order.paymentStatus === 'PENDING') {
+        return true;
+    }
+    // Đơn POD: chưa chuyển xưởng in (chờ duyệt hoặc trong hàng đợi)
+    if (order.isPod && !['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED'].includes(order.fulfillmentStatus || '')) {
+        return true;
+    }
+    // Đơn hàng có sẵn: người bán chưa duyệt
+    if (!order.isPod && order.sellerApprovalStatus === 'PENDING_APPROVAL') {
+        return true;
+    }
+    return false;
+}
 
 export function BuyerOrdersPage() {
     const navigate = useNavigate();
@@ -602,11 +626,7 @@ export function BuyerOrdersPage() {
                                                 <span>Xem chi tiết</span>
                                             </button>
 
-                                            {order.status !== 'cancelled' &&
-                                                order.status !== 'shipping' &&
-                                                order.status !== 'completed' &&
-                                                (order.status === 'pending' || order.status === 'paid' || order.paymentStatus === 'PENDING') &&
-                                                !['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.fulfillmentStatus || '') && (
+                                            {canCancelOrder(order) && (
                                                 <button
                                                     type="button"
                                                     onClick={() => navigate(`/orders/${order.id}`)}

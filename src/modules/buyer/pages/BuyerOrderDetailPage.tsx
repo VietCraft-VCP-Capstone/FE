@@ -173,7 +173,8 @@ export function BuyerOrderDetailPage() {
             const finalReason = cancelReason === 'Khác' ? (customCancelReason.trim() || 'Lý do khác') : cancelReason;
             await ordersService.cancelOrder(order.id, finalReason);
             setIsCancelModalOpen(false);
-            showToast('Hủy đơn hàng thành công!', 'success');
+            const isPaid = order.paymentStatus === 'PAID' && order.paymentMethod?.toLowerCase() !== 'cod';
+            showToast(isPaid ? 'Đã hủy đơn và hoàn tiền tự động về tài khoản ngân hàng!' : 'Hủy đơn hàng thành công!', 'success');
             const res = await ordersService.getById(order.id);
             setOrder(res);
         } catch (err: any) {
@@ -321,13 +322,21 @@ export function BuyerOrderDetailPage() {
     const orderItems: OrderItemResponse[] = Array.isArray(order.items) ? order.items : [];
     const subtotal = orderItems.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
     const shippingFee = Number(order.shippingFee ?? 0);
-    const totalAmount = Number(order.totalAmount ?? (subtotal + shippingFee));
+    const totalAmount = Number(order.totalAmount ?? 0);
     const canCancelOrder = order && 
-        (order.status === 'pending' || order.status === 'paid' || order.paymentStatus === 'PENDING') &&
         order.status !== 'cancelled' &&
         order.status !== 'shipping' &&
         order.status !== 'completed' &&
-        !['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.fulfillmentStatus || '');
+        !['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.fulfillmentStatus || '') &&
+        (
+            // Chưa thanh toán (COD hoặc pending): luôn có thể hủy
+            order.status === 'pending' ||
+            order.paymentStatus === 'PENDING' ||
+            // Đơn POD: chưa chuyển xưởng in (chờ duyệt hoặc trong hàng đợi)
+            (order.isPod && !['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED'].includes(order.fulfillmentStatus || '')) ||
+            // Đơn có sẵn: người bán chưa duyệt/chuẩn bị hàng
+            (!order.isPod && order.sellerApprovalStatus === 'PENDING_APPROVAL')
+        );
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -756,7 +765,9 @@ export function BuyerOrderDetailPage() {
                             <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
                             <span>
                                 Sau khi hủy đơn, lượt dùng mã giảm giá và số lượng tồn kho sản phẩm sẽ được <strong>hoàn lại tự động</strong>.
-                                {order.paymentStatus === 'PAID' ? ' Do đơn hàng đã thanh toán trước, số tiền sẽ được hoàn lại theo quy định.' : ''}
+                                {order.paymentStatus === 'PAID' && order.paymentMethod?.toLowerCase() !== 'cod' ? (
+                                    <> Số tiền đã thanh toán sẽ được hệ thống <strong>tự động hoàn tiền về tài khoản ngân hàng</strong> bạn đã dùng để thanh toán.</>
+                                ) : null}
                             </span>
                         </div>
 
