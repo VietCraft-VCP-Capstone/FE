@@ -32,10 +32,26 @@ export function ShopOnboardingPage() {
     sellerSettingsService.getSettings().then(setSettings).catch(console.error);
   }, []);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < 4) {
-      setCurrentStep(prev => prev + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      try {
+        // Lưu dữ liệu step hiện tại trước khi chuyển step
+        if (currentStep === 1) {
+          const updated = await sellerSettingsService.updateGeneral(settings.brand);
+          setSettings(updated);
+        } else if (currentStep === 2) {
+          const updated = await sellerSettingsService.updateShipping(settings.shipping);
+          setSettings(updated);
+        } else if (currentStep === 3) {
+          const updated = await sellerSettingsService.updatePayment(settings.payment);
+          setSettings(updated);
+        }
+        
+        setCurrentStep(prev => prev + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        console.error('Save failed:', err);
+      }
     }
   };
 
@@ -122,7 +138,7 @@ export function ShopOnboardingPage() {
           <OnboardingStepBrand
             data={settings.brand}
             onChange={(brand) => {
-              sellerSettingsService.updateGeneral(brand).then(setSettings).catch(console.error);
+              setSettings(prev => ({ ...prev, brand }));
             }}
           />
         )}
@@ -131,7 +147,7 @@ export function ShopOnboardingPage() {
           <OnboardingStepShipping
             data={settings.shipping}
             onChange={(shipping) => {
-              sellerSettingsService.updateShipping(shipping).then(setSettings).catch(console.error);
+              setSettings(prev => ({ ...prev, shipping }));
             }}
           />
         )}
@@ -140,7 +156,7 @@ export function ShopOnboardingPage() {
           <OnboardingStepBank
             data={settings.payment}
             onChange={(payment) => {
-              sellerSettingsService.updatePayment(payment).then(setSettings).catch(console.error);
+              setSettings(prev => ({ ...prev, payment }));
             }}
           />
         )}
