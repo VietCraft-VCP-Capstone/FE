@@ -50,7 +50,7 @@ export interface InsightEnvelope<T> {
   viewer?: InsightViewer;
 }
 
-export type TimeRange = '7d' | '30d' | '90d';
+export type TimeRange = '7d' | '30d' | '90d' | '180d' | '365d';
 export type AlertPeriod = TimeRange | 'all';
 export type ForecastWindow = '30' | '60' | '90';
 
