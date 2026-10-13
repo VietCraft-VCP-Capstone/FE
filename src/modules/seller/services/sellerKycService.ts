@@ -34,6 +34,7 @@ export interface SellerKycStatusResponse {
             legal_rep_position?: string;
             front_id_url?: string;
             back_id_url?: string;
+            portrait_url?: string;
             business_license_url?: string;
         };
         shop_info: {
@@ -85,6 +86,7 @@ export interface SubmitApplicationPayload {
         tax_code?: string;
         front_id_image?: string;
         back_id_image?: string;
+        portrait_image?: string;
 
         company_name?: string;
         business_license_number?: string;
@@ -159,7 +161,42 @@ export const sellerKycService = {
         return res.data;
     },
 
+    async validatePortrait(filename: string): Promise<PortraitValidationResponse> {
+        const res = await api.post('/seller/kyc/validate-portrait', { filename });
+        return res.data;
+    },
+
 };
+
+export interface PortraitValidationResponse {
+    success?: boolean;
+    face_detection?: {
+        face_count: number;
+        has_single_face: boolean;
+        warnings?: string[];
+        [key: string]: any;
+    };
+    quality?: {
+        is_sharp: boolean;
+        is_resolution_ok: boolean;
+        is_brightness_ok: boolean;
+        warnings?: string[];
+        [key: string]: any;
+    };
+    ai_detection?: {
+        is_likely_ai: boolean;
+        warnings?: string[];
+        [key: string]: any;
+    };
+    verdict?: {
+        is_valid: boolean;
+        confidence_score: number;
+        checks?: Record<string, boolean>;
+        warnings?: string[];
+    };
+    warnings?: string[];
+    error?: string;
+}
 
 export interface CccdOcrData {
     id_number?: string;

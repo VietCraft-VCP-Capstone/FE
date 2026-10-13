@@ -10,10 +10,19 @@ export function OnboardingStepBank({ data, onChange }: OnboardingStepBankProps) 
   const defaultBank = data.bankAccounts.find(b => b.isDefault) || data.bankAccounts[0];
 
   const handleUpdateFirstBank = (field: keyof BankAccountItem, value: string) => {
-    const updated = data.bankAccounts.map((b, idx) => {
-      if (idx === 0) return { ...b, [field]: value };
-      return b;
-    });
+    let updated = [...data.bankAccounts];
+    if (updated.length === 0) {
+      updated = [{
+        id: 'new_bank_' + Date.now(),
+        bankName: '',
+        bankCode: '',
+        accountNumber: '',
+        accountHolder: '',
+        branch: '',
+        isDefault: true
+      }];
+    }
+    updated[0] = { ...updated[0], [field]: value };
     onChange({ ...data, bankAccounts: updated });
   };
 
