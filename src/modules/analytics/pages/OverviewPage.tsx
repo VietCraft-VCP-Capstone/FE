@@ -15,8 +15,9 @@ import { ChevronRight, Star } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SERIES } from '../../../shared/components/charts/chartTheme';
 import { TrendChart, TrendLegend } from '../../../shared/components/charts/TrendChart';
-import { compactMoney, count, money } from '../../../shared/utils/format';
+import { count, money } from '../../../shared/utils/format';
 import { RangeTabs } from '../../seller/components/dashboard/SellerDashboardUi';
+import { RevenueOverviewChart } from '../components/charts/RevenueOverviewChart';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { SourceFooter } from '../components/SourceFooter';
@@ -25,7 +26,7 @@ import { NA, RANGE_OPTIONS, dateRange, fullDate, pct, shortDate } from '../forma
 import { useInsight } from '../hooks/useInsight';
 import type { ShopOverview, TimeRange } from '../types';
 
-const RANGES: TimeRange[] = ['7d', '30d', '90d'];
+const RANGES: TimeRange[] = ['7d', '30d', '90d', '180d', '365d'];
 
 /** Số đếm: null là "Chưa có", không phải 0. */
 function countOrNa(value: number | null | undefined): string {
@@ -104,7 +105,6 @@ export function OverviewPage() {
           }));
           const totalViews = data.series.reduce((sum, p) => sum + (p.views ?? 0), 0);
           const totalOrders = data.series.reduce((sum, p) => sum + p.orders, 0);
-          const totalRevenue = data.series.reduce((sum, p) => sum + p.revenue_vnd, 0);
           const feedback = data.recent_feedback ?? [];
 
           return (
@@ -151,19 +151,15 @@ export function OverviewPage() {
               </InsightCard>
 
               <InsightCard
-                title="Doanh thu theo ngày"
-                description="Tiền về mỗi ngày trong kỳ đã chọn."
+                title="Phân tích Doanh thu theo chu kỳ"
+                description="Theo dõi doanh thu, số đơn và giá trị trung bình theo ngày, tuần, tháng, quý hoặc năm."
                 footer={<SourceFooter meta={meta} />}
               >
-                <TrendChart
-                  data={chart}
-                  series={[{ key: 'revenue', name: 'Doanh thu', color: SERIES.green }]}
-                  formatValue={compactMoney}
-                  ariaLabel={`Doanh thu từng ngày từ ${fullDate(data.from)} đến ${fullDate(data.to)}`}
+                <RevenueOverviewChart
+                  series={data.series}
+                  timeRangeLabel={`Từ ${shortDate(data.from)} đến ${fullDate(data.to)}`}
+                  onRangeSuggestion={setRange}
                 />
-                <div className="mt-3">
-                  <TrendLegend items={[{ name: 'Tổng doanh thu trong kỳ', color: SERIES.green, total: money(totalRevenue) }]} />
-                </div>
               </InsightCard>
 
               <InsightCard

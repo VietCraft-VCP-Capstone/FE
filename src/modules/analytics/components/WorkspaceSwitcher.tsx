@@ -62,7 +62,7 @@ export function WorkspaceSwitcher() {
       </button>
       <button type="button" aria-current={inInsights} onClick={() => go('insights')} className={`${base} ${inInsights ? 'bg-[#dff0df] text-[#15691a]' : 'bg-transparent text-stone-500 hover:bg-stone-50 hover:text-stone-800'}`}>
         <Sparkles size={15} aria-hidden />
-        Phân tích &amp; AI
+        Phân tích chuyên sâu
       </button>
     </div>
   );
