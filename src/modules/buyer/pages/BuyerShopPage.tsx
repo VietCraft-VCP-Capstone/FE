@@ -18,7 +18,8 @@ import {
   Check,
   CheckCircle2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { shopService, ShopDetail } from '../../product/services/shopService';
@@ -26,6 +27,7 @@ import { promotionService, CouponDTO } from '../../promotion/services/promotionS
 import { isLoggedIn, getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { useToast } from '../../../shared/components/Toast';
 import { useAuth } from '../../auth/hooks/useAuth';
+import { SeoMeta } from '../../../shared/components/SeoMeta';
 
 interface ShopHeader {
   id?: string;
@@ -41,6 +43,8 @@ interface ShopHeader {
   ratingCount?: number;
   followersCount?: number;
   isFollowing?: boolean;
+  reputation_score?: number;
+  reputation_tier?: string;
 }
 
 type TabType = 'all' | 'best_seller' | 'newest' | 'promotions';
@@ -97,14 +101,21 @@ export function BuyerShopPage() {
 
         const [data, couponsData] = await Promise.all([
           productsService.getAll({ shopId: resolvedShopId, pageSize: 100 } as any),
-          promotionService.getAvailableCoupons({ shopId: resolvedShopId }).catch(async () => {
-            // Fallback: lấy từ tất cả khuyến mãi công khai lọc theo shop_id
-            const all = await promotionService.getAll().catch(() => []);
-            return all.filter((c: any) => {
-              const sId = typeof c.shop_id === 'object' ? (c.shop_id?._id || c.shop_id?.id) : c.shop_id;
-              return String(sId) === String(resolvedShopId) || String(sId) === String(id);
-            });
-          })
+          isLoggedIn()
+            ? promotionService.getAvailableCoupons({ shopId: resolvedShopId }).catch(async () => {
+                // Fallback: lấy từ tất cả khuyến mãi công khai lọc theo shop_id
+                const all = await promotionService.getAll().catch(() => []);
+                return all.filter((c: any) => {
+                  const sId = typeof c.shop_id === 'object' ? (c.shop_id?._id || c.shop_id?.id) : c.shop_id;
+                  return String(sId) === String(resolvedShopId) || String(sId) === String(id);
+                });
+              })
+            : promotionService.getAll().catch(() => []).then((all: any[]) =>
+                all.filter((c: any) => {
+                  const sId = typeof c.shop_id === 'object' ? (c.shop_id?._id || c.shop_id?.id) : c.shop_id;
+                  return String(sId) === String(resolvedShopId) || String(sId) === String(id);
+                })
+              )
         ]);
 
         if (!alive) return;
@@ -127,7 +138,9 @@ export function BuyerShopPage() {
             rating: typeof detail.averageRating === 'number' ? detail.averageRating : (detail.rating || 5),
             ratingCount: detail.ratingCount || 0,
             followersCount: detail.followersCount || 0,
-            isFollowing: Boolean(detail.isFollowing)
+            isFollowing: Boolean(detail.isFollowing),
+            reputation_score: detail.reputation_score,
+            reputation_tier: detail.reputation_tier
           });
           setIsFollowing(Boolean(detail.isFollowing));
           setFollowersCount(detail.followersCount || 0);
@@ -297,6 +310,23 @@ export function BuyerShopPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 font-sans">
+      <SeoMeta
+        title={shop?.name ? `${shop.name} - Nghệ nhân VietCraft` : 'Gian hàng VietCraft'}
+        description={shop?.description || shop?.slogan || `Gian hàng thủ công chính hãng ${shop?.name || ''} trên sàn VietCraft. Đánh giá ${shop?.rating || 5} sao.`}
+        ogImage={shop?.banner || shop?.logo}
+        schema={shop ? {
+          "@context": "https://schema.org",
+          "@type": "Store",
+          "name": shop.name,
+          "description": shop.description || shop.slogan,
+          "image": shop.logo || shop.banner,
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": shop.rating || 5,
+            "reviewCount": shop.ratingCount || 1
+          }
+        } : undefined}
+      />
       {/* Nút quay lại & Banner thông báo nếu là seller */}
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <button
@@ -367,6 +397,12 @@ export function BuyerShopPage() {
                     <CheckCircle2 className="w-3.5 h-3.5 text-[#15803d]" />
                     <span>Xưởng thủ công</span>
                   </span>
+                  {shop?.reputation_tier === 'TRUSTED' && (
+                    <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-200 shrink-0 shadow-2xs">
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Nghệ Nhân Uy Tín</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* Slogan / Bio mô tả */}

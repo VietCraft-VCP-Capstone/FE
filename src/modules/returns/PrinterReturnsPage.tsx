@@ -48,7 +48,7 @@ export function PrinterReturnsPage() {
 
   if (!enabled) return <main className="p-5"><h1 className="text-2xl font-bold">Printer dev tool không bật</h1><p>Chỉ khả dụng ở Vite development khi VITE_ENABLE_DEV_RETURN_TOOLS=true.</p></main>;
   return <main className="mx-auto max-w-3xl space-y-4 p-5">
-    <h1 className="text-2xl font-bold">Return v3 · Printer (dev)</h1>
+    <h1 className="text-2xl font-bold">Đổi trả POD · Xưởng in (Printer)</h1>
     <section className="rounded-xl border bg-amber-50 p-4 text-sm"><strong>Đồng hồ hiệu lực BE:</strong> {clock ? new Date(clock).toLocaleString('vi-VN') : 'Đang tải…'}<p className="mb-0">Để đổi offset, đặt DEV_CLOCK_OFFSET_HOURS ở BE rồi khởi động lại BE.</p></section>
     {message && <p role="status" className="rounded bg-red-50 p-3 text-sm">{message}</p>}
     <button onClick={() => void load()} className="rounded border px-3 py-2">Tải lại danh sách</button>
