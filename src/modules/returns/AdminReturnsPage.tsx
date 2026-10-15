@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../../infrastructure/api/interceptors';
+import { Scale, Store, User, AlertTriangle, Sparkles } from 'lucide-react';
 import { returnService, type ReturnDetail, type ReturnRequest, type ReturnResolution, type FaultParty, type DisputeAuditProfile } from './services/returnService';
 import { canConfirmReturnRefund, canDecideReturn, canRejectReturn, returnRefundMessage } from './return-workflow-policy';
 
@@ -46,7 +47,6 @@ const reasonTranslations: Record<string, string> = {
 const translateReason = (r: string) => reasonTranslations[r] || r;
 
 const field = 'mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm';
-const printerToolsEnabled = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_RETURN_TOOLS === 'true';
 const pageSize = 20;
 
 export function AdminReturnsPage() {
@@ -139,7 +139,7 @@ export function AdminReturnsPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return <main className="space-y-4 p-5">
-    <div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-bold">Đổi trả và hoàn tiền · Quản trị</h1>{printerToolsEnabled && <a className="text-emerald-700 underline" href="/admin/returns/printer">Printer dev tool</a>}</div>
+    <div className="flex flex-wrap items-center gap-3"><h1 className="text-2xl font-bold">Đổi trả và hoàn tiền · Quản trị</h1></div>
     <label className="block max-w-xs text-sm">Lọc trạng thái<select className={field} value={status} onChange={e => { setStatus(e.target.value); setPage(1); setSelected(null); setDetail(null); }}>{statuses.map(value => <option key={value} value={value}>{value ? labels[value] || value : 'Tất cả trạng thái'}</option>)}</select></label>
     {error && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {!selected ? <>
@@ -155,7 +155,7 @@ export function AdminReturnsPage() {
           <div className="my-3 rounded-2xl border border-stone-200 bg-white p-4 text-xs sm:text-sm shadow-sm">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
               <h3 className="font-bold text-stone-900 flex items-center gap-1.5">
-                <span className="text-base">⚖️</span> Hồ Sơ Đối Soát Tranh Chấp & Căn Cứ Phân Xử
+                <Scale size={17} className="text-emerald-800" /> Hồ Sơ Đối Soát Tranh Chấp & Căn Cứ Phân Xử
               </h3>
               {auditProfile.shop && (
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${auditProfile.shop.reputation_tier === 'TRUSTED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
@@ -172,7 +172,7 @@ export function AdminReturnsPage() {
               {/* Box Shop */}
               <div className="rounded-xl bg-stone-50/70 p-3.5 border border-stone-200/80 space-y-1.5">
                 <p className="font-semibold text-stone-900 flex items-center gap-1.5">
-                  <span>🏪</span> Người bán: {auditProfile.shop?.shop_name || 'Gian hàng'}
+                  <Store size={15} className="text-stone-700" /> Người bán: {auditProfile.shop?.shop_name || 'Gian hàng'}
                 </p>
                 <div className="flex justify-between text-stone-600">
                   <span>Điểm Uy Tín (SRS):</span>
@@ -197,7 +197,7 @@ export function AdminReturnsPage() {
               {/* Box Buyer */}
               <div className="rounded-xl bg-stone-50/70 p-3.5 border border-stone-200/80 space-y-1.5">
                 <p className="font-semibold text-stone-900 flex items-center gap-1.5">
-                  <span>👤</span> Khách mua hàng
+                  <User size={15} className="text-stone-700" /> Khách mua hàng
                 </p>
                 <div className="flex justify-between text-stone-600">
                   <span>Đơn giao thành công:</span>
@@ -214,10 +214,13 @@ export function AdminReturnsPage() {
                   </span>
                 </div>
                 {auditProfile.buyer.is_flagged_for_abuse && (
-                  <p className="mt-1 rounded bg-rose-50 p-1 text-xs text-rose-700 font-medium">
-                    {auditProfile.buyer.total_delivered_orders === 0
-                      ? '⚠️ Cảnh báo: Khách chưa có đơn hoàn tất nhưng đã mở nhiều yêu cầu đổi/hoàn trả.'
-                      : '⚠️ Cảnh báo: Khách có tỷ lệ hoàn trả bất thường (>25%).'}
+                  <p className="mt-1 rounded bg-rose-50 p-2 text-xs text-rose-700 font-medium flex items-center gap-1.5">
+                    <AlertTriangle size={14} className="shrink-0 text-rose-600" />
+                    <span>
+                      {auditProfile.buyer.total_delivered_orders === 0
+                        ? 'Cảnh báo: Khách chưa có đơn hoàn tất nhưng đã mở nhiều yêu cầu đổi/hoàn trả.'
+                        : 'Cảnh báo: Khách có tỷ lệ hoàn trả bất thường (>25%).'}
+                    </span>
                   </p>
                 )}
               </div>
@@ -225,7 +228,7 @@ export function AdminReturnsPage() {
 
             {auditProfile.shop?.recommendation && (
               <div className="mt-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 p-3 text-xs text-emerald-950 flex items-start gap-2">
-                <span className="text-base">💡</span>
+                <Sparkles size={16} className="text-emerald-700 mt-0.5 shrink-0" />
                 <div>
                   <span className="font-bold">Gợi ý phân xử hệ thống: </span>
                   <span>{auditProfile.shop.recommendation}</span>

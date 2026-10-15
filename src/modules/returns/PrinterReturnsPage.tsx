@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../../infrastructure/api/interceptors';
 import { returnService, type PrinterDecision, type ReturnRequest, type FaultParty } from './services/returnService';
 
-const enabled = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_RETURN_TOOLS === 'true';
+const enabled = import.meta.env.DEV;
 const field = 'mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm';
 const actions: PrinterDecision['action'][] = ['APPROVE', 'REJECT', 'REQUEST_EVIDENCE', 'PROPOSE_FAULT_CHANGE'];
 const actionNames: Record<PrinterDecision['action'], string> = { APPROVE: 'Duyệt', REJECT: 'Từ chối', REQUEST_EVIDENCE: 'Yêu cầu bổ sung minh chứng', PROPOSE_FAULT_CHANGE: 'Đề xuất đổi phân loại' };
@@ -46,7 +46,7 @@ export function PrinterReturnsPage() {
     finally { setBusy(false); }
   };
 
-  if (!enabled) return <main className="p-5"><h1 className="text-2xl font-bold">Printer dev tool không bật</h1><p>Chỉ khả dụng ở Vite development khi VITE_ENABLE_DEV_RETURN_TOOLS=true.</p></main>;
+  if (!enabled) return <main className="p-5"><h1 className="text-2xl font-bold">Printer dev tool không bật</h1><p>Chỉ khả dụng ở môi trường phát triển (Vite development).</p></main>;
   return <main className="mx-auto max-w-3xl space-y-4 p-5">
     <h1 className="text-2xl font-bold">Đổi trả POD · Xưởng in (Printer)</h1>
     <section className="rounded-xl border bg-amber-50 p-4 text-sm"><strong>Đồng hồ hiệu lực BE:</strong> {clock ? new Date(clock).toLocaleString('vi-VN') : 'Đang tải…'}<p className="mb-0">Để đổi offset, đặt DEV_CLOCK_OFFSET_HOURS ở BE rồi khởi động lại BE.</p></section>
