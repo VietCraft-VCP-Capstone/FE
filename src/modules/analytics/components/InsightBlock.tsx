@@ -57,7 +57,7 @@ function RetryButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] active:translate-y-px motion-reduce:transition-none"
+      className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] active:translate-y-px motion-reduce:transition-none"
     >
       <RefreshCw size={13} aria-hidden /> Thử lại
     </button>
@@ -126,7 +126,7 @@ export function InsightStatusView<T>({ state, onRetry, compact, skeleton }: {
           title="Bạn chưa có gian hàng"
           body="Thiết lập gian hàng trước, phân tích sẽ tự gắn với gian hàng của bạn."
           action={
-            <Link to="/seller/onboarding" className="rounded-xl bg-[#007700] px-3 py-1.5 text-xs font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00]">
+            <Link to="/seller/onboarding" className="rounded-md bg-[#007700] px-3 py-1.5 text-xs font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00]">
               Thiết lập gian hàng
             </Link>
           }
@@ -176,7 +176,7 @@ export function InsightBlock<T>({ state, onRetry, compact, skeleton, children }:
   return (
     <>
       {state.meta.status === 'partial' && (
-        <div role="note" className="mb-4 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+        <div role="note" className="mb-4 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />
           <div>
             <span><strong>Độ tin cậy thấp.</strong> {state.meta.reason}</span>

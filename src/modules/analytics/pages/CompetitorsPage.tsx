@@ -96,7 +96,7 @@ function MyListingsTable({ rows }: { rows: Competitors['my_listings'] }) {
           <button
             type="button"
             onClick={() => setExpanded(v => !v)}
-            className="cursor-pointer rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
+            className="cursor-pointer rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
           >
             {expanded ? 'Thu gọn danh sách' : `Xem tất cả ${count(rows.length)} sản phẩm`}
           </button>

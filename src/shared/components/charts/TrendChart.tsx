@@ -90,6 +90,7 @@ export function TrendChart({
   ariaLabel,
   thresholds = [],
   yDomain,
+  dots = false,
 }: {
   data: TrendPoint[];
   series: TrendSeries[];
@@ -99,6 +100,8 @@ export function TrendChart({
   thresholds?: TrendThreshold[];
   /** Cố định trục tung (vd. thang điểm 0–100) thay vì để recharts tự co theo dữ liệu. */
   yDomain?: [number, number];
+  /** Chấm ở mọi điểm: chỉ nên bật khi có rất ít điểm, vd. mới có một ngày. */
+  dots?: boolean;
 }) {
   // Mỗi thực thể biểu đồ cần id gradient riêng, nếu không hai biểu đồ trên cùng
   // một trang sẽ dùng chung <defs> và cái sau đè màu cái trước.
@@ -171,7 +174,7 @@ export function TrendChart({
               strokeLinejoin="round"
               fill={`url(#${uid}-${s.key})`}
               // Không chấm ở mọi điểm: 90 điểm thì chấm nuốt mất đường.
-              dot={false}
+              dot={dots ? { r: CHART_MARKS.activeDotRadius, strokeWidth: CHART_MARKS.activeDotRing, stroke: CHART_INK.surface, fill: s.color } : false}
               // Tắt hiệu ứng vẽ dần. Khi người dùng đổi khoảng thời gian, trục
               // hoành nhảy sang miền ngày khác NGAY, còn đường thì bò dần từ hình
               // cũ sang hình mới — trong lúc đó biểu đồ hiển thị những giá trị

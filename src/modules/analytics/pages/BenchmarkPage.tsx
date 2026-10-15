@@ -68,13 +68,13 @@ export function BenchmarkPage() {
           return (
             <div className="space-y-5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Phân khúc của bạn" value={categoryLabel(data.segment)} hint={data.segment_reason} />
                 </InsightCard>
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Số shop trong phân khúc" value={decimal(data.shops_in_segment, 0)} hint="Toàn bộ shop được đưa vào phép chuẩn hoá" />
                 </InsightCard>
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Đang so với" value={`${data.competitors.length} shop mạnh nhất`} hint="Xếp theo doanh thu ước lượng 90 ngày" />
                 </InsightCard>
               </div>
@@ -98,7 +98,7 @@ export function BenchmarkPage() {
                 />
 
                 {weakestName && weakest && (
-                  <div className="mt-4 rounded-xl bg-stone-50 p-4">
+                  <div className="mt-4 rounded-md bg-stone-50 p-4">
                     <p className="m-0 text-[13px] leading-relaxed text-stone-700">
                       {weakest.gap < 0 ? (
                         <>
@@ -124,7 +124,7 @@ export function BenchmarkPage() {
                 </div>
               </InsightCard>
 
-              <InsightCard title="Giá trị thật của từng trục" description="Con số gốc trước khi quy về thang 100." bodyClassName="px-5 py-4">
+              <InsightCard title="Giá trị thật của từng trục" description="Con số gốc trước khi quy về thang 100." bodyClassName="px-4 py-3">
                 <DataTable
                   caption="Giá trị thật của shop trên từng trục so sánh"
                   head={
@@ -149,7 +149,7 @@ export function BenchmarkPage() {
                 </DataTable>
               </InsightCard>
 
-              <InsightCard title="Doanh thu ước lượng của nhóm dẫn đầu" bodyClassName="px-5 py-4">
+              <InsightCard title="Doanh thu ước lượng của nhóm dẫn đầu" bodyClassName="px-4 py-3">
                 <DataTable
                   caption="Doanh thu ước lượng 90 ngày của các shop được đưa vào so sánh"
                   head={

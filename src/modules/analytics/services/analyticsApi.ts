@@ -1,5 +1,6 @@
 import api from '../../../infrastructure/api/interceptors';
-import type { HealthStatus, InsightContext, InsightEnvelope, ListingHealthList } from '../types';
+import type { HealthStatus, InsightContext, InsightEnvelope } from '../types';
+import type { ListingHealthList } from '../healthTypes';
 import type { HealthPreview, PreviewInputs } from '../healthTypes';
 
 /**

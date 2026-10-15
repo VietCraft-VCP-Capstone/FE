@@ -6,10 +6,10 @@
  * `vc-ai/AI-Analysic/app/core/f29/` và `HEALTH_SPEC.md`.
  */
 
-import { AlertTriangle, ArrowRight, CheckCircle2, CircleDashed } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Circle, CircleDashed } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Chip, type Tone } from './ui';
-import type { ConversionDetail, HealthAxis, HealthStatus, HealthTodo } from '../types';
+import type { HealthAxis, HealthStatus, HealthTodo } from '../types';
 
 export const AXIS_ORDER: HealthAxis[] = ['content', 'inventory', 'freshness', 'rating', 'conversion'];
 
@@ -25,32 +25,32 @@ export const AXIS_WEIGHT: Record<HealthAxis, number> = {
 export const AXIS_INFO: Record<HealthAxis, { label: string; measures: string; whyMissing: string; improve: string }> = {
   content: {
     label: 'Nội dung sản phẩm',
-    measures: 'Số ảnh (nên có từ 5), độ dài mô tả (nên từ 150 ký tự) và số tag (nên từ 3).',
+    measures: 'Ảnh, độ dài mô tả và số tag đã duyệt. Mỗi phần chấm theo mốc rồi lấy trung bình.',
     whyMissing: 'Sản phẩm chưa có nội dung để chấm.',
     improve: 'Thêm ảnh rõ nét nhiều góc, mô tả chất liệu, kích thước, cách dùng, và gắn đủ tag.',
   },
   inventory: {
     label: 'Tồn kho',
-    measures: 'Tỉ lệ phân loại (màu, kích cỡ) còn hàng.',
-    whyMissing: 'Chỉ tính cho hàng có sẵn. Sản phẩm làm theo yêu cầu hoặc in theo mẫu không có tồn kho để chấm.',
+    measures: 'Bao nhiêu phân loại (màu, kích cỡ) đang bán còn hàng. Chỉ tính cho hàng có sẵn.',
+    whyMissing: 'Hàng làm hoặc in theo yêu cầu, hoặc chưa có phân loại đang bán, nên không tính.',
     improve: 'Bổ sung hàng cho các phân loại đã hết, hoặc ẩn phân loại không còn bán.',
   },
   freshness: {
     label: 'Độ cập nhật',
-    measures: 'Số ngày từ lần bạn sửa nội dung gần nhất. Đủ điểm trong 90 ngày, sau đó giảm dần đến 0 sau một năm.',
+    measures: 'Lần gần nhất bạn sửa ảnh, mô tả, tag hoặc tên. Sửa giá, tồn kho không tính.',
     whyMissing: 'Chưa xác định được lần sửa gần nhất.',
     improve: 'Xem lại ảnh, mô tả, giá định kỳ, đặc biệt trước mùa cao điểm.',
   },
   rating: {
     label: 'Đánh giá của người mua',
-    measures: 'Số sao trung bình. Sản phẩm ít đánh giá được kéo về mức trung bình của sàn, để vài đánh giá đầu tiên không quyết định tất cả.',
-    whyMissing: 'Chưa có người mua nào đánh giá. Tiêu chí này tự được tính khi có đánh giá đầu tiên.',
+    measures: 'Số sao người mua chấm. Khi còn ít đánh giá, điểm được kéo về mức chung của sàn.',
+    whyMissing: 'Chưa có đánh giá nào. Có đánh giá đầu tiên là được tính.',
     improve: 'Giao đúng mô tả, đóng gói cẩn thận, nhắc người mua đánh giá sau khi nhận hàng.',
   },
   conversion: {
     label: 'Tỉ lệ mua',
-    measures: 'Trong số người xem sản phẩm, bao nhiêu người mua, so với sản phẩm cùng danh mục.',
-    whyMissing: 'Sàn mới bắt đầu ghi lượt xem. Tiêu chí này tự được tính khi sản phẩm có khoảng 100 lượt xem trong 30 ngày.',
+    measures: 'Trong số người xem, bao nhiêu người mua, so với sản phẩm cùng loại.',
+    whyMissing: 'Cần khoảng 100 lượt xem trong 30 ngày mới tính được.',
     improve: 'Ảnh bìa hấp dẫn, giá cạnh tranh và mô tả trả lời đủ câu hỏi của người mua.',
   },
 };
@@ -72,17 +72,11 @@ export function axisLabel(axis: string): string {
   return AXIS_INFO[axis as HealthAxis]?.label ?? axis;
 }
 
-/** Tỉ trọng THỰC áp vào điểm: tiêu chí thiếu dữ liệu bị bỏ, phần còn lại chia lại cho đủ 100%. */
+/** Phần trăm điểm thật của mỗi tiêu chí: tiêu chí thiếu dữ liệu bị bỏ, phần còn lại chia lại cho đủ 100%. */
 export function effectiveWeights(counted: HealthAxis[]): Partial<Record<HealthAxis, number>> {
   const total = counted.reduce((s, a) => s + AXIS_WEIGHT[a], 0);
   if (!total) return {};
   return Object.fromEntries(counted.map(a => [a, AXIS_WEIGHT[a] / total]));
-}
-
-function scoreColor(score: number): string {
-  if (score >= 80) return '#2f7d32';
-  if (score >= 50) return '#d97706';
-  return '#d03b3b';
 }
 
 export function editLink(productId: string, field?: string | null): string {
@@ -91,54 +85,29 @@ export function editLink(productId: string, field?: string | null): string {
 
 /* ------------------------------------------------------------------------ */
 
-/** Khối "Điểm này đo gì" đặt đầu trang danh sách. */
+/** Nội dung "Điểm được tính thế nào?" ở trang danh sách. */
 export function HealthExplainer({ counted, missing }: { counted: HealthAxis[]; missing: HealthAxis[] }) {
-  const weights = effectiveWeights(counted);
   return (
-    <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3.5">
-      <p className="m-0 text-[13px] font-bold text-stone-800">Điểm sức khoẻ cho biết listing của bạn đã chuẩn bị tốt đến đâu</p>
-      <p className="m-0 mt-1 text-xs leading-relaxed text-stone-600">
-        Mỗi sản phẩm được chấm 0 đến 100 điểm từ các tiêu chí dưới đây. Hiện điểm phản ánh những thứ bạn tự sửa được ngay
-        (nội dung, tồn kho, độ cập nhật), <strong className="font-semibold">chưa phản ánh doanh số</strong>. Khi sản phẩm có
-        lượt xem và đánh giá, điểm sẽ tính thêm hiệu quả bán hàng.
+    <div className="space-y-3 text-[13px] leading-relaxed text-stone-700">
+      <p className="m-0">
+        Mỗi sản phẩm được chấm từ 0 đến 100, đo mức sản phẩm đã sẵn sàng để bán. Điểm không ảnh hưởng thứ hạng
+        tìm kiếm. Mỗi việc trong danh sách đi kèm số điểm bạn sẽ được cộng khi làm xong; điểm cập nhật khoảng 1 phút sau khi sửa.
       </p>
-
-      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-        <div>
-          <p className="m-0 mb-1.5 text-[11.5px] font-semibold uppercase tracking-wide text-stone-500">Đang dùng để chấm</p>
-          <ul className="m-0 list-none space-y-1.5 p-0">
-            {counted.map(axis => (
-              <li key={axis} className="flex items-start gap-2 text-xs leading-relaxed text-stone-700">
-                <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[#2f7d32]" aria-hidden />
-                <span>
-                  <span className="font-semibold text-stone-800">{AXIS_INFO[axis].label}</span>
-                  {weights[axis] != null && <span className="text-stone-500"> · chiếm {Math.round((weights[axis] as number) * 100)}% điểm</span>}
-                  <span className="block text-stone-500">{AXIS_INFO[axis].measures}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        {missing.length > 0 && (
-          <div>
-            <p className="m-0 mb-1.5 text-[11.5px] font-semibold uppercase tracking-wide text-stone-500">Chưa đủ dữ liệu, chưa tính</p>
-            <ul className="m-0 list-none space-y-1.5 p-0">
-              {missing.map(axis => (
-                <li key={axis} className="flex items-start gap-2 text-xs leading-relaxed text-stone-700">
-                  <CircleDashed size={14} className="mt-0.5 shrink-0 text-stone-400" aria-hidden />
-                  <span>
-                    <span className="font-semibold text-stone-800">{AXIS_INFO[axis].label}</span>
-                    <span className="block text-stone-500">{AXIS_INFO[axis].whyMissing}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-stone-200 pt-3 text-xs text-stone-600">
-        <span className="font-semibold text-stone-700">Mức điểm:</span>
+      <ul className="m-0 list-none space-y-1.5 p-0">
+        {counted.map(axis => (
+          <li key={axis} className="flex items-start gap-2">
+            <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-[#2f7d32]" aria-hidden />
+            <span><strong className="font-semibold text-stone-800">{AXIS_INFO[axis].label}:</strong> {AXIS_INFO[axis].measures}</span>
+          </li>
+        ))}
+        {missing.map(axis => (
+          <li key={axis} className="flex items-start gap-2 text-stone-500">
+            <CircleDashed size={15} className="mt-0.5 shrink-0 text-stone-400" aria-hidden />
+            <span><strong className="font-semibold text-stone-600">{AXIS_INFO[axis].label} (chưa tính):</strong> {AXIS_INFO[axis].whyMissing}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap items-center gap-2">
         {HEALTH_BANDS.map(b => (
           <Chip key={b.status} tone={b.tone}>{b.label} · {b.range}</Chip>
         ))}
@@ -147,112 +116,28 @@ export function HealthExplainer({ counted, missing }: { counted: HealthAxis[]; m
   );
 }
 
-function pctText(rate: number | null | undefined): string {
-  return rate == null ? '—' : `${(rate * 100).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`;
-}
+const ACTION_BTN =
+  'inline-flex h-8 shrink-0 cursor-pointer items-center rounded-md border px-3 text-xs font-semibold no-underline transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none';
 
-/** Dòng giải thích riêng cho tiêu chí tỉ lệ mua: tiến độ lượt xem hoặc căn cứ so sánh. */
-function ConversionNote({ detail, counted }: { detail: ConversionDetail; counted: boolean }) {
-  if (counted) {
-    const scope = detail.baseline_scope === 'category' ? 'cùng danh mục' : 'toàn sàn';
-    return (
-      <p className="m-0 mt-1 text-xs leading-relaxed text-stone-500">
-        Tỉ lệ mua của sản phẩm {pctText(detail.conversion_rate)} ({detail.orders_30d} đơn / {detail.views_30d} lượt xem
-        trong 30 ngày), mặt bằng sản phẩm {scope} {pctText(detail.baseline_rate)}. Bằng mặt bằng được 50 điểm, gấp đôi
-        trở lên được 100 điểm.
-      </p>
-    );
-  }
-  if (detail.reason === 'not_enough_views') {
-    const done = Math.min(detail.views_30d, detail.min_views);
-    return (
-      <div className="mt-1.5">
-        <div className="mb-1 flex justify-between text-xs text-stone-500">
-          <span>Đã có {detail.views_30d.toLocaleString('vi-VN')}/{detail.min_views} lượt xem trong 30 ngày</span>
-          <span>{Math.round((done / detail.min_views) * 100)}%</span>
-        </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
-          <div className="h-1.5 rounded-full bg-sky-500" style={{ width: `${(done / detail.min_views) * 100}%` }} />
-        </div>
-        <p className="m-0 mt-1 text-xs leading-relaxed text-stone-500">
-          Đủ {detail.min_views} lượt xem, tiêu chí này tự được tính. Ít hơn thì tỉ lệ mua dao động quá mạnh để kết luận.
-        </p>
-      </div>
-    );
-  }
-  const why = detail.reason === 'not_enough_peers'
-    ? 'Sản phẩm đã đủ lượt xem, nhưng sàn chưa có đủ 5 sản phẩm đủ lượt xem để làm mặt bằng so sánh.'
-    : 'Sản phẩm đã đủ lượt xem, nhưng các sản phẩm dùng để so sánh chưa có đơn nào nên chưa có mặt bằng.';
-  return <p className="m-0 mt-1 text-xs leading-relaxed text-stone-500">{why}</p>;
-}
-
-/** Danh sách năm tiêu chí của MỘT sản phẩm, kèm điểm, tỉ trọng thực và giải thích. */
-export function HealthAxisList({ axes, missing, conversionDetail }: {
-  axes: Partial<Record<HealthAxis, number | null>>;
-  missing: string[];
-  conversionDetail?: ConversionDetail | null;
-}) {
-  const counted = AXIS_ORDER.filter(a => axes[a] != null && !missing.includes(a));
-  const weights = effectiveWeights(counted);
+/** Một việc tăng điểm: ○ nội dung · +điểm · [Sửa]. */
+export function TodoItem({ todo, productId }: { todo: HealthTodo; productId: string }) {
   return (
-    <ul className="m-0 list-none space-y-3.5 p-0">
-      {AXIS_ORDER.map(axis => {
-        const info = AXIS_INFO[axis];
-        const score = axes[axis];
-        const isCounted = counted.includes(axis);
-        return (
-          <li key={axis}>
-            <div className="mb-1 flex items-baseline justify-between gap-3 text-[13px]">
-              <span className="font-semibold text-stone-800">
-                {info.label}
-                {isCounted && <span className="ml-1.5 text-xs font-normal text-stone-400">chiếm {Math.round((weights[axis] ?? 0) * 100)}% điểm</span>}
-              </span>
-              <span className="tabular-nums font-semibold text-stone-800">
-                {isCounted && score != null ? `${Math.round(score)}/100` : <span className="text-xs font-normal text-stone-500">Chưa tính</span>}
-              </span>
-            </div>
-            {isCounted && score != null ? (
-              <div className="h-2 w-full overflow-hidden rounded-full bg-stone-100">
-                <div className="h-2 rounded-full" style={{ width: `${Math.max(2, Math.min(100, score))}%`, background: scoreColor(score) }} />
-              </div>
-            ) : (
-              <div className="h-2 w-full rounded-full border border-dashed border-stone-200" />
-            )}
-            {axis === 'conversion' && conversionDetail ? (
-              <ConversionNote detail={conversionDetail} counted={isCounted} />
-            ) : (
-              <p className="m-0 mt-1 text-xs leading-relaxed text-stone-500">
-                {isCounted ? info.measures : info.whyMissing}
-              </p>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-/** Một việc tăng điểm: nội dung · +điểm · nút sửa. */
-export function TodoItem({ todo, index, productId }: { todo: HealthTodo; index: number; productId: string }) {
-  return (
-    <li className="flex items-start gap-2.5 text-[13px] leading-relaxed text-stone-700">
-      <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EAF0E2] text-[11px] font-bold text-[#005B00]">
-        {index + 1}
-      </span>
-      <span className="flex-1">
-        {todo.message}
+    <li className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-1.5 text-[13px] leading-snug text-stone-700">
+      <Circle size={16} className="shrink-0 text-stone-400" aria-hidden />
+      <span className="min-w-[10rem] flex-1">{todo.message}</span>
+      <span className="ml-auto flex shrink-0 items-center gap-2.5">
         {todo.impact != null && todo.impact > 0 && (
-          <span className="ml-1.5 whitespace-nowrap font-semibold text-[#005B00]">+{todo.impact.toLocaleString('vi-VN')} điểm</span>
+          <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-[#005B00]">+{Math.max(1, Math.round(todo.impact))} điểm</span>
+        )}
+        {todo.field && (
+          <Link
+            to={editLink(productId, todo.field)}
+            className={`${ACTION_BTN} border-stone-200 bg-white text-[#007700] hover:border-[#007700] hover:bg-[#F3F7EE] focus-visible:outline-[#007700]`}
+          >
+            Sửa
+          </Link>
         )}
       </span>
-      {todo.field && (
-        <Link
-          to={editLink(productId, todo.field)}
-          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-[#007700] no-underline hover:underline"
-        >
-          Sửa ngay <ArrowRight size={13} aria-hidden />
-        </Link>
-      )}
     </li>
   );
 }
@@ -260,15 +145,15 @@ export function TodoItem({ todo, index, productId }: { todo: HealthTodo; index: 
 /** Một cảnh báo: không trừ điểm nhưng nên kiểm tra. */
 export function WarningItem({ todo, productId }: { todo: HealthTodo; productId: string }) {
   return (
-    <li className="flex items-start gap-2.5 text-[13px] leading-relaxed text-amber-900">
-      <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" aria-hidden />
-      <span className="flex-1">{todo.message}</span>
+    <li className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-1.5 text-[13px] leading-snug text-amber-900">
+      <AlertTriangle size={16} className="shrink-0 text-amber-600" aria-hidden />
+      <span className="min-w-[10rem] flex-1">{todo.message}</span>
       {todo.field && (
         <Link
           to={editLink(productId, todo.field)}
-          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-amber-800 no-underline hover:underline"
+          className={`ml-auto ${ACTION_BTN} border-amber-200 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-amber-600`}
         >
-          Kiểm tra <ArrowRight size={13} aria-hidden />
+          Kiểm tra
         </Link>
       )}
     </li>

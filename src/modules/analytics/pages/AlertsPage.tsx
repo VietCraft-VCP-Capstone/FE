@@ -94,7 +94,7 @@ export function AlertsPage() {
               <InsightCard
                 title={alerts.length > 0 ? `${alerts.length} ngày vượt ngưỡng` : 'Không có ngày nào vượt ngưỡng'}
                 description="Sắp xếp theo ngày mới nhất trước."
-                bodyClassName={alerts.length > 0 ? 'px-5 py-4' : 'p-5'}
+                bodyClassName={alerts.length > 0 ? 'px-4 py-3' : 'p-4'}
                 footer={<SourceFooter meta={meta} limitation={data.limitation} />}
               >
                 {alerts.length === 0 ? (

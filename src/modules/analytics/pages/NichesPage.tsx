@@ -63,8 +63,8 @@ export function NichesPage() {
         onRetry={reload}
         skeleton={
           <div className="space-y-4">
-            <Skeleton className="h-24 w-full rounded-2xl" />
-            <Skeleton className="h-96 w-full rounded-2xl" />
+            <Skeleton className="h-24 w-full rounded-md" />
+            <Skeleton className="h-96 w-full rounded-md" />
           </div>
         }
       >
@@ -158,7 +158,7 @@ export function NichesPage() {
                         </Note>
                       )}
                       <QuadrantScatter points={points} selectedId={selected} onSelect={id => setSelected(id)} />
-                      <div className="mt-8 min-h-[52px] rounded-xl bg-stone-50 px-3 py-2.5">
+                      <div className="mt-8 min-h-[52px] rounded-md bg-stone-50 px-3 py-2.5">
                         {active ? (
                           <p className="m-0 text-xs leading-relaxed text-stone-600">
                             <strong className="text-stone-800">{active.keyword}</strong>: cầu {pct(active.demand_pct)},
@@ -207,7 +207,7 @@ export function NichesPage() {
               <InsightCard
                 title={`Bảng ${count(niches.length)} ngách theo khoảng trống`}
                 description="Xếp từ ngách còn nhiều chỗ nhất xuống dần."
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 footer={<SourceFooter meta={meta} limitation={data.limitation} />}
               >
                 {niches.length === 0 ? (

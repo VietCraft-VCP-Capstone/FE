@@ -55,7 +55,7 @@ export function WorkspaceSwitcher() {
     'inline-flex cursor-pointer items-center gap-1.5 rounded-[10px] border-none px-3 py-1.5 text-[13px] font-semibold leading-none transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#1a6b1a] motion-reduce:transition-none';
 
   return (
-    <div role="group" aria-label="Chuyển khu làm việc" className="inline-flex items-center gap-0.5 rounded-xl border border-stone-200 bg-white p-0.5">
+    <div role="group" aria-label="Chuyển khu làm việc" className="inline-flex items-center gap-0.5 rounded-md border border-stone-200 bg-white p-0.5">
       <button type="button" aria-current={!inInsights} onClick={() => go('ops')} className={`${base} ${!inInsights ? 'bg-[#dff0df] text-[#15691a]' : 'bg-transparent text-stone-500 hover:bg-stone-50 hover:text-stone-800'}`}>
         <Store size={15} aria-hidden />
         Vận hành

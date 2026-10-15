@@ -183,24 +183,6 @@ export interface ListingHealthDetail {
   conversion_detail?: ConversionDetail | null;
 }
 
-export interface ListingHealthItem {
-  product_id: string;
-  title: string;
-  thumbnail: string | null;
-  score: number | null;
-  status: HealthStatus | null;
-  axes_missing: string[];
-  computed_at: string | null;
-  top_todo?: HealthTodo | null;
-  n_todos?: number;
-  n_warnings?: number;
-}
-
-export interface ListingHealthList {
-  items: ListingHealthItem[];
-  total: number;
-}
-
 /* ------------------------------------------------------------ F30 -------- */
 
 export interface AnomalyAlert {

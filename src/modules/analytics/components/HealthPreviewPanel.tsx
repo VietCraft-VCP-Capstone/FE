@@ -1,23 +1,28 @@
+import { useCountTo } from '../../../shared/hooks/useMotion';
 /**
- * F29 · "Xem điểm nếu sửa" (plan §4.3): seller chỉnh thử 4 chỉ số, AI chấm lại bằng
- * đúng engine và trả điểm dự kiến. Không lưu gì.
+ * F29 · "Tính thử điểm": seller nhập con số dự định (số ảnh, độ dài mô tả, số tag,
+ * % phân loại còn hàng), AI chấm lại bằng đúng engine và trả điểm dự kiến. Không lưu gì.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { ArrowRight, Pencil, RotateCcw, Wand2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { HEALTH_STATUS_LABEL, decimal } from '../format';
 import { useInsightContext } from '../hooks/useInsightContext';
 import { analyticsApi } from '../services/analyticsApi';
-import type { HealthPreview, PreviewInputs, PreviewLever } from '../healthTypes';
-import type { HealthTodo } from '../types';
-import { healthTone } from './HealthParts';
-import { Chip, Note } from './ui';
+import type { HealthInputs, HealthPreview, PreviewInputs, PreviewLever } from '../healthTypes';
+import type { HealthStatus, HealthTodo } from '../types';
+import { editLink, healthTone } from './HealthParts';
+import { FOCUS } from './health/healthStats';
+import { LeverInput } from './health/LeverInput';
+import { Chip, InfoTip, Note } from './ui';
 
-const LEVERS: { key: PreviewLever; field: string; label: string; unit: string; step: number; max: number; fallback: number }[] = [
-  { key: 'n_images', field: 'images', label: 'Số ảnh', unit: 'ảnh', step: 1, max: 50, fallback: 5 },
-  { key: 'description_length', field: 'description', label: 'Độ dài mô tả', unit: 'ký tự', step: 50, max: 20000, fallback: 150 },
-  { key: 'n_tags', field: 'tags', label: 'Số tag', unit: 'tag', step: 1, max: 50, fallback: 3 },
-  { key: 'in_stock_ratio_pct', field: 'stock_quantity', label: 'Phân loại còn hàng', unit: '%', step: 10, max: 100, fallback: 100 },
+/** Mốc đủ điểm khớp `constants.py`; nếu có việc cần làm thì dùng mốc của việc đó (có thể cao hơn theo danh mục). */
+const LEVERS: { key: PreviewLever; field: string; label: string; unit: string; step: number; max: number; goal: number }[] = [
+  { key: 'n_images', field: 'images', label: 'Số ảnh', unit: 'ảnh', step: 1, max: 50, goal: 5 },
+  { key: 'description_length', field: 'description', label: 'Độ dài mô tả', unit: 'ký tự', step: 50, max: 20000, goal: 150 },
+  { key: 'n_tags', field: 'tags', label: 'Số tag đã duyệt', unit: 'tag', step: 1, max: 50, goal: 3 },
+  { key: 'in_stock_ratio_pct', field: 'stock_quantity', label: 'Phân loại còn hàng', unit: '%', step: 10, max: 100, goal: 100 },
 ];
 
 const DEBOUNCE_MS = 400;
@@ -28,49 +33,48 @@ type PreviewState =
   | { kind: 'ready'; data: HealthPreview }
   | { kind: 'message'; text: string };
 
-function initialValues(todos: HealthTodo[], inventoryPct: number | null | undefined): Record<PreviewLever, number> {
-  const out = {} as Record<PreviewLever, number>;
-  for (const lever of LEVERS) {
-    const todo = todos.find(t => t.field === lever.field && typeof t.current_value === 'number');
-    // Không có todo nghĩa là chỉ số đã đạt mốc; trục tồn kho chính là % còn hàng.
-    const fromAxis = lever.key === 'in_stock_ratio_pct' ? inventoryPct ?? null : null;
-    out[lever.key] = (todo?.current_value as number | undefined) ?? fromAxis ?? lever.fallback;
-  }
-  return out;
+function currentOf(inputs: HealthInputs): Record<PreviewLever, number | null> {
+  return {
+    n_images: inputs.n_images,
+    description_length: inputs.description_length,
+    n_tags: inputs.n_approved_tags,
+    in_stock_ratio_pct: inputs.in_stock_ratio_pct,
+  };
 }
 
 function errorText(err: any): string {
   const status: number | undefined = err?.response?.status;
   if (status === 400) return 'Giá trị chưa hợp lệ, kiểm tra lại các ô.';
-  if (!status || status >= 502) return 'Dịch vụ phân tích không phản hồi, chưa chấm thử được.';
-  return 'Chưa chấm thử được, vui lòng thử lại.';
+  if (!status || status >= 502) return 'Dịch vụ phân tích không phản hồi, chưa tính thử được.';
+  return 'Chưa tính thử được, vui lòng thử lại.';
 }
 
-export function HealthPreviewPanel({ productId, todos, inventoryPct }: {
+export function HealthPreviewPanel({ productId, inputs, todos, score, status }: {
   productId: string;
+  inputs: HealthInputs;
   todos: HealthTodo[];
-  inventoryPct: number | null | undefined;
+  score: number | null;
+  status: HealthStatus | null;
 }) {
   const { context } = useInsightContext();
   const aiDown = context !== null && !context.ai_reachable;
-  const inventoryApplies = inventoryPct !== null && inventoryPct !== undefined;
+  const current = useMemo(() => currentOf(inputs), [inputs]);
+  const goals = useMemo(() => Object.fromEntries(LEVERS.map(l => {
+    const todo = todos.find(t => t.field === l.field && typeof t.target === 'number');
+    return [l.key, Math.max(l.goal, (todo?.target as number | undefined) ?? 0)];
+  })) as Record<PreviewLever, number>, [todos]);
 
-  const [values, setValues] = useState(() => initialValues(todos, inventoryPct));
+  const initial = () => Object.fromEntries(LEVERS.map(l => [l.key, current[l.key] ?? 0])) as Record<PreviewLever, number>;
+  const [values, setValues] = useState(initial);
   const [dirty, setDirty] = useState<PreviewLever[]>([]);
   const [result, setResult] = useState<PreviewState>({ kind: 'idle' });
 
-  // Chỉ gửi lever đã chỉnh để phần còn lại dùng giá trị thật phía AI.
-  const payload = useMemo(() => {
-    const body: PreviewInputs = {};
-    for (const key of dirty) body[key] = values[key];
-    return body;
-  }, [dirty, values]);
-  const payloadKey = JSON.stringify(payload);
+  // Chỉ gửi ô đã đổi, ô còn lại AI dùng giá trị thật.
+  const payloadKey = JSON.stringify(Object.fromEntries(dirty.map(k => [k, values[k]])));
 
   useEffect(() => {
     const body = JSON.parse(payloadKey) as PreviewInputs;
-    const touched = Object.keys(body) as PreviewLever[];
-    if (aiDown || touched.length === 0) {
+    if (aiDown || Object.keys(body).length === 0) {
       setResult({ kind: 'idle' });
       return;
     }
@@ -81,20 +85,10 @@ export function HealthPreviewPanel({ productId, todos, inventoryPct }: {
         .healthPreview(productId, body, controller.signal)
         .then(res => {
           if (!res.data || res.meta?.status === 'insufficient_data') {
-            setResult({ kind: 'message', text: res.meta?.reason || 'Chưa đủ dữ liệu để chấm thử.' });
+            setResult({ kind: 'message', text: res.meta?.reason || 'Chưa đủ dữ liệu để tính thử.' });
             return;
           }
-          const preview = res.data;
-          setResult({ kind: 'ready', data: preview });
-          // Ô chưa chỉnh lấy theo giá trị thật AI vừa đọc; không đổi payload nên không gọi lại.
-          setValues(prev => {
-            const next = { ...prev };
-            for (const lever of LEVERS) {
-              const real = preview.current_inputs?.[lever.key];
-              if (!touched.includes(lever.key) && typeof real === 'number') next[lever.key] = real;
-            }
-            return next;
-          });
+          setResult({ kind: 'ready', data: res.data });
         })
         .catch(err => {
           if (controller.signal.aborted || err?.code === 'ERR_CANCELED') return;
@@ -107,113 +101,118 @@ export function HealthPreviewPanel({ productId, todos, inventoryPct }: {
     };
   }, [productId, payloadKey, aiDown]);
 
+  const applies = (key: PreviewLever) => current[key] !== null;
   const setLever = (key: PreviewLever, raw: number, max: number) => {
     const value = Math.min(max, Math.max(0, Number.isFinite(raw) ? Math.round(raw) : 0));
     setValues(prev => ({ ...prev, [key]: value }));
     setDirty(prev => (prev.includes(key) ? prev : [...prev, key]));
   };
-
+  const fillGoals = () => {
+    const keys = LEVERS.filter(l => applies(l.key) && (current[l.key] ?? 0) < goals[l.key]).map(l => l.key);
+    setValues(prev => ({ ...prev, ...Object.fromEntries(keys.map(k => [k, goals[k]])) }));
+    setDirty(keys);
+  };
   const reset = () => {
     setDirty([]);
-    setValues(initialValues(todos, inventoryPct));
+    setValues(initial());
   };
 
   return (
-    <div className="rounded-xl border border-stone-200 p-4">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="m-0 text-[13px] font-bold text-stone-800">Xem điểm nếu sửa</p>
-        {dirty.length > 0 && !aiDown && (
-          <button type="button" onClick={reset} className="cursor-pointer border-none bg-transparent p-0 text-xs font-semibold text-stone-500 hover:text-stone-800">
-            Đặt lại
-          </button>
-        )}
-      </div>
+    <section className="rounded-md border border-stone-200 bg-white">
+      <header className="border-b border-stone-100 px-4 py-3">
+        <h2 className="m-0 flex items-center gap-1.5 text-sm font-bold text-stone-900">
+          Tính thử điểm
+          <InfoTip
+            text="Nhập con số bạn định sửa (số ảnh, độ dài mô tả, số tag, phân loại còn hàng) để xem điểm mới trước khi sửa thật. Chỉ để tính, không thay đổi sản phẩm."
+            label="Tính thử điểm là gì?"
+          />
+        </h2>
+        <p className="m-0 mt-0.5 text-xs text-stone-500">Đổi số dự định để xem điểm mới, không lưu vào sản phẩm.</p>
+      </header>
 
       {aiDown ? (
-        <Note tone="warn">Dịch vụ phân tích đang không phản hồi nên chưa chấm thử được. Điểm hiện tại phía trên vẫn đúng.</Note>
+        <div className="p-4"><Note tone="warn">Dịch vụ phân tích đang không phản hồi nên chưa tính thử được. Điểm hiện tại vẫn đúng.</Note></div>
       ) : (
-        <>
-          <p className="m-0 mb-3 text-xs text-stone-500">Chỉnh thử các chỉ số dưới đây để xem điểm thay đổi ra sao. Không lưu gì vào sản phẩm.</p>
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {LEVERS.map(lever => {
-              const disabled = lever.key === 'in_stock_ratio_pct' && !inventoryApplies;
-              return (
-                <LeverInput
-                  key={lever.key}
-                  label={lever.label}
-                  unit={lever.unit}
-                  value={values[lever.key]}
-                  step={lever.step}
-                  max={lever.max}
-                  disabled={disabled}
-                  hint={disabled ? 'Chỉ áp cho hàng có sẵn' : undefined}
-                  onChange={v => setLever(lever.key, v, lever.max)}
-                />
-              );
-            })}
+        <div className="space-y-3 p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {LEVERS.map(lever => (
+              <LeverInput
+                key={lever.key}
+                label={lever.label}
+                unit={lever.unit}
+                current={current[lever.key]}
+                goal={goals[lever.key]}
+                value={values[lever.key]}
+                step={lever.step}
+                max={lever.max}
+                onChange={v => setLever(lever.key, v, lever.max)}
+              />
+            ))}
           </div>
-          <div className="mt-3 min-h-[24px]" aria-live="polite">
-            <PreviewResult state={result} />
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <button type="button" onClick={fillGoals} className={`inline-flex cursor-pointer items-center gap-1 rounded border-none bg-transparent p-0 text-xs font-semibold text-[#007700] hover:underline ${FOCUS}`}>
+              <Wand2 size={13} aria-hidden /> Điền đúng mốc nên có
+            </button>
+            {dirty.length > 0 && (
+              <button type="button" onClick={reset} className={`inline-flex cursor-pointer items-center gap-1 rounded border-none bg-transparent p-0 text-xs font-semibold text-stone-600 hover:text-stone-900 ${FOCUS}`}>
+                <RotateCcw size={13} aria-hidden /> Về giá trị hiện tại
+              </button>
+            )}
           </div>
-        </>
+          <div aria-live="polite">
+            <PreviewResult state={result} score={score} status={status} />
+          </div>
+          <Link
+            to={editLink(productId)}
+            className={`inline-flex h-9 items-center gap-1.5 rounded-md bg-[#007700] px-3.5 text-sm font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] motion-reduce:transition-none ${FOCUS}`}
+          >
+            <Pencil size={15} aria-hidden /> Sửa sản phẩm
+          </Link>
+        </div>
       )}
+    </section>
+  );
+}
+
+function ScoreBox({ label, score, status, strong }: { label: string; score: number | null; status: HealthStatus | null; strong?: boolean }) {
+  const numberRef = useCountTo<HTMLSpanElement>(score, n => decimal(n, 1));
+  return (
+    <div className="min-w-0">
+      <span className="block text-xs text-stone-500">{label}</span>
+      <span ref={numberRef} className={`font-jakarta font-extrabold tabular-nums leading-tight text-stone-900 ${strong ? 'text-3xl' : 'text-2xl text-stone-600'}`}>{decimal(score, 1)}</span>
+      {status && <Chip tone={healthTone(status)} className="ml-2 align-middle">{HEALTH_STATUS_LABEL[status] ?? status}</Chip>}
     </div>
   );
 }
 
-function PreviewResult({ state }: { state: PreviewState }) {
-  if (state.kind === 'idle') return <Note>Đổi một ô để xem điểm dự kiến.</Note>;
-  if (state.kind === 'loading') return <Note>Đang chấm thử…</Note>;
-  if (state.kind === 'message') return <Note tone="warn">{state.text}</Note>;
-
-  const { score, status, delta_vs_current: delta } = state.data;
-  const sign = delta !== null && delta > 0 ? '+' : '';
+function PreviewResult({ state, score, status }: { state: PreviewState; score: number | null; status: HealthStatus | null }) {
+  const preview = state.kind === 'ready' ? state.data : null;
+  const delta = preview?.delta_vs_current ?? null;
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[13px] text-stone-800">
-      <span>
-        Điểm dự kiến: <strong className="tabular-nums">{decimal(score, 1)}</strong>
-        {delta !== null && <span className="tabular-nums text-stone-500"> ({sign}{decimal(delta, 1)})</span>}
-      </span>
-      {status && <Chip tone={healthTone(status)}>{HEALTH_STATUS_LABEL[status] ?? status}</Chip>}
-    </div>
-  );
-}
-
-function LeverInput({ label, unit, value, step, max, disabled, hint, onChange }: {
-  label: string;
-  unit: string;
-  value: number;
-  step: number;
-  max: number;
-  disabled?: boolean;
-  hint?: string;
-  onChange: (value: number) => void;
-}) {
-  const btn =
-    'inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 transition-colors duration-150 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40';
-  return (
-    <div className={disabled ? 'opacity-60' : ''}>
-      <span className="mb-1 block text-xs font-semibold text-stone-600">{label}</span>
-      <div className="flex items-center gap-1.5">
-        <button type="button" className={btn} disabled={disabled || value <= 0} onClick={() => onChange(value - step)} aria-label={`Giảm ${label.toLowerCase()}`}>
-          <Minus size={14} aria-hidden />
-        </button>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={max}
-          value={value}
-          disabled={disabled}
-          aria-label={`${label} (${unit})`}
-          onChange={e => onChange(Number(e.target.value))}
-          className="h-8 w-20 rounded-lg border border-stone-200 px-2 text-center text-sm tabular-nums text-stone-800 outline-none focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20 disabled:bg-stone-50"
-        />
-        <button type="button" className={btn} disabled={disabled || value >= max} onClick={() => onChange(value + step)} aria-label={`Tăng ${label.toLowerCase()}`}>
-          <Plus size={14} aria-hidden />
-        </button>
-        <span className="text-xs text-stone-500">{hint ?? unit}</span>
+    <div className="rounded-md border border-stone-200 bg-stone-50 px-3.5 py-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <ScoreBox label="Điểm hiện tại" score={score} status={status} />
+        <ArrowRight size={18} className="shrink-0 text-stone-400" aria-hidden />
+        {preview ? (
+          <>
+            <ScoreBox label="Điểm dự kiến" score={preview.score} status={preview.status} strong />
+            {delta !== null && (
+              <span className={`text-lg font-bold tabular-nums ${delta > 0 ? 'text-[#005B00]' : delta < 0 ? 'text-red-700' : 'text-stone-600'}`}>
+                ({delta > 0 ? '+' : ''}{decimal(delta, 1)})
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-[13px] text-stone-600">
+            {state.kind === 'loading' ? 'Đang tính…' : state.kind === 'message' ? state.text : 'Đổi một ô ở trên để xem điểm dự kiến.'}
+          </span>
+        )}
       </div>
+      {preview && preview.status && status && preview.status !== status && (
+        <p className="m-0 mt-2 text-xs font-semibold text-stone-700">
+          Mức điểm đổi từ “{HEALTH_STATUS_LABEL[status]}” sang “{HEALTH_STATUS_LABEL[preview.status]}”.
+        </p>
+      )}
     </div>
   );
 }

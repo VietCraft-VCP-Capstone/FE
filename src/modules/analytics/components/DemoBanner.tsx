@@ -25,7 +25,7 @@ export function DemoBanner() {
 
   if (context && !context.ai_reachable) {
     return (
-      <div role="status" className="mx-auto mb-5 flex w-full max-w-7xl items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+      <div role="status" className="mx-auto mb-5 flex w-full max-w-7xl items-start gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
         <PlugZap size={18} className="mt-0.5 shrink-0" aria-hidden />
         <p className="m-0 leading-relaxed">
           <strong>Dịch vụ phân tích đang không phản hồi.</strong> Các trang trong khu này sẽ chưa có số liệu cho tới khi dịch vụ chạy lại.
@@ -46,7 +46,7 @@ export function DemoBanner() {
   };
 
   return (
-    <div role="note" className="mx-auto mb-5 flex w-full max-w-7xl items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    <div role="note" className="mx-auto mb-5 flex w-full max-w-7xl items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       <FlaskConical size={18} className="mt-0.5 shrink-0" aria-hidden />
       <p className="m-0 flex-1 leading-relaxed">
         <strong>Đang xem gian hàng mẫu.</strong> Số liệu phân tích lấy từ shop mẫu{' '}

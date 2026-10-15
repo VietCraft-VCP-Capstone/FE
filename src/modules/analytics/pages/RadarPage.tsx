@@ -74,7 +74,7 @@ export function RadarPage() {
               <InsightCard
                 title="10 tag tăng nhanh nhất tuần này"
                 description="Tốc độ tăng so với tuần trước. Đà tăng gần 1 nghĩa là tăng liên tục nhiều tuần, không phải vọt một hôm rồi tụt."
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 footer={<SourceFooter meta={meta} limitation={data.limitation} />}
               >
                 {tags.length === 0 ? (
@@ -133,7 +133,7 @@ export function RadarPage() {
                 </p>
                 <Link
                   to="/seller/insights/niches"
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#007700] px-3.5 py-2 text-[13px] font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-[#007700] px-3.5 py-2 text-[13px] font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
                 >
                   Xem cung và cầu từng ngách
                   <ArrowRight size={15} aria-hidden />

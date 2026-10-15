@@ -1,5 +1,5 @@
 /**
- * F29 · Điểm sức khoẻ theo ngày trong thẻ điểm: seller thấy điểm nhảy sau khi sửa và
+ * F29 · Điểm sức khoẻ theo ngày của một sản phẩm: seller thấy điểm nhảy sau khi sửa và
  * tụt dần khi lâu không cập nhật nội dung.
  */
 
@@ -9,7 +9,7 @@ import { TrendChart } from '../../../shared/components/charts/TrendChart';
 import { decimal, fullDate, shortDate } from '../format';
 import { useInsight, type InsightState } from '../hooks/useInsight';
 import type { HealthHistoryPoint } from '../healthTypes';
-import { Note, Skeleton } from './ui';
+import { InsightCard, Note, Skeleton } from './ui';
 
 const DAY_OPTIONS = [30, 90] as const;
 type HistoryDays = (typeof DAY_OPTIONS)[number];
@@ -24,27 +24,30 @@ export function HealthHistory({ productId }: { productId: string }) {
   const { state } = useInsight<HealthHistoryPoint[]>(`/listings/${productId}/health/history`, { days });
 
   return (
-    <div>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="m-0 text-[13px] font-bold text-stone-800">Điểm theo ngày</p>
-        <div role="group" aria-label="Khoảng thời gian của lịch sử điểm" className="inline-flex rounded-lg bg-stone-100 p-0.5">
+    <InsightCard
+      title="Điểm theo ngày"
+      info="Điểm tăng ngay sau khi bạn sửa sản phẩm, và giảm dần nếu lâu không cập nhật ảnh, mô tả, tag."
+      bodyClassName="px-4 py-3"
+      action={
+        <div role="group" aria-label="Khoảng thời gian của lịch sử điểm" className="inline-flex rounded-md bg-stone-100 p-0.5">
           {DAY_OPTIONS.map(d => (
             <button
               key={d}
               type="button"
               aria-pressed={days === d}
               onClick={() => setDays(d)}
-              className={`cursor-pointer rounded-md border-none px-2.5 py-1 text-xs font-semibold transition-colors duration-150 motion-reduce:transition-none ${
-                days === d ? 'bg-white text-stone-900 shadow-sm' : 'bg-transparent text-stone-500 hover:text-stone-800'
+              className={`cursor-pointer rounded border-none px-2.5 py-1 text-xs font-semibold transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007700] motion-reduce:transition-none ${
+                days === d ? 'bg-white text-stone-900 shadow-sm' : 'bg-transparent text-stone-600 hover:text-stone-900'
               }`}
             >
               {d} ngày
             </button>
           ))}
         </div>
-      </div>
+      }
+    >
       <HistoryBody state={state} days={days} />
-    </div>
+    </InsightCard>
   );
 }
 
@@ -75,7 +78,7 @@ function HistoryBody({ state, days }: { state: InsightState<HealthHistoryPoint[]
       <TrendChart
         data={rows}
         series={[{ key: 'score', name: 'Điểm sức khoẻ', color: SERIES.green }]}
-        height={150}
+        height={140}
         yDomain={[0, 100]}
         thresholds={BAND_LINES}
         formatValue={n => decimal(n, 1)}

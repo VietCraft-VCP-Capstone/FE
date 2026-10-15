@@ -54,7 +54,7 @@ export function SourceFooter({ meta, limitation, method }: {
         )}
       </div>
       {open && hasDetail && (
-        <div className="mt-2 space-y-1.5 rounded-xl bg-stone-50 px-3 py-2.5 leading-relaxed text-stone-600">
+        <div className="mt-2 space-y-1.5 rounded-md bg-stone-50 px-3 py-2.5 leading-relaxed text-stone-600">
           {method && <p className="m-0"><strong className="text-stone-700">Phương pháp:</strong> {method}</p>}
           {limitation && <p className="m-0"><strong className="text-stone-700">Giới hạn:</strong> {limitation}</p>}
         </div>

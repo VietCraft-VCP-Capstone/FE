@@ -61,7 +61,7 @@ function EventItem({ event, active, onSelect }: { event: SeasonalEvent; active: 
         type="button"
         onClick={onSelect}
         aria-pressed={active}
-        className={`w-full cursor-pointer rounded-2xl border bg-white p-4 text-left transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none ${
+        className={`w-full cursor-pointer rounded-md border bg-white p-4 text-left transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none ${
           active ? 'border-[#007700] bg-[#EAF0E2]/40' : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'
         }`}
       >
@@ -72,7 +72,7 @@ function EventItem({ event, active, onSelect }: { event: SeasonalEvent; active: 
           )}
         </span>
 
-        <span className="mt-2.5 block rounded-xl bg-stone-50 px-3 py-2.5">
+        <span className="mt-2.5 block rounded-md bg-stone-50 px-3 py-2.5">
           <span className="flex items-center gap-1.5 text-[11.5px] font-semibold text-stone-500">
             <CalendarDays size={13} aria-hidden /> Cửa sổ ra hàng
           </span>
@@ -121,9 +121,9 @@ export function SeasonalPage() {
         onRetry={reload}
         skeleton={
           <div className="space-y-4">
-            <Skeleton className="h-28 w-full rounded-2xl" />
-            <Skeleton className="h-72 w-full rounded-2xl" />
-            <Skeleton className="h-72 w-full rounded-2xl" />
+            <Skeleton className="h-28 w-full rounded-md" />
+            <Skeleton className="h-72 w-full rounded-md" />
+            <Skeleton className="h-72 w-full rounded-md" />
           </div>
         }
       >
