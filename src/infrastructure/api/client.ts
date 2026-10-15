@@ -42,7 +42,10 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         const url = String(error.config?.url || '');
-        if (error.response?.status === 401 && !PUBLIC_AUTH_ROUTE.test(url)) {
+        // Chỉ coi là hết phiên khi request có gửi token; khách vãng lai gặp 401 ở một
+        // request phụ (vd. mã giảm giá trên trang shop) thì không bị đẩy sang trang đăng nhập.
+        const sentToken = Boolean(error.config?.headers?.Authorization);
+        if (error.response?.status === 401 && sentToken && !PUBLIC_AUTH_ROUTE.test(url)) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             if (window.location.pathname !== '/login') {
