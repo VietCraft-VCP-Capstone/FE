@@ -6,6 +6,7 @@
  *   GET /seller/analytics/listings/{id}/health      điểm sức khoẻ và việc cần làm
  *   GET /seller/analytics/listings/{id}/conversion  phễu xem -> giỏ -> mua
  *   GET /seller/analytics/listings/{id}/timeseries  diễn biến theo ngày
+ * Thẻ điểm còn tự gọi `/health/history` (HealthHistory) và `/health/preview` (HealthPreviewPanel).
  *
  * Mỗi khối tự xử trạng thái của mình. Gộp ba lời gọi vào một khối thì một endpoint chưa
  * đủ dữ liệu sẽ làm trắng cả trang, trong khi hai cái kia có số để xem.
@@ -20,33 +21,36 @@ import { RangeTabs } from '../../seller/components/dashboard/SellerDashboardUi';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { SourceFooter } from '../components/SourceFooter';
-import { FunnelBars, MiniStat, ScoreBars } from '../components/charts/MiniViz';
+import { FunnelBars, MiniStat } from '../components/charts/MiniViz';
+import { AXIS_ORDER, HealthAxisList, TodoItem, WarningItem } from '../components/HealthParts';
+import { HealthHistory } from '../components/HealthHistory';
+import { HealthPreviewPanel } from '../components/HealthPreviewPanel';
 import { Chip, InsightCard, Note, type Tone } from '../components/ui';
-import { NA, RANGE_OPTIONS, dateRange, decimal, fullDate, pct, shortDate } from '../format';
+import { HEALTH_STATUS_LABEL, NA, RANGE_OPTIONS, dateRange, decimal, fullDate, pct, shortDate } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import { categoryLabel } from '../labels';
-import type { HealthAxis, ListingConversion, ListingHealth, ListingTimeseries, TimeRange, TrendDirection } from '../types';
+import type {
+  HealthStatus,
+  ListingConversion,
+  ListingHealthDetail,
+  ListingTimeseries,
+  TimeRange,
+  TrendDirection,
+} from '../types';
 
 const RANGES: TimeRange[] = ['7d', '30d', '90d'];
-
-const AXIS_LABEL: Record<HealthAxis, string> = {
-  conversion: 'Tỉ lệ chuyển đổi',
-  rating: 'Điểm đánh giá',
-  content: 'Nội dung listing',
-  stock: 'Tồn kho',
-  freshness: 'Độ mới',
-};
 
 const STEP_LABEL: Record<string, string> = {
   view_to_cart: 'từ xem sang thêm giỏ',
   cart_to_order: 'từ thêm giỏ sang đặt mua',
 };
 
-/** Dải điểm sức khoẻ: luôn kèm chữ, không chỉ dựa vào màu. */
-function bandTone(band: string): Tone {
-  if (band.includes('tốt')) return 'good';
-  if (band.includes('kém')) return 'bad';
-  return 'warn';
+/** Mức điểm BR-182: luôn kèm chữ, không chỉ dựa vào màu. */
+function healthTone(status: HealthStatus | null): Tone {
+  if (status === 'good') return 'good';
+  if (status === 'poor') return 'bad';
+  if (status === 'needs_improvement') return 'warn';
+  return 'neutral';
 }
 
 function TrendPill({ direction, slope, threshold, what }: {
@@ -77,7 +81,7 @@ export function ListingDetailPage() {
   const raw = params.get('range');
   const timeRange: TimeRange = RANGES.includes(raw as TimeRange) ? (raw as TimeRange) : '30d';
 
-  const health = useInsight<ListingHealth>(id ? `/listings/${id}/health` : null);
+  const health = useInsight<ListingHealthDetail>(id ? `/listings/${id}/health` : null);
   const conversion = useInsight<ListingConversion>(id ? `/listings/${id}/conversion` : null);
   const series = useInsight<ListingTimeseries>(id ? `/listings/${id}/timeseries` : null, { timeRange });
 
@@ -106,88 +110,83 @@ export function ListingDetailPage() {
       <div className="space-y-5">
         {/* ------------------------------------------------ F29 điểm sức khoẻ -- */}
         <InsightBlock state={health.state} onRetry={health.reload}>
-          {(data, meta) => (
-            <InsightCard
-              title="Điểm sức khoẻ"
-              description="Chấm trên năm trục, mỗi trục một trọng số. Điểm từ 80 là tốt, 50 đến 79 là cần cải thiện, dưới 50 là kém."
-              footer={<SourceFooter meta={meta} limitation={data.note} />}
-            >
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,260px)_1fr]">
-                <div className="space-y-4">
-                  <div>
+          {(data, meta) => {
+            const todos = data.todos.filter(t => t.type !== 'warning');
+            const warnings = data.todos.filter(t => t.type === 'warning');
+            const countedAxes = AXIS_ORDER.filter(a => data.axes[a] != null && !data.axes_missing.includes(a));
+            const gainTodos = todos.filter(t => (t.impact ?? 0) > 0);
+            const totalGain = gainTodos.reduce((s, t) => s + (t.impact ?? 0), 0);
+            return (
+              <InsightCard
+                title="Điểm sức khoẻ"
+                description="Listing này đã chuẩn bị tốt đến đâu, tính từ những tiêu chí đang có dữ liệu."
+                footer={<SourceFooter meta={meta} />}
+              >
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,280px)_1fr]">
+                  <div className="space-y-3">
                     <div className="flex items-end gap-2">
-                      <span className="font-jakarta text-5xl font-extrabold leading-none text-stone-900">{decimal(data.health_score, 1)}</span>
+                      <span className="font-jakarta text-5xl font-extrabold leading-none text-stone-900">{decimal(data.score, 1)}</span>
                       <span className="pb-1 text-sm text-stone-400">trên 100</span>
                     </div>
-                    <div className="mt-2">
-                      <Chip tone={bandTone(data.band)}>{data.band}</Chip>
-                    </div>
-                    <p className="mb-0 mt-2 text-xs text-stone-500">Chấm ngày {fullDate(data.date)}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 border-t border-stone-100 pt-4">
-                    <MiniStat
-                      label="Chuyển đổi"
-                      value={pct(data.conversion_rate, 2)}
-                      hint={data.category_avg_cr === null ? undefined : `Danh mục ${pct(data.category_avg_cr, 2)}`}
-                    />
-                    <MiniStat
-                      label="So với danh mục"
-                      value={data.cr_index === null ? NA : `${decimal(data.cr_index)} lần`}
-                      hint={data.cr_index === null ? undefined : data.cr_index >= 1 ? 'Tốt hơn mặt bằng' : 'Thấp hơn mặt bằng'}
-                    />
-                    <MiniStat
-                      label="Điểm đánh giá"
-                      value={data.rating_shrunk === null ? 'Chưa có đánh giá' : decimal(data.rating_shrunk)}
-                      hint={data.n_reviews > 0 ? `${count(data.n_reviews)} đánh giá` : 'Chưa ai đánh giá'}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <ScoreBars
-                    rows={(Object.keys(AXIS_LABEL) as HealthAxis[])
-                      .filter(axis => data.breakdown[axis])
-                      .map(axis => ({
-                        label: AXIS_LABEL[axis],
-                        score: data.breakdown[axis].score,
-                        weight: data.breakdown[axis].weight,
-                        counted: data.breakdown[axis].counted,
-                      }))}
-                  />
-
-                  {data.axes_missing.length > 0 && (
+                    <Chip tone={healthTone(data.status)}>{data.status ? HEALTH_STATUS_LABEL[data.status] ?? data.status : NA}</Chip>
                     <Note>
-                      Trục {data.axes_missing.map(a => AXIS_LABEL[a as HealthAxis] ?? a).join(', ')} thiếu dữ liệu nên bị loại
-                      khỏi phép tính và trọng số được chia lại cho các trục còn lại. Thiếu dữ liệu không bị tính 0 điểm, vì
-                      thiếu dữ liệu khác với làm kém.
+                      Tính trên {countedAxes.length}/5 tiêu chí đang có dữ liệu. Tiêu chí chưa có dữ liệu không bị tính 0 điểm,
+                      phần tỉ trọng của nó được chia lại cho các tiêu chí còn lại.
                     </Note>
-                  )}
+                    {meta?.computed_at && <Note>Cập nhật lúc {fullDate(meta.computed_at)}. Sau khi bạn sửa sản phẩm, điểm mới có sau khoảng 1 phút.</Note>}
+                    {totalGain > 0 && (
+                      <div className="rounded-xl bg-[#F3F7EE] px-3.5 py-3 text-[13px] leading-relaxed text-[#1f4d1f]">
+                        Làm hết {gainTodos.length} việc tăng điểm bên dưới có thể đưa điểm lên khoảng{' '}
+                        <strong>{decimal(Math.min(100, (data.score ?? 0) + totalGain), 0)}</strong> điểm.
+                      </div>
+                    )}
+                  </div>
 
-                  {data.todo.length > 0 ? (
-                    <div className="rounded-xl bg-stone-50 p-4">
-                      <p className="m-0 mb-2 text-[13px] font-bold text-stone-800">Việc nên sửa trước</p>
-                      <ol className="m-0 list-none space-y-2 p-0">
-                        {[...data.todo].sort((a, b) => a.priority - b.priority).map(task => (
-                          <li key={`${task.priority}-${task.action}`} className="flex items-start gap-2.5 text-[13px] leading-relaxed text-stone-700">
-                            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EAF0E2] text-[11px] font-bold text-[#005B00]">
-                              {task.priority}
-                            </span>
-                            <span>
-                              {task.action}
-                              {task.expected_gain && <span className="ml-1 font-semibold text-[#005B00]">{task.expected_gain}</span>}
-                            </span>
-                          </li>
-                        ))}
-                      </ol>
+                  <div className="space-y-5">
+                    <div>
+                      <p className="m-0 mb-2.5 text-[13px] font-bold text-stone-800">Điểm gồm những gì</p>
+                      <HealthAxisList axes={data.axes} missing={data.axes_missing} conversionDetail={data.conversion_detail} />
                     </div>
-                  ) : (
-                    <Note>Không có việc nào cần sửa gấp ở sản phẩm này.</Note>
-                  )}
+
+                    <HealthHistory productId={id} />
+
+                    <div className="rounded-xl bg-stone-50 p-4">
+                      <p className="m-0 mb-2 text-[13px] font-bold text-stone-800">Cách tăng điểm</p>
+                      {todos.length > 0 ? (
+                        <>
+                          <p className="m-0 mb-2.5 text-xs text-stone-500">
+                            Xếp theo lợi ích so với công sức: việc dễ mà tăng nhiều điểm đứng trước. Mốc lấy theo mức phổ biến
+                            của sản phẩm cùng danh mục trên sàn.
+                          </p>
+                          <ol className="m-0 list-none space-y-2 p-0">
+                            {todos.map((todo, i) => (
+                              <TodoItem key={`${todo.field}-${i}`} todo={todo} index={i} productId={id} />
+                            ))}
+                          </ol>
+                        </>
+                      ) : (
+                        <Note>Sản phẩm đã đạt mọi mốc ở các tiêu chí đang chấm. Giữ cập nhật nội dung định kỳ để không bị giảm điểm độ cập nhật.</Note>
+                      )}
+                    </div>
+
+                    <HealthPreviewPanel productId={id} todos={todos} inventoryPct={data.axes.inventory} />
+
+                    {warnings.length > 0 && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                        <p className="m-0 mb-1 text-[13px] font-bold text-amber-900">Cần kiểm tra</p>
+                        <p className="m-0 mb-2.5 text-xs text-amber-800">Không trừ điểm, nhưng có thể khiến bạn bán lỗ hoặc sản phẩm không được hiển thị.</p>
+                        <ul className="m-0 list-none space-y-2 p-0">
+                          {warnings.map((w, i) => (
+                            <WarningItem key={`${w.field}-${i}`} todo={w} productId={id} />
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </InsightCard>
-          )}
+              </InsightCard>
+            );
+          }}
         </InsightBlock>
 
         {/* ------------------------------------------------- F28 phễu chuyển --- */}

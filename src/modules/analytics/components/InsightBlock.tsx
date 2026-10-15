@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Clock3, Hourglass, PlugZap, RefreshCw, SearchX, Store } from 'lucide-react';
 import type { InsightState } from '../hooks/useInsight';
-import type { InsightMeta } from '../types';
+import type { InsightMeta, InsightUnlock } from '../types';
 import { Skeleton } from './ui';
 
 /**
@@ -29,6 +29,25 @@ function Panel({ icon, title, body, action, compact }: {
         {body && <div className="mt-1 text-xs leading-relaxed text-stone-500">{body}</div>}
       </div>
       {action}
+    </div>
+  );
+}
+
+/**
+ * Thanh tiến độ "đang có bao nhiêu / cần bao nhiêu" (plan §9.2) — thay cho câu thông
+ * báo chay khi một tính năng mở theo ngưỡng dữ liệu sàn thật (ví dụ "12/20 đơn").
+ */
+function UnlockProgress({ unlock }: { unlock: InsightUnlock }) {
+  const pct = unlock.target > 0 ? Math.max(0, Math.min(100, Math.round((unlock.current / unlock.target) * 100))) : 0;
+  return (
+    <div className="mt-3 w-full max-w-[22rem]" role="progressbar" aria-valuenow={unlock.current} aria-valuemin={0} aria-valuemax={unlock.target}>
+      <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-stone-500">
+        <span className="truncate">{unlock.requirement}</span>
+        <span className="shrink-0 tabular-nums">{unlock.current}/{unlock.target} {unlock.unit}</span>
+      </div>
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-stone-200">
+        <div className="h-full rounded-full bg-[#007700] transition-[width] duration-300" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
@@ -76,7 +95,19 @@ export function InsightStatusView<T>({ state, onRetry, compact, skeleton }: {
         </div>
       );
     case 'insufficient':
-      return <Panel compact={compact} icon={<Hourglass size={18} />} title="Chưa đủ dữ liệu để tính" body={state.reason} />;
+      return (
+        <Panel
+          compact={compact}
+          icon={<Hourglass size={18} />}
+          title="Chưa đủ dữ liệu để tính"
+          body={
+            <>
+              {state.reason}
+              {state.meta?.unlock && <UnlockProgress unlock={state.meta.unlock} />}
+            </>
+          }
+        />
+      );
     case 'not_ready':
       return (
         <Panel
@@ -147,7 +178,10 @@ export function InsightBlock<T>({ state, onRetry, compact, skeleton, children }:
       {state.meta.status === 'partial' && (
         <div role="note" className="mb-4 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />
-          <span><strong>Độ tin cậy thấp.</strong> {state.meta.reason}</span>
+          <div>
+            <span><strong>Độ tin cậy thấp.</strong> {state.meta.reason}</span>
+            {state.meta.unlock && <UnlockProgress unlock={state.meta.unlock} />}
+          </div>
         </div>
       )}
       {children(state.data, state.meta)}

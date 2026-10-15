@@ -57,3 +57,10 @@ export const RANGE_OPTIONS = [
   { value: '30d', label: '30 ngày' },
   { value: '90d', label: '90 ngày' },
 ] as const;
+
+/** Nhãn BR-182: >= 80 tốt · 50-79 cần cải thiện · < 50 kém. */
+export const HEALTH_STATUS_LABEL: Record<string, string> = {
+  good: 'Tốt',
+  needs_improvement: 'Cần cải thiện',
+  poor: 'Kém',
+};

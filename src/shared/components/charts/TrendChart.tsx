@@ -12,6 +12,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -25,6 +26,12 @@ export interface TrendSeries {
   /** Nhãn hiển thị ở chú giải và tooltip. */
   name: string;
   color: string;
+}
+
+/** Ngưỡng ngang, ví dụ mốc phân hạng. Nét đứt = ngưỡng, không phải dữ liệu. */
+export interface TrendThreshold {
+  y: number;
+  label: string;
 }
 
 export interface TrendPoint {
@@ -81,12 +88,17 @@ export function TrendChart({
   formatValue = (n: number) => n.toLocaleString('vi-VN'),
   /** Nhãn cho trình đọc màn hình — biểu đồ SVG không tự mô tả được nội dung. */
   ariaLabel,
+  thresholds = [],
+  yDomain,
 }: {
   data: TrendPoint[];
   series: TrendSeries[];
   height?: number;
   formatValue?: (n: number) => string;
   ariaLabel: string;
+  thresholds?: TrendThreshold[];
+  /** Cố định trục tung (vd. thang điểm 0–100) thay vì để recharts tự co theo dữ liệu. */
+  yDomain?: [number, number];
 }) {
   // Mỗi thực thể biểu đồ cần id gradient riêng, nếu không hai biểu đồ trên cùng
   // một trang sẽ dùng chung <defs> và cái sau đè màu cái trước.
@@ -123,9 +135,21 @@ export function TrendChart({
             axisLine={false}
             allowDecimals={false}
             width={44}
+            {...(yDomain ? { domain: yDomain } : {})}
             tick={{ fill: CHART_INK.axis, fontSize: 11 }}
             tickFormatter={v => formatValue(Number(v) || 0)}
           />
+
+          {thresholds.map(t => (
+            <ReferenceLine
+              key={t.y}
+              y={t.y}
+              stroke={CHART_INK.axis}
+              strokeDasharray="4 4"
+              strokeOpacity={0.6}
+              label={{ value: t.label, position: 'insideTopRight', fill: CHART_INK.axis, fontSize: 10.5 }}
+            />
+          ))}
 
           <Tooltip
             cursor={{ stroke: '#c9cec9', strokeWidth: 1 }}

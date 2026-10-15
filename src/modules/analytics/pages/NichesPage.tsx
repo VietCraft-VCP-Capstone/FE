@@ -70,13 +70,19 @@ export function NichesPage() {
       >
         {(data, meta) => {
           const niches = data.niches;
-          const points = niches.map(n => ({
-            id: n.keyword,
-            label: n.keyword,
-            supply: n.supply_pct,
-            demand: n.demand_pct,
-            highlight: n.quadrant === 'opportunity',
-          }));
+          // Shop thật: phần CUNG có thể null (chưa đủ listing thật gắn tag để so — xem
+          // meta.unlock). Không vẽ được một điểm mà trục hoành không có giá trị, nên bỏ
+          // qua các ngách đó trên biểu đồ bốn góc; bảng bên dưới vẫn liệt kê đủ.
+          const points = niches
+            .filter((n): n is Niche & { supply_pct: number } => n.supply_pct !== null)
+            .map(n => ({
+              id: n.keyword,
+              label: n.keyword,
+              supply: n.supply_pct,
+              demand: n.demand_pct,
+              highlight: n.quadrant === 'opportunity',
+            }));
+          const supplyHiddenCount = niches.length - points.length;
           const opportunities = niches.filter(n => n.quadrant === 'opportunity').length;
           const active: Niche | undefined = niches.find(n => n.keyword === selected);
           const filterBlind = data.banned_list_size === 0;
@@ -138,9 +144,19 @@ export function NichesPage() {
                   footer={<SourceFooter meta={meta} limitation={data.limitation} />}
                 >
                   {points.length === 0 ? (
-                    <Note>Chưa có ngách nào để vẽ.</Note>
+                    <Note>
+                      {supplyHiddenCount > 0
+                        ? 'Chưa đủ listing thật gắn tag để vẽ phần cung — xem bảng bên dưới cho phần cầu.'
+                        : 'Chưa có ngách nào để vẽ.'}
+                    </Note>
                   ) : (
                     <>
+                      {supplyHiddenCount > 0 && (
+                        <Note tone="warn">
+                          Ẩn {count(supplyHiddenCount)} ngách khỏi biểu đồ vì sàn thật chưa đủ listing gắn tag để tính
+                          phần cung — vẫn liệt kê đủ trong bảng bên dưới.
+                        </Note>
+                      )}
                       <QuadrantScatter points={points} selectedId={selected} onSelect={id => setSelected(id)} />
                       <div className="mt-8 min-h-[52px] rounded-xl bg-stone-50 px-3 py-2.5">
                         {active ? (
@@ -235,7 +251,9 @@ export function NichesPage() {
                             <td className="text-right tabular-nums text-stone-700">{pct(n.supply_pct)}</td>
                             <td className="text-right tabular-nums font-bold text-stone-900">{decimal(n.gap_score, 1)}</td>
                             <td className="text-right tabular-nums text-stone-700">
-                              {n.tag_id ? (
+                              {n.supply_insufficient ? (
+                                <span title="Sàn thật chưa đủ listing gắn tag này để đếm cung">{NA}</span>
+                              ) : n.tag_id ? (
                                 count(n.n_listings)
                               ) : (
                                 <span title="Từ khoá chưa gắn với tag nào trên sàn nên chưa đếm được listing">{NA}</span>

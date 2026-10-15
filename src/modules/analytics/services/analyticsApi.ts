@@ -1,5 +1,6 @@
 import api from '../../../infrastructure/api/interceptors';
-import type { InsightContext, InsightEnvelope } from '../types';
+import type { HealthStatus, InsightContext, InsightEnvelope, ListingHealthList } from '../types';
+import type { HealthPreview, PreviewInputs } from '../healthTypes';
 
 /**
  * Gọi 16 tính năng phân tích qua cổng BE /api/seller/analytics.
@@ -31,6 +32,18 @@ export const analyticsApi = {
   async context(signal?: AbortSignal): Promise<InsightContext> {
     const res = await api.get(`${BASE}/context`, { signal });
     return res.data.data;
+  },
+
+  /** F29 · danh sách sản phẩm thật của shop kèm điểm sức khoẻ mới nhất. */
+  async listingsHealth(status?: HealthStatus, signal?: AbortSignal): Promise<InsightEnvelope<ListingHealthList>> {
+    const res = await api.get(`${BASE}/listings/health`, { params: clean({ status }), signal });
+    return res.data;
+  },
+
+  /** F29 · chấm thử điểm với giá trị giả định. Chỉ gửi lever người bán đã chỉnh. */
+  async healthPreview(productId: string, body: PreviewInputs, signal?: AbortSignal): Promise<InsightEnvelope<HealthPreview>> {
+    const res = await api.post(`${BASE}/listings/${productId}/health/preview`, body, { signal });
+    return res.data;
   },
 
   async trackCompetitor(shopId: string) {
