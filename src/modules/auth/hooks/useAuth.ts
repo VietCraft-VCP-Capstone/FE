@@ -77,26 +77,17 @@ export function useAuth() {
     };
 
     const login = async (credentials: any) => {
-        setLoading(true);
-        try {
-            const data = await authService.login(credentials);
-            return persistSession(data);
-        } finally { setLoading(false); }
+        const data = await authService.login(credentials);
+        return persistSession(data);
     };
 
     const signup = async (userData: any) => {
-        setLoading(true);
-        try {
-            return await authService.signup(userData);
-        } finally { setLoading(false); }
+        return await authService.signup(userData);
     };
 
     const googleLogin = async (accessToken: string) => {
-        setLoading(true);
-        try {
-            const data = await authService.googleLogin(accessToken);
-            return persistSession(data);
-        } finally { setLoading(false); }
+        const data = await authService.googleLogin(accessToken);
+        return persistSession(data);
     };
 
     const logout = () => {
