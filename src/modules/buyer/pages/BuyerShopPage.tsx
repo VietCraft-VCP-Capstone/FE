@@ -142,9 +142,9 @@ export function BuyerShopPage() {
           } : null);
         }
 
-        // Set Vouchers
+        // Set Vouchers: chỉ hiển thị voucher do chính gian hàng phát hành (API trả kèm voucher toàn sàn)
         if (Array.isArray(couponsData)) {
-          setVouchers(couponsData);
+          setVouchers(couponsData.filter((c: CouponDTO) => !(c.is_platform ?? !c.shop_id)));
         } else {
           setVouchers([]);
         }
