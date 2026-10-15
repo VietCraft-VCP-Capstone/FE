@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, Star, ArrowRight, CheckCircle2, Info, Ticket, Flame } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
+import { shopService } from '../../product/services/shopService';
 import { promotionService } from '../../promotion/services/promotionService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
@@ -75,7 +76,11 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
     Promise.all([
       productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
-      productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
+      isLoggedIn()
+        ? shopService.getFollowedShops()
+            .then(followed => (Array.isArray(followed) && followed.length > 0 ? followed : productsService.getFeaturedShops()))
+            .catch(() => productsService.getFeaturedShops().catch(() => []))
+        : productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
       promotionService.getAll().catch((err) => { console.error('Failed to fetch coupons', err); return []; }),
     ]).then(([products, shops, coupons]) => {
       const productList = Array.isArray(products) ? products : (products as any)?.items || [];
@@ -208,6 +213,21 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       couponTitle?: string;
     }> = [];
 
+    // Helper chuẩn hoá Shop ID
+    const getShopId = (obj: any): string | null => {
+      if (!obj) return null;
+      if (typeof obj === 'string') return obj;
+      if (typeof obj === 'object') {
+        return obj._id?.toString() || obj.id?.toString() || null;
+      }
+      return null;
+    };
+
+    const getProductShopId = (p: any): string | null => {
+      if (!p) return null;
+      return getShopId(p.shop_id) || getShopId(p.shopInfo?.id || p.shopInfo?._id) || getShopId(p.sellerId) || null;
+    };
+
     const addedProductIds = new Set<string>();
 
     // 1. Sản phẩm thuộc chương trình FLASH SALE thật
@@ -215,6 +235,9 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
         ? parseFloat(coupon.discount_value.$numberDecimal)
         : parseFloat(coupon.discount_value || 0);
+      const minVal = typeof coupon.min_order_value === 'object' && coupon.min_order_value?.$numberDecimal
+        ? parseFloat(coupon.min_order_value.$numberDecimal)
+        : parseFloat(coupon.min_order_value || 0);
 
       if (coupon.applicable_scope === 'SPECIFIC_PRODUCTS' && Array.isArray(coupon.applicable_product_ids)) {
         for (const prodId of coupon.applicable_product_ids) {
@@ -223,14 +246,13 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
           if (p && p.price > 0) {
             const basePrice = p.price;
+            if (minVal > 0 && basePrice < minVal) continue;
             let dealPrice = basePrice;
             let discountText = '';
             if (discountVal <= 100) {
-              // val là %
               dealPrice = Math.round(basePrice * (1 - discountVal / 100));
               discountText = `-${discountVal}%`;
             } else {
-              // val là số tiền VNĐ
               dealPrice = Math.max(0, basePrice - discountVal);
               discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
             }
@@ -249,21 +271,21 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           }
         }
       } else if (coupon.applicable_scope === 'ALL') {
-        const matchingProds = coupon.shop_id
-          ? allProducts.filter((p: any) => (p.sellerId === coupon.shop_id || p.shop_id === coupon.shop_id))
+        const couponShopId = getShopId(coupon.shop_id);
+        const matchingProds = couponShopId
+          ? allProducts.filter((p: any) => getProductShopId(p) === couponShopId)
           : allProducts;
-        for (const p of matchingProds.slice(0, 4)) {
+        for (const p of matchingProds.slice(0, 8)) {
           const idStr = (p.id || p._id)?.toString();
           if (!idStr || addedProductIds.has(idStr)) continue;
           const basePrice = p.price;
+          if (minVal > 0 && basePrice < minVal) continue;
           let dealPrice = basePrice;
           let discountText = '';
           if (discountVal <= 100) {
-            // val là %
             dealPrice = Math.round(basePrice * (1 - discountVal / 100));
             discountText = `-${discountVal}%`;
           } else {
-            // val là số tiền VNĐ
             dealPrice = Math.max(0, basePrice - discountVal);
             discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
           }
@@ -283,41 +305,45 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       }
     }
 
-    // 2. Sản phẩm thuộc các voucher giảm giá chỉ định khác
+    // 2. Sản phẩm thuộc các voucher chỉ định sản phẩm cụ thể (SPECIFIC_PRODUCTS) thỏa mãn điều kiện đơn tối thiểu
     for (const coupon of otherCoupons) {
-      if (coupon.applicable_scope === 'SPECIFIC_PRODUCTS' && Array.isArray(coupon.applicable_product_ids)) {
-        const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
-          ? parseFloat(coupon.discount_value.$numberDecimal)
-          : parseFloat(coupon.discount_value || 0);
+      if (coupon.applicable_scope !== 'SPECIFIC_PRODUCTS' || !Array.isArray(coupon.applicable_product_ids)) continue;
 
-        for (const prodId of coupon.applicable_product_ids) {
-          const idStr = (prodId?._id || prodId)?.toString();
-          if (!idStr || addedProductIds.has(idStr)) continue;
-          const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
-          if (p && p.price > 0) {
-            const basePrice = p.price;
-            let dealPrice = basePrice;
-            let discountText = '';
-            if (coupon.discount_type === 'PERCENTAGE') {
-              dealPrice = Math.round(basePrice * (1 - discountVal / 100));
-              discountText = `-${discountVal}%`;
-            } else {
-              dealPrice = Math.max(0, basePrice - discountVal);
-              discountText = `-${Math.round((discountVal / basePrice) * 100)}%`;
-            }
-            deals.push({
-              id: p.id || p._id,
-              title: p.title || p.name,
-              price: dealPrice,
-              oldPrice: basePrice,
-              discount: discountText,
-              image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
-              badge: 'ƯU ĐÃI',
-              couponCode: coupon.code,
-              couponTitle: coupon.title
-            });
-            addedProductIds.add(idStr);
+      const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
+        ? parseFloat(coupon.discount_value.$numberDecimal)
+        : parseFloat(coupon.discount_value || 0);
+      const minVal = typeof coupon.min_order_value === 'object' && coupon.min_order_value?.$numberDecimal
+        ? parseFloat(coupon.min_order_value.$numberDecimal)
+        : parseFloat(coupon.min_order_value || 0);
+
+      for (const prodId of coupon.applicable_product_ids) {
+        const idStr = (prodId?._id || prodId)?.toString();
+        if (!idStr || addedProductIds.has(idStr)) continue;
+        const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
+        if (p && p.price > 0) {
+          const basePrice = p.price;
+          if (minVal > 0 && basePrice < minVal) continue;
+          let dealPrice = basePrice;
+          let discountText = '';
+          if (coupon.discount_type === 'PERCENTAGE') {
+            dealPrice = Math.round(basePrice * (1 - discountVal / 100));
+            discountText = `-${discountVal}%`;
+          } else {
+            dealPrice = Math.max(0, basePrice - discountVal);
+            discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
           }
+          deals.push({
+            id: p.id || p._id,
+            title: p.title || p.name,
+            price: dealPrice,
+            oldPrice: basePrice,
+            discount: discountText,
+            image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
+            badge: 'ƯU ĐÃI',
+            couponCode: coupon.code,
+            couponTitle: coupon.title
+          });
+          addedProductIds.add(idStr);
         }
       }
     }
@@ -335,19 +361,34 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
     };
   });
 
-  const subbedShops = shopList.length > 0 ? shopList.map((shop: any) => {
-    const shopProds = allProducts.filter((p: any) => p.sellerId === shop._id?.toString() || p.sellerId === shop.id).slice(0, 3);
-    const thumbnails = shopProds.map((p: any) => p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=150');
-    while (thumbnails.length < 3) {
-      thumbnails.push('https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=150');
-    }
-    return {
-      name: shop.shop_name,
-      caption: `Đã thêm ${shop.listing_count || 5} sản phẩm mới`,
-      image: shop.logo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200',
-      thumbnails
-    };
-  }) : [];
+  const subbedShops = useMemo(() => {
+    if (!shopList || shopList.length === 0) return [];
+    return shopList.map((shop: any) => {
+      const sId = (shop._id || shop.id)?.toString();
+      const sSlug = shop.slug;
+      const targetShop = sId || sSlug;
+
+      // Lọc sản phẩm của gian hàng này
+      const shopProds = allProducts.filter((p: any) => {
+        const pSeller = (p.sellerId || p.shop_id || p.shopInfo?.id || p.shopInfo?._id)?.toString();
+        return pSeller && sId && pSeller === sId;
+      }).slice(0, 3);
+
+      const thumbnails = shopProds.map((p: any) => p.images?.[0] || p.thumbnail || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=150');
+      while (thumbnails.length < 3) {
+        thumbnails.push('https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=150');
+      }
+
+      return {
+        id: targetShop,
+        slug: sSlug,
+        name: shop.shop_name || shop.name || shop.shopName || 'Gian hàng',
+        caption: `Đã thêm ${shop.listing_count || shop.listingCount || (shopProds.length > 0 ? shopProds.length : 1)} sản phẩm mới`,
+        image: shop.logo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200',
+        thumbnails
+      };
+    });
+  }, [shopList, allProducts]);
 
   const searchedProducts = allProducts.filter((p: any) =>
     (p.title || p.name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -791,35 +832,62 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Cập nhật từ gian hàng bạn theo dõi</h2>
         </div>
         <div className="buyer-grid-3">
-          {subbedShops.map((shop, i) => (
-            <div key={i} className="shop-update-card">
-              <div className="shop-head" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <img src={shop.image} alt={shop.name} className="shop-avatar" style={{ border: '1px solid #ebd0eb' }} />
-                <div>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{shop.name}</h3>
-                  <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{shop.caption}</p>
-                </div>
-              </div>
-              <div className="shop-thumbnails">
-                {shop.thumbnails.map((t, idx) => (
-                  <img key={idx} src={t} alt="thumbnail" />
-                ))}
-              </div>
-              <button
-                className="shop-view-btn"
-                onClick={() => navigate('/')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6
+          {subbedShops.map((shop, i) => {
+            const targetShop = shop.id || shop.slug;
+            return (
+              <div
+                key={shop.id || i}
+                className="shop-update-card cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => {
+                  if (targetShop) navigate(`/shop/${targetShop}`);
                 }}
+                style={{ cursor: 'pointer' }}
+                title={`Xem gian hàng ${shop.name}`}
               >
-                <span>Xem bộ sưu tập mới</span>
-                <ArrowRight size={12} />
-              </button>
-            </div>
-          ))}
+                <div className="shop-head" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img src={shop.image} alt={shop.name} className="shop-avatar" style={{ border: '1px solid #ebd0eb' }} />
+                  <div>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{shop.name}</h3>
+                    <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{shop.caption}</p>
+                  </div>
+                </div>
+                <div className="shop-thumbnails">
+                  {shop.thumbnails.map((t: string, idx: number) => (
+                    <img
+                      key={idx}
+                      src={t}
+                      alt="thumbnail"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (targetShop) navigate(`/shop/${targetShop}`);
+                      }}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="shop-view-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (targetShop) {
+                      navigate(`/shop/${targetShop}`);
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    cursor: 'pointer'
+                  }}
+                  title={`Xem bộ sưu tập mới của ${shop.name}`}
+                >
+                  <span>Xem bộ sưu tập mới</span>
+                  <ArrowRight size={12} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </section>
 

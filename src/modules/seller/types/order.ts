@@ -43,8 +43,22 @@ export interface SellerOrder {
   id: string;
   orderCode: string;
   status: SellerOrderStatus;
+  approvalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  fulfillmentStatus?: string;
+  supplierOrderId?: string;
+  printerInfo?: {
+    printerId?: string;
+    printerName?: string;
+    supplierOrderId?: string;
+    printerStatus?: string;
+    dispatchedAt?: string;
+    rejectionReason?: string;
+  };
+  canApprove?: boolean;
+  isPod?: boolean;
+  orderType?: 'POD' | 'READY_TO_SHIP' | 'STANDARD';
   paymentStatus: 'PENDING' | 'PAID' | 'REFUNDED';
-  paymentMethod: 'VNPAY' | 'MOMO' | 'COD';
+  paymentMethod: 'VNPAY' | 'PAYOS' | 'COD';
   createdAt: string;
   updatedAt: string;
   buyer: { id: string; name: string };
@@ -64,7 +78,7 @@ export interface SellerOrder {
   statusHistory: { status: SellerOrderStatus; changedAt: string; note?: string }[];
 }
 
-export type SellerOrderCounts = Record<SellerOrderStatus | 'all', number>;
+export type SellerOrderCounts = Record<SellerOrderStatus | 'all' | 'PENDING_APPROVAL' | 'POD_ORDERS', number>;
 
 export interface SellerOrderList {
   items: SellerOrder[];
@@ -79,11 +93,10 @@ export interface SellerOrderList {
 export type SellerOrderSort = 'newest' | 'oldest' | 'highest' | 'lowest';
 
 /**
- * Giá trị lọc trạng thái. Ngoài 6 trạng thái thật còn hai nhóm ảo:
- * 'ALL' (không lọc) và 'TODO' (mọi đơn còn chờ tay người bán — BE gom
- * ORDERED + PENDING_DESIGN + PROCESSING).
+ * Giá trị lọc trạng thái. Ngoài 6 trạng thái thật còn các nhóm:
+ * 'ALL' (không lọc), 'PENDING_APPROVAL' (chờ duyệt in), 'POD_ORDERS' (đơn xưởng in) và 'TODO' (mọi đơn còn chờ tay người bán).
  */
-export type SellerOrderStatusFilter = SellerOrderStatus | 'ALL' | 'TODO';
+export type SellerOrderStatusFilter = SellerOrderStatus | 'ALL' | 'TODO' | 'PENDING_APPROVAL' | 'POD_ORDERS';
 
 export interface SellerOrderFilter {
   status: SellerOrderStatusFilter;

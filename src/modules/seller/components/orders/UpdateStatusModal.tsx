@@ -90,8 +90,8 @@ export function UpdateStatusModal({
             Đơn{' '}
             <span className="rounded border border-stone-200 bg-stone-100 px-1.5 py-0.5 font-bold text-stone-900">
               {order.orderCode}
-            </span>{' '}
-            — {action.description}
+            </span>
+            : {action.description}
           </p>
 
           {action.requiresTracking && (

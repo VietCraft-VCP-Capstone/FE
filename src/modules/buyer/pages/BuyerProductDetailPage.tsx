@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
+import { reviewService } from '../../product/services/reviewService';
 import { cartService } from '../../order/services/cartService';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
@@ -139,6 +140,12 @@ export function BuyerProductDetailPage() {
     }
   });
 
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [avgRating, setAvgRating] = useState(5.0);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [starBreakdown, setStarBreakdown] = useState<Record<string, { count: number; pct: string }>>({});
+
   const triggerToast = useCallback((msg: string, type: 'success' | 'info' = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -167,6 +174,39 @@ export function BuyerProductDetailPage() {
   // ── Load product ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
+
+    // Load real reviews from API
+    setIsLoadingReviews(true);
+    reviewService.getProductReviews(id)
+      .then((data: any) => {
+        const items = data.items || [];
+        setReviews(items);
+        if (data.summary) {
+          const avg = Number(data.summary.averageRating) || 5.0;
+          const total = Number(data.summary.totalReviews ?? data.summary.reviewCount ?? items.length) || 0;
+          setAvgRating(avg);
+          setReviewCount(total);
+          const breakdown: Record<string, { count: number; pct: string }> = {};
+          [1, 2, 3, 4, 5].forEach(s => {
+            const count = data.summary.breakdown?.[String(s)] || 0;
+            const pct = data.summary.percentages?.[String(s)] || (total > 0 ? `${Math.round((count / total) * 100)}%` : '0%');
+            breakdown[String(s)] = { count, pct };
+          });
+          setStarBreakdown(breakdown);
+        } else {
+          setReviewCount(items.length);
+          if (items.length > 0) {
+            const sum = items.reduce((acc: number, cur: any) => acc + (Number(cur.rating) || 5), 0);
+            setAvgRating(sum / items.length);
+          }
+        }
+      })
+      .catch((err: any) => {
+        console.warn('Could not load reviews:', err);
+      })
+      .finally(() => {
+        setIsLoadingReviews(false);
+      });
 
     if (productDetailCache.has(id)) {
       const cached = productDetailCache.get(id);
@@ -250,28 +290,82 @@ export function BuyerProductDetailPage() {
           try {
             const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
             setIsFav(favs.includes(id!));
-          } catch {}
+          } catch { }
         });
     }
   }, [id]);
 
   // Derive unique option sets from variants
   const colors = [...new Set((product?.variants || []).map(v => v.color).filter(Boolean))] as string[];
-  const sizes  = [...new Set((product?.variants || []).map(v => v.size).filter(Boolean))] as string[];
+  const sizes = [...new Set((product?.variants || []).map(v => v.size).filter(Boolean))] as string[];
   const materials = [...new Set((product?.variants || []).map(v => v.material).filter(Boolean))] as string[];
 
+  const hasColors = colors.length > 0;
+  const hasSizes = sizes.length > 0;
+  const hasMaterials = materials.length > 0;
+
   // Resolve active variant by selected options
-  const activeVariant = product?.variants.find(v =>
-    (!selectedColor || v.color === selectedColor) &&
-    (!selectedSize  || v.size  === selectedSize)  &&
-    (!selectedMaterial || v.material === selectedMaterial)
-  ) || selectedVariant || product?.variants[0] || null;
+  const activeVariant = useMemo(() => {
+    if (!product?.variants || product.variants.length === 0) return null;
+    const exact = product.variants.find(v =>
+      (!selectedColor || v.color === selectedColor) &&
+      (!selectedSize || v.size === selectedSize) &&
+      (!selectedMaterial || v.material === selectedMaterial)
+    );
+    if (exact) return exact;
+    return selectedVariant || product.variants[0] || null;
+  }, [product?.variants, selectedColor, selectedSize, selectedMaterial, selectedVariant]);
 
-  const basePrice = activeVariant?.price || product?.price || 0;
+  const handleSelectColor = (c: string) => {
+    setSelectedColor(c);
+    const match = product?.variants?.find(v =>
+      v.color === c &&
+      (!selectedSize || v.size === selectedSize) &&
+      (!selectedMaterial || v.material === selectedMaterial)
+    ) || product?.variants?.find(v => v.color === c);
+    if (match) {
+      setSelectedVariant(match);
+      if (match.size && !selectedSize) setSelectedSize(match.size);
+      if (match.material && !selectedMaterial) setSelectedMaterial(match.material);
+    }
+  };
 
-  // Active promotion (Flash Sale or Specific Product Voucher)
+  const handleSelectSize = (sz: string) => {
+    setSelectedSize(sz);
+    const match = product?.variants?.find(v =>
+      v.size === sz &&
+      (!selectedColor || v.color === selectedColor) &&
+      (!selectedMaterial || v.material === selectedMaterial)
+    ) || product?.variants?.find(v => v.size === sz);
+    if (match) {
+      setSelectedVariant(match);
+      if (match.color && !selectedColor) setSelectedColor(match.color);
+      if (match.material && !selectedMaterial) setSelectedMaterial(match.material);
+    }
+  };
+
+  const handleSelectMaterial = (m: string) => {
+    setSelectedMaterial(m);
+    const match = product?.variants?.find(v =>
+      v.material === m &&
+      (!selectedColor || v.color === selectedColor) &&
+      (!selectedSize || v.size === selectedSize)
+    ) || product?.variants?.find(v => v.material === m);
+    if (match) {
+      setSelectedVariant(match);
+      if (match.color && !selectedColor) setSelectedColor(match.color);
+      if (match.size && !selectedSize) setSelectedSize(match.size);
+    }
+  };
+
+  const rawBasePrice = activeVariant?.price ?? (activeVariant as any)?.retail_price ?? product?.price ?? (product as any)?.retail_price ?? 0;
+  const basePrice = typeof rawBasePrice === 'object' && rawBasePrice?.$numberDecimal
+    ? parseFloat(rawBasePrice.$numberDecimal)
+    : Number(rawBasePrice) || 0;
+
+  // Active promotion: CHỈ áp dụng Flash Sale trực tiếp nếu đủ điều kiện đơn tối thiểu
   const activePromotion = useMemo(() => {
-    if (!id || !availableCoupons.length) return null;
+    if (!id || !availableCoupons.length || basePrice <= 0) return null;
     const now = new Date();
 
     const isActive = (c: any) => {
@@ -280,13 +374,25 @@ export function BuyerProductDetailPage() {
       return true;
     };
 
+    const getShopId = (obj: any): string | null => {
+      if (!obj) return null;
+      if (typeof obj === 'string') return obj;
+      if (typeof obj === 'object') {
+        return obj._id?.toString() || obj.id?.toString() || null;
+      }
+      return null;
+    };
+
+    const pAny = product as any;
+    const currentProductShopId = getShopId(pAny?.shopInfo?.id) || getShopId(pAny?.shop_id) || getShopId(pAny?.sellerId);
+
     const appliesToProduct = (c: any): boolean => {
       if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
         return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
       }
       if (c.applicable_scope === 'ALL') {
-        // Nếu có shop_id thì chỉ áp dụng cho shop đó; nếu không thì toàn sàn
-        if (c.shop_id) return product?.shopInfo?.id === c.shop_id;
+        const cShopId = getShopId(c.shop_id);
+        if (cShopId) return currentProductShopId === cShopId;
         return true; // platform-wide
       }
       return false;
@@ -297,40 +403,20 @@ export function BuyerProductDetailPage() {
         ? parseFloat(raw.$numberDecimal)
         : parseFloat(raw || 0);
 
-    // 1. Flash Sale: ưu tiên SPECIFIC_PRODUCTS trước, sau đó scope ALL
-    const flashSale = availableCoupons.find(c =>
-      isActive(c) && c.discount_type === 'FLASH_SALE' && appliesToProduct(c)
-    );
+    // Chỉ áp dụng Flash Sale trực tiếp vào giá sản phẩm nếu đạt đơn tối thiểu
+    const flashSale = availableCoupons.find(c => {
+      if (!isActive(c) || c.discount_type !== 'FLASH_SALE' || !appliesToProduct(c)) return false;
+      const minVal = parseVal(c.min_order_value);
+      if (minVal > 0 && basePrice < minVal) return false;
+      return true;
+    });
+
     if (flashSale) {
       return { type: 'FLASH_SALE' as const, coupon: flashSale, discountVal: parseVal(flashSale.discount_value) };
     }
 
-    // 2. Coupon chỉ định sản phẩm cụ thể (ưu tiên cao hơn scope ALL)
-    const specificCoupon = availableCoupons.find(c =>
-      isActive(c) &&
-      c.discount_type !== 'FLASH_SALE' &&
-      c.discount_type !== 'FREE_SHIPPING' &&
-      c.applicable_scope === 'SPECIFIC_PRODUCTS' &&
-      (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id)
-    );
-    if (specificCoupon) {
-      return { type: specificCoupon.discount_type, coupon: specificCoupon, discountVal: parseVal(specificCoupon.discount_value) };
-    }
-
-    // 3. Coupon scope ALL (toàn shop hoặc toàn sàn) – chỉ PERCENTAGE / FIXED_AMOUNT
-    const allScopeCoupon = availableCoupons.find(c =>
-      isActive(c) &&
-      c.discount_type !== 'FLASH_SALE' &&
-      c.discount_type !== 'FREE_SHIPPING' &&
-      c.applicable_scope === 'ALL' &&
-      appliesToProduct(c)
-    );
-    if (allScopeCoupon) {
-      return { type: allScopeCoupon.discount_type, coupon: allScopeCoupon, discountVal: parseVal(allScopeCoupon.discount_value) };
-    }
-
     return null;
-  }, [id, availableCoupons, product?.shopInfo?.id]);
+  }, [id, availableCoupons, product, basePrice]);
 
   let finalPrice = basePrice;
   let strikePrice = 0;
@@ -341,24 +427,14 @@ export function BuyerProductDetailPage() {
   if (activePromotion) {
     strikePrice = basePrice;
     const val = activePromotion.discountVal;
-    if (activePromotion.type === 'FLASH_SALE') {
-      isFlashSale = true;
-      if (val <= 100) {
-        // val là % giảm
-        finalPrice = Math.round(basePrice * (1 - val / 100));
-        discountPct = Math.round(val);
-        discountBadgeText = `-${discountPct}%`;
-      } else {
-        // val là số tiền giảm (VNĐ)
-        finalPrice = Math.max(0, basePrice - val);
-        discountPct = Math.round((val / basePrice) * 100);
-        discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
-      }
-    } else if (activePromotion.type === 'PERCENTAGE') {
+    isFlashSale = true;
+    if (val <= 100) {
+      // val là % giảm
       finalPrice = Math.round(basePrice * (1 - val / 100));
       discountPct = Math.round(val);
       discountBadgeText = `-${discountPct}%`;
-    } else if (activePromotion.type === 'FIXED_AMOUNT') {
+    } else {
+      // val là số tiền giảm (VNĐ)
       finalPrice = Math.max(0, basePrice - val);
       discountPct = Math.round((val / basePrice) * 100);
       discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
@@ -372,17 +448,21 @@ export function BuyerProductDetailPage() {
   const productVouchers = useMemo(() => {
     if (!availableCoupons.length) return [];
     const now = new Date();
+    const pAny = product as any;
+    const currentProductShopId = pAny?.shopInfo?.id || pAny?.shop_id?._id?.toString() || pAny?.shop_id?.toString() || pAny?.sellerId?.toString();
     return availableCoupons.filter(c => {
       if (!c.is_active) return false;
       if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
       if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
         return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
       }
-      if (c.is_platform) return true;
-      if (c.shop_id && product?.shopInfo?.id && c.shop_id === product.shopInfo.id) return true;
+      if (c.is_platform || !c.shop_id) return true;
+      const sId = c.shop_id as any;
+      const cShopId = sId?._id?.toString() || sId?.id?.toString() || (typeof sId === 'string' ? sId : null);
+      if (cShopId && currentProductShopId && cShopId === currentProductShopId) return true;
       return false;
     });
-  }, [availableCoupons, id, product?.shopInfo?.id]);
+  }, [availableCoupons, id, product]);
 
 
   // Images list
@@ -392,13 +472,39 @@ export function BuyerProductDetailPage() {
     'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?auto=format&fit=crop&w=600',
   ];
 
+  // ── Validation chọn phân loại ───────────────────────────────────────────────
+  const validateVariantSelection = (): boolean => {
+    if (!product) return false;
+    if (hasColors && !selectedColor) {
+      triggerToast('Vui lòng chọn Màu sắc sản phẩm trước khi tiếp tục.', 'info');
+      return false;
+    }
+    if (hasSizes && !selectedSize) {
+      triggerToast('Vui lòng chọn Kích cỡ sản phẩm trước khi tiếp tục.', 'info');
+      return false;
+    }
+    if (hasMaterials && !selectedMaterial) {
+      triggerToast('Vui lòng chọn Loại sản phẩm / Chất liệu trước khi tiếp tục.', 'info');
+      return false;
+    }
+    if (product.variants?.length > 0 && !activeVariant) {
+      triggerToast('Vui lòng chọn phân loại sản phẩm hợp lệ.', 'info');
+      return false;
+    }
+    return true;
+  };
+
   // ── Add to cart ──────────────────────────────────────────────────────────────
   const addToCart = async (): Promise<boolean> => {
     if (!product) return false;
+    if (!validateVariantSelection()) return false;
+
+    const targetVariantId = activeVariant?.id || (activeVariant as any)?._id || selectedVariant?.id || (selectedVariant as any)?._id;
+
     try {
       await cartService.addToCart({
-        productId: product.id,
-        variantId: activeVariant?.id,
+        productId: product.id || (product as any)._id,
+        variantId: targetVariantId ? String(targetVariantId) : undefined,
         quantity: qty,
         customNotes: customText || undefined
       });
@@ -411,15 +517,46 @@ export function BuyerProductDetailPage() {
     }
   };
 
-  // Chỉ sang giỏ khi thêm THÀNH CÔNG, tránh đưa người dùng tới giỏ trống mà không rõ lý do.
+  // "Mua ngay" chuyển thẳng tới trang /checkout với sản phẩm được chọn
   const buyNow = async () => {
-    // "Mua ngay" dẫn thẳng tới luồng thanh toán → bắt đăng nhập tại đây.
+    if (!product) return;
+    if (!validateVariantSelection()) return;
     if (!isLoggedIn()) {
-      navigate('/login');
+      navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
-    const ok = await addToCart();
-    if (ok) navigate('/cart');
+
+    const targetVariantId = activeVariant?.id || (activeVariant as any)?._id || selectedVariant?.id || (selectedVariant as any)?._id;
+    const currentImg = (product.images && product.images[selectedImage]) || (product.variants && selectedVariant?.mockupImage) || (product as any)?.thumbnail || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600';
+    const variantName = [selectedColor, selectedSize, selectedMaterial].filter(Boolean).join(' - ') || activeVariant?.name || 'Tiêu chuẩn';
+
+    const checkoutItem = {
+      productId: product.id || (product as any)._id,
+      variantId: targetVariantId ? String(targetVariantId) : '',
+      title: product.title || 'Sản phẩm VietCraft',
+      shopName: product.shopInfo?.name || (product as any)?.shop_id?.shop_name || 'VietCraft Shop',
+      variantName,
+      price: basePrice,
+      quantity: qty,
+      image: currentImg,
+      color: selectedColor || undefined,
+      size: selectedSize || undefined,
+      productType: (product as any)?.product_type || 'NORMAL'
+    };
+
+    try {
+      await cartService.addToCart({
+        productId: product.id || (product as any)._id,
+        variantId: targetVariantId ? String(targetVariantId) : undefined,
+        quantity: qty,
+        customNotes: customText || undefined
+      });
+    } catch (e) {
+      console.warn('Sync buy-now item into cart background:', e);
+    }
+
+    localStorage.setItem('vietcraft_checkout', JSON.stringify([checkoutItem]));
+    navigate('/checkout');
   };
 
   const handleChatWithSeller = () => {
@@ -462,7 +599,7 @@ export function BuyerProductDetailPage() {
         localStorage.setItem('vietcraft_favorites', JSON.stringify(next));
         setIsFav(!isFav);
         window.dispatchEvent(new CustomEvent('wishlist-updated'));
-      } catch {}
+      } catch { }
     }
   };
 
@@ -570,12 +707,18 @@ export function BuyerProductDetailPage() {
           <div>
             {/* Shop badge */}
             {product.shopInfo && (
-              <div style={S.shopRow}>
-                <Store size={14} color="#008000" />
-                <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
-                  <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                  <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || '4.8'}</span>
+              <div style={{ ...S.shopRow, justifyContent: 'space-between' }}>
+                <div
+                  onClick={() => product.shopInfo?.id && navigate(`/shop/${product.shopInfo.id}`)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                  title="Xem trang gian hàng"
+                >
+                  <Store size={14} color="#008000" />
+                  <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                    <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
+                    <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || avgRating.toFixed(1)}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -669,10 +812,12 @@ export function BuyerProductDetailPage() {
             {/* Material tabs (if variants have material) */}
             {materials.length > 0 && (
               <>
-                <p style={S.sectionLabel}>Loại sản phẩm</p>
+                <p style={S.sectionLabel}>
+                  Loại sản phẩm: <span style={{ fontWeight: 600, color: selectedMaterial ? '#008000' : '#dc2626' }}>{selectedMaterial || '(Chưa chọn)'}</span>
+                </p>
                 <div style={S.optionGroup}>
                   {materials.map(m => (
-                    <button key={m} style={S.optionBtn(selectedMaterial === m)} onClick={() => setSelectedMaterial(m)}>{m}</button>
+                    <button key={m} style={S.optionBtn(selectedMaterial === m)} onClick={() => handleSelectMaterial(m)}>{m}</button>
                   ))}
                 </div>
               </>
@@ -681,12 +826,14 @@ export function BuyerProductDetailPage() {
             {/* Color swatches */}
             {colors.length > 0 && (
               <>
-                <p style={S.sectionLabel}>Màu sắc: <span style={{ fontWeight: 400, color: '#555' }}>{selectedColor}</span></p>
+                <p style={S.sectionLabel}>
+                  Màu sắc: <span style={{ fontWeight: 600, color: selectedColor ? '#008000' : '#dc2626' }}>{selectedColor || '(Chưa chọn)'}</span>
+                </p>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   {colors.map(c => {
                     const css = resolveColorCss(c, product.colors);
                     return (
-                      <button key={c} title={c} style={S.colorDot(css, selectedColor === c)} onClick={() => setSelectedColor(c)} />
+                      <button key={c} title={c} style={S.colorDot(css, selectedColor === c)} onClick={() => handleSelectColor(c)} />
                     );
                   })}
                 </div>
@@ -696,10 +843,12 @@ export function BuyerProductDetailPage() {
             {/* Size grid */}
             {sizes.length > 0 && (
               <>
-                <p style={S.sectionLabel}>Kích cỡ</p>
+                <p style={S.sectionLabel}>
+                  Kích cỡ: <span style={{ fontWeight: 600, color: selectedSize ? '#008000' : '#dc2626' }}>{selectedSize || '(Chưa chọn)'}</span>
+                </p>
                 <div style={S.optionGroup}>
                   {sizes.map(sz => (
-                    <button key={sz} style={S.optionBtn(selectedSize === sz)} onClick={() => setSelectedSize(sz)}>{sz}</button>
+                    <button key={sz} style={S.optionBtn(selectedSize === sz)} onClick={() => handleSelectSize(sz)}>{sz}</button>
                   ))}
                 </div>
               </>
@@ -780,54 +929,74 @@ export function BuyerProductDetailPage() {
 
         {/* ── Reviews ───────────────────────────────────────────────────────── */}
         <section style={S.reviewSection}>
-          <h2 style={S.sectionTitle}>Đánh giá sản phẩm</h2>
-          {product?.reviews && product.reviews.length > 0 ? (
-            <>
-              <div style={S.reviewSummary}>
-                <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
-                  <div style={S.ratingBig}>{product.rating ? product.rating.toFixed(1) : '5.0'}</div>
-                  <StarRow rating={Math.round(product.rating || 5)} size={18} />
-                  <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{product.reviews.length} đánh giá</div>
-                </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <h2 style={{ ...S.sectionTitle, marginBottom: 0 }}>Đánh giá sản phẩm</h2>
+          </div>
+          <div style={S.reviewSummary}>
+            <div style={{ textAlign: 'center', paddingRight: 24, borderRight: '1px solid #eee' }}>
+              <div style={S.ratingBig}>{reviewCount > 0 ? avgRating.toFixed(1) : '0.0'}</div>
+              <StarRow rating={Math.round(avgRating)} size={18} />
+              <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>
+                {reviewCount > 0 ? `${reviewCount} đánh giá` : 'Chưa có đánh giá'}
               </div>
-              {product.reviews.map(rv => (
-                <div key={rv.id} style={S.reviewCard}>
-                  {rv.avatar ? (
-                    <img src={rv.avatar} alt={rv.name} style={S.avatar} />
-                  ) : (
-                    <div style={{ ...S.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e5e7eb', color: '#4b5563', fontWeight: 'bold' }}>
-                      {rv.name?.[0]?.toUpperCase() || 'U'}
+            </div>
+            <div style={{ flex: 1, paddingLeft: 16 }}>
+              {[5, 4, 3, 2, 1].map(star => {
+                const pctStr = starBreakdown?.[String(star)]?.pct || '0%';
+                return (
+                  <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <StarRow rating={star} size={12} />
+                    <div style={{ flex: 1, height: 8, background: '#f0f0f0', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', background: '#f59e0b', borderRadius: 4, width: pctStr }} />
                     </div>
-                  )}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <span style={{ fontWeight: 700, fontSize: 14 }}>{rv.name}</span>
-                      <StarRow rating={rv.rating} size={12} />
-                      <span style={{ fontSize: 12, color: '#aaa', marginLeft: 'auto' }}>{rv.date}</span>
-                    </div>
-                    <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{rv.text}</p>
-                    {rv.images && rv.images.length > 0 && (
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {rv.images.map((img, i) => (
-                          <img key={i} src={img} alt="review" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
-                        ))}
-                      </div>
-                    )}
+                    <span style={{ fontSize: 12, color: '#888', width: 32 }}>{pctStr}</span>
                   </div>
-                </div>
-              ))}
-            </>
+                );
+              })}
+            </div>
+          </div>
+
+          {isLoadingReviews ? (
+            <div style={{ padding: '36px 0', textAlign: 'center' }}>
+              <div style={{ display: 'inline-block', width: 28, height: 28, border: '3px solid #e5e7eb', borderTopColor: '#008000', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: 8 }} />
+              <p style={{ fontSize: 13, color: '#888', margin: 0 }}>Đang tải đánh giá sản phẩm...</p>
+            </div>
+          ) : reviews.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', background: '#fafafa', borderRadius: 12, border: '1px dashed #e2e8f0', marginTop: 16 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>Sản phẩm này chưa có đánh giá nào.</p>
+              <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>Hãy là người đầu tiên mua hàng và để lại nhận xét nhé!</p>
+            </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '32px 16px', background: '#fafafa', borderRadius: 12, border: '1px dashed #e5e7eb' }}>
-              <div style={{ display: 'inline-flex', marginBottom: 8 }}>
-                <StarRow rating={product?.rating ? Math.round(product.rating) : 5} size={20} />
-              </div>
-              <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#374151', fontSize: 14 }}>
-                Chưa có đánh giá nào cho sản phẩm này
-              </p>
-              <p style={{ margin: 0, fontSize: 12.5, color: '#6b7280' }}>
-                Khách hàng mua sản phẩm có thể để lại nhận xét và đánh giá tại đây.
-              </p>
+            <div style={{ marginTop: 8 }}>
+              {reviews.map((rv, idx) => {
+                const authorName = rv.name || rv.buyer?.name || 'Khách hàng ẩn danh';
+                const authorAvatar = rv.avatar || rv.buyer?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100';
+                const reviewDate = rv.date || (rv.createdAt ? new Date(rv.createdAt).toLocaleDateString('vi-VN') : '');
+                const reviewText = rv.text || rv.comment || '';
+                const reviewImages = Array.isArray(rv.images) ? rv.images : [];
+                const ratingVal = typeof rv.rating === 'number' ? rv.rating : 5;
+
+                return (
+                  <div key={rv.id || rv._id || idx} style={S.reviewCard}>
+                    <img src={authorAvatar} alt={authorName} style={S.avatar} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{authorName}</span>
+                        <StarRow rating={ratingVal} size={12} />
+                        <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 'auto' }}>{reviewDate}</span>
+                      </div>
+                      <p style={{ margin: '0 0 8px', fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>{reviewText}</p>
+                      {reviewImages.length > 0 && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {reviewImages.map((img: string, i: number) => (
+                            <img key={i} src={img} alt={`review-img-${i}`} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

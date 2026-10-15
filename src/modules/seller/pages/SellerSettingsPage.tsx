@@ -12,15 +12,17 @@ import { GeneralSettingsTab } from '../components/settings/GeneralSettingsTab';
 import { ShippingSettingsTab } from '../components/settings/ShippingSettingsTab';
 import { PaymentSettingsTab } from '../components/settings/PaymentSettingsTab';
 import { NotificationSettingsTab } from '../components/settings/NotificationSettingsTab';
+import { PrinterSettingsTab } from '../components/settings/PrinterSettingsTab';
 import { useToast } from '../../../shared/components/Toast';
 import {
   Store,
   Truck,
   CreditCard,
-  Bell
+  Bell,
+  Printer
 } from 'lucide-react';
 
-type TabKey = 'general' | 'shipping' | 'payment' | 'notifications';
+type TabKey = 'general' | 'shipping' | 'payment' | 'notifications' | 'printer';
 
 export function SellerSettingsPage() {
   const [settings, setSettings] = useState<SellerSettingsState>(sellerSettingsService.getCachedSettings());
@@ -141,6 +143,7 @@ export function SellerSettingsPage() {
     { key: 'general', label: 'Thông tin chung', icon: Store },
     { key: 'shipping', label: 'Vận chuyển', icon: Truck },
     { key: 'payment', label: 'Thanh toán', icon: CreditCard },
+    { key: 'printer', label: 'Xưởng in (POD)', icon: Printer },
     { key: 'notifications', label: 'Thông báo', icon: Bell },
   ] as const;
 
@@ -214,6 +217,10 @@ export function SellerSettingsPage() {
             onSetDefaultBank={handleSetDefaultBank}
             loading={loading}
           />
+        )}
+
+        {activeTab === 'printer' && (
+          <PrinterSettingsTab />
         )}
 
         {activeTab === 'notifications' && (

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import {
-  LayoutDashboard, Users, ClipboardCheck, Tag, Scale, Megaphone, Bell, Search, LogOut, Store
+  LayoutDashboard, Users, ClipboardCheck, Tag, Scale, Megaphone, Bell, Search, LogOut, Store, Calculator, Percent, Wallet
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -13,13 +13,17 @@ interface AdminLayoutProps {
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Tổng quan' },
+  { to: '/admin/finance', icon: Calculator, label: 'Tài chính' },
   { to: '/admin/users', icon: Users, label: 'Người dùng' },
   { to: '/admin/moderation', icon: ClipboardCheck, label: 'Kiểm duyệt' },
   { to: '/admin/sellers', icon: Store, label: 'Duyệt Người bán' },
   { to: '/admin/categories', icon: Tag, label: 'Danh mục' },
   { to: '/admin/tags', icon: Tag, label: 'Thẻ' },
   { to: '/admin/disputes', icon: Scale, label: 'Tranh chấp' },
+  { to: '/admin/returns', icon: Scale, label: 'Return v3' },
   { to: '/admin/marketing', icon: Megaphone, label: 'Marketing' },
+  { to: '/admin/revenue', icon: Wallet, label: 'Thống kê thu nhập' },
+  { to: '/admin/commission', icon: Percent, label: 'Cấu hình lợi nhuận' },
 ];
 
 export function AdminLayout({ children, user, onLogout }: AdminLayoutProps) {
@@ -54,7 +58,8 @@ export function AdminLayout({ children, user, onLogout }: AdminLayoutProps) {
               to={to}
               className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[14px] font-medium no-underline transition-all duration-150 ${location.pathname === to ? 'bg-admin-brand text-white' : 'text-[#555] hover:bg-[#f0f7f0] hover:text-admin-brand'}`}
             >
-              <Icon size={18} /><span>{label}</span>
+              <Icon size={18} className="shrink-0" />
+              <span className="whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>
             </Link>
           ))}
         </nav>

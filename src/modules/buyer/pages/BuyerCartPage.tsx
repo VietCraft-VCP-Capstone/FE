@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, Sparkles, Check, ArrowLeft } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { cartService } from '../../order/services/cartService';
+import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import api, { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 
 interface CartItem {
     id: string;
     productId: string;
     variantId: string;
+    shopId?: string;
     title: string;
     shopName: string;
     variantName: string;
@@ -49,18 +51,95 @@ const resolveCartItemImage = (variant: any, prod: any): string => {
 
 const parseMongooseDecimal = (val: any): number => {
     if (val === null || val === undefined) return 0;
-    if (typeof val === 'number') return val;
-    if (typeof val === 'string') return Number(val) || 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (typeof val === 'string') {
+        const parsed = parseFloat(val);
+        return isNaN(parsed) ? 0 : parsed;
+    }
     if (typeof val === 'object') {
         if ('$numberDecimal' in val) {
-            return Number(val.$numberDecimal) || 0;
+            return parseFloat(val.$numberDecimal) || 0;
         }
         if ('value' in val) {
-            return Number(val.value) || 0;
+            return parseFloat(val.value) || 0;
         }
     }
     const num = Number(val);
     return isNaN(num) ? 0 : num;
+};
+
+const computeItemDiscount = (item: CartItem, coupons: CouponDTO[]) => {
+    const basePrice = item.price;
+    if (!coupons || coupons.length === 0 || basePrice <= 0) {
+        return { finalPrice: basePrice, strikePrice: 0, discountPct: 0, badgeText: '', isFlashSale: false };
+    }
+
+    const now = new Date();
+    const isActive = (c: CouponDTO) =>
+        c.is_active &&
+        new Date(c.start_date) <= now &&
+        new Date(c.end_date) >= now;
+
+    const parseVal = (raw: any) =>
+        typeof raw === 'object' && raw?.$numberDecimal
+            ? parseFloat(raw.$numberDecimal)
+            : parseFloat(raw || 0);
+
+    // 1. Flash Sale: ưu tiên SPECIFIC_PRODUCTS trước, sau đó ALL (yêu cầu basePrice >= min_order_value nếu có)
+    const flashSale = coupons.find(c => {
+        if (!isActive(c) || c.discount_type !== 'FLASH_SALE') return false;
+        const minVal = parseVal(c.min_order_value);
+        if (minVal > 0 && basePrice < minVal) return false;
+        if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
+            return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === item.productId);
+        }
+        return true;
+    });
+
+    if (flashSale) {
+        const val = parseVal(flashSale.discount_value);
+        let finalPrice = basePrice;
+        let discountPct = 0;
+        let badgeText = '';
+        if (val <= 100) {
+            finalPrice = Math.round(basePrice * (1 - val / 100));
+            discountPct = Math.round(val);
+            badgeText = `-${discountPct}%`;
+        } else {
+            finalPrice = Math.max(0, basePrice - val);
+            discountPct = Math.round((val / basePrice) * 100);
+            badgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
+        }
+        return { finalPrice, strikePrice: basePrice, discountPct, badgeText, isFlashSale: true };
+    }
+
+    // 2. Coupon chỉ định sản phẩm cụ thể (PERCENTAGE / FIXED_AMOUNT) đủ điều kiện đơn tối thiểu
+    const specificCoupon = coupons.find(c => {
+        if (!isActive(c) || c.discount_type === 'FLASH_SALE' || c.discount_type === 'FREE_SHIPPING') return false;
+        if (c.applicable_scope !== 'SPECIFIC_PRODUCTS') return false;
+        const minVal = parseVal(c.min_order_value);
+        if (minVal > 0 && basePrice < minVal) return false;
+        return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === item.productId);
+    });
+
+    if (specificCoupon) {
+        const val = parseVal(specificCoupon.discount_value);
+        let finalPrice = basePrice;
+        let discountPct = 0;
+        let badgeText = '';
+        if (specificCoupon.discount_type === 'PERCENTAGE') {
+            finalPrice = Math.round(basePrice * (1 - val / 100));
+            discountPct = Math.round(val);
+            badgeText = `-${discountPct}%`;
+        } else {
+            finalPrice = Math.max(0, basePrice - val);
+            discountPct = Math.round((val / basePrice) * 100);
+            badgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
+        }
+        return { finalPrice, strikePrice: basePrice, discountPct, badgeText, isFlashSale: false };
+    }
+
+    return { finalPrice: basePrice, strikePrice: 0, discountPct: 0, badgeText: '', isFlashSale: false };
 };
 
 const mapBackendCart = (cartData: any): CartItem[] => {
@@ -72,26 +151,34 @@ const mapBackendCart = (cartData: any): CartItem[] => {
         const variant = item.variant_id || {};
         
         const shopName = prod.shop_id?.shop_name || 'VietCraft Selection';
+        const shopId = prod.shop_id?._id?.toString() || prod.shop_id?.toString() || prod.sellerId?.toString() || '';
         
-        let variantName = 'Mặc định';
+        let variantName = '';
         if (variant.color || variant.size || variant.material) {
             variantName = [variant.color, variant.size, variant.material].filter(Boolean).join(' - ');
         } else if (variant.name) {
             variantName = variant.name;
+        } else if (item.color || item.size) {
+            variantName = [item.color, item.size].filter(Boolean).join(' - ');
+        }
+        if (!variantName) {
+            variantName = 'Tiêu chuẩn';
         }
 
         let price = 0;
-        if (variant.retail_price) {
+        if (variant.retail_price !== undefined && variant.retail_price !== null) {
             price = parseMongooseDecimal(variant.retail_price);
-        } else if (variant.price) {
+        } else if (variant.price !== undefined && variant.price !== null) {
             price = parseMongooseDecimal(variant.price);
-        } else if (prod.retail_price) {
+        } else if (prod.retail_price !== undefined && prod.retail_price !== null) {
             price = parseMongooseDecimal(prod.retail_price);
-        } else if (prod.price) {
+        } else if (prod.price !== undefined && prod.price !== null) {
             price = parseMongooseDecimal(prod.price);
+        } else if (item.price !== undefined && item.price !== null) {
+            price = parseMongooseDecimal(item.price);
         } else if (Array.isArray(prod.variants) && prod.variants.length > 0) {
             const firstV = prod.variants[0];
-            price = parseMongooseDecimal(firstV?.retail_price || firstV?.price || 0);
+            price = parseMongooseDecimal(firstV?.retail_price ?? firstV?.price ?? 0);
         }
 
         const image = resolveCartItemImage(variant, prod);
@@ -100,6 +187,7 @@ const mapBackendCart = (cartData: any): CartItem[] => {
             id: item._id, // Cart item DB MongoDB ObjectId
             productId: prod._id || prod.id || '',
             variantId: variant._id || variant.id || '',
+            shopId,
             title: prod.title || 'Sản phẩm VietCraft',
             shopName,
             variantName,
@@ -116,6 +204,7 @@ export function BuyerCartPage() {
     const navigate = useNavigate();
 
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const [availableCoupons, setAvailableCoupons] = useState<CouponDTO[]>([]);
     const [recommendations, setRecommendations] = useState<any[]>([]);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -142,6 +231,16 @@ export function BuyerCartPage() {
         };
 
         syncAndFetchCart();
+
+        const fetchCoupons = async () => {
+            try {
+                const data = await promotionService.getAll();
+                setAvailableCoupons(Array.isArray(data) ? data : []);
+            } catch (err) {
+                console.warn('Could not fetch coupons for cart:', err);
+            }
+        };
+        fetchCoupons();
 
         const fetchRecs = async () => {
             try {
@@ -224,7 +323,12 @@ export function BuyerCartPage() {
 
     const checkedItems = cartItems.filter((item: CartItem) => item.checked);
     const totalSelectedQty = checkedItems.reduce((acc: number, item: CartItem) => acc + item.quantity, 0);
-    const totalPrice = checkedItems.reduce((acc: number, item: CartItem) => acc + (item.price * item.quantity), 0);
+    const totalPrice = checkedItems.reduce((acc: number, item: CartItem) => {
+        const d = computeItemDiscount(item, availableCoupons);
+        return acc + (d.finalPrice * item.quantity);
+    }, 0);
+    const totalOriginalPrice = checkedItems.reduce((acc: number, item: CartItem) => acc + (item.price * item.quantity), 0);
+    const totalSaved = Math.max(0, totalOriginalPrice - totalPrice);
     const allChecked = cartItems.length > 0 && cartItems.every((item: CartItem) => item.checked);
 
     const handleCheckout = () => {
@@ -264,72 +368,88 @@ export function BuyerCartPage() {
                             </button>
                         </div>
                     ) : (
-                        cartItems.map((item: CartItem) => (
-                            <div key={item.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow">
-                                {/* Left Checkbox and Product Details */}
-                                <div className="flex items-center gap-4 flex-1">
-                                    <input
-                                        type="checkbox"
-                                        checked={item.checked}
-                                        onChange={() => handleToggleCheck(item.id)}
-                                        className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
-                                    />
-                                    <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                        <img 
-                                            src={item.image} 
-                                            alt={item.title} 
-                                            className="w-full h-full object-cover" 
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMG;
-                                            }}
+                        cartItems.map((item: CartItem) => {
+                            const itemDiscount = computeItemDiscount(item, availableCoupons);
+                            const itemFinalPrice = itemDiscount.finalPrice;
+                            const hasDiscount = itemDiscount.strikePrice > itemDiscount.finalPrice;
+
+                            return (
+                                <div key={item.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow">
+                                    {/* Left Checkbox and Product Details */}
+                                    <div className="flex items-center gap-4 flex-1">
+                                        <input
+                                            type="checkbox"
+                                            checked={item.checked}
+                                            onChange={() => handleToggleCheck(item.id)}
+                                            className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
                                         />
+                                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
+                                            <img 
+                                                src={item.image} 
+                                                alt={item.title} 
+                                                className="w-full h-full object-cover" 
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMG;
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h3 className="font-bold text-gray-900 leading-snug line-clamp-1">{item.title}</h3>
+                                            <p className="text-xs text-gray-500">Cửa hàng: <span className="font-medium text-gray-700">{item.shopName}</span></p>
+                                            <p className="text-xs text-gray-400">Phân loại: {item.variantName}</p>
+                                        </div>
                                     </div>
-                                    <div className="space-y-1">
-                                        <h3 className="font-bold text-gray-900 leading-snug line-clamp-1">{item.title}</h3>
-                                        <p className="text-xs text-gray-500">Cửa hàng: <span className="font-medium text-gray-700">{item.shopName}</span></p>
-                                        <p className="text-xs text-gray-400">Phân loại: {item.variantName}</p>
+
+                                    {/* Right Side: Price, Qty and Delete */}
+                                    <div className="flex items-center gap-6 pr-2">
+                                        <div className="text-right flex flex-col items-end min-w-[120px]">
+                                            <span className="font-extrabold text-gray-900 text-lg leading-tight">
+                                                {(itemFinalPrice * item.quantity).toLocaleString('vi-VN')}đ
+                                            </span>
+                                            {hasDiscount && (
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <span className="text-xs text-gray-400 line-through">
+                                                        {(item.price * item.quantity).toLocaleString('vi-VN')}đ
+                                                    </span>
+                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200 whitespace-nowrap">
+                                                        {itemDiscount.isFlashSale ? '⚡ ' : ''}{itemDiscount.badgeText}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Qty controller */}
+                                        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                                            <button
+                                                onClick={() => handleQtyChange(item.id, -1)}
+                                                className="px-2.5 py-1 text-gray-500 hover:bg-gray-100 transition-colors"
+                                            >
+                                                <Minus size={12} />
+                                            </button>
+                                            <span className="px-3 text-sm font-semibold text-gray-700 select-none">
+                                                {item.quantity}
+                                            </span>
+                                            <button
+                                                onClick={() => handleQtyChange(item.id, 1)}
+                                                className="px-2.5 py-1 text-gray-500 hover:bg-gray-100 transition-colors"
+                                            >
+                                                <Plus size={12} />
+                                            </button>
+                                        </div>
+
+                                        {/* Delete button */}
+                                        <button
+                                            onClick={() => handleDeleteItem(item.id)}
+                                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1 text-xs font-semibold"
+                                            title="Xóa sản phẩm"
+                                        >
+                                            <Trash2 size={14} />
+                                            <span>Xóa</span>
+                                        </button>
                                     </div>
                                 </div>
-
-                                {/* Right Side: Price, Qty and Delete */}
-                                <div className="flex items-center gap-8 pr-2">
-                                    <div className="text-right">
-                                        <span className="font-extrabold text-gray-900 text-lg">
-                                            {(item.price * item.quantity).toLocaleString('vi-VN')}đ
-                                        </span>
-                                    </div>
-
-                                    {/* Qty controller */}
-                                    <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                                        <button
-                                            onClick={() => handleQtyChange(item.id, -1)}
-                                            className="px-2.5 py-1 text-gray-500 hover:bg-gray-100 transition-colors"
-                                        >
-                                            <Minus size={12} />
-                                        </button>
-                                        <span className="px-3 text-sm font-semibold text-gray-700 select-none">
-                                            {item.quantity}
-                                        </span>
-                                        <button
-                                            onClick={() => handleQtyChange(item.id, 1)}
-                                            className="px-2.5 py-1 text-gray-500 hover:bg-gray-100 transition-colors"
-                                        >
-                                            <Plus size={12} />
-                                        </button>
-                                    </div>
-
-                                    {/* Delete button */}
-                                    <button
-                                        onClick={() => handleDeleteItem(item.id)}
-                                        className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1 text-xs font-semibold"
-                                        title="Xóa sản phẩm"
-                                    >
-                                        <Trash2 size={14} />
-                                        <span>Xóa</span>
-                                    </button>
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
 
@@ -393,14 +513,21 @@ export function BuyerCartPage() {
                         {/* Summary details */}
                         <div className="flex items-center gap-6">
                             <div className="text-right">
-                                <span className="text-sm text-gray-500 font-medium">Tổng thanh toán ({totalSelectedQty} sản phẩm):</span>
-                                <span className="text-xl font-black text-[#10b981] ml-2">
-                                    {totalPrice.toLocaleString('vi-VN')}đ
-                                </span>
+                                <div className="flex items-center justify-end gap-2">
+                                    <span className="text-sm text-gray-500 font-medium">Tổng thanh toán ({totalSelectedQty} sản phẩm):</span>
+                                    <span className="text-xl font-black text-[#10b981]">
+                                        {totalPrice.toLocaleString('vi-VN')}đ
+                                    </span>
+                                </div>
+                                {totalSaved > 0 && (
+                                    <p className="text-xs text-rose-600 font-bold mt-0.5">
+                                        Tiết kiệm {totalSaved.toLocaleString('vi-VN')}đ
+                                    </p>
+                                )}
                             </div>
                             <button
                                 onClick={handleCheckout}
-                                className="bg-[#008000] hover:bg-emerald-700 text-white rounded-full py-2.5 px-10 font-bold transition-all shadow-md active:scale-95 text-sm"
+                                className="bg-[#008000] hover:bg-emerald-700 text-white rounded-full py-2.5 px-10 font-bold transition-all shadow-md active:scale-95 text-sm cursor-pointer"
                             >
                                 Mua Hàng
                             </button>

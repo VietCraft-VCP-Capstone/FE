@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
+import { sellerPrinterService } from '../services/sellerPrinterService';
 import Step1PrinterAndBlank from '../components/create-product/Step1PrinterAndBlank';
 import Step2DesignEditor from '../components/create-product/Step2DesignEditor';
 import Step3MockupPreview from '../components/create-product/Step3MockupPreview';
@@ -143,31 +144,61 @@ export function CreateProductPage() {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [categoryId, setCategoryId] = useState('');
+    const [commissionPercent, setCommissionPercent] = useState<number | null>(null);
     const [blank, setBlank] = useState<any | null>(null);
     const [faces, setFaces] = useState<Record<string, L[]>>({});
     const [activeFace, setActiveFace] = useState<string>('front');
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [selectedVariants, setSelectedVariants] = useState<Record<string, { on: boolean; markup: string; stock: string }>>({});
+    const [connectedPrinter, setConnectedPrinter] = useState<any>(null);
+    const [connectedPrinters, setConnectedPrinters] = useState<any[]>([]);
+    const [selectedVariants, setSelectedVariants] = useState<Record<string, { on: boolean; markup: string; stock: string; color?: string; size?: string; base_cost?: number }>>({});
+    const [selectedImages, setSelectedImages] = useState<string[]>([]);
+    const [coverImage, setCoverImage] = useState<string>('');
     const [areaOverrides, setAreaOverrides] = useState<Record<string, { x?: number; y?: number; width?: number; height?: number }>>({});
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const fileRef = useRef<HTMLInputElement>(null);
 
+    // Hoa hồng phụ thuộc danh mục + loại sản phẩm; hàng ở form này luôn là POD_TEMPLATE.
+    useEffect(() => {
+        let alive = true;
+        productsService
+            .getCommissionPercent(categoryId || null, 'POD_TEMPLATE')
+            .then(p => alive && setCommissionPercent(p))
+            .catch(() => alive && setCommissionPercent(null));
+        return () => { alive = false; };
+    }, [categoryId]);
+
     useEffect(() => {
         Promise.allSettled([
             productsService.getCategories(),
             productsService.getBlanks(),
-            productsService.getMyDesigns()
-        ]).then(([catRes, blankRes, desRes]) => {
+            productsService.getMyDesigns(),
+            sellerPrinterService.getSettings()
+        ]).then(([catRes, blankRes, desRes, printerRes]) => {
             const c = catRes.status === 'fulfilled' ? catRes.value : [];
-            const b = blankRes.status === 'fulfilled' && Array.isArray(blankRes.value) && blankRes.value.length ? blankRes.value : DEFAULT_FRONTEND_BLANKS;
+            const b = blankRes.status === 'fulfilled' && Array.isArray(blankRes.value) ? blankRes.value : [];
             const d = desRes.status === 'fulfilled' ? desRes.value : [];
+            const pData = printerRes.status === 'fulfilled' ? printerRes.value : null;
+            const p = pData?.printer;
+            const pList = pData?.printers && pData.printers.length > 0 ? pData.printers : (p?.is_connected ? [p] : []);
+
             setCategories(Array.isArray(c) ? c : []);
-            setBlanks(Array.isArray(b) ? b : DEFAULT_FRONTEND_BLANKS);
+            setBlanks(Array.isArray(b) ? b : []);
             setDesigns(Array.isArray(d) ? d : []);
-            if (blankRes.status === 'rejected' || catRes.status === 'rejected') {
-                setLoadErr('Không thể kết nối đến máy chủ xưởng in, đã tự động tải phôi mặc định.');
+            setConnectedPrinter(p);
+            setConnectedPrinters(pList);
+
+            if (pList.length === 1) {
+                setSelectedPrinter(pList[0].printer_id || 'all');
+            }
+
+            if (!p?.is_connected && pList.length === 0) {
+                setLoadErr('Bạn chưa liên kết xưởng in nào. Vui lòng vào Cài đặt -> Xưởng in (POD) để hoàn tất thỏa thuận hợp tác và xác thực API Key trước khi tạo sản phẩm.');
+            } else if (b.length === 0) {
+                const names = pList.map((x: any) => x.printer_name).join(', ') || p?.printer_name;
+                setLoadErr(`Đã kết nối xưởng "${names}" nhưng chưa nhận được phôi khả dụng từ xưởng.`);
             }
         }).catch(() => {
             setBlanks(DEFAULT_FRONTEND_BLANKS);
@@ -175,15 +206,31 @@ export function CreateProductPage() {
         });
     }, []);
 
-    const filteredBlanks = (blanks || []).filter((b: any) => {
-        if (!b?._id) return false;
-        if (selectedPrinter === 'vietcraft-direct') return b._id.includes('tshirt');
-        if (selectedPrinter === 'nam-dinh-pod') return b._id.includes('tshirt') || b._id.includes('tote');
-        if (selectedPrinter === 'sai-gon-hub') return b._id.includes('mug') || b._id.includes('frame');
-        return true;
-    });
+    const dynamicPrinters = (connectedPrinters && connectedPrinters.length > 0) ? [
+        ...(connectedPrinters.length > 1 ? [{
+            id: 'all',
+            name: 'Tất cả xưởng in',
+            desc: `Tổng hợp toàn bộ phôi in từ ${connectedPrinters.length} xưởng đối tác`,
+            badge: `${blanks.length} Phôi in`
+        }] : []),
+        ...connectedPrinters.map(p => ({
+            id: p.printer_id || 'connected-workshop',
+            name: p.printer_name,
+            desc: `Đã kết nối qua API Key (${p.seller_printing_email || 'Seller POD'})`,
+            badge: 'Đã xác thực API'
+        }))
+    ] : (connectedPrinter?.is_connected ? [
+        { 
+            id: connectedPrinter.printer_id || 'connected-workshop', 
+            name: connectedPrinter.printer_name, 
+            desc: `Đã kết nối qua API Key (${connectedPrinter.seller_printing_email || 'Seller POD'})`, 
+            badge: 'Đã xác thực API' 
+        }
+    ] : PRINTERS);
 
-    const displayedBlanks = filteredBlanks.length > 0 ? filteredBlanks : blanks;
+    const displayedBlanks = (selectedPrinter === 'all' || !selectedPrinter)
+        ? blanks
+        : blanks.filter(b => b.printer_id === selectedPrinter);
 
     const updateAreaOverride = (key: string, patch: Partial<{ x: number; y: number; width: number; height: number }>) => {
         setAreaOverrides(prev => ({ ...prev, [key]: { ...(prev[key] || {}), ...patch } }));
@@ -208,10 +255,23 @@ export function CreateProductPage() {
 
     const chooseBlank = (b: any) => {
         if (!b) return;
-        setBlank(b);
+        let normalized = { ...b };
+        if (!normalized.print_areas || normalized.print_areas.length === 0) {
+            normalized.print_areas = [{
+                key: 'front',
+                label: 'Mặt trước',
+                image: normalized.default_image,
+                x: 275,
+                y: 220,
+                width: 250,
+                height: 330,
+                surface: 'flat'
+            }];
+        }
+        setBlank(normalized);
         setAreaOverrides({});
         const initV: Record<string, any> = {};
-        (b.variations || []).forEach((v: any) => {
+        (normalized.variations || []).forEach((v: any) => {
             if (!v?.sku) return;
             initV[v.sku] = {
                 on: true,
@@ -223,10 +283,12 @@ export function CreateProductPage() {
             };
         });
         setSelectedVariants(initV);
+        setSelectedImages([]);
+        setCoverImage('');
         const initF: Record<string, L[]> = {};
-        (b.print_areas || []).forEach((a: any) => { if (a?.key) initF[a.key] = []; });
+        (normalized.print_areas || []).forEach((a: any) => { if (a?.key) initF[a.key] = []; });
         setFaces(initF);
-        setActiveFace(b.print_areas?.[0]?.key || 'front');
+        setActiveFace(normalized.print_areas?.[0]?.key || 'front');
         setSelectedId(null);
     };
 
@@ -299,7 +361,14 @@ export function CreateProductPage() {
     };
 
     const toApiLayer = (l: L) => ({
-        type: 'image', design_id: l.design._id, width: l.baseW, x: l.x, y: l.y, scale: l.scale, rotation: l.rotation
+        type: 'image',
+        design_id: l.design?._id,
+        designUrl: l.design?.file_url,
+        width: l.baseW,
+        x: l.x,
+        y: l.y,
+        scale: l.scale,
+        rotation: l.rotation
     });
 
     const submit = async () => {
@@ -322,8 +391,26 @@ export function CreateProductPage() {
                 layers: ls.map(toApiLayer)
             };
         });
+        let finalImages = Array.from(new Set(selectedImages.filter(Boolean)));
+        if (coverImage && finalImages.includes(coverImage)) {
+            finalImages = [coverImage, ...finalImages.filter(img => img !== coverImage)];
+        } else if (coverImage) {
+            finalImages = [coverImage, ...finalImages];
+        }
+
         try {
-            await productsService.create({ title, description, categoryId, blankId: blank._id, variants, designPlacements });
+            await productsService.create({ 
+                title, 
+                description, 
+                categoryId, 
+                blankId: blank._id, 
+                printerId: blank.printer_id || connectedPrinter?.printer_id || 'vietcraft-direct',
+                printerName: blank.printer_name || connectedPrinter?.printer_name || 'Xưởng in đối tác',
+                images: finalImages,
+                thumbnail: coverImage || finalImages[0],
+                variants, 
+                designPlacements 
+            });
             navigate('/seller/products');
         } catch (e: any) {
             const d = e.response?.data;
@@ -364,7 +451,7 @@ export function CreateProductPage() {
             <div className="creator-page-body">
                 {step === 1 && (
                     <Step1PrinterAndBlank
-                        printers={PRINTERS}
+                        printers={dynamicPrinters}
                         selectedPrinter={selectedPrinter}
                         setSelectedPrinter={setSelectedPrinter}
                         blanks={displayedBlanks}
@@ -403,6 +490,11 @@ export function CreateProductPage() {
                         faces={faces}
                         toApiLayer={toApiLayer}
                         selectedVariants={selectedVariants}
+                        setSelectedVariants={setSelectedVariants}
+                        selectedImages={selectedImages}
+                        setSelectedImages={setSelectedImages}
+                        coverImage={coverImage}
+                        setCoverImage={setCoverImage}
                         spaceOf={spaceOf}
                     />
                 )}
@@ -418,6 +510,9 @@ export function CreateProductPage() {
                         blank={blank}
                         selectedVariants={selectedVariants}
                         setSelectedVariants={setSelectedVariants}
+                        selectedImages={selectedImages}
+                        coverImage={coverImage}
+                        commissionPercent={commissionPercent}
                     />
                 )}
             </div>

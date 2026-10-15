@@ -87,6 +87,7 @@ export interface SubmitApplicationPayload {
         front_id_image?: string;
         back_id_image?: string;
         portrait_image?: string;
+
         company_name?: string;
         business_license_number?: string;
         business_license_image?: string;
@@ -153,5 +154,92 @@ export const sellerKycService = {
     async cancelOrDelete(): Promise<{ success: boolean; message: string }> {
         const res = await api.delete('/seller/kyc/cancel-or-delete');
         return res.data;
-    }
+    },
+
+    async scanCccd(filename: string, side: 'front' | 'back' = 'front'): Promise<CccdScanResponse> {
+        const res = await api.post('/seller/kyc/scan-cccd', { filename, side });
+        return res.data;
+    },
+
+    async validatePortrait(filename: string): Promise<PortraitValidationResponse> {
+        const res = await api.post('/seller/kyc/validate-portrait', { filename });
+        return res.data;
+    },
+
 };
+
+export interface PortraitValidationResponse {
+    success?: boolean;
+    face_detection?: {
+        face_count: number;
+        has_single_face: boolean;
+        warnings?: string[];
+        [key: string]: any;
+    };
+    quality?: {
+        is_sharp: boolean;
+        is_resolution_ok: boolean;
+        is_brightness_ok: boolean;
+        warnings?: string[];
+        [key: string]: any;
+    };
+    ai_detection?: {
+        is_likely_ai: boolean;
+        warnings?: string[];
+        [key: string]: any;
+    };
+    verdict?: {
+        is_valid: boolean;
+        confidence_score: number;
+        checks?: Record<string, boolean>;
+        warnings?: string[];
+    };
+    warnings?: string[];
+    error?: string;
+}
+
+export interface CccdOcrData {
+    id_number?: string;
+    full_name?: string;
+    date_of_birth?: string;
+    gender?: string;
+    nationality?: string;
+    place_of_origin?: string;
+    place_of_residence?: string;
+    date_of_expiry?: string;
+    personal_identification?: string;
+    issue_date?: string;
+    issuing_authority?: string;
+    [key: string]: any;
+}
+
+export interface CccdVerification {
+    is_likely_authentic: boolean;
+    confidence_score: number;
+    checks: Record<string, boolean>;
+    warnings: string[];
+    details: {
+        image_quality?: {
+            resolution?: [number, number];
+            blur_score?: number;
+            brightness?: number;
+        };
+        layout?: {
+            keywords_found?: string[];
+            is_valid?: boolean;
+        };
+        screen_capture?: {
+            high_freq_energy?: number;
+            is_screen?: boolean;
+        };
+    };
+}
+
+export interface CccdScanResponse {
+    success: boolean;
+    side: 'front' | 'back';
+    ocr_data: CccdOcrData;
+    verification: CccdVerification;
+}
+
+

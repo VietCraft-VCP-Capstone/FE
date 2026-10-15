@@ -1,6 +1,7 @@
 import { BrowserRouter } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AppRouter } from './router';
+import { ScrollToTop } from '../shared/components/ScrollToTop';
 
 import { ToastProvider } from '../shared/components/Toast';
 
@@ -11,6 +12,7 @@ export function App() {
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <ToastProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <AppRouter />
         </BrowserRouter>
       </ToastProvider>

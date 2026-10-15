@@ -13,6 +13,8 @@ import type {
   ModerationAction,
   ModerationStats,
   PendingProductsResponse,
+  CommissionOverview,
+  FinanceOverview,
 } from '../types';
 
 export interface ListParams {
@@ -217,5 +219,45 @@ export const adminService = {
       headers: authHeader(),
     });
     return data.data;
+  },
+
+  /** Mức hoa hồng đang áp dụng, lịch sử đổi, và số liệu ước lượng tác động — một lượt gọi. */
+  async getCommission(): Promise<CommissionOverview> {
+    const { data } = await api.get(`${ADMIN_BASE}/settings/commission`, {
+      headers: authHeader(),
+    });
+    return data.data;
+  },
+
+  /** Số liệu thu nhập sàn trong `days` ngày gần nhất (tối đa 365 — BR-118). */
+  async getFinanceOverview(days: number): Promise<FinanceOverview> {
+    const { data } = await api.get(`${ADMIN_BASE}/finance/overview`, {
+      params: { days },
+      headers: authHeader(),
+    });
+    return data.data;
+  },
+
+  /** Thêm luật mới (bỏ trống `id`) hoặc sửa luật có sẵn. */
+  async saveCommissionRule(rule: {
+    id?: string;
+    categoryId: string | null;
+    productType: string | null;
+    percent: number;
+  }): Promise<void> {
+    await api.put(`${ADMIN_BASE}/settings/commission/rules`, rule, { headers: authHeader() });
+  },
+
+  async deleteCommissionRule(id: string): Promise<void> {
+    await api.delete(`${ADMIN_BASE}/settings/commission/rules/${id}`, { headers: authHeader() });
+  },
+
+  async updateCommission(percent: number): Promise<number> {
+    const { data } = await api.put(
+      `${ADMIN_BASE}/settings/commission`,
+      { percent },
+      { headers: authHeader() }
+    );
+    return data.data.percent;
   },
 };

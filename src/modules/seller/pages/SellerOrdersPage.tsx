@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, RefreshCw, Search, X } from 'lucide-react';
 
-import { StatCard } from '../components/dashboard/SellerDashboardUi';
 import {
   OrdersPagination,
   OrdersTable,
@@ -40,11 +39,13 @@ const EMPTY: SellerOrderList = {
   page: 1,
   pageSize: PAGE_SIZE,
   totalPages: 0,
-  counts: { all: 0, ORDERED: 0, PENDING_DESIGN: 0, PROCESSING: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 },
+  counts: { all: 0, PENDING_APPROVAL: 0, POD_ORDERS: 0, ORDERED: 0, PENDING_DESIGN: 0, PROCESSING: 0, SHIPPING: 0, DELIVERED: 0, CANCELLED: 0 },
   revenue: { settled: 0, pending: 0 },
 };
 
 const TAB_ORDER: SellerOrderStatusFilter[] = [
+  'PENDING_APPROVAL',
+  'POD_ORDERS',
   'TODO',
   'ORDERED',
   'PENDING_DESIGN',
@@ -62,11 +63,90 @@ const SORT_OPTIONS: { value: SellerOrderSort; label: string }[] = [
   { value: 'lowest', label: 'Giá trị thấp nhất' },
 ];
 
+interface Kpi {
+  label: string;
+  value: string;
+  hint: string;
+  /** Bấm để lọc bảng theo đúng nhóm đơn mà con số đang đếm. */
+  filter?: SellerOrderStatusFilter;
+  /** Con số đòi người bán làm gì đó ngay: tô màu nhấn. */
+  urgent?: boolean;
+}
+
+function KpiStrip({
+  items,
+  loading,
+  activeFilter,
+  onFilter,
+}: {
+  items: Kpi[];
+  loading: boolean;
+  activeFilter: SellerOrderStatusFilter;
+  onFilter: (f: SellerOrderStatusFilter) => void;
+}) {
+  return (
+    <section
+      aria-label="Tổng quan đơn hàng"
+      className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 lg:grid-cols-4"
+    >
+      {items.map(item => {
+        const active = item.filter !== undefined && item.filter === activeFilter;
+        const body = (
+          <>
+            <span className="text-[12.5px] font-medium text-stone-500">{item.label}</span>
+            {loading ? (
+              <span className="mt-1 block h-7 w-16 animate-pulse rounded-md bg-stone-100 motion-reduce:animate-none" />
+            ) : (
+              <span
+                className={`mt-1 block text-[26px] font-bold leading-none tracking-tight tabular-nums ${
+                  item.urgent ? 'text-[#007700]' : 'text-stone-900'
+                }`}
+              >
+                {item.value}
+              </span>
+            )}
+            <span className="mt-2 block text-[12px] leading-snug text-stone-500">{item.hint}</span>
+          </>
+        );
+        return item.filter ? (
+          <button
+            key={item.label}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onFilter(item.filter!)}
+            className={`flex cursor-pointer flex-col border-0 px-5 py-4 text-left transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#007700] motion-reduce:transition-none ${
+              active ? 'bg-[#F3F8EF]' : 'bg-white hover:bg-stone-50'
+            }`}
+          >
+            {body}
+          </button>
+        ) : (
+          <div key={item.label} className="flex flex-col bg-white px-5 py-4">
+            {body}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function emptyCopy(status: SellerOrderStatusFilter, searching: boolean) {
   if (searching) {
     return {
       title: 'Không tìm thấy đơn nào khớp',
       hint: 'Thử tìm bằng mã đơn, tên người nhận, số điện thoại hoặc mã vận đơn.',
+    };
+  }
+  if (status === 'PENDING_APPROVAL') {
+    return {
+      title: 'Không có đơn nào chờ duyệt',
+      hint: 'Mọi đơn hàng (đơn trong kho và đơn xưởng in) đều đã được duyệt xử lý.',
+    };
+  }
+  if (status === 'POD_ORDERS') {
+    return {
+      title: 'Chưa có đơn xưởng in nào',
+      hint: 'Các đơn hàng in ấn theo yêu cầu (POD) do Printing Shop phụ trách sẽ hiển thị tiến độ tại đây.',
     };
   }
   if (status === 'ALL') {
@@ -182,71 +262,97 @@ export function SellerOrdersPage() {
     [detail, pendingAction, filter, load, showToast]
   );
 
+  const handleQuickApprove = useCallback(
+    async (order: SellerOrder, e: React.MouseEvent) => {
+      e.stopPropagation();
+      const isPod = Boolean(order.isPod || order.orderType === 'POD' || order.items.some(it => it.designFileUrl));
+      try {
+        showToast(`Đang duyệt đơn #${order.orderCode}...`, 'info');
+        if (isPod) {
+          const res = await sellerOrdersService.dispatchToPrinter(order.orderCode);
+          showToast(res.message || 'Đã duyệt đơn và chuyển sang xưởng in!', 'success');
+        } else {
+          const res = await sellerOrdersService.approveOrder(order.orderCode);
+          showToast(res.message || 'Đã duyệt đơn hàng thành công!', 'success');
+        }
+        void load(filter, true);
+      } catch (err: any) {
+        showToast(getApiErrorMessage(err, 'Lỗi khi duyệt đơn.'), 'error');
+      }
+    },
+    [filter, load, showToast]
+  );
+
   const searching = Boolean(filter.search.trim());
   const empty = emptyCopy(filter.status, searching);
 
   return (
     <div className="mx-auto w-full max-w-[1600px]">
-      {/* Header Section */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <h1 className="m-0 text-2xl font-extrabold tracking-tight text-stone-900 font-jakarta">Đơn hàng</h1>
-          <p className="mb-0 mt-1.5 max-w-[64ch] text-[13.5px] leading-relaxed text-stone-500">
+          <h1 className="m-0 font-jakarta text-[26px] font-bold tracking-tight text-stone-900">Đơn hàng</h1>
+          <p className="mb-0 mt-1.5 text-[13.5px] leading-relaxed text-stone-500">
             {todoCount > 0
-              ? `${fmtCount(todoCount)} đơn đang chờ bạn xử lý — nhận sản xuất, đóng gói rồi bàn giao cho GHN / GHTK.`
+              ? `${fmtCount(todoCount)} đơn cần xử lý: nhận sản xuất, đóng gói và bàn giao vận chuyển.`
               : 'Không còn đơn nào chờ xử lý. Đơn mới sẽ hiện ngay tại đây.'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void load(filter, true)}
-          disabled={refreshing || loading}
-          className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2 text-[13.5px] font-semibold text-stone-600 transition-colors duration-150 hover:bg-stone-50 disabled:pointer-events-none disabled:opacity-55 motion-reduce:transition-none"
-        >
-          <RefreshCw
-            size={15}
-            className={refreshing ? 'animate-spin motion-reduce:animate-none' : undefined}
-            aria-hidden
-          />
-          Làm mới
-        </button>
-      </div>
+        <div className="flex items-center gap-3">
+          {loadedAt && !loading && (
+            <span className="hidden text-[12px] text-stone-500 sm:inline">Cập nhật {timeAgo(loadedAt)}</span>
+          )}
+          <button
+            type="button"
+            onClick={() => void load(filter, true)}
+            disabled={refreshing || loading}
+            className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-3.5 text-[13px] font-semibold text-stone-700 transition duration-150 hover:bg-stone-50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-55 motion-reduce:transition-none"
+          >
+            <RefreshCw
+              size={15}
+              className={refreshing ? 'animate-spin motion-reduce:animate-none' : undefined}
+              aria-hidden
+            />
+            Làm mới
+          </button>
+        </div>
+      </header>
 
-      {/* Overview Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          loading={loading}
-          label="Chờ xử lý"
-          accent={todoCount > 0 ? STATUS_META.ORDERED.dot : undefined}
-          value={fmtCount(todoCount)}
-          hint={`${fmtCount(data.counts.ORDERED)} đơn mới · ${fmtCount(data.counts.PROCESSING)} đang sản xuất`}
-        />
-        <StatCard
-          loading={loading}
-          label="Đang giao"
-          accent={STATUS_META.SHIPPING.dot}
-          value={fmtCount(data.counts.SHIPPING)}
-          hint="đã bàn giao, chờ khách nhận"
-        />
-        <StatCard
-          loading={loading}
-          label="Tiền đang treo"
-          value={compactMoney(data.revenue.pending)}
-          hint={`${money(data.revenue.pending)} — đơn chưa giao xong`}
-        />
-        <StatCard
-          loading={loading}
-          label="Tiền đã chốt"
-          accent={STATUS_META.DELIVERED.dot}
-          value={compactMoney(data.revenue.settled)}
-          hint={`${fmtCount(data.counts.DELIVERED)} đơn đã giao thành công`}
-        />
-      </div>
+      <KpiStrip
+        loading={loading}
+        activeFilter={filter.status}
+        onFilter={status => setFilter(f => ({ ...f, status, page: 1 }))}
+        items={[
+          {
+            label: 'Chờ xử lý',
+            value: fmtCount(todoCount),
+            hint: `${fmtCount(data.counts.ORDERED)} đơn mới, ${fmtCount(data.counts.PROCESSING)} đang sản xuất`,
+            filter: 'TODO',
+            urgent: todoCount > 0,
+          },
+          {
+            label: 'Đang giao',
+            value: fmtCount(data.counts.SHIPPING),
+            hint: 'Đã bàn giao, chờ khách nhận',
+            filter: 'SHIPPING',
+          },
+          {
+            label: 'Tiền đang treo',
+            value: compactMoney(data.revenue.pending),
+            hint: `${money(data.revenue.pending)} ở các đơn chưa giao xong`,
+          },
+          {
+            label: 'Tiền đã chốt',
+            value: compactMoney(data.revenue.settled),
+            hint: `${fmtCount(data.counts.DELIVERED)} đơn đã giao thành công`,
+            filter: 'DELIVERED',
+          },
+        ]}
+      />
 
       {error && (
         <div
           role="alert"
-          className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] font-medium text-amber-900"
+          className="mt-4 flex items-start gap-2.5 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] font-medium text-amber-900"
         >
           <AlertTriangle size={16} className="mt-px shrink-0" aria-hidden />
           <span>{error}</span>
@@ -254,9 +360,9 @@ export function SellerOrdersPage() {
       )}
 
       {/* Orders Filter & Table Section */}
-      <section className="mt-4 flex flex-col rounded-2xl border border-stone-200 bg-white shadow-sm">
+      <section className="mt-5 flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-[0_1px_2px_rgba(41,37,36,0.04)]">
         {/* Status Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-4 pt-2">
+        <div className="border-b border-stone-100 px-2">
           <StatusTabs
             value={filter.status}
             tabs={tabs}
@@ -266,14 +372,14 @@ export function SellerOrdersPage() {
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-4 py-3">
-          <label className="relative min-w-0 flex-1 sm:max-w-xs">
+          <label className="relative min-w-0 flex-1 sm:max-w-sm">
             <span className="sr-only">Tìm đơn hàng</span>
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden />
             <input
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
-              placeholder="Mã đơn, tên khách, SĐT, mã vận đơn…"
-              className="w-full rounded-xl border border-stone-200 bg-white py-2 pl-9 pr-8 text-[13px] text-stone-900 outline-none transition-colors duration-150 placeholder:text-stone-400 focus:border-[#007700] motion-reduce:transition-none"
+              placeholder="Tìm mã đơn, tên khách, SĐT, mã vận đơn"
+              className="h-9 w-full rounded-lg border border-stone-200 bg-white pl-9 pr-8 text-[13px] text-stone-900 outline-none transition-colors duration-150 placeholder:text-stone-500 focus:border-[#007700] focus:ring-2 focus:ring-[#007700]/15 motion-reduce:transition-none"
             />
             {searchInput && (
               <button
@@ -287,33 +393,29 @@ export function SellerOrdersPage() {
             )}
           </label>
 
-          <div className="flex items-center gap-3">
-            {loadedAt && !loading && (
-              <span className="hidden text-xs text-stone-500 sm:inline">Số liệu lúc {timeAgo(loadedAt)}</span>
-            )}
-            <label className="flex items-center gap-1.5 text-[12.5px] text-stone-500">
-              Sắp xếp
-              <select
-                value={filter.sort}
-                onChange={e => setFilter(f => ({ ...f, sort: e.target.value as SellerOrderSort, page: 1 }))}
-                className="cursor-pointer rounded-lg border border-stone-200 bg-white py-1.5 pl-2 pr-1 text-[12.5px] font-semibold text-stone-700 outline-none focus:border-[#007700]"
-              >
-                {SORT_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="flex items-center gap-2 text-[12.5px] text-stone-500">
+            Sắp xếp
+            <select
+              value={filter.sort}
+              onChange={e => setFilter(f => ({ ...f, sort: e.target.value as SellerOrderSort, page: 1 }))}
+              className="h-9 cursor-pointer rounded-lg border border-stone-200 bg-white pl-2.5 pr-1.5 text-[13px] font-medium text-stone-800 outline-none focus:border-[#007700] focus:ring-2 focus:ring-[#007700]/15"
+            >
+              {SORT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {/* Orders Table */}
-        <div className={refreshing ? 'opacity-60 transition-opacity duration-200' : undefined}>
+        <div className={`transition-opacity duration-200 motion-reduce:transition-none ${refreshing ? 'opacity-60' : ''}`}>
           <OrdersTable
             orders={data.items}
             loading={loading}
             onOpen={order => void openDetail(order)}
+            onQuickApprove={handleQuickApprove}
             emptyTitle={empty.title}
             emptyHint={empty.hint}
           />
@@ -339,6 +441,7 @@ export function SellerOrdersPage() {
           setPendingAction(null);
         }}
         onAction={setPendingAction}
+        onRefresh={() => void load(filter, true)}
       />
 
       {/* Update Status Modal */}
