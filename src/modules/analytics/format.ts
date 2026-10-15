@@ -56,6 +56,8 @@ export const RANGE_OPTIONS = [
   { value: '7d', label: '7 ngày' },
   { value: '30d', label: '30 ngày' },
   { value: '90d', label: '90 ngày' },
+  { value: '180d', label: '6 tháng' },
+  { value: '365d', label: '1 năm' },
 ] as const;
 
 /** Nhãn BR-182: >= 80 tốt · 50-79 cần cải thiện · < 50 kém. */
