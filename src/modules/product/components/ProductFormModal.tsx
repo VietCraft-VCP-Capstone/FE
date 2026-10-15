@@ -4,6 +4,7 @@ import { ProductItem, ProductFormData, CatalogOption } from '../types/product';
 import { productsService } from '../services/productsService';
 import { ProductFormImageManager } from './ProductFormImageManager';
 import { ProductFormColorManager } from './ProductFormColorManager';
+import { ProductFormSizeManager } from './ProductFormSizeManager';
 import { commissionAmount, netFromGross, withCommission } from '../../../shared/utils/commission';
 import { money } from '../../../shared/utils/format';
 import {
@@ -13,8 +14,20 @@ import {
   List,
   ListOrdered,
   Link as LinkIcon,
-  Minus
+  Minus,
+  Sparkles
 } from 'lucide-react';
+import SmartProductAiModal from '../../seller/components/SmartProductAiModal';
+
+export const isApparelCategory = (categoryName?: string): boolean => {
+  if (!categoryName) return false;
+  const lower = categoryName.toLowerCase();
+  const keywords = [
+    'áo', 'quần', 'hoodie', 't-shirt', 'tshirt', 'polo', 'tank top', 'shirt', 
+    'thời trang', 'váy', 'đầm', 'khoác', 'jacket', 'jean', 'quần áo', 'trang phục', 'apparel', 'fashion'
+  ];
+  return keywords.some(k => lower.includes(k));
+};
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -38,6 +51,7 @@ export function ProductFormModal({
   const [tags, setTags] = useState<CatalogOption[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
   const [formData, setFormData] = useState<ProductFormData>({
     title: '',
@@ -53,7 +67,8 @@ export function ProductFormModal({
     description: '',
     thumbnail: '',
     images: [],
-    colors: [{ name: 'Gỗ sồi tự nhiên', hex: '#5C4033' }]
+    colors: [{ name: 'Gỗ sồi tự nhiên', hex: '#5C4033' }],
+    sizes: []
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -104,7 +119,10 @@ export function ProductFormModal({
         description: product.description || '',
         thumbnail: activeThumb,
         images: orderedImages,
-        colors: product.colors && product.colors.length > 0 ? product.colors : []
+        colors: product.colors && product.colors.length > 0 ? product.colors : [],
+        sizes: product.sizes && product.sizes.length > 0 
+          ? product.sizes 
+          : Array.from(new Set((product.variants || []).map(v => v.size).filter(Boolean))) as string[]
       });
     } else {
       setFormData({
@@ -124,7 +142,8 @@ export function ProductFormModal({
         colors: [
           { name: 'Đen', hex: '#1C1C1C' },
           { name: 'Trắng', hex: '#FFFFFF' }
-        ]
+        ],
+        sizes: []
       });
     }
     setErrors({});
@@ -254,9 +273,19 @@ export function ProductFormModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Title */}
             <div className="md:col-span-2 space-y-1.5">
-              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
-                Tên sản phẩm <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
+                  Tên sản phẩm <span className="text-rose-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsAiModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer"
+                >
+                  <Sparkles size={13} className="text-amber-300 animate-pulse" />
+                  <span>✨ AI Gợi ý tên, giá & tag hot</span>
+                </button>
+              </div>
               <input
                 type="text"
                 placeholder="VD: Bình gốm Bát Tràng men rạn cổ..."
@@ -281,7 +310,16 @@ export function ProductFormModal({
                   const id = e.target.value;
                   // Giữ luôn tên để bảng/drawer hiển thị được ngay, không phải chờ tải lại.
                   const picked = categories.find((c) => c._id === id);
-                  setFormData({ ...formData, categoryId: id, category: picked?.name || '' });
+                  const catName = picked?.name || '';
+                  const nextIsApparel = isApparelCategory(catName);
+                  setFormData((prev) => ({
+                    ...prev,
+                    categoryId: id,
+                    category: catName,
+                    sizes: (nextIsApparel && (!prev.sizes || prev.sizes.length === 0))
+                      ? ['S', 'M', 'L', 'XL']
+                      : prev.sizes
+                  }));
                 }}
                 className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] cursor-pointer font-medium disabled:opacity-60 disabled:cursor-not-allowed ${
                   errors.category ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
@@ -338,9 +376,19 @@ export function ProductFormModal({
 
             {/* Price */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
-                Giá bán (VNĐ) <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
+                  Giá bán (VNĐ) <span className="text-rose-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsAiModalOpen(true)}
+                  className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline cursor-pointer"
+                >
+                  <Sparkles size={11} className="text-amber-500" />
+                  <span>Khảo sát giá AI</span>
+                </button>
+              </div>
               <input
                 type="number"
                 min="0"
@@ -438,6 +486,13 @@ export function ProductFormModal({
             onChangeColors={(colors) => setFormData({ ...formData, colors })}
           />
 
+          {/* Section 3.5: Size Variants for Apparel/Clothing */}
+          <ProductFormSizeManager
+            sizes={formData.sizes || []}
+            onChangeSizes={(sizes) => setFormData({ ...formData, sizes })}
+            isApparel={isApparelCategory(formData.category)}
+          />
+
           {/* Section 4: Description */}
           <div className="space-y-2 pt-2 border-t border-stone-100">
             <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
@@ -527,6 +582,45 @@ export function ProductFormModal({
             {isEdit ? 'Lưu thay đổi' : 'Tạo sản phẩm'}
           </button>
         </div>
+
+        {/* Modal Gợi Ý Thông Minh AI */}
+        <SmartProductAiModal
+          isOpen={isAiModalOpen}
+          onClose={() => setIsAiModalOpen(false)}
+          categories={categories}
+          initialCategory={formData.categoryId}
+          initialTitle={formData.title}
+          isPod={false}
+          onApplyTitle={(newTitle) => setFormData(prev => ({ ...prev, title: newTitle }))}
+          onApplyPrice={(newPrice) => setFormData(prev => ({ ...prev, price: newPrice }))}
+          onApplyDescription={(newDesc) => setFormData(prev => ({ ...prev, description: newDesc }))}
+          onApplyTags={(tagNames) => {
+            const matchedIds = tags
+              .filter(t => tagNames.some(tn => tn.toLowerCase().includes(t.name.toLowerCase()) || t.name.toLowerCase().includes(tn.toLowerCase())))
+              .map(t => t._id);
+            if (matchedIds.length > 0) {
+              setFormData(prev => ({
+                ...prev,
+                tagIds: Array.from(new Set([...prev.tagIds, ...matchedIds]))
+              }));
+            }
+          }}
+          onApplyAll={(aiData) => {
+            setFormData(prev => {
+              const matchedIds = tags
+                .filter(t => (aiData.tags || []).some(tn => tn.toLowerCase().includes(t.name.toLowerCase()) || t.name.toLowerCase().includes(tn.toLowerCase())))
+                .map(t => t._id);
+              return {
+                ...prev,
+                title: aiData.title || prev.title,
+                price: aiData.price > 0 ? aiData.price : prev.price,
+                description: aiData.description || prev.description,
+                categoryId: aiData.categoryId || prev.categoryId,
+                tagIds: matchedIds.length > 0 ? Array.from(new Set([...prev.tagIds, ...matchedIds])) : prev.tagIds,
+              };
+            });
+          }}
+        />
       </div>
     </ModalOverlay>
   );

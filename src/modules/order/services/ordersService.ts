@@ -28,6 +28,8 @@ export interface OrderResponse {
   items: OrderItemResponse[];
   totalAmount: number;
   shippingFee?: number;
+  discount?: number;
+  couponCode?: string | null;
   status: 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled';
   paymentGateway: 'vnpay' | 'payos' | 'cod';
   paymentMethod?: string;

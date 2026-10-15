@@ -42,7 +42,47 @@ export const analyticsApi = {
     const res = await api.delete(`${BASE}/competitor-tracking`, { data: { shop_id: shopId } });
     return res.data;
   },
+
+  async getSmartProductSuggestion(params: {
+    category_id?: string;
+    category_name?: string;
+    product_type?: string;
+    keywords?: string;
+    blank_cost?: number;
+  }, signal?: AbortSignal) {
+    const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
+    return res.data?.data;
+  },
 };
+
+export interface SmartProductSuggestionResult {
+  category_detected: string;
+  product_type: string;
+  noun: string;
+  suggested_titles: string[];
+  pricing_insight: {
+    recommended_price: number;
+    recommended_markup: number;
+    price_range: {
+      low: number;
+      median: number;
+      high: number;
+      premium: number;
+    };
+    market_sample_count: number;
+    summary: string;
+  };
+  trending_keywords: Array<{
+    keyword: string;
+    growth: string;
+    demand_index: number;
+    gap_score: number;
+    is_hot: boolean;
+    tag_id?: string;
+  }>;
+  suggested_tags: string[];
+  seo_description: string;
+}
 
 /** Câu thông báo cho các mã lỗi riêng của khu phân tích (400 do AI trả về theo hợp đồng). */
 export function analyticsErrorMessage(err: any, fallback = 'Không thực hiện được, vui lòng thử lại.'): string {
