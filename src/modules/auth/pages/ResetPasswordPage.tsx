@@ -1,62 +1,133 @@
-import React, { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Loader2, AlertCircle, Eye, EyeOff, Check } from 'lucide-react';
 import { authService } from '../services/authService';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+
+function isValidEmail(e: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
 
 export const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  const initialEmail = ((location.state as any)?.email || '').trim() as string;
+
+  const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    code?: string;
+    newPassword?: string;
+    confirmPassword?: string;
+  }>({});
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const sanitizedEmail = useMemo(() => email.trim().toLowerCase(), [email]);
   const sanitizedCode = useMemo(() => code.trim(), [code]);
 
-  const handleSubmit = React.useCallback(async (e: React.FormEvent) => {
+  const handleEmailChange = (val: string) => {
+    setEmail(val);
+    if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: undefined }));
+    if (error) setError(null);
+  };
+
+  const handleCodeChange = (val: string) => {
+    const clean = val.replace(/\D/g, '');
+    setCode(clean);
+    if (fieldErrors.code) setFieldErrors(prev => ({ ...prev, code: undefined }));
+    if (error) setError(null);
+  };
+
+  const handleNewPasswordChange = (val: string) => {
+    setNewPassword(val);
+    if (fieldErrors.newPassword) setFieldErrors(prev => ({ ...prev, newPassword: undefined }));
+    if (fieldErrors.confirmPassword && confirmPassword && val === confirmPassword) {
+      setFieldErrors(prev => ({ ...prev, confirmPassword: undefined }));
+    }
+    if (error) setError(null);
+  };
+
+  const handleConfirmPasswordChange = (val: string) => {
+    setConfirmPassword(val);
+    if (fieldErrors.confirmPassword) setFieldErrors(prev => ({ ...prev, confirmPassword: undefined }));
+    if (error) setError(null);
+  };
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!sanitizedEmail || !sanitizedCode || !newPassword || !confirmPassword) {
-      setError('Vui lòng điền đầy đủ tất cả các trường.');
-      return;
+    const errors: {
+      email?: string;
+      code?: string;
+      newPassword?: string;
+      confirmPassword?: string;
+    } = {};
+
+    if (!sanitizedEmail) {
+      errors.email = 'Vui lòng nhập địa chỉ email.';
+    } else if (!isValidEmail(sanitizedEmail)) {
+      errors.email = 'Email không đúng định dạng (ví dụ: name@example.com).';
     }
-    if (sanitizedCode.length !== 6) {
-      setError('Mã OTP phải có đúng 6 chữ số.');
-      return;
+
+    if (!sanitizedCode) {
+      errors.code = 'Vui lòng nhập mã OTP xác thực.';
+    } else if (sanitizedCode.length !== 6) {
+      errors.code = 'Mã OTP phải có đúng 6 chữ số.';
     }
-    if (newPassword.length < 8) {
-      setError('Mật khẩu mới phải có ít nhất 8 ký tự.');
-      return;
+
+    if (!newPassword) {
+      errors.newPassword = 'Vui lòng nhập mật khẩu mới.';
+    } else if (newPassword.length < 8) {
+      errors.newPassword = 'Mật khẩu mới phải có ít nhất 8 ký tự.';
     }
-    if (newPassword !== confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.');
+
+    if (!confirmPassword) {
+      errors.confirmPassword = 'Vui lòng xác nhận mật khẩu mới.';
+    } else if (newPassword !== confirmPassword) {
+      errors.confirmPassword = 'Mật khẩu xác nhận không khớp.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Vui lòng kiểm tra lại các trường thông tin bên dưới.');
       return;
     }
 
+    setFieldErrors({});
     setLoading(true);
+
     try {
       await authService.resetPassword({ email: sanitizedEmail, code: sanitizedCode, newPassword });
       setSuccess(true);
       setTimeout(() => {
-        navigate('/login');
+        navigate('/login', { replace: true });
       }, 2500);
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Mã OTP không hợp lệ hoặc đã hết hạn.');
+      setError(getApiErrorMessage(err, 'Mã OTP không chính xác hoặc đã hết hạn.'));
       setLoading(false);
     }
-  }, [email, code, newPassword, confirmPassword, navigate]);
+  }, [sanitizedEmail, sanitizedCode, newPassword, confirmPassword, navigate]);
 
-  const pill: React.CSSProperties = {
-    width: '100%', border: '1.5px solid #e2e0dd', borderRadius: 50,
-    padding: '10px 18px', fontSize: 15, boxSizing: 'border-box', outline: 'none',
-    background: '#fff', color: '#1c1917',
-  };
+  const getInputStyle = (hasError?: boolean): React.CSSProperties => ({
+    width: '100%',
+    border: `1.5px solid ${hasError ? '#ef4444' : '#e2e0dd'}`,
+    borderRadius: 50,
+    padding: '10px 18px',
+    fontSize: 15,
+    boxSizing: 'border-box',
+    outline: 'none',
+    background: '#fff',
+    color: '#1c1917',
+    transition: 'border-color 0.2s',
+  });
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -106,50 +177,99 @@ export const ResetPasswordPage: React.FC = () => {
 
           <h1 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Đặt lại mật khẩu</h1>
           <p style={{ fontSize: 14, color: '#78716c', margin: '0 0 12px' }}>
-            Điền mã OTP đã gửi đến email và thiết lập mật khẩu mới của bạn.
+            Điền mã OTP đã gửi đến email và thiết lập mật khẩu mới cho tài khoản của bạn.
           </p>
 
           <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Email</label>
-              <input type="email" placeholder="nhapemail@example.com" value={email} onChange={e => setEmail(e.target.value)} disabled={loading}
-                style={pill} />
+              <label htmlFor="rp-email" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 3 }}>Email</label>
+              <input
+                id="rp-email"
+                type="email"
+                placeholder="nhapemail@example.com"
+                value={email}
+                onChange={e => handleEmailChange(e.target.value)}
+                disabled={loading}
+                style={getInputStyle(!!fieldErrors.email)}
+              />
+              {fieldErrors.email && (
+                <p style={{ color: '#dc2626', fontSize: 13, margin: '4px 0 0 12px' }}>{fieldErrors.email}</p>
+              )}
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Mã OTP (6 số)</label>
-              <input type="text" placeholder="------" maxLength={6} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} disabled={loading}
-                style={{ ...pill, letterSpacing: 2, textAlign: 'center', fontWeight: 'bold' }} />
+              <label htmlFor="rp-code" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 3 }}>Mã OTP (6 số)</label>
+              <input
+                id="rp-code"
+                type="text"
+                placeholder="------"
+                maxLength={6}
+                value={code}
+                onChange={e => handleCodeChange(e.target.value)}
+                disabled={loading}
+                style={{ ...getInputStyle(!!fieldErrors.code), letterSpacing: 4, textAlign: 'center', fontWeight: 'bold' }}
+              />
+              {fieldErrors.code && (
+                <p style={{ color: '#dc2626', fontSize: 13, margin: '4px 0 0 12px' }}>{fieldErrors.code}</p>
+              )}
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Mật khẩu mới</label>
+              <label htmlFor="rp-npw" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 3 }}>Mật khẩu mới</label>
               <div style={{ position: 'relative' }}>
-                <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={newPassword} onChange={e => setNewPassword(e.target.value)} disabled={loading}
-                  style={{ ...pill, paddingRight: 55 }} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', padding: 4, display: 'flex' }}>
+                <input
+                  id="rp-npw"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="•••••••• (tối thiểu 8 ký tự)"
+                  value={newPassword}
+                  onChange={e => handleNewPasswordChange(e.target.value)}
+                  disabled={loading}
+                  style={{ ...getInputStyle(!!fieldErrors.newPassword), paddingRight: 55 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', padding: 4, display: 'flex' }}
+                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {fieldErrors.newPassword && (
+                <p style={{ color: '#dc2626', fontSize: 13, margin: '4px 0 0 12px' }}>{fieldErrors.newPassword}</p>
+              )}
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Xác nhận mật khẩu</label>
+              <label htmlFor="rp-cpw" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 3 }}>Xác nhận mật khẩu mới</label>
               <div style={{ position: 'relative' }}>
-                <input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} disabled={loading}
-                  style={{ ...pill, paddingRight: 55 }} />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', padding: 4, display: 'flex' }}>
+                <input
+                  id="rp-cpw"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={e => handleConfirmPasswordChange(e.target.value)}
+                  disabled={loading}
+                  style={{ ...getInputStyle(!!fieldErrors.confirmPassword), paddingRight: 55 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#a8a29e', padding: 4, display: 'flex' }}
+                  aria-label={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                >
                   {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {fieldErrors.confirmPassword && (
+                <p style={{ color: '#dc2626', fontSize: 13, margin: '4px 0 0 12px' }}>{fieldErrors.confirmPassword}</p>
+              )}
             </div>
 
             {error && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px' }}>
-                <AlertCircle size={17} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 15, color: '#dc2626' }}>{error}</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px', marginTop: 2 }}>
+                <AlertCircle size={18} style={{ color: '#ef4444', flexShrink: 0, marginTop: 2 }} />
+                <span style={{ fontSize: 14, color: '#dc2626', lineHeight: 1.45 }}>{error}</span>
               </div>
             )}
 
@@ -157,20 +277,20 @@ export const ResetPasswordPage: React.FC = () => {
               style={{
                 background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '12px', fontSize: 16, fontWeight: 700,
                 cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '8px 0 0'
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '6px 0 0'
               }}>
               {loading && <Loader2 size={18} className="animate-spin" />}
-              {loading ? 'Đang cập nhật...' : 'Đặt lại mật khẩu'}
+              {loading ? 'Đang cập nhật mật khẩu...' : 'Đặt lại mật khẩu'}
             </button>
           </form>
 
-          <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 12 }}>
+          <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 14 }}>
             Hủy và quay lại{' '}<Link to="/login" style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng nhập</Link>
           </p>
         </div>
       </div>
     </div>
   );
-}
+};
 
-
+export default ResetPasswordPage;
