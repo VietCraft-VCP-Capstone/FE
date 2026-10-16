@@ -7,7 +7,7 @@ const api = axios.create({
     }
 });
 
-const PUBLIC_AUTH_ROUTE = /\/auth\/(login|signup|verify-otp|resend-otp|google|forgot-password|reset-password)\/?$/;
+const PUBLIC_AUTH_ROUTE = /\/auth\/(login|signup|verify-otp|resend-otp|google|forgot-password|reset-password)(\?.*)?$/;
 function readToken(): string | null {
     const token = localStorage.getItem('token');
     if (!token || token === 'undefined' || token === 'null') return null;
@@ -22,10 +22,22 @@ export function getApiErrorMessage(err: any, fallback = 'Đã có lỗi xảy ra
     const data = err?.response?.data;
     // Lỗi validate của BE: { error: 'Dữ liệu không hợp lệ', errors: [...] } — lý do thật nằm trong errors.
     const details = Array.isArray(data?.errors) ? data.errors.filter((e: unknown) => typeof e === 'string' && e) : [];
-    if (details.length) return `${typeof data.error === 'string' && data.error ? data.error + ': ' : ''}${details.join('; ')}`;
+    if (details.length) {
+        if (details.length === 1 && details[0] === data?.error) return details[0];
+        return details.join('; ');
+    }
     if (data && typeof data.error === 'string' && data.error) return data.error;
     if (data && typeof data.message === 'string' && data.message) return data.message;
     if (typeof data === 'string' && data) return data;
+    if (err?.code === 'ERR_NETWORK' || err?.message?.includes('Network Error')) {
+        return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền mạng hoặc thử lại sau ít phút.';
+    }
+    if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+        return 'Thời gian chờ phản hồi từ máy chủ đã quá hạn. Vui lòng thử lại.';
+    }
+    if (err?.message && typeof err.message === 'string' && !err.message.includes('[object')) {
+        return err.message;
+    }
     return fallback;
 }
 
@@ -45,7 +57,7 @@ api.interceptors.response.use(
         if (error.response?.status === 401 && !PUBLIC_AUTH_ROUTE.test(url)) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            if (window.location.pathname !== '/login') {
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
                 window.location.href = '/login';
             }
         }
