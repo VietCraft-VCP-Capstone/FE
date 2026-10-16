@@ -49,8 +49,14 @@ export const INITIAL_SELLER_SETTINGS: SellerSettingsState = {
         estimatedTime: '2 - 3 ngày'
       }
     ],
-    useFlatRate: false,
-    flatRateFee: 0
+    pricingType: 'FLAT_RATE',
+    useFlatRate: true,
+    flatRateFee: 0,
+    zoneRates: {
+      intraProvince: 22000,
+      intraRegion: 30000,
+      interRegion: 38000
+    }
   },
   payment: {
     bankAccounts: [],
