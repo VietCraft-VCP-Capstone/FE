@@ -104,8 +104,47 @@ export function BuyerCheckoutPage() {
         fetchAddress();
     }, [authed]);
 
+    const [shippingFee, setShippingFee] = useState<number>(30000);
+    const [shippingDetails, setShippingDetails] = useState<{
+        zoneLabel: string;
+        shopProvince?: string;
+        pricingType?: string;
+    }>({ zoneLabel: 'Tiêu chuẩn' });
+    const [loadingShipping, setLoadingShipping] = useState<boolean>(false);
+
+    const currentShopId = items[0]?.shopId || (items[0] as any)?.shop_id;
+
+    useEffect(() => {
+        if (!currentShopId) return;
+
+        let isCancelled = false;
+        setLoadingShipping(true);
+
+        ordersService.calculateShipping({
+            shopId: String(currentShopId),
+            address: recipientAddress || {}
+        }).then((res) => {
+            if (isCancelled) return;
+            if (typeof res?.shippingFee === 'number') {
+                setShippingFee(res.shippingFee);
+                setShippingDetails({
+                    zoneLabel: res.zoneLabel || 'Tiêu chuẩn',
+                    shopProvince: res.shopProvince,
+                    pricingType: res.pricingType
+                });
+            }
+        }).catch((err) => {
+            console.warn('Lỗi tính phí vận chuyển từ server, dùng mặc định:', err);
+        }).finally(() => {
+            if (!isCancelled) setLoadingShipping(false);
+        });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [currentShopId, recipientAddress]);
+
     const subtotal = items.reduce((acc, it) => acc + (it.price * it.quantity), 0);
-    const shippingFee = 30000;
     const shippingDiscount = appliedCouponInfo?.target === 'SHIPPING' ? Math.min(discount, shippingFee) : 0;
     const productDiscount = appliedCouponInfo?.target === 'PRODUCT' ? discount : 0;
     const finalTotal = Math.max(0, subtotal - productDiscount + shippingFee - shippingDiscount);
@@ -121,7 +160,6 @@ export function BuyerCheckoutPage() {
     const loadAvailableCoupons = useCallback(async () => {
         setLoadingCoupons(true);
         try {
-            const currentShopId = items[0]?.shopId || (items[0] as any)?.shop_id;
             const data = await promotionService.getAvailableCoupons({
                 shopId: currentShopId ? String(currentShopId) : undefined,
                 productId: items[0]?.productId,
@@ -159,7 +197,6 @@ export function BuyerCheckoutPage() {
 
         setApplyingCoupon(true);
         try {
-            const currentShopId = items[0]?.shopId || (items[0] as any)?.shop_id;
             const res = await promotionService.applyCoupon({
                 code: targetCode,
                 subtotal,
@@ -351,10 +388,17 @@ export function BuyerCheckoutPage() {
 
                         {recipientAddress ? (
                             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 text-xs space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-bold text-gray-900">{recipientAddress.recipient_name}</span>
-                                    <span className="text-gray-400">|</span>
-                                    <span className="text-gray-600 font-medium">{recipientAddress.phone}</span>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-gray-900">{recipientAddress.recipient_name}</span>
+                                        <span className="text-gray-400">|</span>
+                                        <span className="text-gray-600 font-medium">{recipientAddress.phone}</span>
+                                    </div>
+                                    {shippingDetails.zoneLabel && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                            <Truck size={11} /> {loadingShipping ? 'Đang tính...' : shippingDetails.zoneLabel}
+                                        </span>
+                                    )}
                                 </div>
                                 <p className="text-gray-600 leading-relaxed">{recipientAddress.address_detail}</p>
                             </div>
@@ -593,9 +637,22 @@ export function BuyerCheckoutPage() {
                                 <span>Tiền hàng</span>
                                 <span className="text-gray-950 font-semibold">{subtotal.toLocaleString('vi-VN')}đ</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span>Phí vận chuyển</span>
-                                <span className="text-gray-950 font-semibold">{shippingFee.toLocaleString('vi-VN')}đ</span>
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-1.5">
+                                    <span>Phí vận chuyển</span>
+                                    {shippingDetails.zoneLabel && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            {loadingShipping ? 'Đang tính...' : shippingDetails.zoneLabel}
+                                        </span>
+                                    )}
+                                </div>
+                                <span className="text-gray-950 font-semibold">
+                                    {shippingFee === 0 ? (
+                                        <span className="text-emerald-600 font-bold">Miễn phí</span>
+                                    ) : (
+                                        `${shippingFee.toLocaleString('vi-VN')}đ`
+                                    )}
+                                </span>
                             </div>
                             {couponApplied && discount > 0 && (
                                 <div className="flex justify-between items-center text-emerald-600 font-bold animate-fade-in bg-emerald-50/70 border border-emerald-100 px-2.5 py-1.5 rounded-xl">

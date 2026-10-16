@@ -8,6 +8,7 @@ import { analyticsApi, SmartProductSuggestionResult } from '../../analytics/serv
 export interface SmartProductAiModalProps {
   isOpen: boolean;
   onClose: () => void;
+  mode?: 'modal' | 'inline';
   categories?: any[];
   initialCategory?: string;
   initialTitle?: string;
@@ -31,6 +32,7 @@ export interface SmartProductAiModalProps {
 export function SmartProductAiModal({
   isOpen,
   onClose,
+  mode = 'modal',
   categories = [],
   initialCategory = '',
   initialTitle = '',
@@ -92,10 +94,20 @@ export function SmartProductAiModal({
     }
   }, [selectedCategory, keywordIdea, blankCost, categories]);
 
+  // Lược bỏ các phần hậu tố (- ...) nếu mở lại từ một tiêu đề đã gợi ý trước đó
+  const extractCoreTopic = (rawTitle: string): string => {
+    if (!rawTitle) return '';
+    let t = rawTitle.trim();
+    for (const sep of [' - ', ' – ', ' — ', ' | ', ' / ']) {
+      if (t.includes(sep)) t = t.split(sep)[0].trim();
+    }
+    return t.replace(/\(.*?\)/g, '').trim();
+  };
+
   useEffect(() => {
     if (isOpen) {
       setSelectedCategory(initialCategory);
-      setKeywordIdea(initialTitle);
+      setKeywordIdea(extractCoreTopic(initialTitle));
       fetchSuggestion();
     }
   }, [isOpen]);
@@ -139,39 +151,42 @@ export function SmartProductAiModal({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-fade-in font-sans">
-      <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh] my-auto">
-        
-        {/* Header với Gradient nổi bật */}
-        <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 p-5 sm:p-6 text-white relative">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
-                <Sparkles className="text-amber-300 animate-pulse" size={22} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-black tracking-tight text-white flex items-center gap-1.5">
-                    VietCraft AI Studio
-                  </h3>
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-stone-950 px-2 py-0.5 rounded-full shadow-xs">
-                    Market Intelligence
-                  </span>
-                </div>
-                <p className="text-xs text-emerald-100 font-medium mt-0.5">
-                  Gợi ý Tên chuẩn SEO, Giá bán tối ưu & Từ khóa Hot từ 5.000+ đối thủ TMĐT
-                </p>
-              </div>
+  const cardContent = (
+    <div className={`bg-white overflow-hidden flex flex-col font-sans ${
+      mode === 'inline'
+        ? 'rounded-2xl border-2 border-emerald-500/40 shadow-sm w-full animate-fade-in'
+        : 'rounded-3xl max-w-3xl w-full shadow-2xl border border-stone-200 max-h-[92vh] my-auto'
+    }`}>
+      {/* Header với Gradient nổi bật */}
+      <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 p-4 sm:p-5 text-white relative">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
+              <Sparkles className="text-amber-300 animate-pulse" size={20} />
             </div>
-
-            <button
-              onClick={onClose}
-              className="p-1.5 text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              <X size={20} />
-            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black tracking-tight text-white flex items-center gap-1.5">
+                  VietCraft AI Studio
+                </h3>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-stone-950 px-2 py-0.5 rounded-full shadow-xs">
+                  Market Intelligence
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-100 font-medium mt-0.5">
+                Gợi ý Tên chuẩn SEO, Giá bán tối ưu & Từ khóa Hot từ 5.000+ đối thủ TMĐT
+              </p>
+            </div>
           </div>
+
+          <button
+            onClick={onClose}
+            title={mode === 'inline' ? 'Thu gọn trợ lý' : 'Đóng'}
+            className="p-1.5 text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
           {/* Quick Search & Filter Toolbar */}
           <div className="mt-4 pt-3.5 border-t border-white/15 grid grid-cols-1 sm:grid-cols-12 gap-2.5">
@@ -213,8 +228,10 @@ export function SmartProductAiModal({
           </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 bg-stone-50/50">
+        {/* Modal/Inline Body */}
+        <div className={`overflow-y-auto p-4 sm:p-5 space-y-5 bg-stone-50/50 ${
+          mode === 'inline' ? 'max-h-[460px]' : 'flex-1'
+        }`}>
           {loading ? (
             <div className="py-16 text-center space-y-3">
               <div className="w-12 h-12 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
@@ -439,28 +456,37 @@ export function SmartProductAiModal({
         </div>
 
         {/* Modal Footer / Action Bar */}
-        <div className="p-4 sm:p-5 bg-white border-t border-stone-200 flex items-center justify-between gap-3">
+        <div className="p-3.5 sm:p-4 bg-white border-t border-stone-200 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 text-xs font-bold text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition cursor-pointer"
+            className="px-4 py-2 text-xs font-bold text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition cursor-pointer"
           >
-            Đóng
+            {mode === 'inline' ? 'Thu gọn trợ lý' : 'Đóng'}
           </button>
 
           <button
             type="button"
             onClick={handleApplyAllChanges}
             disabled={!data || loading}
-            className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <Sparkles size={15} className="text-amber-300" />
-            <span>Áp Dụng Tất Cả Vào Sản Phẩm</span>
-            <ArrowRight size={14} />
+            <Sparkles size={14} className="text-amber-300" />
+            <span>Áp Dụng Tất Cả Vào Form</span>
+            <ArrowRight size={13} />
           </button>
         </div>
 
       </div>
+  );
+
+  if (mode === 'inline') {
+    return cardContent;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-fade-in font-sans">
+      {cardContent}
     </div>
   );
 }

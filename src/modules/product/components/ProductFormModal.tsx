@@ -4,7 +4,11 @@ import { ProductItem, ProductFormData, CatalogOption } from '../types/product';
 import { productsService } from '../services/productsService';
 import { ProductFormImageManager } from './ProductFormImageManager';
 import { ProductFormColorManager } from './ProductFormColorManager';
-import { ProductFormSizeManager } from './ProductFormSizeManager';
+import {
+  ApparelSizeManager,
+  ShoeSizeManager,
+  GeneralSizeManager,
+} from './ProductFormSizeManager';
 import { commissionAmount, netFromGross, withCommission } from '../../../shared/utils/commission';
 import { money } from '../../../shared/utils/format';
 import {
@@ -19,14 +23,35 @@ import {
 } from 'lucide-react';
 import SmartProductAiModal from '../../seller/components/SmartProductAiModal';
 
-export const isApparelCategory = (categoryName?: string): boolean => {
-  if (!categoryName) return false;
-  const lower = categoryName.toLowerCase();
-  const keywords = [
-    'áo', 'quần', 'hoodie', 't-shirt', 'tshirt', 'polo', 'tank top', 'shirt', 
-    'thời trang', 'váy', 'đầm', 'khoác', 'jacket', 'jean', 'quần áo', 'trang phục', 'apparel', 'fashion'
+export type CategoryVariantType = 'apparel' | 'shoes' | 'general';
+
+export const getCategoryVariantType = (categoryName?: string, title?: string, location?: string): CategoryVariantType => {
+  const text = `${categoryName || ''} ${title || ''} ${location || ''}`.toLowerCase();
+  
+  // 1. Giày dép & Thể thao
+  const shoeKeywords = [
+    'giày', 'giay', 'dép', 'dep', 'guốc', 'guoc', 'sneaker', 'sandal', 'sandals', 
+    'boot', 'boots', 'loafer', 'footwear', 'đá bóng', 'da bong', 'đá banh', 'da banh'
   ];
-  return keywords.some(k => lower.includes(k));
+  if (shoeKeywords.some(k => text.includes(k))) {
+    return 'shoes';
+  }
+
+  // 2. May mặc / Thời trang
+  const apparelKeywords = [
+    'áo', 'ao', 'quần', 'quan', 'hoodie', 't-shirt', 'tshirt', 'polo', 'tank top', 'shirt', 
+    'thời trang', 'váy', 'vay', 'đầm', 'dam', 'khoác', 'jacket', 'jean', 'quần áo', 'trang phục', 'apparel', 'fashion'
+  ];
+  if (apparelKeywords.some(k => text.includes(k))) {
+    return 'apparel';
+  }
+
+  // 3. Đồ thủ công mỹ nghệ, decor, gốm sứ, đồ gỗ, phụ kiện...
+  return 'general';
+};
+
+export const isApparelCategory = (categoryName?: string): boolean => {
+  return getCategoryVariantType(categoryName) === 'apparel';
 };
 
 interface ProductFormModalProps {
@@ -279,13 +304,62 @@ export function ProductFormModal({
                 </label>
                 <button
                   type="button"
-                  onClick={() => setIsAiModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer"
+                  onClick={() => setIsAiModalOpen(prev => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition active:scale-95 cursor-pointer ${
+                    isAiModalOpen
+                      ? 'bg-emerald-800 text-white ring-2 ring-emerald-500'
+                      : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white'
+                  }`}
                 >
                   <Sparkles size={13} className="text-amber-300 animate-pulse" />
-                  <span>✨ AI Gợi ý tên, giá & tag hot</span>
+                  <span>{isAiModalOpen ? '✕ Thu gọn trợ lý AI' : '✨ AI Gợi ý tên, giá & tag hot'}</span>
                 </button>
               </div>
+
+              {/* Trợ lý AI hiển thị trực tiếp (Inline Assistant) - Không mở modal đè lên modal */}
+              {isAiModalOpen && (
+                <div className="pt-1 pb-1">
+                  <SmartProductAiModal
+                    mode="inline"
+                    isOpen={isAiModalOpen}
+                    onClose={() => setIsAiModalOpen(false)}
+                    categories={categories}
+                    initialCategory={formData.categoryId}
+                    initialTitle={formData.title}
+                    isPod={false}
+                    onApplyTitle={(newTitle) => setFormData(prev => ({ ...prev, title: newTitle }))}
+                    onApplyPrice={(newPrice) => setFormData(prev => ({ ...prev, price: newPrice }))}
+                    onApplyDescription={(newDesc) => setFormData(prev => ({ ...prev, description: newDesc }))}
+                    onApplyTags={(tagNames) => {
+                      const matchedIds = tags
+                        .filter(t => tagNames.some(tn => tn.toLowerCase().includes(t.name.toLowerCase()) || t.name.toLowerCase().includes(tn.toLowerCase())))
+                        .map(t => t._id);
+                      if (matchedIds.length > 0) {
+                        setFormData(prev => ({
+                          ...prev,
+                          tagIds: Array.from(new Set([...prev.tagIds, ...matchedIds]))
+                        }));
+                      }
+                    }}
+                    onApplyAll={(aiData) => {
+                      setFormData(prev => {
+                        const matchedIds = tags
+                          .filter(t => (aiData.tags || []).some(tn => tn.toLowerCase().includes(t.name.toLowerCase()) || t.name.toLowerCase().includes(tn.toLowerCase())))
+                          .map(t => t._id);
+                        return {
+                          ...prev,
+                          title: aiData.title || prev.title,
+                          price: aiData.price > 0 ? aiData.price : prev.price,
+                          description: aiData.description || prev.description,
+                          categoryId: aiData.categoryId || prev.categoryId,
+                          tagIds: matchedIds.length > 0 ? Array.from(new Set([...prev.tagIds, ...matchedIds])) : prev.tagIds,
+                        };
+                      });
+                      setIsAiModalOpen(false);
+                    }}
+                  />
+                </div>
+              )}
               <input
                 type="text"
                 placeholder="VD: Bình gốm Bát Tràng men rạn cổ..."
@@ -311,15 +385,28 @@ export function ProductFormModal({
                   // Giữ luôn tên để bảng/drawer hiển thị được ngay, không phải chờ tải lại.
                   const picked = categories.find((c) => c._id === id);
                   const catName = picked?.name || '';
-                  const nextIsApparel = isApparelCategory(catName);
-                  setFormData((prev) => ({
-                    ...prev,
-                    categoryId: id,
-                    category: catName,
-                    sizes: (nextIsApparel && (!prev.sizes || prev.sizes.length === 0))
-                      ? ['S', 'M', 'L', 'XL']
-                      : prev.sizes
-                  }));
+                  setFormData((prev) => {
+                    const nextCatType = getCategoryVariantType(catName, prev.title, prev.location);
+                    let nextSizes = prev.sizes || [];
+
+                    if (nextSizes.length === 0) {
+                      if (nextCatType === 'apparel') nextSizes = ['S', 'M', 'L', 'XL'];
+                      else if (nextCatType === 'shoes') nextSizes = ['39', '40', '41', '42'];
+                    } else if (nextCatType === 'shoes' && nextSizes.some(s => ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'Freesize'].includes(s))) {
+                      // Chuyển sang Giày dép: tự động đổi sang size số
+                      nextSizes = ['39', '40', '41', '42'];
+                    } else if (nextCatType === 'apparel' && nextSizes.every(s => /^\d{2}$/.test(s))) {
+                      // Chuyển sang May mặc: tự động đổi sang size chữ
+                      nextSizes = ['S', 'M', 'L', 'XL'];
+                    }
+
+                    return {
+                      ...prev,
+                      categoryId: id,
+                      category: catName,
+                      sizes: nextSizes
+                    };
+                  });
                 }}
                 className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] cursor-pointer font-medium disabled:opacity-60 disabled:cursor-not-allowed ${
                   errors.category ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
@@ -486,12 +573,33 @@ export function ProductFormModal({
             onChangeColors={(colors) => setFormData({ ...formData, colors })}
           />
 
-          {/* Section 3.5: Size Variants for Apparel/Clothing */}
-          <ProductFormSizeManager
-            sizes={formData.sizes || []}
-            onChangeSizes={(sizes) => setFormData({ ...formData, sizes })}
-            isApparel={isApparelCategory(formData.category)}
-          />
+          {/* Section 3.5: Kích hoạt 1 trong 3 Component kích thước tương ứng theo Danh mục đã chọn */}
+          {(() => {
+            const activeCategoryType = getCategoryVariantType(formData.category, formData.title, formData.location);
+            if (activeCategoryType === 'shoes') {
+              return (
+                <ShoeSizeManager
+                  sizes={formData.sizes || []}
+                  onChangeSizes={(sizes) => setFormData({ ...formData, sizes })}
+                />
+              );
+            }
+            if (activeCategoryType === 'apparel') {
+              return (
+                <ApparelSizeManager
+                  sizes={formData.sizes || []}
+                  onChangeSizes={(sizes) => setFormData({ ...formData, sizes })}
+                />
+              );
+            }
+            return (
+              <GeneralSizeManager
+                sizes={formData.sizes || []}
+                onChangeSizes={(sizes) => setFormData({ ...formData, sizes })}
+                categoryName={formData.category}
+              />
+            );
+          })()}
 
           {/* Section 4: Description */}
           <div className="space-y-2 pt-2 border-t border-stone-100">
@@ -583,44 +691,6 @@ export function ProductFormModal({
           </button>
         </div>
 
-        {/* Modal Gợi Ý Thông Minh AI */}
-        <SmartProductAiModal
-          isOpen={isAiModalOpen}
-          onClose={() => setIsAiModalOpen(false)}
-          categories={categories}
-          initialCategory={formData.categoryId}
-          initialTitle={formData.title}
-          isPod={false}
-          onApplyTitle={(newTitle) => setFormData(prev => ({ ...prev, title: newTitle }))}
-          onApplyPrice={(newPrice) => setFormData(prev => ({ ...prev, price: newPrice }))}
-          onApplyDescription={(newDesc) => setFormData(prev => ({ ...prev, description: newDesc }))}
-          onApplyTags={(tagNames) => {
-            const matchedIds = tags
-              .filter(t => tagNames.some(tn => tn.toLowerCase().includes(t.name.toLowerCase()) || t.name.toLowerCase().includes(tn.toLowerCase())))
-              .map(t => t._id);
-            if (matchedIds.length > 0) {
-              setFormData(prev => ({
-                ...prev,
-                tagIds: Array.from(new Set([...prev.tagIds, ...matchedIds]))
-              }));
-            }
-          }}
-          onApplyAll={(aiData) => {
-            setFormData(prev => {
-              const matchedIds = tags
-                .filter(t => (aiData.tags || []).some(tn => tn.toLowerCase().includes(t.name.toLowerCase()) || t.name.toLowerCase().includes(tn.toLowerCase())))
-                .map(t => t._id);
-              return {
-                ...prev,
-                title: aiData.title || prev.title,
-                price: aiData.price > 0 ? aiData.price : prev.price,
-                description: aiData.description || prev.description,
-                categoryId: aiData.categoryId || prev.categoryId,
-                tagIds: matchedIds.length > 0 ? Array.from(new Set([...prev.tagIds, ...matchedIds])) : prev.tagIds,
-              };
-            });
-          }}
-        />
       </div>
     </ModalOverlay>
   );

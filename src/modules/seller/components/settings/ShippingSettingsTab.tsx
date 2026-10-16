@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SellerShippingSettings, ShippingCarrierItem, ZoneShippingRates, ShippingPricingType } from '../../types/settings';
+import { AddressSelector, VietnamAddressValue } from '../../../../shared/components/AddressSelector';
 import {
   Truck,
   MapPin,
@@ -37,20 +38,7 @@ const DEFAULT_CARRIERS: ShippingCarrierItem[] = [
   }
 ];
 
-const VIETNAM_PROVINCES = [
-  'Thành phố Hà Nội',
-  'Thành phố Hồ Chí Minh',
-  'Thành phố Đà Nẵng',
-  'Thành phố Hải Phòng',
-  'Thành phố Cần Thơ',
-  'Tỉnh Quảng Nam',
-  'Tỉnh Hải Dương',
-  'Tỉnh Thừa Thiên Huế',
-  'Tỉnh Thanh Hóa',
-  'Tỉnh Bắc Ninh',
-  'Tỉnh Ninh Bình',
-  'Tỉnh Lâm Đồng'
-];
+
 
 const DEFAULT_ZONE_RATES: ZoneShippingRates = {
   intraProvince: 22000,
@@ -90,6 +78,17 @@ export function ShippingSettingsTab({ initialData, onSave, loading = false }: Sh
       zoneRates: initialData?.zoneRates || DEFAULT_ZONE_RATES
     };
   });
+
+  const handleAddressChange = (addr: VietnamAddressValue) => {
+    setFormData(prev => ({
+      ...prev,
+      province: addr.province,
+      district: addr.district,
+      ward: addr.ward,
+      specificAddress: addr.specificAddress
+    }));
+  };
+
 
   useEffect(() => {
     if (initialData) {
@@ -194,70 +193,21 @@ export function ShippingSettingsTab({ initialData, onSave, loading = false }: Sh
               />
             </div>
           </div>
-
-          {/* Province */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
-              Tỉnh / Thành phố <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={formData.province}
-              onChange={e => setFormData({ ...formData, province: e.target.value })}
-              className="w-full px-4 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] cursor-pointer"
-              required
-            >
-              <option value="">Chọn Tỉnh / Thành phố</option>
-              {VIETNAM_PROVINCES.map(prov => (
-                <option key={prov} value={prov}>{prov}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* District */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
-              Quận / Huyện <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.district}
-              onChange={e => setFormData({ ...formData, district: e.target.value })}
-              placeholder="VD: Huyện Gia Lâm, Quận Hoàn Kiếm..."
-              className="w-full px-4 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700]"
-              required
-            />
-          </div>
-
-          {/* Ward */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
-              Phường / Xã <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.ward}
-              onChange={e => setFormData({ ...formData, ward: e.target.value })}
-              placeholder="VD: Xã Bát Tràng, Phường Hàng Gai..."
-              className="w-full px-4 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700]"
-              required
-            />
-          </div>
-
-          {/* Specific Address */}
-          <div className="space-y-1.5 md:col-span-2">
-            <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
-              Địa chỉ chi tiết (Số nhà, tên ngõ/đường) <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.specificAddress}
-              onChange={e => setFormData({ ...formData, specificAddress: e.target.value })}
-              placeholder="VD: Số 88 Đường Giang Cao, Thôn 2..."
-              className="w-full px-4 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700]"
-              required
-            />
-          </div>
         </div>
+
+        {/* Reusable Vietnam Address Selector (Open-API.vn & OpenStreetMap Nominatim) */}
+        <AddressSelector
+          value={{
+            province: formData.province,
+            district: formData.district,
+            ward: formData.ward,
+            specificAddress: formData.specificAddress,
+          }}
+          onChange={handleAddressChange}
+          showQuickSearch={true}
+          showSpecificAddress={true}
+          required={true}
+        />
       </div>
 
       {/* Section 2: Shipping Carriers Integration */}

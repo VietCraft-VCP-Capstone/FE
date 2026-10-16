@@ -56,6 +56,17 @@ export interface OrderResponse {
 }
 
 export const ordersService = {
+  calculateShipping: async (payload: { shopId?: string; address?: any }): Promise<{
+    shippingFee: number;
+    pricingType: 'FLAT_RATE' | 'ZONE_BASED';
+    zoneType: 'intraProvince' | 'intraRegion' | 'interRegion' | 'flatRate';
+    zoneLabel: string;
+    shopProvince: string;
+    destProvince: string;
+  }> => {
+    const res = await api.post('/orders/calculate-shipping', payload);
+    return res.data;
+  },
   create: async (orderData: any): Promise<OrderResponse> => {
     const res = await api.post('/orders', orderData);
     return res.data;
