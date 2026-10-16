@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Heart, ShoppingCart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { cartService } from '../../order/services/cartService';
 
 interface LandingHeaderProps {
@@ -48,6 +48,16 @@ export function LandingHeader({
     };
   }, []);
 
+  const navigate = useNavigate();
+
+  const handleExecuteSearch = () => {
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      navigate('/search');
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-100 px-6 py-4">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -73,12 +83,21 @@ export function LandingHeader({
 
         {/* Search Bar */}
         <div className="flex-1 max-w-lg relative group">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#007700] transition-colors" />
+          <Search
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#007700] transition-colors cursor-pointer"
+            onClick={handleExecuteSearch}
+          />
           <input
             type="text"
             placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleExecuteSearch();
+              }
+            }}
             className="w-full bg-stone-50 border border-stone-200 focus:border-[#007700] focus:bg-white rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none transition-all shadow-inner"
           />
         </div>

@@ -1,5 +1,12 @@
 import api from '../../../infrastructure/api/interceptors';
-import { ProductItem, ProductFormData, ProductFilterState, PaginatedProductsResult } from '../types/product';
+import {
+  ProductItem,
+  ProductFormData,
+  ProductFilterState,
+  PaginatedProductsResult,
+  SearchFilterState,
+  SuggestResult
+} from '../types/product';
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
 const absImg = (u: any) => (typeof u === 'string' && u.startsWith('/') ? ORIGIN + u : u);
@@ -43,6 +50,26 @@ export const productsService = {
     } catch (err) {
       console.error('Error fetching products from API:', err);
       return { items: [], total: 0, page: 1, limit: 6, totalPages: 1 };
+    }
+  },
+
+  search: async (params?: Partial<SearchFilterState>): Promise<PaginatedProductsResult> => {
+    try {
+      const res = await api.get('/products/search', { params });
+      return toPaginated(res.data);
+    } catch (err) {
+      console.error('Error searching products from API:', err);
+      return { items: [], total: 0, page: 1, limit: 12, totalPages: 1 };
+    }
+  },
+
+  suggest: async (q: string, signal?: AbortSignal): Promise<SuggestResult> => {
+    try {
+      if (!q || !q.trim()) return { products: [], shops: [], categories: [] };
+      const res = await api.get('/products/suggest', { params: { q: q.trim() }, signal });
+      return res.data || { products: [], shops: [], categories: [] };
+    } catch (err: any) {
+      return { products: [], shops: [], categories: [] };
     }
   },
 

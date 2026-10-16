@@ -5,6 +5,7 @@ export interface SeoMetaProps {
   description?: string;
   ogImage?: string;
   schema?: Record<string, unknown>;
+  noindex?: boolean;
 }
 
 /**
@@ -12,8 +13,9 @@ export interface SeoMetaProps {
  * - Cập nhật document.title và meta[name="description"]
  * - Cập nhật OpenGraph tag cho chia sẻ mạng xã hội
  * - Nhúng Schema.org Structured Data (JSON-LD) cho Google Rich Results
+ * - Cung cấp noindex cho các trang tìm kiếm nội bộ tránh trùng lặp nội dung
  */
-export function SeoMeta({ title, description, ogImage, schema }: SeoMetaProps) {
+export function SeoMeta({ title, description, ogImage, schema, noindex }: SeoMetaProps) {
   useEffect(() => {
     const prevTitle = document.title;
 
@@ -53,6 +55,20 @@ export function SeoMeta({ title, description, ogImage, schema }: SeoMetaProps) {
       document.head.appendChild(scriptTag);
     }
 
+    // 5. Cập nhật Meta Robots noindex khi được yêu cầu (cho trang search)
+    let robotsTag: HTMLMetaElement | null = null;
+    let createdRobots = false;
+    if (noindex) {
+      robotsTag = document.querySelector('meta[name="robots"]');
+      if (!robotsTag) {
+        robotsTag = document.createElement('meta');
+        robotsTag.setAttribute('name', 'robots');
+        document.head.appendChild(robotsTag);
+        createdRobots = true;
+      }
+      robotsTag.setAttribute('content', 'noindex, follow');
+    }
+
     return () => {
       if (prevTitle) {
         document.title = prevTitle;
@@ -60,8 +76,11 @@ export function SeoMeta({ title, description, ogImage, schema }: SeoMetaProps) {
       if (scriptTag && document.head.contains(scriptTag)) {
         document.head.removeChild(scriptTag);
       }
+      if (createdRobots && robotsTag && document.head.contains(robotsTag)) {
+        document.head.removeChild(robotsTag);
+      }
     };
-  }, [title, description, ogImage, schema]);
+  }, [title, description, ogImage, schema, noindex]);
 
   return null;
 }

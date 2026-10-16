@@ -390,12 +390,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
     });
   }, [shopList, allProducts]);
 
-  const searchedProducts = allProducts.filter((p: any) =>
-    (p.title || p.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.category || '').toLowerCase().includes(search.toLowerCase())
-  );
-
-  const displayProducts = searchedProducts;
+  const displayProducts = allProducts;
   const itemsPerPage = 8;
   const totalPages = Math.ceil(displayProducts.length / itemsPerPage);
   const paginatedProducts = displayProducts.slice(

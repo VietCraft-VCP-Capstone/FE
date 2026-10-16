@@ -48,6 +48,10 @@ export interface ProductItem {
     rating: number;
   };
   sellerId?: string;
+  rating?: number;
+  ratingCount?: number;
+  productType?: string;
+  soldCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -104,3 +108,44 @@ export interface PaginatedProductsResult {
   limit: number;
   totalPages: number;
 }
+
+export interface SearchFilterState {
+  q?: string;
+  category?: string;
+  productType?: string;
+  craftType?: string;
+  location?: string;
+  rating?: number | string;
+  minPrice?: number | string;
+  maxPrice?: number | string;
+  sort?: string;
+  page?: number;
+  limit?: number;
+  pageSize?: number;
+  inStockOnly?: boolean;
+}
+
+export interface SuggestResult {
+  products: Array<{
+    id: string;
+    title: string;
+    thumbnail: string;
+    price: number;
+    average_rating: number;
+    slug?: string;
+  }>;
+  shops: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string;
+    reputationScore: number;
+    reputationTier: string;
+  }>;
+  categories: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
+}
+
