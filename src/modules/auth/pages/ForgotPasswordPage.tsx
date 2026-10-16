@@ -2,36 +2,66 @@ import React, { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { authService } from '../services/authService';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+
+function isValidEmail(e: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
+  const [fieldError, setFieldError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleEmailChange = (val: string) => {
+    setEmail(val);
+    if (fieldError) setFieldError(undefined);
+    if (error) setError('');
+  };
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
     const sanitizedEmail = email.trim();
     if (!sanitizedEmail) {
-      setError('Vui lòng nhập email.');
+      setFieldError('Vui lòng nhập địa chỉ email.');
+      setError('Vui lòng nhập email để tiếp tục.');
       return;
     }
+
+    if (!isValidEmail(sanitizedEmail)) {
+      setFieldError('Email không đúng định dạng (ví dụ: name@example.com).');
+      setError('Địa chỉ email không hợp lệ.');
+      return;
+    }
+
+    setFieldError(undefined);
     setLoading(true);
+
     try {
       await authService.forgotPassword(sanitizedEmail);
       navigate('/reset-password', { state: { email: sanitizedEmail } });
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Có lỗi xảy ra. Vui lòng thử lại sau.');
+      setError(getApiErrorMessage(err, 'Không thể gửi mã đặt lại mật khẩu. Vui lòng thử lại sau.'));
     } finally {
       setLoading(false);
     }
   }, [email, navigate]);
 
   const pill: React.CSSProperties = {
-    width: '100%', border: '1.5px solid #e2e0dd', borderRadius: 50,
-    padding: '10px 18px', fontSize: 15, boxSizing: 'border-box', outline: 'none',
-    background: '#fff', color: '#1c1917',
+    width: '100%',
+    border: `1.5px solid ${fieldError ? '#ef4444' : '#e2e0dd'}`,
+    borderRadius: 50,
+    padding: '10px 18px',
+    fontSize: 15,
+    boxSizing: 'border-box',
+    outline: 'none',
+    background: '#fff',
+    color: '#1c1917',
+    transition: 'border-color 0.2s',
   };
 
   return (
@@ -57,21 +87,31 @@ export function ForgotPasswordPage() {
           </div>
 
           <h1 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Quên mật khẩu?</h1>
-          <p style={{ fontSize: 14, color: '#78716c', margin: '0 0 12px' }}>
-            Nhập email tài khoản của bạn để nhận mã xác thực OTP đặt lại mật khẩu.
+          <p style={{ fontSize: 14, color: '#78716c', margin: '0 0 14px' }}>
+            Nhập địa chỉ email tài khoản của bạn để nhận mã OTP xác thực đặt lại mật khẩu mới.
           </p>
 
-          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 2 }}>Email</label>
-              <input type="email" placeholder="nhapemail@example.com" value={email} onChange={e => setEmail(e.target.value)} disabled={loading}
-                style={pill} />
+              <label htmlFor="fp-email" style={{ display: 'block', fontSize: 15, fontWeight: 600, color: '#44403c', marginBottom: 4 }}>Email</label>
+              <input
+                id="fp-email"
+                type="email"
+                placeholder="nhapemail@example.com"
+                value={email}
+                onChange={e => handleEmailChange(e.target.value)}
+                disabled={loading}
+                style={pill}
+              />
+              {fieldError && (
+                <p style={{ color: '#dc2626', fontSize: 13, margin: '4px 0 0 12px' }}>{fieldError}</p>
+              )}
             </div>
 
             {error && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px' }}>
-                <AlertCircle size={17} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 15, color: '#dc2626' }}>{error}</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px' }}>
+                <AlertCircle size={18} style={{ color: '#ef4444', flexShrink: 0, marginTop: 2 }} />
+                <span style={{ fontSize: 14, color: '#dc2626', lineHeight: 1.45 }}>{error}</span>
               </div>
             )}
 
@@ -79,15 +119,15 @@ export function ForgotPasswordPage() {
               style={{
                 background: '#007700', color: '#fff', border: 'none', borderRadius: 50, padding: '12px', fontSize: 16, fontWeight: 700,
                 cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '8px 0 0'
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, margin: '6px 0 0'
               }}>
               {loading && <Loader2 size={18} className="animate-spin" />}
-              {loading ? 'Đang gửi...' : 'Gửi mã xác thực'}
+              {loading ? 'Đang gửi mã xác thực...' : 'Gửi mã xác thực OTP'}
             </button>
           </form>
 
-          <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 12 }}>
-            Quay lại{' '}<Link to="/login" style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng nhập</Link>
+          <p style={{ textAlign: 'center', fontSize: 15, color: '#78716c', marginTop: 16 }}>
+            Nhớ mật khẩu?{' '}<Link to="/login" style={{ color: '#007700', fontWeight: 700, textDecoration: 'none' }}>Đăng nhập ngay</Link>
           </p>
         </div>
       </div>
