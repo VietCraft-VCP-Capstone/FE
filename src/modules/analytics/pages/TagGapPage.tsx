@@ -1,5 +1,5 @@
 /**
- * F34 — Từ khoá nên thêm. Đọc GET /seller/analytics/tag-gap (tham số categoryId).
+ * F34 — Gợi ý từ khoá. Đọc GET /seller/analytics/tag-gap (tham số categoryId).
  *
  * Người bán mới cần biết "nên thêm từ khoá nào", không cần "lift" hay "tag đủ mạnh". Khi
  * chưa có tín hiệu thì nói bình tĩnh là chưa cần thêm, thay vì đặt khung cảnh báo lên đầu
@@ -30,7 +30,7 @@ export function TagGapPage() {
   };
 
   return (
-    <InsightPage title="Từ khoá nên thêm" question="Shop bán chạy cùng danh mục hay gắn từ khoá (tag) nào mà tôi chưa có?">
+    <InsightPage title="Gợi ý từ khoá" question="Shop bán chạy cùng danh mục hay gắn từ khoá (tag) nào mà tôi chưa có?">
       <InsightBlock state={state} onRetry={reload}>
         {(data, meta) => {
           const trusted = data.signal.has_signal;
@@ -45,7 +45,7 @@ export function TagGapPage() {
                 action={
                   trusted && goi
                     ? <Link to="/seller/products" className={ACTION_CLASS}>Thêm từ khoá cho sản phẩm</Link>
-                    : <Link to="/seller/insights/benchmark" className={ACTION_CLASS}>Xem tôi mạnh, yếu ở đâu</Link>
+                    : <Link to="/seller/insights/benchmark" className={ACTION_CLASS}>Xem điểm mạnh & điểm yếu</Link>
                 }
               >
                 {trusted && goi ? (
@@ -67,7 +67,7 @@ export function TagGapPage() {
               <InsightCard
                 title="Từ khoá shop bán chạy hay dùng"
                 description={`Lấy từ ${count(data.competitors_scanned)} sản phẩm bán chạy nhất của shop khác. Dấu ✓ là bạn đã có, dấu + là bạn chưa có.`}
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 action={
                   <SelectField
                     label="Danh mục"
@@ -102,7 +102,7 @@ export function TagGapPage() {
                 <InsightCard
                   title={trusted ? 'Từ khoá nên cân nhắc thêm' : 'Từ khoá tham khảo (chưa đủ chắc chắn)'}
                   description="Từ khoá nhóm bán chạy dùng nhiều hơn hẳn phần còn lại của danh mục, mà shop bạn chưa có."
-                  bodyClassName="px-5 py-4"
+                  bodyClassName="px-4 py-3"
                 >
                   <DataTable
                     caption={`Từ khoá của nhóm bán chạy trong ${catName} mà shop chưa dùng`}

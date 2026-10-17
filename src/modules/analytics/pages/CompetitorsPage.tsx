@@ -1,5 +1,5 @@
 /**
- * F32 · Ai đang bán chạy — GET /seller/analytics/competitors?categoryId=
+ * F32 · Đối thủ bán chạy — GET /seller/analytics/competitors?categoryId=
  *
  * Trả lời: "Trong danh mục của tôi, ai đang bán chạy và tôi đứng ở đâu?" Viết cho người bán
  * mới: kết luận một câu trước, số liệu sau, và một việc làm ngay (theo dõi shop bán chạy nhất).
@@ -104,8 +104,7 @@ export function CompetitorsPage() {
   const urlCategory = params.get('categoryId') || '';
   const { state, reload } = useInsight<Competitors>('/competitors', { categoryId: urlCategory || undefined });
 
-  // Không truyền categoryId thì service tự chọn danh mục chính và trả về trong category_id.
-  // Nhớ lại giá trị đó để ô chọn không bị trống và không phải gọi lại API lần hai.
+  // Service tự chọn danh mục chính khi không truyền categoryId; nhớ lại để ô chọn không trống.
   const [resolved, setResolved] = useState<{ id: string; list: string[]; names: Record<string, string | null> } | null>(null);
   useEffect(() => {
     if (state.kind === 'ready') {
@@ -138,7 +137,7 @@ export function CompetitorsPage() {
       await analyticsApi.trackCompetitor(shopId);
       invalidateInsights('/competitor-tracking');
       tracking.reload();
-      setNotice({ tone: 'good', text: `Đã theo dõi ${shopName}. Hàng mới của shop này sẽ hiện ở mục Đối thủ đang theo dõi.` });
+      setNotice({ tone: 'good', text: `Đã theo dõi ${shopName}. Hàng mới của shop này sẽ hiện ở mục Theo dõi đối thủ.` });
     } catch (err) {
       setNotice({ tone: 'bad', text: analyticsErrorMessage(err, 'Không theo dõi được shop này.') });
     } finally {
@@ -155,7 +154,7 @@ export function CompetitorsPage() {
 
   return (
     <InsightPage
-      title="Ai đang bán chạy"
+      title="Đối thủ bán chạy"
       question="Trong danh mục của tôi, ai đang bán chạy và tôi đứng ở đâu?"
       actions={
         options.length > 0 && (
@@ -194,7 +193,7 @@ export function CompetitorsPage() {
                         {pendingShop === nextRival.shop_id ? 'Đang theo dõi...' : `Theo dõi ${nextRival.shop_name}`}
                       </button>
                     ) : canTrack ? (
-                      <Link to={`${INSIGHTS_ROOT}/tracking`} className={ACTION_CLASS}>Xem đối thủ đang theo dõi</Link>
+                      <Link to={`${INSIGHTS_ROOT}/tracking`} className={ACTION_CLASS}>Xem theo dõi đối thủ</Link>
                     ) : undefined
                   }
                 >
@@ -328,7 +327,7 @@ export function CompetitorsPage() {
                             to={`${INSIGHTS_ROOT}/tracking`}
                             className="inline-flex items-center gap-1 font-semibold text-[#007700] no-underline transition-colors duration-150 hover:text-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
                           >
-                            <Radar size={14} aria-hidden /> Đối thủ đang theo dõi
+                            <Radar size={14} aria-hidden /> Theo dõi đối thủ
                           </Link>
                           .
                         </Note>

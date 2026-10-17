@@ -172,7 +172,6 @@ export function SellerCompetitorDetailPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in font-sans">
-      {/* 1. Breadcrumbs & Back Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-stone-500">
           <button
@@ -217,9 +216,7 @@ export function SellerCompetitorDetailPage() {
         </div>
       </div>
 
-      {/* 2. Shop Hero Profile Banner & Header Card */}
       <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
-        {/* Banner */}
         <div className="h-44 sm:h-56 w-full relative bg-stone-900 overflow-hidden">
           {shop?.banner ? (
             <img src={shop.banner} alt="" className="w-full h-full object-cover" />
@@ -231,7 +228,6 @@ export function SellerCompetitorDetailPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
         </div>
 
-        {/* Floating Info Section */}
         <div className="p-6 sm:p-8 pt-0 relative">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 -mt-12 sm:-mt-14 mb-6">
             <div className="flex items-end gap-4">
@@ -263,7 +259,6 @@ export function SellerCompetitorDetailPage() {
               </div>
             </div>
 
-            {/* Quick Location & Stats */}
             {(shop?.city || shop?.province || shop?.address) && (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-500 self-start md:self-end">
                 <MapPin size={14} className="text-stone-400 shrink-0" />
@@ -274,7 +269,6 @@ export function SellerCompetitorDetailPage() {
         </div>
       </div>
 
-      {/* 3. Competitor Benchmarking KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-2xs">
           <div className="flex items-center justify-between text-stone-500 mb-2">
@@ -323,7 +317,6 @@ export function SellerCompetitorDetailPage() {
         </div>
       </div>
 
-      {/* 4. Active Vouchers Benchmark (Chiến lược ưu đãi của đối thủ) */}
       {vouchers.length > 0 && (
         <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
@@ -369,7 +362,6 @@ export function SellerCompetitorDetailPage() {
         </div>
       )}
 
-      {/* 5. Competitor Products Catalog Benchmarking */}
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -381,7 +373,6 @@ export function SellerCompetitorDetailPage() {
             </p>
           </div>
 
-          {/* Search & Sort Controls */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative min-w-[220px]">
               <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -407,7 +398,6 @@ export function SellerCompetitorDetailPage() {
           </div>
         </div>
 
-        {/* Product Grid */}
         {filteredProducts.length === 0 ? (
           <div className="py-12 text-center text-stone-400 text-xs font-semibold">
             Không tìm thấy sản phẩm nào của đối thủ khớp với từ khóa.

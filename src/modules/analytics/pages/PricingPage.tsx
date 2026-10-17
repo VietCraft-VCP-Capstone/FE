@@ -1,5 +1,5 @@
 /**
- * F35 — Giá tôi đắt hay rẻ. Đọc GET /seller/analytics/pricing (tham số productType, price, productId).
+ * F35 — So sánh giá. Đọc GET /seller/analytics/pricing (tham số productType, price, productId).
  *
  * Trang này CHỈ trả lời "giá này đứng ở đâu". Nó KHÔNG hứa "giá nào bán chạy hơn", vì
  * nhóm đã đo và chỉ 24 trên 94 loại phôi có thứ tự giá đúng theo mức bán chạy, gần bằng
@@ -65,7 +65,7 @@ export function PricingPage() {
   };
 
   return (
-    <InsightPage title="Giá tôi đắt hay rẻ" question="Giá sản phẩm của tôi đứng ở đâu so với các sản phẩm cùng loại đang bán chạy?">
+    <InsightPage title="So sánh giá" question="Giá sản phẩm của tôi đứng ở đâu so với các sản phẩm cùng loại đang bán chạy?">
       <InsightBlock state={state} onRetry={reload}>
         {(data, meta) => {
           const d = data.distribution;
@@ -101,7 +101,7 @@ export function PricingPage() {
                 <InsightCard
                   title="Chọn một sản phẩm của bạn"
                   description="Giá lấy từ sản phẩm bạn đang bán. Loại sản phẩm do hệ thống đoán từ tên, đổi lại được ở khối bên dưới nếu chưa đúng."
-                  bodyClassName="px-5 py-4"
+                  bodyClassName="px-4 py-3"
                 >
                   <ul className="m-0 grid list-none grid-cols-1 gap-2 p-0 md:grid-cols-2">
                     {mine.map(p => {
@@ -259,7 +259,7 @@ export function PricingPage() {
                 </div>
               </InsightCard>
 
-              <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+              <section className="rounded-md border border-stone-200 bg-white p-5">
                 <div className="flex items-start gap-3">
                   <Info size={18} className="mt-0.5 shrink-0 text-stone-500" aria-hidden />
                   <div className="min-w-0 flex-1 space-y-2 text-[13px] leading-relaxed text-stone-600">

@@ -51,7 +51,6 @@ export function SellerFollowedCompetitorsPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-fade-in font-sans">
-      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-stone-200">
         <div>
           <div className="flex items-center gap-2">
@@ -86,7 +85,6 @@ export function SellerFollowedCompetitorsPage() {
         </div>
       </div>
 
-      {/* Overview Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
@@ -119,7 +117,6 @@ export function SellerFollowedCompetitorsPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map(n => (

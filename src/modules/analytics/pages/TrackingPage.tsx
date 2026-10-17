@@ -1,7 +1,5 @@
 /**
- * F36 — Đối thủ đang theo dõi, bản phân tích chuyên sâu (khu Vận hành /seller/competitors là bản
- * thẻ shop, có nút sang đây; cùng một danh sách follow). Thứ tự theo việc người bán mới cần: tin
- * mới nhất (hàng mới của đối thủ) -> danh sách shop -> thêm shop -> bước tiếp theo.
+ * F36 — Theo dõi đối thủ; cùng danh sách follow với khu Vận hành /seller/competitors.
  *
  * Hai chế độ, nhận ra bằng `meta.source.mode`:
  *   live       gian hàng thật. Danh sách là follow của sàn (dùng chung nút "Theo dõi" trên trang
@@ -29,15 +27,15 @@ import type { CompetitorTracking, Competitors } from '../types';
 const ROOT = '/seller/insights';
 
 const FIELD_CLASS =
-  'h-9 rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none transition-colors duration-150 hover:border-stone-300 focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20 disabled:bg-stone-50 disabled:text-stone-400 motion-reduce:transition-none';
+  'h-9 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none transition-colors duration-150 hover:border-stone-300 focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20 disabled:bg-stone-50 disabled:text-stone-400 motion-reduce:transition-none';
 
 const LINK_CLASS = 'font-semibold text-[#007700] no-underline hover:text-[#005B00]';
 
 const BUOC_TIEP: { to: string; icon: LucideIcon; title: string; say: string }[] = [
-  { to: `${ROOT}/competitors`, icon: Users, title: 'Ai đang bán chạy', say: 'Tìm thêm shop bán chạy cùng danh mục để theo dõi.' },
-  { to: `${ROOT}/benchmark`, icon: Crosshair, title: 'Tôi mạnh, yếu ở đâu', say: 'So shop bạn với 5 shop dẫn đầu theo từng tiêu chí.' },
-  { to: `${ROOT}/pricing`, icon: Target, title: 'Giá tôi đắt hay rẻ', say: 'Xem giá từng sản phẩm so với thị trường.' },
-  { to: `${ROOT}/tag-gap`, icon: Tags, title: 'Từ khoá nên thêm', say: 'Từ khoá shop bán chạy dùng mà bạn chưa có.' },
+  { to: `${ROOT}/competitors`, icon: Users, title: 'Đối thủ bán chạy', say: 'Tìm thêm shop bán chạy cùng danh mục để theo dõi.' },
+  { to: `${ROOT}/benchmark`, icon: Crosshair, title: 'Điểm mạnh & điểm yếu', say: 'So shop bạn với 5 shop dẫn đầu theo từng tiêu chí.' },
+  { to: `${ROOT}/pricing`, icon: Target, title: 'So sánh giá', say: 'Xem giá từng sản phẩm so với thị trường.' },
+  { to: `${ROOT}/tag-gap`, icon: Tags, title: 'Gợi ý từ khoá', say: 'Từ khoá shop bán chạy dùng mà bạn chưa có.' },
 ];
 
 export function TrackingPage() {
@@ -100,7 +98,7 @@ export function TrackingPage() {
   };
 
   return (
-    <InsightPage title="Đối thủ đang theo dõi" question="Đối thủ của tôi vừa ra hàng gì, và tôi nên xem gì tiếp?">
+    <InsightPage title="Theo dõi đối thủ" question="Đối thủ của tôi vừa ra hàng gì, và tôi nên xem gì tiếp?">
       <InsightBlock state={state} onRetry={reload}>
         {(data, meta) => {
           const full = data.slots_used >= data.slots_limit;
@@ -117,7 +115,7 @@ export function TrackingPage() {
                   ) : latest && live ? (
                     <Link to={`/seller/competitors/${latest.shop_id}`} className={ACTION_CLASS}>Xem shop {latest.shop_name}</Link>
                   ) : (
-                    <Link to={`${ROOT}/benchmark`} className={ACTION_CLASS}>Xem tôi mạnh, yếu ở đâu</Link>
+                    <Link to={`${ROOT}/benchmark`} className={ACTION_CLASS}>Xem điểm mạnh & điểm yếu</Link>
                   )
                 }
               >
@@ -134,14 +132,14 @@ export function TrackingPage() {
               </Takeaway>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Đang theo dõi" value={`${count(data.slots_used)} / ${count(data.slots_limit)} shop`} hint={full ? 'Đã đủ chỗ. Bỏ bớt một shop để thêm shop mới.' : undefined} />
                 </InsightCard>
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Hàng mới của đối thủ" value={`${count(data.alerts_total)} sản phẩm`} hint="Cùng nhóm hàng với bạn" />
                 </InsightCard>
                 {live && (
-                  <InsightCard bodyClassName="px-5 py-4">
+                  <InsightCard bodyClassName="px-4 py-3">
                     <MiniStat label="Shop bán chạy bạn chưa theo dõi" value={`${count(rivalOptions.length)} shop`} hint="Trong danh mục chính của bạn" />
                   </InsightCard>
                 )}
@@ -154,7 +152,7 @@ export function TrackingPage() {
                     ? `Sản phẩm các shop bạn theo dõi đăng trong 7 ngày gần nhất, cùng từ khoá hoặc danh mục với shop bạn.${data.alerts_computed_at ? ` Cập nhật ${timeAgo(data.alerts_computed_at)}.` : ''}`
                     : 'Sản phẩm có từ khoá trùng với nhóm hàng bạn đang bán.'
                 }
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 footer={<SourceFooter meta={meta} limitation={data.limitation} />}
               >
                 {data.alerts.length === 0 ? (
@@ -237,7 +235,7 @@ export function TrackingPage() {
               <InsightCard
                 title={`Shop đang theo dõi (${count(data.slots_used)}/${count(data.slots_limit)})`}
                 description={live ? 'Bấm tên shop để xem hồ sơ, sản phẩm và khuyến mãi của họ.' : 'Nhập mã shop để thêm vào danh sách. Mã có dạng shp_00042.'}
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
               >
                 <form onSubmit={add} className="mb-4 flex flex-wrap items-end gap-2">
                   <div className="flex flex-col gap-1">
@@ -274,7 +272,7 @@ export function TrackingPage() {
                   </button>
                   {live && (
                     <span className="self-center text-xs text-stone-500">
-                      Hoặc mở <Link to={`${ROOT}/competitors`} className={LINK_CLASS}>Ai đang bán chạy</Link> để chọn ở danh mục khác.
+                      Hoặc mở <Link to={`${ROOT}/competitors`} className={LINK_CLASS}>Đối thủ bán chạy</Link> để chọn ở danh mục khác.
                     </span>
                   )}
                 </form>
@@ -348,7 +346,7 @@ export function TrackingPage() {
                     <li key={b.to}>
                       <Link
                         to={b.to}
-                        className="flex h-full flex-col gap-1.5 rounded-2xl border border-stone-200 bg-white p-4 no-underline shadow-sm transition-colors duration-150 hover:border-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
+                        className="flex h-full flex-col gap-1.5 rounded-md border border-stone-200 bg-white p-4 no-underline transition-colors duration-150 hover:border-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
                       >
                         <span className="inline-flex items-center gap-2 text-[13px] font-bold text-stone-900">
                           <b.icon size={16} className="text-[#007700]" aria-hidden /> {b.title}

@@ -1,5 +1,5 @@
 /**
- * F33 — Tôi mạnh, yếu ở đâu. Đọc GET /seller/analytics/shop-comparison.
+ * F33 — Điểm mạnh & điểm yếu. Đọc GET /seller/analytics/shop-comparison.
  *
  * Người bán mới không đọc được radar 6 đường hay "điểm 0-100 min-max", nên mỗi tiêu chí là
  * một dòng: số thật của bạn, số thật trung bình 5 shop dẫn đầu, và nhận xét bằng lời. Nhận xét
@@ -38,7 +38,7 @@ const AXIS: Record<string, AxisInfo> = {
   avg_rating: { name: 'Điểm đánh giá', fmt: v => `${decimal(v, 1)} / 5`, better: 'more', tol: () => 0.1, action: { label: 'Xem lại sản phẩm', to: '/seller/products' } },
   // Service lưu ÂM để chuẩn hoá đúng chiều; ở đây luôn dùng trị tuyệt đối (phút).
   response_speed: { name: 'Thời gian trả lời khách', fmt: v => `${decimal(v, 0)} phút`, better: 'less', tol: g => Math.max(2, g * 0.15), action: { label: 'Mở tin nhắn khách hàng', to: '/seller/chat' } },
-  avg_price: { name: 'Giá trung bình', fmt: v => money(Math.round(v)), better: null, tol: g => g * 0.1, action: { label: 'Xem giá đắt hay rẻ', to: '/seller/insights/pricing' } },
+  avg_price: { name: 'Giá trung bình', fmt: v => money(Math.round(v)), better: null, tol: g => g * 0.1, action: { label: 'Xem so sánh giá', to: '/seller/insights/pricing' } },
   product_diversity: { name: 'Số loại sản phẩm', fmt: v => `${so(v)} loại`, better: 'more', tol: () => 1, action: { label: 'Đăng thêm loại sản phẩm', to: '/seller/products' } },
 };
 
@@ -60,7 +60,7 @@ export function BenchmarkPage() {
   const { state, reload } = useInsight<ShopComparison>('/shop-comparison');
 
   return (
-    <InsightPage title="Tôi mạnh, yếu ở đâu" question="So với 5 shop bán chạy nhất cùng danh mục, shop tôi hơn và kém ở điểm nào?">
+    <InsightPage title="Điểm mạnh & điểm yếu" question="So với 5 shop bán chạy nhất cùng danh mục, shop tôi hơn và kém ở điểm nào?">
       <InsightBlock state={state} onRetry={reload}>
         {(data, meta) => {
           const rows = data.axes.map((axis, i) => {
@@ -100,7 +100,7 @@ export function BenchmarkPage() {
                 action={
                   weakest?.info
                     ? <Link to={weakest.info.action.to} className={ACTION_CLASS}>{weakest.info.action.label}</Link>
-                    : <Link to="/seller/insights/pricing" className={ACTION_CLASS}>Xem giá đắt hay rẻ</Link>
+                    : <Link to="/seller/insights/pricing" className={ACTION_CLASS}>Xem so sánh giá</Link>
                 }
               >
                 {strongest && (
@@ -114,13 +114,13 @@ export function BenchmarkPage() {
               </Takeaway>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Danh mục chính của bạn" value={catName} hint={data.segment_reason} />
                 </InsightCard>
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Số shop cùng danh mục" value={`${decimal(data.shops_in_segment, 0)} shop`} hint="Kể cả shop bạn" />
                 </InsightCard>
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Đang so với" value={`${data.competitors.length} shop bán chạy nhất`} hint="Xếp theo doanh thu 90 ngày" />
                 </InsightCard>
               </div>
@@ -159,7 +159,7 @@ export function BenchmarkPage() {
                   )}
                   <Note>Giá cao hay thấp không tự nó là tốt hay xấu, nên trang chỉ ghi đắt hơn hay rẻ hơn nhóm.</Note>
                 </div>
-                <details className="mt-4 rounded-xl border border-stone-200 px-4 py-3">
+                <details className="mt-4 rounded-md border border-stone-200 px-4 py-3">
                   <summary className="cursor-pointer text-[13px] font-semibold text-stone-700">Xem biểu đồ radar của từng shop</summary>
                   <div className="mt-3">
                     <RadarCompare
@@ -174,7 +174,7 @@ export function BenchmarkPage() {
                 </details>
               </InsightCard>
 
-              <InsightCard title="5 shop đang được so" bodyClassName="px-5 py-4">
+              <InsightCard title="5 shop đang được so" bodyClassName="px-4 py-3">
                 <DataTable
                   caption="Doanh thu 90 ngày của các shop được đưa vào so sánh"
                   head={

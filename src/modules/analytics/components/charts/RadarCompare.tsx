@@ -44,8 +44,7 @@ export function RadarCompare({ axes, series, height = 320, unitHint }: {
     });
     return row;
   });
-  // Trục có shop thiếu số thì không vẽ lên radar: vẽ 0 là nói sai rằng shop đó kém nhất.
-  // Bảng bên dưới vẫn liệt kê đủ mọi trục.
+  // Trục có shop thiếu số thì không vẽ (vẽ 0 là nói sai shop đó kém nhất); bảng dưới vẫn đủ trục.
   const complete = axes.map((_, i) => series.every(s => isNumber(s.values[i])));
   const chartRows = rows.filter((_, i) => complete[i]);
   const hiddenAxes = axes.filter((_, i) => !complete[i]);
