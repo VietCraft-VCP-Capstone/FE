@@ -31,7 +31,6 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
           loading="lazy"
         />
 
-        {/* Product Type Badge */}
         <div style={{
           position: 'absolute',
           top: 8,
@@ -49,7 +48,6 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
           {isPod ? 'In theo yêu cầu' : 'Thủ công'}
         </div>
 
-        {/* Wishlist Heart Overlay */}
         <button
           type="button"
           className="fav-overlay"
@@ -62,7 +60,6 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
       </div>
 
       <div className="card-info" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px' }}>
-        {/* Shop badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#78716c', fontWeight: 600 }}>
           <Store size={12} color="#007700" />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -70,12 +67,10 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
           </span>
         </div>
 
-        {/* Product Title */}
         <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#1c1917', lineHeight: '18px' }} title={product.title}>
           {product.title}
         </h3>
 
-        {/* Rating row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 18 }}>
           {(product.ratingCount ?? 0) > 0 ? (
             <>
@@ -110,7 +105,6 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
           )}
         </div>
 
-        {/* Price Row */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 'auto', paddingTop: 4 }}>
           <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: '#007700' }}>
             {(product.price || 0).toLocaleString('vi-VN')}đ

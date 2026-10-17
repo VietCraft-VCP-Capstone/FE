@@ -48,7 +48,6 @@ export const SearchEmptyState: React.FC<SearchEmptyStateProps> = ({
           : 'Không có sản phẩm nào thỏa mãn các tiêu chí lọc hiện tại.'}
       </p>
 
-      {/* Suggested Keywords */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
         {popularKeywords.map((kw) => (
           <button

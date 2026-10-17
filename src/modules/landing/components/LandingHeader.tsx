@@ -74,7 +74,6 @@ export function LandingHeader({
           </Link>
         </nav>
 
-        {/* Search Bar with Live Suggestion Popover */}
         <div className="flex-1 max-w-lg min-w-[160px] relative group" ref={searchBox.containerRef}>
           <Search
             className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#007700] transition-colors cursor-pointer"

@@ -192,7 +192,6 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
           </a>
         </nav>
 
-        {/* Search Bar with Live Suggestion Popover */}
         <div className="buyer-search-bar" ref={searchBox.containerRef} style={{ position: 'relative' }}>
           <Search className="search-icon" size={16} style={{ cursor: 'pointer' }} onClick={() => searchBox.onExecuteSearch()} />
           <input type="text" placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..." {...searchBox.inputProps} />

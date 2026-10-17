@@ -61,7 +61,6 @@ export const SearchHeaderBanner: React.FC<SearchHeaderBannerProps> = ({
         </p>
       </div>
 
-      {/* Quick popular tags */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: '#a8a29e', display: 'flex', alignItems: 'center', gap: 4 }}>
           <Sparkles size={13} color="#eab308" /> Gợi ý:
