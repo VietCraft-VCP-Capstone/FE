@@ -11,42 +11,27 @@ export const RecentSearches: React.FC<RecentSearchesProps> = ({ onSelect }) => {
 
   if (items.length === 0) return null;
 
+  const clear = () => {
+    clearRecentSearches();
+    setItems([]);
+  };
+
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#44403c', fontSize: 13, fontWeight: 700 }}>
+    <div className="mb-4">
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[13px] font-bold text-[#44403c]">
           <History size={15} color="#78716c" />
           <span>Tìm kiếm gần đây</span>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            clearRecentSearches();
-            setItems([]);
-          }}
-          style={{ background: 'none', border: 'none', color: '#78716c', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-        >
-          Xoá
-        </button>
+        <button type="button" onClick={clear} className="cursor-pointer text-[12px] font-semibold text-[#78716c]">Xoá</button>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <div className="flex flex-wrap gap-2">
         {items.map((kw) => (
           <button
             key={kw}
             type="button"
             onClick={() => onSelect(kw)}
-            style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #e7e5e4',
-              borderRadius: 20,
-              padding: '6px 14px',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#44403c',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}
+            className="shrink-0 cursor-pointer whitespace-nowrap rounded-[20px] border border-[#e7e5e4] bg-white px-3.5 py-1.5 text-[12px] font-semibold text-[#44403c]"
           >
             {kw}
           </button>

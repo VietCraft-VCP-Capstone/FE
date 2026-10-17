@@ -115,15 +115,12 @@ export interface SearchFilterState {
   q?: string;
   category?: string;
   productType?: string;
-  craftType?: string;
-  location?: string;
   rating?: number | string;
   minPrice?: number | string;
   maxPrice?: number | string;
   sort?: string;
   page?: number;
   limit?: number;
-  pageSize?: number;
   inStockOnly?: boolean;
 }
 

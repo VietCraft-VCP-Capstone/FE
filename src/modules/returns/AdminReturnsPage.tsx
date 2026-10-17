@@ -1,41 +1,20 @@
 import { useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../../infrastructure/api/interceptors';
-import { Scale, Store, User, AlertTriangle, Sparkles } from 'lucide-react';
+import { DisputeAuditCard } from './components/DisputeAuditCard';
 import { returnService, type ReturnDetail, type ReturnRequest, type ReturnResolution, type FaultParty, type DisputeAuditProfile } from './services/returnService';
 import { canConfirmReturnRefund, canDecideReturn, canRejectReturn, returnRefundMessage } from './return-workflow-policy';
 
 const statuses = ['', 'PENDING_PRINTER', 'DISPUTED', 'AWAITING_ADMIN_REFUND', 'PRINTER_PROPOSED_FAULT_CHANGE', 'REJECTED', 'APPROVED', 'CONVERTED_TO_REFUND', 'ADMIN_REJECTED', 'COMPLETED'];
 const labels: Record<string, string> = {
-  SUBMITTED: 'Đã nộp yêu cầu',
-  PENDING_PRINTER: 'Chờ xưởng in',
-  DISPUTED: 'Đang tranh chấp',
-  AWAITING_ADMIN_REFUND: 'Chờ xác nhận hoàn tiền',
-  PRINTER_PROPOSED_FAULT_CHANGE: 'Đề xuất phân loại lỗi',
-  REJECTED: 'Bị từ chối',
-  APPROVED: 'Đã duyệt',
-  CONVERTED_TO_REFUND: 'Đã duyệt hoàn tiền',
-  ADMIN_REJECTED: 'Quản trị từ chối',
-  COMPLETED: 'Hoàn tất',
-  WAITING_BUYER_CHOICE: 'Chờ khách chọn',
-  WAITING_STOCK: 'Chờ phôi in',
-  REPLACEMENT_CREATED: 'Đã tạo đơn in bù 0đ',
-  EXPIRED: 'Đã hết hạn',
-  CANCELLED: 'Đã hủy',
-};
-
-const tierLabels: Record<string, string> = {
-  TRUSTED: 'Nghệ Nhân Uy Tín',
-  NORMAL: 'Gian Hàng Tiêu Chuẩn',
-  WARNING: 'Cảnh Báo Rủi Ro',
-  RESTRICTED: 'Hạn Chế / Nguy Cơ Cao',
+  SUBMITTED: 'Đã nộp yêu cầu', PENDING_PRINTER: 'Chờ xưởng in', DISPUTED: 'Đang tranh chấp', AWAITING_ADMIN_REFUND: 'Chờ xác nhận hoàn tiền',
+  PRINTER_PROPOSED_FAULT_CHANGE: 'Đề xuất phân loại lỗi', REJECTED: 'Bị từ chối', APPROVED: 'Đã duyệt', CONVERTED_TO_REFUND: 'Đã duyệt hoàn tiền',
+  ADMIN_REJECTED: 'Quản trị từ chối', COMPLETED: 'Hoàn tất', WAITING_BUYER_CHOICE: 'Chờ khách chọn', WAITING_STOCK: 'Chờ phôi in',
+  REPLACEMENT_CREATED: 'Đã tạo đơn in bù 0đ', EXPIRED: 'Đã hết hạn', CANCELLED: 'Đã hủy',
 };
 
 const faultPartyLabels: Record<string, string> = {
-  PRINTER: 'Xưởng in (Printer)',
-  SELLER: 'Người bán (Seller)',
-  BUYER: 'Khách mua (Buyer)',
-  CARRIER: 'Đơn vị vận chuyển (Carrier)',
-  PLATFORM: 'Sàn bảo lãnh (Platform)',
+  PRINTER: 'Xưởng in (Printer)', SELLER: 'Người bán (Seller)', BUYER: 'Khách mua (Buyer)',
+  CARRIER: 'Đơn vị vận chuyển (Carrier)', PLATFORM: 'Sàn bảo lãnh (Platform)',
 };
 
 const reasonTranslations: Record<string, string> = {
@@ -151,92 +130,7 @@ export function AdminReturnsPage() {
       {!detail ? <p role="status">Đang tải chi tiết…</p> : <>
         <p>Trạng thái: {labels[detail.request.status] || detail.request.status}</p><p>Lý do: {detail.request.reason_code} — {detail.request.reason_description}</p><p>{detail.request.quantity} sản phẩm · phương án yêu cầu: {detail.request.requested_resolution === 'EXCHANGE' ? 'Đổi hàng (In bù 0đ)' : 'Hoàn tiền'}</p>
 
-        {auditProfile && (
-          <div className="my-3 rounded-2xl border border-stone-200 bg-white p-4 text-xs sm:text-sm shadow-sm">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
-              <h3 className="font-bold text-stone-900 flex items-center gap-1.5">
-                <Scale size={17} className="text-emerald-800" /> Hồ Sơ Đối Soát Tranh Chấp & Căn Cứ Phân Xử
-              </h3>
-              {auditProfile.shop && (
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${auditProfile.shop.reputation_tier === 'TRUSTED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
-                  auditProfile.shop.reputation_tier === 'NORMAL' ? 'bg-blue-50 text-blue-800 border border-blue-200' :
-                    auditProfile.shop.reputation_tier === 'WARNING' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
-                      'bg-rose-50 text-rose-800 border border-rose-200'
-                  }`}>
-                  Phân cấp Shop: {tierLabels[auditProfile.shop.reputation_tier] || auditProfile.shop.reputation_tier}
-                </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Box Shop */}
-              <div className="rounded-xl bg-stone-50/70 p-3.5 border border-stone-200/80 space-y-1.5">
-                <p className="font-semibold text-stone-900 flex items-center gap-1.5">
-                  <Store size={15} className="text-stone-700" /> Người bán: {auditProfile.shop?.shop_name || 'Gian hàng'}
-                </p>
-                <div className="flex justify-between text-stone-600">
-                  <span>Điểm Uy Tín (SRS):</span>
-                  <strong className="text-emerald-700 font-jakarta">{auditProfile.shop?.reputation_score ?? 80} / 100</strong>
-                </div>
-                <div className="flex justify-between text-stone-600">
-                  <span>Chuỗi đơn:</span>
-                  <span>{auditProfile.shop?.clean_streak_orders ?? 0} / 10 đơn</span>
-                </div>
-                <div className="flex justify-between text-stone-600">
-                  <span>Khiếu nại trong 30 ngày:</span>
-                  <span className={auditProfile.shop && auditProfile.shop.dispute_count_30d > 2 ? 'text-rose-600 font-bold' : ''}>
-                    {auditProfile.shop?.dispute_count_30d ?? 0} đơn
-                  </span>
-                </div>
-                <div className="flex justify-between text-stone-600">
-                  <span>Điểm phạt tích lũy:</span>
-                  <span className="text-stone-500">{auditProfile.shop?.penalty_points_30d ?? 0} điểm</span>
-                </div>
-              </div>
-
-              {/* Box Buyer */}
-              <div className="rounded-xl bg-stone-50/70 p-3.5 border border-stone-200/80 space-y-1.5">
-                <p className="font-semibold text-stone-900 flex items-center gap-1.5">
-                  <User size={15} className="text-stone-700" /> Khách mua hàng
-                </p>
-                <div className="flex justify-between text-stone-600">
-                  <span>Đơn giao thành công:</span>
-                  <strong>{auditProfile.buyer.total_delivered_orders} đơn</strong>
-                </div>
-                <div className="flex justify-between text-stone-600">
-                  <span>Yêu cầu đổi/hoàn:</span>
-                  <span>{auditProfile.buyer.total_return_requests} lần</span>
-                </div>
-                <div className="flex justify-between text-stone-600">
-                  <span>Tỷ lệ hoàn trả:</span>
-                  <span className={auditProfile.buyer.is_flagged_for_abuse ? 'text-rose-600 font-bold' : ''}>
-                    {auditProfile.buyer.dispute_rate_pct}%
-                  </span>
-                </div>
-                {auditProfile.buyer.is_flagged_for_abuse && (
-                  <p className="mt-1 rounded bg-rose-50 p-2 text-xs text-rose-700 font-medium flex items-center gap-1.5">
-                    <AlertTriangle size={14} className="shrink-0 text-rose-600" />
-                    <span>
-                      {auditProfile.buyer.total_delivered_orders === 0
-                        ? 'Cảnh báo: Khách chưa có đơn hoàn tất nhưng đã mở nhiều yêu cầu đổi/hoàn trả.'
-                        : 'Cảnh báo: Khách có tỷ lệ hoàn trả bất thường (>25%).'}
-                    </span>
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {auditProfile.shop?.recommendation && (
-              <div className="mt-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 p-3 text-xs text-emerald-950 flex items-start gap-2">
-                <Sparkles size={16} className="text-emerald-700 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-bold">Gợi ý phân xử hệ thống: </span>
-                  <span>{auditProfile.shop.recommendation}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {auditProfile && <DisputeAuditCard profile={auditProfile} />}
 
         <h3 className="font-semibold">Diễn biến</h3><ol>{detail.timeline.map((event, i) => <li key={event.event_id || i} className="border-l-2 border-emerald-300 py-1 pl-3">{event.created_at && new Date(event.created_at).toLocaleString('vi-VN')} · {event.from_status ? (labels[event.from_status] || event.from_status) : 'Khởi tạo'} → {labels[event.to_status || ''] || event.to_status} · {translateReason(event.reason)}</li>)}</ol>
         <h3 className="font-semibold">Minh chứng</h3><div className="flex flex-wrap gap-3">{detail.evidence.map(e => e.kind === 'VIDEO' ? <video key={e.evidence_id} src={e.storage_ref} controls className="max-h-48 max-w-xs" /> : <a key={e.evidence_id} href={e.storage_ref} target="_blank" rel="noreferrer"><img src={e.storage_ref} alt="Minh chứng" className="h-24 w-24 rounded object-cover" /></a>)}</div>

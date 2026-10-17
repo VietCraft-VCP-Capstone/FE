@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Heart, Bell, ShoppingBag, MessageCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
@@ -7,10 +7,9 @@ import { notificationService } from '../../notification/services/notificationSer
 import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
 import { favoritesService } from '../../product/services/favoritesService';
 import { userService } from '../../user/services/userService';
-import { productsService } from '../../product/services/productsService';
-import { SuggestResult } from '../../product/types/product';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import { SearchPopover } from './SearchPopover';
+import { useSearchSuggest } from '../hooks/useSearchSuggest';
 
 interface BuyerHeaderProps {
   user: any;
@@ -27,71 +26,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [isSearchPopoverOpen, setIsSearchPopoverOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<SuggestResult>({ keywords: [], shops: [], categories: [] });
-  const [isSuggestLoading, setIsSuggestLoading] = useState(false);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const isComposingRef = useRef(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-
-  const handleExecuteSearch = (targetKeyword?: string) => {
-    const kw = targetKeyword !== undefined ? targetKeyword : search;
-    setIsSearchPopoverOpen(false);
-    if (!kw || !kw.trim()) {
-      navigate('/search');
-    } else {
-      navigate(`/search?q=${encodeURIComponent(kw.trim())}`);
-    }
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
-        setIsSearchPopoverOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    if (!search || !search.trim()) {
-      setSuggestions({ keywords: [], shops: [], categories: [] });
-      setIsSuggestLoading(false);
-      return;
-    }
-
-    setIsSuggestLoading(true);
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    const timer = setTimeout(() => {
-      if (isComposingRef.current) {
-        setIsSuggestLoading(false);
-        return;
-      }
-      productsService.suggest(search, controller.signal)
-        .then((res) => {
-          setSuggestions(res);
-        })
-        .catch(() => {
-          setSuggestions({ keywords: [], shops: [], categories: [] });
-        })
-        .finally(() => {
-          setIsSuggestLoading(false);
-        });
-    }, 250);
-
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [search]);
+  const searchBox = useSearchSuggest(search, setSearch);
 
   useEffect(() => {
     setCurrentUser(user);
@@ -258,45 +193,10 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
         </nav>
 
         {/* Search Bar with Live Suggestion Popover */}
-        <div className="buyer-search-bar" ref={searchContainerRef} style={{ position: 'relative' }}>
-          <Search
-            className="search-icon"
-            size={16}
-            style={{ cursor: 'pointer' }}
-            onClick={() => handleExecuteSearch()}
-          />
-          <input
-            type="text"
-            placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..."
-            value={search}
-            onCompositionStart={() => { isComposingRef.current = true; }}
-            onCompositionEnd={() => { isComposingRef.current = false; }}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setIsSearchPopoverOpen(true);
-            }}
-            onFocus={() => setIsSearchPopoverOpen(true)}
-            onClick={() => setIsSearchPopoverOpen(true)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleExecuteSearch();
-              } else if (e.key === 'Escape') {
-                setIsSearchPopoverOpen(false);
-              }
-            }}
-          />
-
-          {/* Instant Search Popover Dropdown */}
-          <SearchPopover
-            isOpen={isSearchPopoverOpen}
-            search={search}
-            setSearch={setSearch}
-            isSuggestLoading={isSuggestLoading}
-            suggestions={suggestions}
-            onExecuteSearch={handleExecuteSearch}
-            onClose={() => setIsSearchPopoverOpen(false)}
-          />
+        <div className="buyer-search-bar" ref={searchBox.containerRef} style={{ position: 'relative' }}>
+          <Search className="search-icon" size={16} style={{ cursor: 'pointer' }} onClick={() => searchBox.onExecuteSearch()} />
+          <input type="text" placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..." {...searchBox.inputProps} />
+          <SearchPopover {...searchBox.popoverProps} />
         </div>
 
         {/* Action Icons (Đã dời Thông báo sang bên phải, cạnh Avatar và Chat) */}

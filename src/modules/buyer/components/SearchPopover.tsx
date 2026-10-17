@@ -6,6 +6,11 @@ import { productsService } from '../../product/services/productsService';
 import { RecentSearches } from './search/RecentSearches';
 import { KeywordSuggestions } from './search/KeywordSuggestions';
 
+export const FALLBACK_KEYWORDS = ['Quà Tặng', 'Áo Đồng Phục', 'Áo Thun', 'Quà Sinh Nhật', 'Móc Khóa', 'Túi Tote', 'Áo Lớp', 'Áo Anime'];
+
+const SHOP_PLACEHOLDER = 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?auto=format&fit=crop&q=80&w=100';
+const sectionTitle = 'mb-2 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-[#78716c]';
+
 interface SearchPopoverProps {
   isOpen: boolean;
   search: string;
@@ -17,132 +22,55 @@ interface SearchPopoverProps {
 }
 
 export const SearchPopover: React.FC<SearchPopoverProps> = ({
-  isOpen,
-  search,
-  setSearch,
-  isSuggestLoading,
-  suggestions,
-  onExecuteSearch,
-  onClose,
+  isOpen, search, setSearch, isSuggestLoading, suggestions, onExecuteSearch, onClose,
 }) => {
   const navigate = useNavigate();
-  const [trendingKeywords, setTrendingKeywords] = useState<string[]>([]);
-  const [isTrendingLoading, setIsTrendingLoading] = useState(false);
+  const [trendingKeywords, setTrendingKeywords] = useState<string[] | null>(null);
 
   useEffect(() => {
     let isMounted = true;
-    const fetchTrending = async () => {
-      setIsTrendingLoading(true);
-      try {
-        const keywords = await productsService.getTrendingKeywords(8);
-        if (isMounted && keywords && keywords.length > 0) {
-          setTrendingKeywords(keywords);
-        }
-      } catch (err) {
-        console.warn('Failed to load AI trending keywords:', err);
-      } finally {
-        if (isMounted) setIsTrendingLoading(false);
-      }
-    };
-
-    fetchTrending();
-    return () => {
-      isMounted = false;
-    };
+    productsService.getTrendingKeywords(8).then((kws) => { if (isMounted) setTrendingKeywords(kws); });
+    return () => { isMounted = false; };
   }, []);
 
   if (!isOpen) return null;
 
-  const displayKeywords = trendingKeywords.length > 0
-    ? trendingKeywords
-    : [
-        'Quà Tặng',
-        'Áo Đồng Phục',
-        'Áo Thun',
-        'Quà Sinh Nhật',
-        'Móc Khóa',
-        'Áo Lớp',
-        'Túi Tote',
-        'Áo Anime'
-      ];
+  const displayKeywords = trendingKeywords?.length ? trendingKeywords : FALLBACK_KEYWORDS;
+  const pick = (kw: string) => {
+    setSearch(kw);
+    onExecuteSearch(kw);
+  };
+  const go = (path: string) => {
+    onClose();
+    navigate(path);
+  };
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 'calc(100% + 8px)',
-        right: 0,
-        width: 'max(100%, 380px)',
-        minWidth: 'min(380px, calc(100vw - 24px))',
-        maxWidth: 'calc(100vw - 24px)',
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        boxShadow: '0 12px 36px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.05)',
-        border: '1px solid #e7e5e4',
-        padding: '16px',
-        zIndex: 9999,
-        maxHeight: '440px',
-        overflowY: 'auto',
-        boxSizing: 'border-box'
-      }}
-    >
-      {/* Trường hợp 1: Chưa gõ gì -> Hiện từ khoá thịnh hành theo dữ liệu AI Analyst */}
+    <div className="absolute right-0 top-[calc(100%+8px)] z-[9999] max-h-[440px] w-[max(100%,380px)] min-w-[min(380px,calc(100vw-24px))] max-w-[calc(100vw-24px)] overflow-y-auto rounded-2xl border border-[#e7e5e4] bg-white p-4 shadow-[0_12px_36px_rgba(0,0,0,0.14),0_2px_8px_rgba(0,0,0,0.05)]">
       {!search.trim() ? (
         <div>
-          <RecentSearches
-            onSelect={(kw) => {
-              setSearch(kw);
-              onExecuteSearch(kw);
-            }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, whiteSpace: 'nowrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#44403c', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
-              <Sparkles size={15} color="#eab308" style={{ flexShrink: 0 }} />
+          <RecentSearches onSelect={pick} />
+          <div className="mb-3 flex items-center justify-between whitespace-nowrap">
+            <div className="flex items-center gap-1.5 whitespace-nowrap text-[13px] font-bold text-[#44403c]">
+              <Sparkles size={15} color="#eab308" className="shrink-0" />
               <span>Tìm kiếm thịnh hành</span>
             </div>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              AI Trend
-            </span>
+            <span className="shrink-0 whitespace-nowrap rounded-[10px] bg-[#ecfdf5] px-2 py-0.5 text-[11px] font-semibold text-[#059669]">AI Trend</span>
           </div>
 
-          {isTrendingLoading && trendingKeywords.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#78716c', fontSize: 12, padding: '8px 0' }}>
+          {trendingKeywords === null ? (
+            <div className="flex items-center gap-1.5 py-2 text-[12px] text-[#78716c]">
               <Loader2 size={13} className="animate-spin" />
               <span>Đang cập nhật xu hướng từ AI Analyst...</span>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {displayKeywords.map((item, idx) => (
+            <div className="flex flex-wrap gap-2">
+              {displayKeywords.map((item) => (
                 <button
-                  key={idx}
+                  key={item}
                   type="button"
-                  onClick={() => {
-                    setSearch(item);
-                    onExecuteSearch(item);
-                  }}
-                  style={{
-                    backgroundColor: '#f5f5f4',
-                    border: '1px solid #e7e5e4',
-                    borderRadius: 20,
-                    padding: '6px 14px',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: '#292524',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#ecfdf5';
-                    e.currentTarget.style.borderColor = '#a7f3d0';
-                    e.currentTarget.style.color = '#007700';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f5f4';
-                    e.currentTarget.style.borderColor = '#e7e5e4';
-                    e.currentTarget.style.color = '#292524';
-                  }}
+                  onClick={() => pick(item)}
+                  className="shrink-0 cursor-pointer whitespace-nowrap rounded-[20px] border border-[#e7e5e4] bg-[#f5f5f4] px-3.5 py-1.5 text-[12px] font-semibold text-[#292524] transition-all duration-150 hover:border-[#a7f3d0] hover:bg-[#ecfdf5] hover:text-[#007700]"
                 >
                   {item}
                 </button>
@@ -151,49 +79,23 @@ export const SearchPopover: React.FC<SearchPopoverProps> = ({
           )}
         </div>
       ) : isSuggestLoading ? (
-        /* Đang tải gợi ý */
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 0', gap: 8, color: '#78716c', fontSize: 13 }}>
+        <div className="flex items-center justify-center gap-2 py-6 text-[13px] text-[#78716c]">
           <Loader2 size={16} className="animate-spin" />
           <span>Đang tìm kiếm gợi ý...</span>
         </div>
       ) : (
-        /* Trường hợp 2: Đã có kết quả gợi ý */
         <div>
-          <KeywordSuggestions
-            keywords={suggestions.keywords ?? []}
-            onSelect={(kw) => {
-              setSearch(kw);
-              onExecuteSearch(kw);
-            }}
-          />
+          <KeywordSuggestions keywords={suggestions.keywords ?? []} onSelect={pick} />
 
-          {/* Danh mục gợi ý nếu có */}
-          {suggestions.categories && suggestions.categories.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#78716c', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <TagIcon size={13} />
-                <span>Danh mục gợi ý</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {suggestions.categories?.length > 0 && (
+            <div className="mb-3.5">
+              <div className={sectionTitle}><TagIcon size={13} /><span>Danh mục gợi ý</span></div>
+              <div className="flex flex-wrap gap-1.5">
                 {suggestions.categories.map((c) => (
                   <span
                     key={c.id}
-                    onClick={() => {
-                      onClose();
-                      navigate(`/search?category=${encodeURIComponent(c.name)}`);
-                    }}
-                    style={{
-                      backgroundColor: '#f0fdf4',
-                      color: '#166534',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      padding: '4px 10px',
-                      borderRadius: 12,
-                      cursor: 'pointer',
-                      border: '1px solid #bbf7d0',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0
-                    }}
+                    onClick={() => go(`/search?category=${encodeURIComponent(c.name)}`)}
+                    className="shrink-0 cursor-pointer whitespace-nowrap rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 py-1 text-[12px] font-semibold text-[#166534]"
                   >
                     {c.name}
                   </span>
@@ -202,69 +104,33 @@ export const SearchPopover: React.FC<SearchPopoverProps> = ({
             </div>
           )}
 
-          {/* Gian hàng gợi ý nếu có */}
-          {suggestions.shops && suggestions.shops.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#78716c', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <Store size={13} />
-                <span>Gian hàng thủ công</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {suggestions.shops?.length > 0 && (
+            <div className="mb-3.5">
+              <div className={sectionTitle}><Store size={13} /><span>Gian hàng thủ công</span></div>
+              <div className="flex flex-col gap-1.5">
                 {suggestions.shops.map((s) => (
                   <div
                     key={s.id}
-                    onClick={() => {
-                      onClose();
-                      navigate(`/shop/${s.slug || s.id}`);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '6px 8px',
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      transition: 'background-color 0.15s'
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f4')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    onClick={() => go(`/shop/${s.slug || s.id}`)}
+                    className="flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-[#f5f5f4]"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <img
-                        src={s.logo || 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?auto=format&fit=crop&q=80&w=100'}
-                        alt={s.name}
-                        style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid #e7e5e4' }}
-                      />
+                    <div className="flex items-center gap-2.5">
+                      <img src={s.logo || SHOP_PLACEHOLDER} alt={s.name} className="h-8 w-8 rounded-full border border-[#e7e5e4] object-cover" />
                       <div>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#1c1917', display: 'block' }}>{s.name}</span>
-                        <span style={{ fontSize: 11, color: '#78716c' }}>Điểm uy tín: {s.reputationScore}/100</span>
+                        <span className="block text-[13px] font-bold text-[#1c1917]">{s.name}</span>
+                        <span className="text-[11px] text-[#78716c]">Điểm uy tín: {s.reputationScore}/100</span>
                       </div>
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#008000', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: 10 }}>
-                      Xem Shop
-                    </span>
+                    <span className="rounded-[10px] bg-[#dcfce7] px-2 py-0.5 text-[11px] font-bold text-[#008000]">Xem Shop</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Nút xem toàn bộ kết quả */}
           <div
             onClick={() => onExecuteSearch()}
-            style={{
-              marginTop: 14,
-              paddingTop: 10,
-              borderTop: '1px solid #f5f5f4',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              color: '#008000',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
+            className="mt-3.5 flex cursor-pointer items-center justify-center gap-1.5 border-t border-[#f5f5f4] pt-2.5 text-[13px] font-bold text-[#008000]"
           >
             <span>Xem tất cả kết quả cho "{search}"</span>
             <ArrowRight size={14} />

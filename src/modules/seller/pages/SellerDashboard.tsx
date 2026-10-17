@@ -10,7 +10,6 @@ import {
   RefreshCw,
   Palette,
   Sparkles,
-  ShieldCheck,
 } from 'lucide-react';
 import { analyticsApi } from '../../analytics/services/analyticsApi';
 
@@ -37,6 +36,7 @@ import {
 } from '../services/sellerDashboardService';
 import type { ProductItem } from '../../product/types/product';
 import { sellerSettingsService } from '../services/sellerSettingsService';
+import { ShopReputationCard } from '../components/dashboard/ShopReputationCard';
 import { PRODUCT_CREATE_PATH } from '../featureFlags';
 
 type RangeKey = '7' | '30' | '90';
@@ -96,7 +96,7 @@ export function SellerDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [range, setRange] = useState<RangeKey>('30');
-  const [reputation, setReputation] = useState<{ profile: any; logs: any[] } | null>(null);
+  const [reputation, setReputation] = useState<any>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -113,7 +113,7 @@ export function SellerDashboard() {
       if (seasonalRes.status === 'fulfilled' && seasonalRes.value?.data?.events?.length > 0) {
         setSeasonalEvent(seasonalRes.value.data.events[0]);
       }
-      if (repRes.status === 'fulfilled' && repRes.value) setReputation(repRes.value);
+      if (repRes.status === 'fulfilled') setReputation(repRes.value.profile);
       setLoadedAt(new Date());
     } finally {
       setLoading(false);
@@ -234,80 +234,7 @@ export function SellerDashboard() {
         </div>
       ))}
 
-      {/* Shop Reputation Score (SRS) Card - Đồng bộ ngôn ngữ giao diện VietCraft */}
-      {reputation?.profile && (
-        <section className="mb-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-            {/* Cột trái: Cấp bậc, Điểm số & Diễn giải */}
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold border ${reputation.profile.reputation_tier === 'TRUSTED' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                  reputation.profile.reputation_tier === 'NORMAL' ? 'bg-blue-50 text-blue-800 border-blue-200' :
-                    reputation.profile.reputation_tier === 'WARNING' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                      'bg-rose-50 text-rose-800 border-rose-200'
-                  }`}>
-                  <ShieldCheck size={14} className={reputation.profile.reputation_tier === 'TRUSTED' ? 'text-emerald-700' : 'text-current'} />
-                  {reputation.profile.reputation_tier === 'TRUSTED' ? 'Nghệ Nhân Uy Tín' :
-                    reputation.profile.reputation_tier === 'NORMAL' ? 'Gian Hàng Tiêu Chuẩn' :
-                      reputation.profile.reputation_tier === 'WARNING' ? 'Cảnh Báo Rủi Ro' : 'Hạn Chế'}
-                </span>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Chỉ số Uy Tín Gian Hàng (SRS)</span>
-              </div>
-
-              <div className="flex items-baseline gap-2">
-                <span className="text-sm font-semibold text-stone-700">Điểm uy tín:</span>
-                <span className="text-3xl font-extrabold leading-none text-stone-900 font-jakarta">
-                  {reputation.profile.reputation_score}
-                </span>
-                <span className="text-xs font-medium text-stone-400">/ 100 điểm</span>
-              </div>
-
-              <p className="text-xs text-stone-500 max-w-2xl leading-relaxed">
-                {reputation.profile.reputation_score >= 90
-                  ? '✨ Điểm uy tín xuất sắc: Sản phẩm của bạn được ưu tiên đẩy Top tìm kiếm tự nhiên và được ưu tiên bảo vệ khi phát sinh khiếu nại.'
-                  : reputation.profile.reputation_score >= 70
-                    ? 'Gian hàng đạt chuẩn sàn: Duy trì chuỗi đơn sạch không lỗi để nâng hạng lên Nghệ Nhân Uy Tín.'
-                    : '⚠️ Cảnh báo: Tỷ lệ khiếu nại cao. Hãy cải thiện chất lượng sản phẩm & đóng gói để tránh bị hạn chế hiển thị.'}
-              </p>
-            </div>
-
-            {/* Cột phải: Thống kê Chuỗi đơn sạch & Khiếu nại 30 ngày */}
-            <div className="flex flex-wrap items-center gap-6 sm:gap-8 border-t lg:border-t-0 lg:border-l border-stone-100 pt-4 lg:pt-0 lg:pl-8 shrink-0">
-              <div>
-                <dt className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Chuỗi đơn</dt>
-                <dd className="m-0 mt-1.5 flex items-baseline gap-1.5">
-                  <span className="text-2xl font-extrabold leading-none text-stone-900 font-jakarta">
-                    {reputation.profile.clean_streak_orders || 0}
-                  </span>
-                  <span className="text-xs text-stone-400">/ 10 đơn</span>
-                </dd>
-                <div className="mt-2 h-2 w-32 rounded-full bg-stone-100 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-[#007700] transition-all duration-300"
-                    style={{ width: `${Math.min(100, ((reputation.profile.clean_streak_orders || 0) / 10) * 100)}%` }}
-                  />
-                </div>
-                <dd className="m-0 mt-1 text-[11px] text-stone-400">Đạt 10 đơn: +5 điểm SRS</dd>
-              </div>
-
-              <div>
-                <dt className="text-[11px] font-bold uppercase tracking-wider text-stone-500">Khiếu nại (30 ngày)</dt>
-                <dd className="m-0 mt-1.5 flex items-baseline gap-1">
-                  <span className={`text-2xl font-extrabold leading-none font-jakarta ${(reputation.profile.dispute_count_30d || 0) > 0 ? 'text-amber-600' : 'text-stone-900'
-                    }`}>
-                    {reputation.profile.dispute_count_30d || 0}
-                  </span>
-                  <span className="text-xs text-stone-400">đơn</span>
-                </dd>
-                <dd className={`m-0 mt-2 text-[11px] font-medium ${reputation.profile.penalty_points_30d ? 'text-rose-600' : 'text-emerald-700'
-                  }`}>
-                  {reputation.profile.penalty_points_30d ? `Trừ ${reputation.profile.penalty_points_30d} điểm vi phạm` : 'Không có vi phạm'}
-                </dd>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+      {reputation && <ShopReputationCard profile={reputation} />}
 
       {/* Smart Seasonal Opportunity Banner */}
       {seasonalEvent && (
@@ -598,8 +525,9 @@ export function SellerDashboard() {
                         <p className="m-0 truncate text-[11.5px] text-stone-500">{p.sku}</p>
                       </div>
                       <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${out ? 'bg-rose-50 text-[#BA1A1A]' : 'bg-amber-50 text-amber-800'
-                          }`}
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                          out ? 'bg-rose-50 text-[#BA1A1A]' : 'bg-amber-50 text-amber-800'
+                        }`}
                       >
                         {out ? 'Hết hàng' : `Còn ${fmtCount(p.stock)}`}
                       </span>

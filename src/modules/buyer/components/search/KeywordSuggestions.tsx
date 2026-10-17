@@ -8,40 +8,20 @@ interface KeywordSuggestionsProps {
 
 export const KeywordSuggestions: React.FC<KeywordSuggestionsProps> = ({ keywords, onSelect }) => {
   if (keywords.length === 0) {
-    return (
-      <p style={{ fontSize: 13, color: '#a8a29e', margin: '8px 0', fontStyle: 'italic' }}>
-        Không có gợi ý từ khoá. Nhấn Enter để tìm kiếm toàn bộ sàn.
-      </p>
-    );
+    return <p className="my-2 text-[13px] italic text-[#a8a29e]">Không có gợi ý từ khoá. Nhấn Enter để tìm kiếm toàn bộ sàn.</p>;
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 14 }}>
+    <div className="mb-3.5 flex flex-col gap-0.5">
       {keywords.map((kw) => (
         <button
           key={kw}
           type="button"
           onClick={() => onSelect(kw)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            width: '100%',
-            padding: '8px',
-            border: 'none',
-            borderRadius: 8,
-            background: 'transparent',
-            fontSize: 13,
-            fontWeight: 600,
-            color: '#1c1917',
-            textAlign: 'left',
-            cursor: 'pointer'
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f4')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-2 text-left text-[13px] font-semibold text-[#1c1917] hover:bg-[#f5f5f4]"
         >
-          <Search size={14} color="#a8a29e" style={{ flexShrink: 0 }} />
-          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kw}</span>
+          <Search size={14} color="#a8a29e" className="shrink-0" />
+          <span className="truncate">{kw}</span>
         </button>
       ))}
     </div>

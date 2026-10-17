@@ -69,24 +69,21 @@ export const productsService = {
   },
 
   suggest: async (q: string, signal?: AbortSignal): Promise<SuggestResult> => {
+    const empty = { keywords: [], shops: [], categories: [] };
+    if (!q.trim()) return empty;
     try {
-      if (!q || !q.trim()) return { keywords: [], shops: [], categories: [] };
       const res = await api.get('/products/suggest', { params: { q: q.trim() }, signal });
-      return res.data || { keywords: [], shops: [], categories: [] };
-    } catch (err: any) {
-      return { keywords: [], shops: [], categories: [] };
+      return res.data || empty;
+    } catch {
+      return empty;
     }
   },
 
   getTrendingKeywords: async (limit = 8): Promise<string[]> => {
     try {
       const res = await api.get('/products/meta/trending-keywords', { params: { limit } });
-      if (Array.isArray(res.data) && res.data.length > 0) {
-        return res.data;
-      }
-      return [];
-    } catch (err) {
-      console.warn('Error fetching trending keywords from AI analyst:', err);
+      return Array.isArray(res.data) ? res.data : [];
+    } catch {
       return [];
     }
   },
