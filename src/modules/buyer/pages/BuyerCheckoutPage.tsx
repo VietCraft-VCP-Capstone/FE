@@ -43,7 +43,14 @@ export function BuyerCheckoutPage() {
     const navigate = useNavigate();
     const outletContext = useOutletContext<{ setCartCount?: (n: number) => void }>() || {};
     const setCartCount = outletContext.setCartCount ?? (() => {});
-    const [items, setItems] = useState<CheckoutItem[]>([]);
+    const [items] = useState<CheckoutItem[]>(() => {
+        try {
+            const parsed = JSON.parse(localStorage.getItem('vietcraft_checkout') || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    });
     const authed = isLoggedIn();
 
     const [paymentMethod, setPaymentMethod] = useState<'payos' | 'card' | 'bank' | 'cod'>('payos');
@@ -188,6 +195,11 @@ export function BuyerCheckoutPage() {
         return <Navigate to={`/login?next=${encodeURIComponent('/checkout')}`} replace />;
     }
 
+    // Không còn sản phẩm để thanh toán (vd. Back về sau khi đã đặt hàng): về giỏ thay vì trang trống bị khoá nút
+    if (items.length === 0) {
+        return <Navigate to="/cart" replace />;
+    }
+
     const handleApplyCoupon = async (codeToUse?: string) => {
         const targetCode = (typeof codeToUse === 'string' ? codeToUse : couponCode).trim();
         if (!targetCode) {
@@ -296,7 +308,8 @@ export function BuyerCheckoutPage() {
             if (paymentMethod === 'payos' && createdOrder?.id) {
                 try {
                     const { checkoutUrl } = await ordersService.createPayosPayment(createdOrder.id);
-                    window.location.href = checkoutUrl;
+                    // replace: Back từ trang payOS không quay lại trang checkout đã dùng
+                    window.location.replace(checkoutUrl);
                     return;
                 } catch (payosErr: any) {
                     showToast(getApiErrorMessage(payosErr, 'Không thể mở cổng payOS. Vui lòng thanh toán lại từ chi tiết đơn hàng.'), 'error');
@@ -304,7 +317,7 @@ export function BuyerCheckoutPage() {
             }
 
             setTimeout(() => {
-                navigate(orderPath);
+                navigate(orderPath, { replace: true });
             }, 1500);
         } catch (error: any) {
             showToast(getApiErrorMessage(error, 'Có lỗi xảy ra trong quá trình đặt hàng. Vui lòng thử lại.'), 'error');

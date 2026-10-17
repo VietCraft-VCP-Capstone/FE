@@ -85,6 +85,12 @@ const computeItemDiscount = (item: CartItem, coupons: CouponDTO[]) => {
             ? parseFloat(raw.$numberDecimal)
             : parseFloat(raw || 0);
 
+    const getCouponShopId = (c: CouponDTO): string | null => {
+        const s: any = c.shop_id;
+        if (!s) return null;
+        return typeof s === 'object' ? (s._id || s.id)?.toString() || null : String(s);
+    };
+
     // 1. Flash Sale: ưu tiên SPECIFIC_PRODUCTS trước, sau đó ALL (yêu cầu basePrice >= min_order_value nếu có)
     const flashSale = coupons.find(c => {
         if (!isActive(c) || c.discount_type !== 'FLASH_SALE') return false;
@@ -93,7 +99,9 @@ const computeItemDiscount = (item: CartItem, coupons: CouponDTO[]) => {
         if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
             return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === item.productId);
         }
-        return true;
+        // Flash Sale toàn shop chỉ áp dụng cho sản phẩm của chính shop tạo ra nó
+        const couponShopId = getCouponShopId(c);
+        return !couponShopId || couponShopId === item.shopId;
     });
 
     if (flashSale) {
