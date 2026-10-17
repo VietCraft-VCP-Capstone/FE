@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   Store,
   Star,
@@ -12,13 +12,16 @@ import {
   Search,
   Ticket,
   DollarSign,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import { shopService, ShopDetail } from '../../product/services/shopService';
 import { productsService } from '../../product/services/productsService';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { useToast } from '../../../shared/components/Toast';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { useInsight } from '../../analytics/hooks/useInsight';
+import type { Competitors } from '../../analytics/types';
 
 export function SellerCompetitorDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +36,11 @@ export function SellerCompetitorDetailPage() {
   const [sortOption, setSortOption] = useState<'newest' | 'price_asc' | 'price_desc' | 'rating'>('newest');
   const [isFollowing, setIsFollowing] = useState(false);
   const [followPending, setFollowPending] = useState(false);
+  // AI: bao nhiêu sản phẩm của mình có hàng giống bên shop này (danh mục chính).
+  const doiThu = useInsight<Competitors>('/competitors');
+  const trungSp = doiThu.state.kind === 'ready'
+    ? doiThu.state.data.my_listings.filter(l => l.direct_rivals?.some(r => r.shop_id === id)).length
+    : 0;
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -268,6 +276,14 @@ export function SellerCompetitorDetailPage() {
           </div>
         </div>
       </div>
+
+      {trungSp > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#007700]/20 bg-[#EAF0E2] px-4 py-3 text-[13px] text-stone-800">
+          <Sparkles size={15} className="text-[#007700]" aria-hidden />
+          <span>AI thấy <strong>{trungSp} sản phẩm</strong> của bạn có hàng giống bên shop này.</span>
+          <Link to="/seller/insights/competitors" className="font-semibold text-[#007700] no-underline hover:text-[#005B00]">Xem đối thủ trực tiếp</Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-2xs">

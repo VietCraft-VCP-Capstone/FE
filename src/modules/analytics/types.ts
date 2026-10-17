@@ -219,6 +219,20 @@ export interface CategoryRevenue {
 
 /* ------------------------------------------------------------ F32 -------- */
 
+/** Sản phẩm của shop khác giống sản phẩm của bạn nhất (AI so nội dung, chỉ trong cùng loại hàng). */
+export interface DirectRival {
+  product_id: string;
+  shop_id: string;
+  shop_name: string | null;
+  title: string | null;
+  price_vnd: number | null;
+  est_sales_90d: number;
+  /** 0–1, độ giống nội dung. */
+  similarity: number;
+  /** Các từ hai sản phẩm cùng có, vd ["mèo", "cung hoàng đạo"]. */
+  reasons: string[];
+}
+
 export interface Competitors {
   category_id: string;
   available_categories: string[];
@@ -233,7 +247,11 @@ export interface Competitors {
     /** Hạng theo số bán 90 ngày trong danh mục. */
     rank_in_cat: number;
     n_in_cat: number;
+    /** Chỉ có ở shop thật. */
+    direct_rivals?: DirectRival[];
   }[];
+  /** Shop trùng nhiều sản phẩm với bạn nhất (chỉ có ở shop thật). */
+  direct_rival_shops?: { shop_id: string; shop_name: string | null; overlap: number; best_similarity: number }[];
   competitors: {
     rank: number;
     listing_id: string;
@@ -336,6 +354,22 @@ export interface MyProduct {
   handmade_hint: boolean;
 }
 
+/** Giá của đối thủ trực tiếp (AI kNN), pha với mặt bằng cùng loại theo độ tin cậy. */
+export interface AiPrice {
+  suggested_vnd: number;
+  low_vnd: number;
+  high_vnd: number;
+  confidence: 'high' | 'medium' | 'low';
+  /** Tỉ trọng giá đối thủ trực tiếp trong con số đề xuất (phần còn lại là mặt bằng cùng loại). */
+  rival_weight: number;
+  n_neighbors: number;
+  avg_similarity: number;
+  rival_price_min_vnd: number;
+  rival_price_max_vnd: number;
+  neighbors: { product_id: string; shop_name: string | null; title: string | null; price_vnd: number; est_sales_90d: number; similarity: number }[];
+  method: string;
+}
+
 export interface PricingAnalysis {
   product_type_id: string;
   available_product_types: string[];
@@ -358,6 +392,8 @@ export interface PricingAnalysis {
   /** true khi chưa chọn sản phẩm nào, nên chưa có phán xét về giá. */
   needs_product_pick?: boolean;
   limitation?: string | null;
+  ai_price?: AiPrice | null;
+  ai_price_reason?: string | null;
 }
 
 /* ------------------------------------------------------------ F36 -------- */

@@ -18,7 +18,7 @@ import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, SelectField, Takeaway
 import { NA, pct } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import { productTypeLabel } from '../labels';
-import type { PriceBand, PricingAnalysis } from '../types';
+import type { AiPrice, PriceBand, PricingAnalysis } from '../types';
 
 const NHOM_SO: Record<string, string> = {
   reference_catalog: 'sản phẩm bán chạy nhất cùng loại ở thị trường tham khảo (không phải shop trên VietCraft)',
@@ -33,6 +33,64 @@ const BAND: Record<PriceBand, { label: string; tone: Tone; say: string }> = {
   premium: { label: 'Cao hơn mặt bằng', tone: 'info', say: 'Giá của bạn cao hơn mặt bằng chung của nhóm bán chạy.' },
   far_above: { label: 'Cao hơn hầu hết', tone: 'warn', say: 'Giá của bạn cao hơn gần như mọi sản phẩm cùng loại trong nhóm bán chạy.' },
 };
+
+const TIN_CAY: Record<AiPrice['confidence'], { label: string; tone: Tone }> = {
+  high: { label: 'Độ tin cậy cao', tone: 'good' },
+  medium: { label: 'Độ tin cậy vừa', tone: 'info' },
+  low: { label: 'Độ tin cậy thấp', tone: 'warn' },
+};
+
+/** Giá của các sản phẩm giống nhất ở shop khác (AI), so với giá bạn đang bán. */
+function AiPriceCard({ ai, reason, myPrice }: { ai: AiPrice | null | undefined; reason?: string | null; myPrice: number | null }) {
+  if (!ai) {
+    return reason ? (
+      <InsightCard title="Giá của đối thủ trực tiếp" bodyClassName="px-4 py-3">
+        <Note>{reason}.</Note>
+      </InsightCard>
+    ) : null;
+  }
+  const tin = TIN_CAY[ai.confidence];
+  const lech = myPrice === null ? null
+    : myPrice > ai.high_vnd ? `Giá bạn đang bán (${money(myPrice)}) cao hơn khoảng này ${pct(Math.round((myPrice / ai.high_vnd - 1) * 100), 0)}.`
+    : myPrice < ai.low_vnd ? `Giá bạn đang bán (${money(myPrice)}) thấp hơn khoảng này ${pct(Math.round((1 - myPrice / ai.low_vnd) * 100), 0)}.`
+    : `Giá bạn đang bán (${money(myPrice)}) nằm trong khoảng này.`;
+  return (
+    <InsightCard
+      title="Giá của đối thủ trực tiếp"
+      description="AI tìm các sản phẩm của shop khác giống sản phẩm bạn chọn nhất (cùng loại hàng) rồi xem họ đang bán giá bao nhiêu."
+      bodyClassName="px-4 py-3"
+    >
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        <div>
+          <span className="block text-xs font-semibold text-stone-500">Khoảng giá nên cân nhắc</span>
+          <strong className="font-jakarta text-2xl text-stone-900">{money(ai.low_vnd)} – {money(ai.high_vnd)}</strong>
+        </div>
+        <MiniStat label="Giá gợi ý" value={money(ai.suggested_vnd)} />
+        <Chip tone={tin.tone}>{tin.label}</Chip>
+      </div>
+      {lech && <p className="mb-0 mt-3 text-[13px] text-stone-700">{lech}</p>}
+      <div className="mt-3">
+        <Note>
+          Dựa trên {count(ai.n_neighbors)} sản phẩm giống nhất, giá của họ từ {money(ai.rival_price_min_vnd)} đến {money(ai.rival_price_max_vnd)}.
+          Con số đã pha {Math.round(ai.rival_weight * 100)}% giá đối thủ trực tiếp với mặt bằng cùng loại cho đỡ dao động.
+        </Note>
+      </div>
+      <details className="mt-3">
+        <summary className="cursor-pointer text-[13px] font-semibold text-[#007700]">Xem {count(ai.n_neighbors)} sản phẩm làm căn cứ</summary>
+        <ul className="m-0 mt-2 list-none space-y-1.5 p-0">
+          {ai.neighbors.map(n => (
+            <li key={n.product_id} className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+              <span className="w-12 shrink-0 font-semibold tabular-nums text-[#005B00]">{Math.round(n.similarity * 100)}%</span>
+              <span className="min-w-0 flex-1 truncate text-stone-800" title={n.title ?? ''}>{n.title}</span>
+              <span className="text-stone-500">{n.shop_name}</span>
+              <span className="w-24 text-right font-semibold tabular-nums text-stone-900">{money(n.price_vnd)}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </InsightCard>
+  );
+}
 
 export function PricingPage() {
   const [params, setParams] = useSearchParams();
@@ -137,6 +195,8 @@ export function PricingPage() {
                   </ul>
                 </InsightCard>
               )}
+
+              <AiPriceCard ai={data.ai_price} reason={data.ai_price_reason} myPrice={chosen?.price_vnd ?? null} />
 
               <InsightCard
                 title="Thử một mức giá khác"
