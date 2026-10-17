@@ -33,14 +33,14 @@ function Panel({ icon, title, body, action, compact }: {
   );
 }
 
-function RetryButton({ onClick }: { onClick: () => void }) {
+function RetryButton({ onClick, label = 'Thử lại' }: { onClick: () => void; label?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] active:translate-y-px motion-reduce:transition-none"
     >
-      <RefreshCw size={13} aria-hidden /> Thử lại
+      <RefreshCw size={13} aria-hidden /> {label}
     </button>
   );
 }
@@ -76,7 +76,15 @@ export function InsightStatusView<T>({ state, onRetry, compact, skeleton }: {
         </div>
       );
     case 'insufficient':
-      return <Panel compact={compact} icon={<Hourglass size={18} />} title="Chưa đủ dữ liệu để tính" body={state.reason} />;
+      return (
+        <Panel
+          compact={compact}
+          icon={<Hourglass size={18} />}
+          title="Chưa đủ dữ liệu để tính"
+          body={state.reason}
+          action={onRetry && <RetryButton onClick={onRetry} label="Kiểm tra lại dữ liệu" />}
+        />
+      );
     case 'not_ready':
       return (
         <Panel
