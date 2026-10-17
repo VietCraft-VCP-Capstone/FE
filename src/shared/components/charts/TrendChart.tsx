@@ -12,6 +12,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -25,6 +26,12 @@ export interface TrendSeries {
   /** Nhãn hiển thị ở chú giải và tooltip. */
   name: string;
   color: string;
+}
+
+/** Ngưỡng ngang, ví dụ mốc phân hạng. Nét đứt = ngưỡng, không phải dữ liệu. */
+export interface TrendThreshold {
+  y: number;
+  label: string;
 }
 
 export interface TrendPoint {
@@ -81,12 +88,20 @@ export function TrendChart({
   formatValue = (n: number) => n.toLocaleString('vi-VN'),
   /** Nhãn cho trình đọc màn hình — biểu đồ SVG không tự mô tả được nội dung. */
   ariaLabel,
+  thresholds = [],
+  yDomain,
+  dots = false,
 }: {
   data: TrendPoint[];
   series: TrendSeries[];
   height?: number;
   formatValue?: (n: number) => string;
   ariaLabel: string;
+  thresholds?: TrendThreshold[];
+  /** Cố định trục tung (vd. thang điểm 0–100) thay vì để recharts tự co theo dữ liệu. */
+  yDomain?: [number, number];
+  /** Chấm ở mọi điểm: chỉ nên bật khi có rất ít điểm, vd. mới có một ngày. */
+  dots?: boolean;
 }) {
   // Mỗi thực thể biểu đồ cần id gradient riêng, nếu không hai biểu đồ trên cùng
   // một trang sẽ dùng chung <defs> và cái sau đè màu cái trước.
@@ -123,9 +138,21 @@ export function TrendChart({
             axisLine={false}
             allowDecimals={false}
             width={44}
+            {...(yDomain ? { domain: yDomain } : {})}
             tick={{ fill: CHART_INK.axis, fontSize: 11 }}
             tickFormatter={v => formatValue(Number(v) || 0)}
           />
+
+          {thresholds.map(t => (
+            <ReferenceLine
+              key={t.y}
+              y={t.y}
+              stroke={CHART_INK.axis}
+              strokeDasharray="4 4"
+              strokeOpacity={0.6}
+              label={{ value: t.label, position: 'insideTopRight', fill: CHART_INK.axis, fontSize: 10.5 }}
+            />
+          ))}
 
           <Tooltip
             cursor={{ stroke: '#c9cec9', strokeWidth: 1 }}
@@ -147,7 +174,7 @@ export function TrendChart({
               strokeLinejoin="round"
               fill={`url(#${uid}-${s.key})`}
               // Không chấm ở mọi điểm: 90 điểm thì chấm nuốt mất đường.
-              dot={false}
+              dot={dots ? { r: CHART_MARKS.activeDotRadius, strokeWidth: CHART_MARKS.activeDotRing, stroke: CHART_INK.surface, fill: s.color } : false}
               // Tắt hiệu ứng vẽ dần. Khi người dùng đổi khoảng thời gian, trục
               // hoành nhảy sang miền ngày khác NGAY, còn đường thì bò dần từ hình
               // cũ sang hình mới — trong lúc đó biểu đồ hiển thị những giá trị

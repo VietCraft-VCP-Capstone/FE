@@ -56,10 +56,10 @@ function PageSkeleton() {
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map(i => (
-          <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          <Skeleton key={i} className="h-24 w-full rounded-md" />
         ))}
       </div>
-      <Skeleton className="h-64 w-full rounded-2xl" />
+      <Skeleton className="h-64 w-full rounded-md" />
     </div>
   );
 }
@@ -218,7 +218,7 @@ export function OverviewPage() {
               <InsightCard
                 title="5 sản phẩm bán chạy nhất"
                 description="Bấm vào một sản phẩm để xem sức khoẻ, phễu chuyển đổi và diễn biến của riêng nó."
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 footer={<SourceFooter meta={meta} />}
               >
                 {data.top_products.length === 0 ? (

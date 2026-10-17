@@ -196,7 +196,7 @@ export function QuadrantScatter({ points, onSelect, selectedId }: {
   const CUT_LOW = 30;
   const CUT_HIGH = 70;
   return (
-    <div className="relative aspect-[4/3] w-full rounded-xl border border-stone-200 bg-white">
+    <div className="relative aspect-[4/3] w-full rounded-md border border-stone-200 bg-white">
       {/* Vùng cơ hội: cầu cao, cung thấp. */}
       <div className="pointer-events-none absolute left-0 top-0 rounded-tl-xl bg-[#EAF0E2]/70" style={{ width: `${CUT_LOW}%`, height: `${100 - CUT_HIGH}%` }} aria-hidden />
       <span className="pointer-events-none absolute left-2 top-2 text-[10.5px] font-bold uppercase tracking-wide text-[#005B00]">Cơ hội</span>

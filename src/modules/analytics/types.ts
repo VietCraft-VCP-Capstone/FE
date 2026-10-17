@@ -11,6 +11,17 @@ export type InsightStatus = 'ok' | 'partial' | 'insufficient_data';
 /** live: dữ liệu thật · seed_demo: dữ liệu mô phỏng · derived: suy ra từ cả hai. */
 export type SourceMode = 'live' | 'seed_demo' | 'derived';
 
+/**
+ * Tiến độ mở khoá một tính năng đang `insufficient_data`/`partial` vì thiếu dữ liệu
+ * sàn thật — "đang có bao nhiêu / cần bao nhiêu" để vẽ thanh tiến độ (plan §9.2).
+ */
+export interface InsightUnlock {
+  requirement: string;
+  current: number;
+  target: number;
+  unit: string;
+}
+
 export interface InsightMeta {
   status: InsightStatus;
   reason?: string;
@@ -29,6 +40,7 @@ export interface InsightMeta {
     identity_linked: boolean;
     confidence: string;
   };
+  unlock?: InsightUnlock | null;
 }
 
 /** Ai đang xem và đang xem số liệu của shop nào (BE gắn vào mọi phản hồi). */
@@ -123,24 +135,52 @@ export interface ListingConversion {
 }
 
 /* ------------------------------------------------------------ F29 -------- */
+/**
+ * Hình dạng health-1.0 (plan v7 §4–§5): BE đọc thẳng `listing_health_scores`, không
+ * còn qua AI gateway. Trục nào thiếu dữ liệu thì bị LOẠI khỏi phép tính (không phải
+ * chấm 0) và liệt tên trong `axes_missing`.
+ */
+export type HealthStatus = 'good' | 'needs_improvement' | 'poor';
 
-export type HealthAxis = 'conversion' | 'rating' | 'content' | 'stock' | 'freshness';
+export type HealthAxis = 'conversion' | 'rating' | 'content' | 'inventory' | 'freshness';
 
-export interface ListingHealth {
-  listing_id: string;
-  title: string | null;
-  date: string;
-  health_score: number;
-  band: 'tốt' | 'cần cải thiện' | 'kém' | string;
+/**
+ * Một mục do engine F29 sinh ra (`vc-ai/AI-Analysic/app/core/f29/todos.py`, plan §4.3).
+ *   type 'todo'    — việc tăng điểm, đã sắp theo lợi ích/công sức.
+ *   type 'warning' — cần kiểm tra, KHÔNG trừ điểm (lỗ vốn, cân nặng mặc định, ...).
+ */
+export interface HealthTodo {
+  type: 'todo' | 'warning' | string;
+  message: string;
+  /** Tên field trong trình soạn sản phẩm: "images" | "description" | "tags" | "stock_quantity" | ... */
+  field?: string | null;
+  current_value?: string | number | null;
+  /** Mốc cần đạt. */
+  target?: string | number | null;
+  /** Số điểm tổng tăng thêm khi kéo đúng chỉ số này lên mốc (chấm lại thật, không ước chừng). */
+  impact?: number | null;
+}
+
+/** Căn cứ của tiêu chí tỉ lệ mua: tiến độ lượt xem, mặt bằng so sánh, lý do chưa tính. */
+export interface ConversionDetail {
+  views_30d: number;
+  orders_30d: number;
+  min_views: number;
   conversion_rate: number | null;
-  category_avg_cr: number | null;
-  cr_index: number | null;
-  rating_shrunk: number | null;
-  n_reviews: number;
-  breakdown: Record<HealthAxis, { score: number | null; weight: number; counted: boolean }>;
+  baseline_rate: number | null;
+  baseline_scope: 'category' | 'platform' | null;
+  reason: 'not_enough_views' | 'not_enough_peers' | 'no_orders_in_baseline' | null;
+}
+
+export interface ListingHealthDetail {
+  product_id: string;
+  title: string | null;
+  score: number | null;
+  status: HealthStatus | null;
+  axes: Partial<Record<HealthAxis, number | null>>;
   axes_missing: string[];
-  todo: { priority: number; action: string; expected_gain?: string }[];
-  note?: string;
+  todos: HealthTodo[];
+  conversion_detail?: ConversionDetail | null;
 }
 
 /* ------------------------------------------------------------ F30 -------- */
@@ -389,14 +429,17 @@ export interface Niches {
     keyword: string;
     tag_id: string;
     demand_pct: number;
-    supply_pct: number;
-    gap_score: number;
-    n_listings: number;
+    /** null ở shop thật: sàn chưa đủ listing thật gắn tag để so cung — xem meta.unlock. */
+    supply_pct: number | null;
+    gap_score: number | null;
+    n_listings: number | null;
     demand_index: number;
     trend: TrendDirection | 'rising' | 'falling' | string;
     growth_pct: number | null;
     quadrant: NicheQuadrant;
     sparkline_7d: number[];
+    /** true khi phần CUNG bị che vì chưa đủ listing thật (shop thật, xem meta.unlock). */
+    supply_insufficient?: boolean;
   }[];
   total_niches: number;
   banned_filtered: number;
