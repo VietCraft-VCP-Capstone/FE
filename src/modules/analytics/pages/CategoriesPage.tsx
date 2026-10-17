@@ -76,7 +76,7 @@ export function CategoriesPage() {
               <InsightCard
                 title="Doanh thu theo loại sản phẩm"
                 description={`Khoảng ${dateRange(data.from, data.to)}. Tổng doanh thu ${money(data.total_revenue_vnd)}.`}
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 footer={<SourceFooter meta={meta} />}
               >
                 {rows.length === 0 ? (
@@ -124,7 +124,7 @@ export function CategoriesPage() {
                           type="button"
                           onClick={() => setExpanded(open => !open)}
                           aria-expanded={expanded}
-                          className="cursor-pointer rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
+                          className="cursor-pointer rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
                         >
                           {expanded ? `Chỉ xem ${TOP_ROWS} loại nhiều nhất` : `Xem tất cả ${rows.length} loại`}
                         </button>
@@ -146,7 +146,7 @@ export function CategoriesPage() {
               >
                 <div className="space-y-4">
                   {data.limitation && (
-                    <div className="rounded-xl bg-amber-50 px-3.5 py-2.5">
+                    <div className="rounded-md bg-amber-50 px-3.5 py-2.5">
                       <Note tone="warn">
                         <strong>Đọc kỹ trước khi xếp lịch đăng bài:</strong> {data.limitation}
                       </Note>

@@ -50,7 +50,7 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
         <Route path="catalog" element={<SellerCatalogPage />} />
         <Route path="shipping" element={<Stub t="Vận chuyển" d="Quản lý phương thức và trạng thái giao hàng." />} />
         <Route path="promotions" element={<SellerPromotionsPage />} />
-        <Route path="revenue" element={<SellerRevenuePage />} />
+        <Route path="revenue" element={<Navigate to="/seller/payouts" replace />} />
 
         {/* Năm đường dẫn phân tích cũ đều là trang rỗng. Giờ chúng là trang thật trong khu
             "Phân tích & AI", nên chuyển tiếp thay vì để người bán gặp trang trắng. Giữ

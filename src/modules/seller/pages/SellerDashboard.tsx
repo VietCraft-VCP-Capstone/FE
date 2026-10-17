@@ -12,8 +12,7 @@ import {
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
-
-
+import { analyticsApi } from '../../analytics/services/analyticsApi';
 
 import {
   ProgressBar,
@@ -92,6 +91,7 @@ function PriceStat({ label, value, hint }: { label: string; value: string; hint?
 
 export function SellerDashboard() {
   const [data, setData] = useState<SellerOverviewData>(EMPTY_DATA);
+  const [seasonalEvent, setSeasonalEvent] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
@@ -101,12 +101,19 @@ export function SellerDashboard() {
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const [result, rep] = await Promise.all([
+      const [overviewResult, seasonalRes, repRes] = await Promise.allSettled([
         sellerDashboardService.loadOverview(),
-        sellerSettingsService.getReputation().catch(() => null),
+        analyticsApi.get<any>('/forecast/seasonal'),
+        sellerSettingsService.getReputation(),
       ]);
-      setData(result);
-      if (rep) setReputation(rep);
+
+      if (overviewResult.status === 'fulfilled') {
+        setData(overviewResult.value);
+      }
+      if (seasonalRes.status === 'fulfilled' && seasonalRes.value?.data?.events?.length > 0) {
+        setSeasonalEvent(seasonalRes.value.data.events[0]);
+      }
+      if (repRes.status === 'fulfilled' && repRes.value) setReputation(repRes.value);
       setLoadedAt(new Date());
     } finally {
       setLoading(false);
@@ -300,6 +307,74 @@ export function SellerDashboard() {
             </div>
           </div>
         </section>
+      )}
+
+      {/* Smart Seasonal Opportunity Banner */}
+      {seasonalEvent && (
+        <div className="mb-4 rounded-2xl border border-[#007700]/30 bg-gradient-to-r from-[#EAF0E2]/60 via-white to-amber-50/40 p-4 sm:p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#007700] text-white">
+                <Sparkles size={20} />
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-[#007700]/10 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-[#007700]">
+                    Cơ hội mùa vụ sắp tới
+                  </span>
+                  <span className="font-jakarta text-base font-extrabold text-stone-900">
+                    &ldquo;{seasonalEvent.name}&rdquo;
+                  </span>
+                </div>
+                <p className="mb-0 mt-1 text-xs text-stone-600">
+                  Cửa sổ ra hàng: <strong>{seasonalEvent.launch_window?.start}</strong> đến <strong>{seasonalEvent.launch_window?.end}</strong>.
+                  Đỉnh tìm kiếm tuần {seasonalEvent.peak_week_of_year} (ngày {seasonalEvent.launch_window?.peak_date}).
+                </p>
+              </div>
+            </div>
+
+            <Link
+              to={`/seller/insights/seasonal?keyword=${encodeURIComponent(seasonalEvent.name)}`}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-stone-900 px-3.5 py-2 text-xs font-bold text-white no-underline transition-colors hover:bg-stone-800"
+            >
+              Xem gợi ý sản phẩm chi tiết <ArrowRight size={13} />
+            </Link>
+          </div>
+
+          <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            {seasonalEvent.ready_to_ship_ideas?.[0] && (
+              <div className="flex items-center justify-between rounded-xl border border-stone-200/80 bg-white/90 p-2.5">
+                <div className="min-w-0 pr-2">
+                  <span className="block text-[10.5px] font-bold uppercase text-stone-500">Gợi ý hàng thường nên nhập</span>
+                  <span className="block truncate text-xs font-bold text-stone-900">{seasonalEvent.ready_to_ship_ideas[0].title}</span>
+                  <span className="block text-[11px] text-stone-500">Giá thị trường: {seasonalEvent.ready_to_ship_ideas[0].market_price_range}</span>
+                </div>
+                <Link
+                  to={`/seller/products/new?title=${encodeURIComponent(seasonalEvent.ready_to_ship_ideas[0].title)}`}
+                  className="shrink-0 rounded-lg bg-stone-100 px-2.5 py-1 text-[11px] font-bold text-stone-700 hover:bg-stone-200"
+                >
+                  Đăng bán
+                </Link>
+              </div>
+            )}
+
+            {seasonalEvent.pod_blanks?.[0] && (
+              <div className="flex items-center justify-between rounded-xl border border-stone-200/80 bg-white/90 p-2.5">
+                <div className="min-w-0 pr-2">
+                  <span className="block text-[10.5px] font-bold uppercase text-stone-500">Gợi ý phôi in thiết kế ngay</span>
+                  <span className="block truncate text-xs font-bold text-stone-900">{seasonalEvent.pod_blanks[0].title}</span>
+                  <span className="block text-[11px] text-stone-500">Phôi: {seasonalEvent.pod_blanks[0].category}</span>
+                </div>
+                <Link
+                  to={`/seller/products/new?blankId=${seasonalEvent.pod_blanks[0].matched_blank?._id || 'blank-tshirt-01'}&title=${encodeURIComponent(seasonalEvent.pod_blanks[0].title)}`}
+                  className="shrink-0 rounded-lg bg-[#007700] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#005b00]"
+                >
+                  Thiết kế
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Summary Cards */}
