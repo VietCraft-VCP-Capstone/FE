@@ -1,5 +1,3 @@
-/** Cột bảng "Tất cả sản phẩm": điểm, số bán 30 ngày, tag, việc nên làm. */
-
 import { Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { CheckCircle2 } from 'lucide-react';
@@ -143,5 +141,4 @@ export const HEALTH_COLUMNS: ColumnsType<ListingHealthItem> = [
   },
 ];
 
-/** Bề rộng tối thiểu trước khi bảng cuộn ngang; cột "Việc nên làm" giãn theo phần còn lại. */
 export const HEALTH_TABLE_WIDTH = 1120;

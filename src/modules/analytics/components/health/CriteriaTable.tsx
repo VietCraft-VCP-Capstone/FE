@@ -5,7 +5,6 @@ import { AXIS_ORDER, AXIS_WEIGHT, effectiveWeights } from '../HealthParts';
 import { InfoTip } from '../ui';
 import { BAND_COLOR, bandOf } from './healthStats';
 
-// Mốc khớp vc-ai/AI-Analysic/app/core/f29/constants.py (HEALTH_SPEC §2).
 const MOC = { images: 5, description: 150, tags: 3, freshDays: 90, zeroDays: 365 };
 const part = (value: number, target: number) => Math.round(Math.min(100, Math.max(0, (value / target) * 100)));
 

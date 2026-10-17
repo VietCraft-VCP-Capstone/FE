@@ -1,5 +1,3 @@
-/** Điểm theo ngày của một sản phẩm. */
-
 import { useState } from 'react';
 import { SERIES } from '../../../shared/components/charts/chartTheme';
 import { TrendChart } from '../../../shared/components/charts/TrendChart';

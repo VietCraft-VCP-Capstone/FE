@@ -11,7 +11,6 @@ export type InsightStatus = 'ok' | 'partial' | 'insufficient_data';
 /** live: dữ liệu thật · seed_demo: dữ liệu mô phỏng · derived: suy ra từ cả hai. */
 export type SourceMode = 'live' | 'seed_demo' | 'derived';
 
-/** Tiến độ mở khoá khi thiếu dữ liệu thật: đang có / cần bao nhiêu. */
 export interface InsightUnlock {
   requirement: string;
   current: number;

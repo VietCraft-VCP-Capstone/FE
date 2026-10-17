@@ -1,5 +1,4 @@
 import { useEnterMotion } from '../../../../shared/hooks/useMotion';
-/** Bảng mọi sản phẩm, điểm thấp trước; bộ lọc lưu trên URL. */
 
 import { Grid, Input, Select, Table } from 'antd';
 import { Search } from 'lucide-react';
@@ -8,7 +7,6 @@ import type { ListingHealthItem } from '../../healthTypes';
 import { HEALTH_COLUMNS, HEALTH_TABLE_WIDTH } from './HealthColumns';
 import { FOCUS, ISSUES, hasIssue, needsWork } from './healthStats';
 
-/** Mọi tag shop đang dùng, kèm số sản phẩm, tag nhiều sản phẩm lên trước. */
 function tagOptions(items: ListingHealthItem[]) {
   const counts = new Map<string, number>();
   for (const item of items) for (const t of item.tags) counts.set(t.name, (counts.get(t.name) ?? 0) + 1);
@@ -27,7 +25,6 @@ export function HealthTable({ items, issue, band, query, tags, setParam, setTags
   setTags: (tags: string[]) => void;
   clearFilters: () => void;
 }) {
-  // Cột cố định chiếm gần hết màn điện thoại nên chỉ ghim từ màn md trở lên.
   const wide = Grid.useBreakpoint().md ?? true;
   const columns = wide ? HEALTH_COLUMNS : HEALTH_COLUMNS.map(c => ({ ...c, fixed: undefined }));
   const needle = query.trim().toLowerCase();

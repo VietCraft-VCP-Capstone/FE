@@ -1,5 +1,4 @@
 import { useCountTo } from '../../../shared/hooks/useMotion';
-/** F29 · Tính thử điểm: AI chấm lại với số dự định, không lưu gì. */
 
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Pencil, RotateCcw, Wand2 } from 'lucide-react';
@@ -14,7 +13,6 @@ import { FOCUS } from './health/healthStats';
 import { LeverInput } from './health/LeverInput';
 import { Chip, InfoTip, Note } from './ui';
 
-/** Mốc khớp constants.py; có việc cần làm thì dùng mốc của việc đó. */
 const LEVERS: { key: PreviewLever; field: string; label: string; unit: string; step: number; max: number; goal: number }[] = [
   { key: 'n_images', field: 'images', label: 'Số ảnh', unit: 'ảnh', step: 1, max: 50, goal: 5 },
   { key: 'description_length', field: 'description', label: 'Độ dài mô tả', unit: 'ký tự', step: 50, max: 20000, goal: 150 },
@@ -66,7 +64,6 @@ export function HealthPreviewPanel({ productId, inputs, todos, score, status }: 
   const [dirty, setDirty] = useState<PreviewLever[]>([]);
   const [result, setResult] = useState<PreviewState>({ kind: 'idle' });
 
-  // Chỉ gửi ô đã đổi, ô còn lại AI dùng giá trị thật.
   const payloadKey = JSON.stringify(Object.fromEntries(dirty.map(k => [k, values[k]])));
 
   useEffect(() => {

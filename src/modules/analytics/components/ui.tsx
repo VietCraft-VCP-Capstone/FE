@@ -180,7 +180,7 @@ export function Fold({ title, children }: { title: string; children: React.React
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const onToggle = (e: React.SyntheticEvent<HTMLDetailsElement>) => {
     if (e.currentTarget.open && bodyRef.current && !reducedMotion()) {
-      gsap.from(bodyRef.current, { autoAlpha: 0, y: -4, duration: MOTION_DURATION, ease: 'power2.out', clearProps: 'all' });
+      gsap.from(bodyRef.current, { autoAlpha: 0, y: -4, duration: MOTION_DURATION, ease: 'power2.out', clearProps: 'opacity,visibility,transform' });
     }
   };
   return (

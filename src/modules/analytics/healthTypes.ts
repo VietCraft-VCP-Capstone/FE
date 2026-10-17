@@ -1,10 +1,7 @@
-/** Kiểu F29: lịch sử điểm và tính thử điểm. */
-
 import type { HealthAxis, HealthStatus, HealthTodo, ListingHealthDetail } from './types';
 
 export type HealthAxes = Partial<Record<HealthAxis, number | null>>;
 
-/** Một ngày trong `listing_health_scores`, BE trả tăng dần theo ngày. */
 export interface HealthHistoryPoint {
   date: string;
   score: number;
@@ -12,7 +9,6 @@ export interface HealthHistoryPoint {
   axes: HealthAxes;
 }
 
-/** Bốn chỉ số seller sửa được. Trần khớp BE `health-preview.ts` và AI `HealthPreviewBody`. */
 export type PreviewLever = 'n_images' | 'description_length' | 'n_tags' | 'in_stock_ratio_pct';
 
 export type PreviewInputs = Partial<Record<PreviewLever, number>>;
@@ -25,14 +21,11 @@ export interface HealthPreview {
   axes_missing: string[];
   current_score: number | null;
   delta_vs_current: number | null;
-  /** Giá trị đã dùng để chấm thử: lever không gửi lên thì là giá trị thật hiện tại. */
   inputs: Record<PreviewLever, number | null>;
   current_inputs: Record<PreviewLever, number | null>;
-  /** Lever không áp được, vd. tồn kho với sản phẩm làm theo yêu cầu. */
   ignored: PreviewLever[];
 }
 
-/** Một dòng của `GET /listings/health`: mọi việc tăng điểm, mọi cảnh báo và tag đang gắn. */
 export interface ListingHealthItem {
   product_id: string;
   title: string;
@@ -45,12 +38,10 @@ export interface ListingHealthItem {
   todos: HealthTodo[];
   n_todos: number;
   warnings: HealthTodo[];
-  /** `pending` = tag chờ admin duyệt, chưa hiện với người mua. */
   tags: { name: string; pending: boolean }[];
   sales: ListingSales;
 }
 
-/** Số 30 ngày trên đơn thật không huỷ; 0 là số thật, không phải thiếu dữ liệu. */
 export interface ListingSales {
   views_30d: number;
   orders_30d: number;
@@ -58,7 +49,6 @@ export interface ListingSales {
   revenue_30d: number;
 }
 
-/** Giá trị thật đang dùng để chấm điểm (BE đọc từ sản phẩm, phân loại, tag, đánh giá). */
 export interface HealthInputs {
   n_images: number;
   description_length: number;
@@ -91,7 +81,6 @@ export interface ListingHealthList {
   total: number;
 }
 
-/** Một ngày của `GET /listings/health/summary`: điểm trung bình và số sản phẩm theo mức. */
 export interface HealthSummaryPoint {
   date: string;
   avg_score: number;

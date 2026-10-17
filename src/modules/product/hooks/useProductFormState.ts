@@ -33,7 +33,6 @@ function formFromProduct(product: ProductItem): ProductFormData {
   return {
     title: product.title || '',
     category: product.category || '',
-    // id được dò ngược từ tên ở effect bên dưới, sau khi catalog tải xong.
     categoryId: '',
     tagIds: [],
     price: product.price || 0,
@@ -72,7 +71,6 @@ function newProductForm(): ProductFormData {
 }
 
 export function useProductFormState(isOpen: boolean, product?: ProductItem | null) {
-  // Danh mục + thẻ do admin quản lý; nạp một lần khi mở modal.
   const [categories, setCategories] = useState<CatalogOption[]>([]);
   const [tags, setTags] = useState<CatalogOption[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -81,7 +79,6 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
 
   const [formData, setFormData] = useState<ProductFormData>(EMPTY_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  /** % hoa hồng sàn. null = chưa tải được, khi đó không hiện giá niêm yết. */
   const [commissionPercent, setCommissionPercent] = useState<number | null>(null);
 
   useEffect(() => {
@@ -114,7 +111,6 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     setErrors({});
   }, [product, isOpen]);
 
-  // Form chỉ có tên danh mục/thẻ: đợi catalog tải xong rồi dò ra id.
   useEffect(() => {
     if (!product || categories.length === 0) return;
     const key = (x?: string) => (x || '').trim().toLowerCase();
@@ -129,7 +125,6 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     }));
   }, [product, categories, tags]);
 
-  // Đổi danh mục thì mức hoa hồng có thể đổi; hàng ở form này luôn READY_TO_SHIP.
   useEffect(() => {
     if (!isOpen) return;
     let alive = true;
@@ -140,7 +135,6 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     return () => { alive = false; };
   }, [isOpen, formData.categoryId]);
 
-  // API trả giá niêm yết; bóc hoa hồng ra để lưu không bị cộng chồng.
   useEffect(() => {
     if (!product || commissionPercent === null) return;
     setFormData(prev => ({ ...prev, price: netFromGross(product.price || 0, commissionPercent) }));
@@ -166,7 +160,6 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     return Object.keys(errs).length === 0;
   };
 
-  /** Ảnh bìa luôn đứng đầu mảng ảnh gửi lên. */
   const buildSubmitData = (): ProductFormData => {
     let finalImages = [...formData.images];
     const targetCover = formData.thumbnail || finalImages[0] || '';

@@ -7,7 +7,6 @@ import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 type OpenForm = (product: ProductItem | null, focusField?: string | null) => void;
 type ShowToast = (message: string, type: 'error') => void;
 
-/** ?new=1 mở form tạo, ?edit=<id>#<field> mở form sửa đúng ô; đọc xong xoá khỏi URL. */
 export function useProductFormDeepLink(openForm: OpenForm, showToast: ShowToast) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { hash } = useLocation();
@@ -35,7 +34,6 @@ export function useProductFormDeepLink(openForm: OpenForm, showToast: ShowToast)
     const editId = searchParams.get('edit');
     if (!editId) return;
     const focusField = hash ? decodeURIComponent(hash.slice(1)) : null;
-    // Không huỷ trong cleanup vì xoá param làm effect chạy lại ngay.
     const requestId = ++latestRequestRef.current;
     const isCurrent = () => mountedRef.current && requestId === latestRequestRef.current;
     (async () => {
@@ -46,7 +44,6 @@ export function useProductFormDeepLink(openForm: OpenForm, showToast: ShowToast)
         if (isCurrent()) showToast(getApiErrorMessage(err, 'Không tìm thấy sản phẩm để sửa.'), 'error');
       }
     })();
-    // setSearchParams điều hướng tới "?..." nên hash cũng bị bỏ theo.
     const next = new URLSearchParams(searchParams);
     next.delete('edit');
     setSearchParams(next, { replace: true });

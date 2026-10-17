@@ -47,7 +47,7 @@ interface TooltipPayloadItem {
   dataKey?: string;
 }
 
-function ChartTooltip({
+export function ChartTooltip({
   active,
   payload,
   label,

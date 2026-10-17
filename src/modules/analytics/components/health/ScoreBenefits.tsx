@@ -1,6 +1,5 @@
 import { Image, PackageCheck, Search, Star } from 'lucide-react';
 
-// Chỉ ghi lợi ích có thật trên sàn (tìm kiếm, giỏ hàng).
 const BENEFITS = [
   { Icon: Search, title: 'Dễ được tìm thấy', text: 'Ô tìm kiếm dò theo tên, mô tả và tag. Mô tả đủ, đủ tag thì khớp nhiều từ khoá người mua gõ hơn.' },
   { Icon: Image, title: 'Người mua yên tâm đặt', text: 'Đủ ảnh nhiều góc, mô tả rõ chất liệu, kích thước giúp người mua hiểu sản phẩm, ít hỏi lại.' },

@@ -11,7 +11,6 @@ import { BAND_COLOR, bandOf } from './healthStats';
 
 export const TREND_DAYS = [30, 90] as const;
 
-// Xếp chồng từ dưới lên: Tốt ở chân để vùng xanh "lớn dần" khi seller sửa.
 const STACK: { key: HealthStatus; label: string }[] = [
   { key: 'good', label: 'Tốt' },
   { key: 'needs_improvement', label: 'Cần cải thiện' },

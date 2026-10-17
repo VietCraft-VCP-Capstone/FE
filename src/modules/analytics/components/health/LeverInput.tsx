@@ -1,5 +1,3 @@
-/** Một ô "Tính thử điểm": nhãn, giá trị hiện tại, mốc, nút −/+. */
-
 import { useId } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { FOCUS } from './healthStats';
@@ -7,7 +5,6 @@ import { FOCUS } from './healthStats';
 export function LeverInput({ label, unit, current, goal, value, step, max, onChange }: {
   label: string;
   unit: string;
-  /** null = không áp cho sản phẩm này (vd. tồn kho của hàng làm theo yêu cầu). */
   current: number | null;
   goal: number;
   value: number;

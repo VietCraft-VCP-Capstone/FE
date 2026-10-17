@@ -18,7 +18,6 @@ export function getSessionId(): string {
     }
 }
 
-// Ghi lượt xem không được làm hỏng trang sản phẩm, nên lỗi chỉ log rồi bỏ qua.
 export async function recordProductViewEvent(productId: string, sessionId: string): Promise<void> {
     try {
         await api.post('/analytics/events/view', { product_id: productId, session_id: sessionId }, { timeout: 5000 });

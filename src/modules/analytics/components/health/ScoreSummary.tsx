@@ -4,7 +4,6 @@ import { healthTone } from '../HealthParts';
 import { Chip, InfoTip } from '../ui';
 import { BAND_COLOR, bandOf } from './healthStats';
 
-// Đậm hơn màu thanh để chữ đạt tương phản 4.5:1 trên nền trắng.
 const SCORE_TEXT: Record<HealthStatus, string> = { good: '#1a6b1a', needs_improvement: '#b45309', poor: '#b91c1c' };
 
 const WHAT_IS_IT = (
@@ -41,7 +40,12 @@ function BandScale({ score }: { score: number }) {
   );
 }
 
-export function ScoreSummary({ score, status, headline }: { score: number | null; status: HealthStatus | null; headline: string }) {
+export function ScoreSummary({ score, status, headline, salesPending }: {
+  score: number | null;
+  status: HealthStatus | null;
+  headline: string;
+  salesPending?: boolean;
+}) {
   const band = status ?? (score !== null ? bandOf(score) : null);
   return (
     <section className="rounded-md border border-stone-200 bg-white p-4">
@@ -57,6 +61,11 @@ export function ScoreSummary({ score, status, headline }: { score: number | null
         <span className="mb-1 ml-auto text-[13px] font-semibold text-stone-800">{headline}</span>
       </div>
       {band && <p className="m-0 mt-2 text-[13px] text-stone-600">{BAND_MEANING[band]}</p>}
+      {salesPending && (
+        <p className="m-0 mt-2 rounded-md bg-stone-50 px-3 py-2 text-xs leading-relaxed text-stone-600">
+          Điểm chưa tính tỉ lệ mua vì sản phẩm chưa đủ 100 lượt xem trong 30 ngày, nên mới phản ánh nội dung, chưa phản ánh bán hàng.
+        </p>
+      )}
       {score !== null && <BandScale score={score} />}
     </section>
   );

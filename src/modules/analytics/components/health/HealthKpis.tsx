@@ -1,5 +1,3 @@
-/** Bốn ô số liệu đầu trang. */
-
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 import { SERIES } from '../../../../shared/components/charts/chartTheme';
 import { decimal } from '../../format';
@@ -8,7 +6,6 @@ import type { InsightState } from '../../hooks/useInsight';
 import { KpiTile } from '../ui';
 import type { ShopStats } from './healthStats';
 
-/** Điểm trung bình hôm nay trừ điểm của ngày gần nhất cách đó ít nhất 7 ngày. */
 function weekChange(points: HealthSummaryPoint[]): number | null {
   const last = points[points.length - 1];
   if (!last) return null;
@@ -35,7 +32,6 @@ function PointsChange({ value }: { value: number | null }) {
   );
 }
 
-/** Đường nhỏ không trục, chỉ để thấy chiều đi của điểm. */
 function Sparkline({ values }: { values: number[] }) {
   const w = 72;
   const h = 26;

@@ -1,5 +1,3 @@
-/** F29 · Sức khoẻ sản phẩm cả shop: tổng quan rồi bảng mọi sản phẩm; bộ lọc lưu trên URL. */
-
 import { PackagePlus } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SellerAntd } from '../../seller/components/SellerAntd';
@@ -17,7 +15,6 @@ import { Fold } from '../components/ui';
 import type { HealthSummaryPoint, ListingHealthList } from '../healthTypes';
 import { useInsight, type InsightState } from '../hooks/useInsight';
 
-/** Câu tóm tắt dưới tiêu đề: bao nhiêu sản phẩm cần sửa, sửa xong điểm lên bao nhiêu. */
 function summary(state: InsightState<ListingHealthList>): string {
   if (state.kind !== 'ready' || state.data.items.length === 0) return 'Làm các việc dưới đây để sản phẩm dễ bán hơn.';
   const items = state.data.items;

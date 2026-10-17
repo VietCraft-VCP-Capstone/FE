@@ -1,5 +1,3 @@
-/** Ba thẻ phân tích dưới biểu đồ xu hướng; hai thẻ đầu bấm để lọc bảng. */
-
 import { ChevronRight, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { HealthAxis, HealthStatus } from '../../types';
@@ -19,7 +17,6 @@ function ClearButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/* ---------------------------------------------------------- mức điểm --- */
 
 export function BandDistribution({ stats, active, onPick, className }: {
   stats: ShopStats;
@@ -84,7 +81,6 @@ export function BandDistribution({ stats, active, onPick, className }: {
   );
 }
 
-/* ------------------------------------------------------- lỗi phổ biến --- */
 
 export function IssueBars({ stats, total, active, onPick, className }: {
   stats: ShopStats;
@@ -127,7 +123,6 @@ export function IssueBars({ stats, total, active, onPick, className }: {
   );
 }
 
-/* ---------------------------------------------------- điểm từng tiêu chí --- */
 
 const AXIS_SHORT: Record<HealthAxis, { label: string; missing: string }> = {
   content: { label: 'Nội dung', missing: 'chưa có nội dung' },

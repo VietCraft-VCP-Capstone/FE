@@ -1,5 +1,3 @@
-/** F29 · Chi tiết sức khoẻ một sản phẩm: giải thích điểm bên trái, việc cần làm và tính thử bên phải. */
-
 import { useParams } from 'react-router-dom';
 import { TodoItem, WarningItem } from '../components/HealthParts';
 import { HealthHistory } from '../components/HealthHistory';
@@ -24,7 +22,6 @@ function headline(score: number | null, todos: HealthTodo[]): string {
   const gain = gainOf(todos);
   if (todos.length === 0) return 'Sản phẩm đã ổn, chưa cần sửa gì.';
   if (score === null || gain <= 0) return `Làm ${todos.length} việc bên phải để sản phẩm dễ bán hơn.`;
-  // Cộng từ số đã làm tròn để khớp với "Làm hết: +N điểm" hiển thị bên cạnh.
   return `Làm hết việc nên làm, điểm lên khoảng ${Math.round(Math.min(100, score + Math.round(gain)))}.`;
 }
 
@@ -83,13 +80,12 @@ export function ListingDetailPage() {
     >
       <InsightBlock state={health.state} onRetry={health.reload}>
         {(data, meta) => {
-          // Gồm cả gợi ý 'info' (không cộng điểm), engine đã xếp chúng sau việc có điểm.
           const todos = data.todos.filter(t => t.type !== 'warning');
           const warnings = data.todos.filter(t => t.type === 'warning');
           return (
             <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,1.75fr)_minmax(360px,1fr)]">
               <div className="min-w-0 space-y-3">
-                <ScoreSummary score={data.score} status={data.status} headline={headline(data.score, todos)} />
+                <ScoreSummary score={data.score} status={data.status} headline={headline(data.score, todos)} salesPending={data.axes_missing.includes('conversion')} />
                 <CriteriaTable
                   axes={data.axes}
                   missing={data.axes_missing}

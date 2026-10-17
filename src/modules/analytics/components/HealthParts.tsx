@@ -1,5 +1,3 @@
-/** Phần dùng chung của F29; mốc phải khớp app/core/f29 và HEALTH_SPEC.md. */
-
 import { AlertTriangle, CheckCircle2, Circle, CircleDashed } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Chip, type Tone } from './ui';
@@ -7,7 +5,6 @@ import type { HealthAxis, HealthStatus, HealthTodo } from '../types';
 
 export const AXIS_ORDER: HealthAxis[] = ['content', 'inventory', 'freshness', 'rating', 'conversion'];
 
-/** Trọng số khi đủ cả năm tiêu chí (health-1.0). */
 export const AXIS_WEIGHT: Record<HealthAxis, number> = {
   conversion: 0.3,
   rating: 0.25,
@@ -66,7 +63,6 @@ export function axisLabel(axis: string): string {
   return AXIS_INFO[axis as HealthAxis]?.label ?? axis;
 }
 
-/** Phần trăm điểm thật của mỗi tiêu chí: tiêu chí thiếu dữ liệu bị bỏ, phần còn lại chia lại cho đủ 100%. */
 export function effectiveWeights(counted: HealthAxis[]): Partial<Record<HealthAxis, number>> {
   const total = counted.reduce((s, a) => s + AXIS_WEIGHT[a], 0);
   if (!total) return {};
@@ -77,9 +73,7 @@ export function editLink(productId: string, field?: string | null): string {
   return `/seller/products?edit=${productId}${field ? `#${field}` : ''}`;
 }
 
-/* ------------------------------------------------------------------------ */
 
-/** Nội dung "Điểm được tính thế nào?" ở trang danh sách. */
 export function HealthExplainer({ counted, missing }: { counted: HealthAxis[]; missing: HealthAxis[] }) {
   return (
     <div className="space-y-3 text-[13px] leading-relaxed text-stone-700">
@@ -113,7 +107,6 @@ export function HealthExplainer({ counted, missing }: { counted: HealthAxis[]; m
 const ACTION_BTN =
   'inline-flex h-8 shrink-0 cursor-pointer items-center rounded-md border px-3 text-xs font-semibold no-underline transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none';
 
-/** Một việc tăng điểm: ○ nội dung · +điểm · [Sửa]. */
 export function TodoItem({ todo, productId }: { todo: HealthTodo; productId: string }) {
   return (
     <li className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-1.5 text-[13px] leading-snug text-stone-700">
@@ -136,7 +129,6 @@ export function TodoItem({ todo, productId }: { todo: HealthTodo; productId: str
   );
 }
 
-/** Một cảnh báo: không trừ điểm nhưng nên kiểm tra. */
 export function WarningItem({ todo, productId }: { todo: HealthTodo; productId: string }) {
   return (
     <li className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-1.5 text-[13px] leading-snug text-amber-900">

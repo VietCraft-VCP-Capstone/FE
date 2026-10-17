@@ -2,7 +2,6 @@ import { RefObject, useEffect, useRef } from 'react';
 
 export type ProductFormFocusTarget = 'images' | 'title' | 'tags' | 'price' | 'stock' | 'description';
 
-// Map field của todo F29 sang ô trong form; field chưa có ô thì chỉ mở modal.
 const FIELD_TO_TARGET: Record<string, ProductFormFocusTarget> = {
   images: 'images',
   description: 'description',
@@ -24,14 +23,12 @@ export function resolveFocusTarget(field?: string | null): ProductFormFocusTarge
   return FIELD_TO_TARGET[field] ?? null;
 }
 
-// Ưu tiên ô nhập trước nút: khối mô tả có thanh công cụ đứng trước textarea.
 function firstFocusable(box: HTMLElement): HTMLElement | undefined {
   const usable = (el: HTMLElement) => el.getClientRects().length > 0 && !(el as HTMLInputElement).disabled;
   const pick = (selector: string) => Array.from(box.querySelectorAll<HTMLElement>(selector)).find(usable);
   return pick('input, textarea, select') ?? pick('button');
 }
 
-/** Cuộn tới và nháy viền ô cần sửa mỗi lần modal mở, chờ catalog tải xong. */
 export function useFocusFormField(
   containerRef: RefObject<HTMLElement | null>,
   isOpen: boolean,
@@ -53,7 +50,6 @@ export function useFocusFormField(
     const frame = requestAnimationFrame(() => {
       box = containerRef.current?.querySelector<HTMLElement>(`[data-focus-target="${target}"]`) ?? null;
       if (!box) return;
-      // Đánh dấu trong callback để StrictMode huỷ frame đầu vẫn chạy lại được.
       doneRef.current = true;
       box.scrollIntoView({ behavior: 'smooth', block: 'center' });
       firstFocusable(box)?.focus({ preventScroll: true });
