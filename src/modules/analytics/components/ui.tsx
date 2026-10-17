@@ -265,9 +265,6 @@ export function Fold({ title, children }: { title: string; children: React.React
   );
 }
 
-  );
-}
-
 /* ---------------------------------------------------------- ghi chú nhỏ --- */
 
 /** Một dòng giải thích đặt ngay dưới số liệu. Dùng cho giới hạn, cách tính. */
