@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { sellerPrinterService } from '../services/sellerPrinterService';
@@ -134,6 +134,7 @@ const DEFAULT_FRONTEND_BLANKS = [
 
 export function CreateProductPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [step, setStep] = useState(1);
     const [categories, setCategories] = useState<any[]>([]);
     const [blanks, setBlanks] = useState<any[]>([]);
@@ -291,6 +292,18 @@ export function CreateProductPage() {
         setActiveFace(normalized.print_areas?.[0]?.key || 'front');
         setSelectedId(null);
     };
+
+    useEffect(() => {
+        const urlTitle = searchParams.get('title');
+        const urlBlankId = searchParams.get('blankId');
+        if (urlTitle) setTitle(urlTitle);
+        if (urlBlankId && blanks.length > 0) {
+            const target = blanks.find((x: any) => x._id === urlBlankId);
+            if (target) {
+                chooseBlank(target);
+            }
+        }
+    }, [searchParams, blanks]);
 
     const addLayer = (l: L) => { setFaces(prev => ({ ...prev, [activeFace]: [...(prev[activeFace] || []), l] })); setSelectedId(l.id); };
     const updateLayer = (id: string, patch: Partial<L>) =>
