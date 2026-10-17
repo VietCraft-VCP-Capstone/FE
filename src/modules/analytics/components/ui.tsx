@@ -229,12 +229,12 @@ export function SelectField({ label, value, onChange, options, className }: {
 /* ------------------------------------------------------- kết luận nhanh --- */
 
 export const ACTION_CLASS =
-  'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border-none bg-[#007700] px-4 py-2 text-[13px] font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:bg-stone-300 motion-reduce:transition-none';
+  'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border-none bg-[#007700] px-4 py-2 text-[13px] font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:bg-stone-300 motion-reduce:transition-none';
 
 /** Đầu mỗi trang: câu trả lời trước, số liệu sau, kèm đúng một việc nên làm (người bán mới đọc 5 giây là đủ). */
 export function Takeaway({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <section aria-label="Kết luận nhanh" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#007700]/20 bg-[#EAF0E2] px-5 py-4">
+    <section aria-label="Kết luận nhanh" className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-[#007700]/20 bg-[#EAF0E2] px-4 py-3">
       <div className="min-w-0 flex-1">
         <span className="block text-[11.5px] font-bold uppercase tracking-wide text-[#005B00]">Kết luận nhanh</span>
         <p className="mb-0 mt-1 text-[15px] leading-relaxed text-stone-900">{children}</p>
@@ -262,9 +262,6 @@ export function Fold({ title, children }: { title: string; children: React.React
       </summary>
       <div ref={bodyRef} className="border-t border-stone-100 px-4 py-3">{children}</div>
     </details>
-  );
-}
-
   );
 }
 
