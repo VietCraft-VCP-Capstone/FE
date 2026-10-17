@@ -132,13 +132,16 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
 
   const currentPath = location.pathname === '/seller/product-listing' ? '/seller/products' : location.pathname;
   const navGroups = groups ?? OPS_GROUPS;
-  const isActive = (to: string) => {
-    if (currentPath === to) return true;
-    if (to === '/seller/products') {
-      return currentPath.startsWith('/seller/products/') && !currentPath.startsWith('/seller/products/new');
-    }
-    return currentPath.startsWith(`${to}/`);
-  };
+  const allNavItems = navGroups.flatMap(g => g.items);
+  const activeNavTo = allNavItems
+    .map(i => i.to)
+    .filter(to => {
+      if (currentPath === to) return true;
+      if (to === '/seller/products' && currentPath.startsWith('/seller/products/new')) return false;
+      return currentPath.startsWith(`${to}/`);
+    })
+    .sort((a, b) => b.length - a.length)[0];
+  const isActive = (to: string) => to === activeNavTo;
 
   return (
     <div className="seller-layout">

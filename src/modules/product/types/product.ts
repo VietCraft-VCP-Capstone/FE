@@ -38,6 +38,17 @@ export interface ProductItem {
   thumbnail: string;
   images: string[];
   colors: ProductColorVariant[];
+  sizes?: string[];
+  variants?: {
+    id: string;
+    name: string;
+    color?: string;
+    size?: string;
+    material?: string;
+    price: number;
+    stock: number;
+    mockupImage?: string;
+  }[];
   engagementTrend: number[]; // 5-7 data points for sparkline
   inventoryTrends: InventoryTrendPoint[]; // Timeline points for detail line chart
   /** BE luôn trả kèm (xem BE product.dto.ts: ProductItemResponseDTO.shopInfo). */
@@ -77,6 +88,7 @@ export interface ProductFormData {
   thumbnail: string;
   images: string[];
   colors: ProductColorVariant[];
+  sizes?: string[];
 }
 
 export type ProductSortOption = 

@@ -544,6 +544,7 @@ export function BuyerProductDetailPage() {
 
     const checkoutItem = {
       productId: product.id || (product as any)._id,
+      shopId: product.shopInfo?.id || (product as any)?.shop_id?._id || (product as any)?.shop_id,
       variantId: targetVariantId ? String(targetVariantId) : '',
       title: product.title || 'Sản phẩm VietCraft',
       shopName: product.shopInfo?.name || (product as any)?.shop_id?.shop_name || 'VietCraft Shop',

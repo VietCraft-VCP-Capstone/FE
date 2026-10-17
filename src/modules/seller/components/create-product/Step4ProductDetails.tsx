@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Star, Filter, Plus, X, Tag as TagIcon, Loader2 } from 'lucide-react';
+import { Star, Filter, Plus, X, Tag as TagIcon, Loader2, Sparkles } from 'lucide-react';
 import { abs } from './useHTMLImage';
 import { commissionAmount, withCommission } from '../../../../shared/utils/commission';
 import { money } from '../../../../shared/utils/format';
 import { catalogService } from '../../services/catalogService';
+import SmartProductAiModal from '../SmartProductAiModal';
 
 interface Step4Props {
     title: string;
@@ -41,6 +42,8 @@ export function Step4ProductDetails({
 }: Step4Props) {
     const [colorFilter, setColorFilter] = useState('all');
     const [onlySelectedFilter, setOnlySelectedFilter] = useState(false);
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+    const baseBlankCost = blank?.variations?.[0]?.print_cost_vnd || blank?.variations?.[0]?.price || 0;
     const [newTagInput, setNewTagInput] = useState('');
 
     // Modal đề xuất danh mục
@@ -153,7 +156,17 @@ export function Step4ProductDetails({
 
             {/* Form đặt tên và thông tin */}
             <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm">
-                <h2 className="text-base font-bold text-stone-900 mb-4">1. Đặt tên & Thông tin sản phẩm</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <h2 className="text-base font-bold text-stone-900">1. Đặt tên & Thông tin sản phẩm</h2>
+                    <button
+                        type="button"
+                        onClick={() => setIsAiModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-black shadow-sm transition active:scale-95 cursor-pointer self-start sm:self-auto"
+                    >
+                        <Sparkles size={14} className="text-amber-300 animate-pulse" />
+                        <span>✨ AI Gợi ý tên, giá & từ khóa hot</span>
+                    </button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                         <label className="block text-[13px] font-semibold text-stone-800 mb-[7px]">Tên sản phẩm POD *</label>
@@ -548,6 +561,41 @@ export function Step4ProductDetails({
                     </table>
                 </div>
             </div>
+            {/* Modal Gợi Ý Thông Minh AI */}
+            <SmartProductAiModal
+                isOpen={isAiModalOpen}
+                onClose={() => setIsAiModalOpen(false)}
+                categories={categories}
+                initialCategory={categoryId}
+                initialTitle={title || (blank?.title ? `${blank.title} Nghệ Thuật` : '')}
+                blankCost={baseBlankCost}
+                isPod={true}
+                onApplyTitle={setTitle}
+                onApplyDescription={setDescription}
+                onApplyMarkup={(markupVal) => {
+                    setSelectedVariants((prev: any) => {
+                        const next = { ...prev };
+                        Object.keys(next).forEach(sku => {
+                            next[sku] = { ...next[sku], markup: String(markupVal) };
+                        });
+                        return next;
+                    });
+                }}
+                onApplyAll={(aiData) => {
+                    if (aiData.title) setTitle(aiData.title);
+                    if (aiData.description) setDescription(aiData.description);
+                    if (aiData.categoryId) setCategoryId(aiData.categoryId);
+                    if (aiData.markup && aiData.markup > 0) {
+                        setSelectedVariants((prev: any) => {
+                            const next = { ...prev };
+                            Object.keys(next).forEach(sku => {
+                                next[sku] = { ...next[sku], markup: String(aiData.markup) };
+                            });
+                            return next;
+                        });
+                    }
+                }}
+            />
         </div>
     );
 }

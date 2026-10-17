@@ -5,8 +5,9 @@ import { ProductItem, ProductFormData } from '../types/product';
 import { useProductFormState } from '../hooks/useProductFormState';
 import { useFocusFormField } from '../hooks/useFocusFormField';
 import { ProductFormImageManager } from './ProductFormImageManager';
-import { ProductFormColorManager } from './ProductFormColorManager';
 import { ProductFormBasicFields } from './ProductFormBasicFields';
+import { ProductFormColorManager } from './ProductFormColorManager';
+import { ProductFormSizeManager } from './ProductFormSizeManager';
 import { ProductFormDescriptionEditor } from './ProductFormDescriptionEditor';
 import { ProposeCategoryModal } from './ProposeCategoryModal';
 
@@ -117,6 +118,14 @@ export function ProductFormModal({
           <ProductFormColorManager
             colors={formData.colors}
             onChangeColors={(colors) => patch({ colors })}
+          />
+
+          {/* Section 3.5: Thanh chuyển đổi Tab & Quản lý Quy cách / Kích thước sản phẩm */}
+          <ProductFormSizeManager
+            sizes={formData.sizes || []}
+            onChangeSizes={(sizes) => patch({ sizes })}
+            categoryName={formData.category}
+            productTitle={formData.title}
           />
 
           <ProductFormDescriptionEditor

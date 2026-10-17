@@ -17,7 +17,8 @@ const EMPTY_FORM: ProductFormData = {
   description: '',
   thumbnail: '',
   images: [],
-  colors: [{ name: 'Gỗ sồi tự nhiên', hex: '#5C4033' }]
+  colors: [{ name: 'Gỗ sồi tự nhiên', hex: '#5C4033' }],
+  sizes: []
 };
 
 function formFromProduct(product: ProductItem): ProductFormData {
@@ -44,7 +45,10 @@ function formFromProduct(product: ProductItem): ProductFormData {
     description: product.description || '',
     thumbnail: activeThumb,
     images: orderedImages,
-    colors: product.colors && product.colors.length > 0 ? product.colors : []
+    colors: product.colors && product.colors.length > 0 ? product.colors : [],
+    sizes: product.sizes && product.sizes.length > 0
+      ? product.sizes
+      : Array.from(new Set((product.variants || []).map(v => v.size).filter(Boolean))) as string[]
   };
 }
 
@@ -66,7 +70,8 @@ function newProductForm(): ProductFormData {
     colors: [
       { name: 'Đen', hex: '#1C1C1C' },
       { name: 'Trắng', hex: '#FFFFFF' }
-    ]
+    ],
+    sizes: []
   };
 }
 
