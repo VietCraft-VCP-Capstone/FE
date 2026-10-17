@@ -43,7 +43,7 @@ export function BuyerCheckoutPage() {
     const navigate = useNavigate();
     const outletContext = useOutletContext<{ setCartCount?: (n: number) => void }>() || {};
     const setCartCount = outletContext.setCartCount ?? (() => {});
-    const [items] = useState<CheckoutItem[]>(() => {
+    const [items, setItems] = useState<CheckoutItem[]>(() => {
         try {
             const parsed = JSON.parse(localStorage.getItem('vietcraft_checkout') || '[]');
             return Array.isArray(parsed) ? parsed : [];
