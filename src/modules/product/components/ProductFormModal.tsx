@@ -4,11 +4,7 @@ import { ProductItem, ProductFormData, CatalogOption } from '../types/product';
 import { productsService } from '../services/productsService';
 import { ProductFormImageManager } from './ProductFormImageManager';
 import { ProductFormColorManager } from './ProductFormColorManager';
-import {
-  ApparelSizeManager,
-  ShoeSizeManager,
-  GeneralSizeManager,
-} from './ProductFormSizeManager';
+import { ProductFormSizeManager } from './ProductFormSizeManager';
 import { commissionAmount, netFromGross, withCommission } from '../../../shared/utils/commission';
 import { money } from '../../../shared/utils/format';
 import {
@@ -573,33 +569,13 @@ export function ProductFormModal({
             onChangeColors={(colors) => setFormData({ ...formData, colors })}
           />
 
-          {/* Section 3.5: Kích hoạt 1 trong 3 Component kích thước tương ứng theo Danh mục đã chọn */}
-          {(() => {
-            const activeCategoryType = getCategoryVariantType(formData.category, formData.title, formData.location);
-            if (activeCategoryType === 'shoes') {
-              return (
-                <ShoeSizeManager
-                  sizes={formData.sizes || []}
-                  onChangeSizes={(sizes) => setFormData({ ...formData, sizes })}
-                />
-              );
-            }
-            if (activeCategoryType === 'apparel') {
-              return (
-                <ApparelSizeManager
-                  sizes={formData.sizes || []}
-                  onChangeSizes={(sizes) => setFormData({ ...formData, sizes })}
-                />
-              );
-            }
-            return (
-              <GeneralSizeManager
-                sizes={formData.sizes || []}
-                onChangeSizes={(sizes) => setFormData({ ...formData, sizes })}
-                categoryName={formData.category}
-              />
-            );
-          })()}
+          {/* Section 3.5: Thanh chuyển đổi Tab & Quản lý Quy cách / Kích thước sản phẩm */}
+          <ProductFormSizeManager
+            sizes={formData.sizes || []}
+            onChangeSizes={(sizes) => setFormData({ ...formData, sizes })}
+            categoryName={formData.category}
+            productTitle={formData.title}
+          />
 
           {/* Section 4: Description */}
           <div className="space-y-2 pt-2 border-t border-stone-100">
