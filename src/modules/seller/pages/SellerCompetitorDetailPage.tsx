@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ExternalLink,
   UserMinus,
+  UserPlus,
   Search,
   Ticket,
   DollarSign,
@@ -30,7 +31,8 @@ export function SellerCompetitorDetailPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState<'newest' | 'price_asc' | 'price_desc' | 'rating'>('newest');
-  const [isUnfollowing, setIsUnfollowing] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followPending, setFollowPending] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -58,6 +60,7 @@ export function SellerCompetitorDetailPage() {
         if (!alive) return;
         if (shopDetail) {
           setShop(shopDetail as ShopDetail);
+          setIsFollowing(Boolean(shopDetail.isFollowing));
         }
         setProducts(productsData.items || []);
         // Chỉ tính voucher do chính gian hàng đối thủ phát hành, bỏ voucher toàn sàn
@@ -73,17 +76,33 @@ export function SellerCompetitorDetailPage() {
   }, [id]);
 
   const handleUnfollow = async () => {
-    if (!shop || isUnfollowing) return;
+    if (!shop || followPending) return;
     const shopId = shop.id || shop._id || id || '';
     try {
-      setIsUnfollowing(true);
+      setFollowPending(true);
       await shopService.unfollow(shopId);
       showToast(`Đã dừng theo dõi gian hàng "${shop.name || shop.shopName}".`, 'info');
       navigate('/seller/competitors');
     } catch (err) {
       showToast(getApiErrorMessage(err, 'Không thể dừng theo dõi gian hàng này.'), 'error');
     } finally {
-      setIsUnfollowing(false);
+      setFollowPending(false);
+    }
+  };
+
+  // Seller mở xem trước từ trang F32 rồi theo dõi ngay tại đây; BE chặn khi đã đủ 10 shop (BR-201)
+  const handleFollow = async () => {
+    if (!shop || followPending) return;
+    const shopId = shop.id || shop._id || id || '';
+    try {
+      setFollowPending(true);
+      await shopService.follow(shopId);
+      setIsFollowing(true);
+      showToast(`Đã theo dõi gian hàng "${shop.name || shop.shopName}".`, 'success');
+    } catch (err) {
+      showToast(getApiErrorMessage(err, 'Không thể theo dõi gian hàng này.'), 'error');
+    } finally {
+      setFollowPending(false);
     }
   };
 
@@ -161,7 +180,7 @@ export function SellerCompetitorDetailPage() {
             className="hover:text-emerald-700 transition-colors cursor-pointer flex items-center gap-1 text-stone-600"
           >
             <ArrowLeft size={14} />
-            <span>Đối thủ theo dõi</span>
+            <span>Đối thủ đang theo dõi</span>
           </button>
           <ChevronRight size={12} className="text-stone-400" />
           <span className="text-stone-900 font-bold truncate max-w-xs">{shopDisplayName}</span>
@@ -176,14 +195,25 @@ export function SellerCompetitorDetailPage() {
             <ExternalLink size={14} />
             <span>Xem giao diện Người mua</span>
           </button>
-          <button
-            disabled={isUnfollowing}
-            onClick={handleUnfollow}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-          >
-            <UserMinus size={14} />
-            <span>{isUnfollowing ? 'Đang bỏ...' : 'Dừng theo dõi'}</span>
-          </button>
+          {isFollowing ? (
+            <button
+              disabled={followPending}
+              onClick={handleUnfollow}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+            >
+              <UserMinus size={14} />
+              <span>{followPending ? 'Đang bỏ...' : 'Dừng theo dõi'}</span>
+            </button>
+          ) : (
+            <button
+              disabled={followPending || !shop}
+              onClick={handleFollow}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+            >
+              <UserPlus size={14} />
+              <span>{followPending ? 'Đang theo dõi...' : 'Theo dõi'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -219,9 +249,11 @@ export function SellerCompetitorDetailPage() {
                   <h1 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
                     {shopDisplayName}
                   </h1>
-                  <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                    Đối thủ đang theo dõi
-                  </span>
+                  {isFollowing && (
+                    <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                      Đối thủ đang theo dõi
+                    </span>
+                  )}
                 </div>
                 {(shop?.slogan || shop?.description) && (
                   <p className="text-xs sm:text-sm text-stone-500 mt-1 max-w-2xl line-clamp-2 italic">

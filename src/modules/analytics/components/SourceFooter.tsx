@@ -53,7 +53,7 @@ export function SourceFooter({ meta, limitation, method }: {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <SourceChip mode={meta.source.mode} />
         <span>Cập nhật {dateTime(meta.computed_at)}</span>
-        {meta.quality?.sample_size != null && <span>Cỡ mẫu {meta.quality.sample_size.toLocaleString('vi-VN')}</span>}
+        {meta.quality?.sample_size != null && <span>Tính trên {meta.quality.sample_size.toLocaleString('vi-VN')} mẫu</span>}
         {hasDetail && (
           <button
             type="button"

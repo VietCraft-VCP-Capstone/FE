@@ -222,17 +222,17 @@ export interface CategoryRevenue {
 export interface Competitors {
   category_id: string;
   available_categories: string[];
+  /** Chỉ có ở shop thật: mã danh mục -> tên. Danh mục của sàn không có trong bảng nhãn cứng. */
+  category_names?: Record<string, string | null>;
   my_listings: {
     listing_id: string;
     title: string;
     price_vnd: number;
     est_sales_90d: number;
     rating_shrunk: number | null;
-    /** Với shop thật đây là PHÂN VỊ GIÁ, không phải hạng doanh số. Xem `note`. */
+    /** Hạng theo số bán 90 ngày trong danh mục. */
     rank_in_cat: number;
     n_in_cat: number;
-    product_type_id?: string | null;
-    type_source?: TypeSource;
   }[];
   competitors: {
     rank: number;
@@ -244,6 +244,8 @@ export interface Competitors {
     rating_shrunk: number | null;
     n_reviews: number;
     favorite_count: number;
+    /** Chỉ có ở shop thật: mã shop để theo dõi ngay trên bảng. Dữ liệu mồi không trả trường này. */
+    shop_id?: string;
   }[];
   my_position: {
     price_percentile: number | null;
@@ -258,14 +260,26 @@ export interface Competitors {
 
 export interface ShopComparison {
   segment: string;
+  /** Chỉ có ở shop thật: tên danh mục của phân khúc. */
+  segment_name?: string | null;
   segment_reason: string;
   axes: string[];
   axes_vi: string[];
   normalization: string;
-  me: number[];
+  /** null = trục thiếu dữ liệu (ví dụ chưa đo được thời gian phản hồi), KHÔNG phải 0 điểm. */
+  me: (number | null)[];
   me_raw: Record<string, number | null>;
-  competitors: { shop_id: string; shop_name: string; values: number[]; est_revenue_90d_vnd: number }[];
+  competitors: {
+    shop_id: string;
+    shop_name: string;
+    values: (number | null)[];
+    /** Số thật từng trục, cùng đơn vị với `me_raw`. */
+    raw?: Record<string, number | null>;
+    est_revenue_90d_vnd: number;
+  }[];
   shops_in_segment: number;
+  /** Trục của chính shop bạn đang thiếu dữ liệu. */
+  axes_missing?: string[];
 }
 
 /* ------------------------------------------------------------ F34 -------- */
@@ -273,8 +287,14 @@ export interface ShopComparison {
 export interface TagGap {
   category_id: string;
   available_categories: string[];
+  /** Chỉ có ở shop thật: mã danh mục -> tên. */
+  category_names?: Record<string, string | null>;
   competitors_scanned: number;
   my_tags: string[];
+  /** mã tag -> tên hiển thị, cho cả tag của shop mình. */
+  tag_names?: Record<string, string>;
+  /** Tag nhóm bán chạy hay dùng, kể cả tag shop mình đã có. */
+  leader_tags?: { tag_id: string; used_by: number; mine: boolean }[];
   missing_tags: {
     tag_id: string;
     name: string;
@@ -319,6 +339,8 @@ export interface MyProduct {
 export interface PricingAnalysis {
   product_type_id: string;
   available_product_types: string[];
+  /** Chỉ có ở shop thật: "loại" là danh mục cấp 2 của sàn, kèm tên để hiển thị. */
+  product_type_names?: Record<string, string | null>;
   n_listings: number;
   basis: string;
   distribution: { min: number; max: number; p10: number; p25: number; p50: number; p75: number; p90: number };
@@ -353,9 +375,18 @@ export interface CompetitorTracking {
     in_my_niche: boolean;
     matched_tags: string[];
     est_sales_90d: number | null;
+    /** Chỉ có ở shop thật: ngày đối thủ đăng sản phẩm lên sàn (ngày thật, không phải lúc soát). */
+    listed_at?: string | null;
+    product_id?: string | null;
+    matched_category?: string | null;
+    category_name?: string | null;
   }[];
   alerts_total: number;
   my_niche_tags: string[];
+  /** Chỉ có ở shop thật: slug tag -> tên hiển thị. */
+  tag_names?: Record<string, string>;
+  /** Chỉ có ở shop thật: lần quét gần nhất của job đêm. */
+  alerts_computed_at?: string | null;
   limitation: string | null;
 }
 

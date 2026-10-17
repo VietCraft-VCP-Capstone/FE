@@ -4,7 +4,7 @@ import '../../../shared/components/layouts.css';
 import { POD_CREATE_ENABLED, POD_CREATE_PATH } from '../featureFlags';
 import {
   LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Palette, Ticket,
-  Banknote, Rocket,
+  Wallet, Banknote, Rocket, Users,
   Settings, Bell, Mail, PanelLeft, LogOut, ChevronDown, MessageSquare
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -44,6 +44,8 @@ const OPS_NAV: SellerNavItem[] = [
   { to: '/seller/products/new', icon: PlusCircle, label: 'Tạo sản phẩm POD' },
   { to: '/seller/designs', icon: Palette, label: 'Kho thiết kế' },
   { to: '/seller/promotions', icon: Ticket, label: 'Khuyến mãi' },
+  { to: '/seller/competitors', icon: Users, label: 'Đối thủ đang theo dõi' },
+  { to: '/seller/revenue', icon: Wallet, label: 'Doanh thu cửa hàng' },
   { to: '/seller/payouts', icon: Banknote, label: 'Đối soát & rút tiền' },
   { to: '/seller/onboarding', icon: Rocket, label: 'Thiết lập gian hàng' },
 ];
