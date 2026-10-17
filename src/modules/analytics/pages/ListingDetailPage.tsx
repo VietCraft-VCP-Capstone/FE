@@ -5,6 +5,7 @@ import { HealthPreviewPanel } from '../components/HealthPreviewPanel';
 import { CriteriaTable } from '../components/health/CriteriaTable';
 import { ListingHeader } from '../components/health/ListingHeader';
 import { ScoreSummary } from '../components/health/ScoreSummary';
+import { VariantStock } from '../components/health/VariantStock';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { ListingTraffic } from '../components/ListingTraffic';
@@ -97,6 +98,7 @@ export function ListingDetailPage() {
               </div>
               <div className="min-w-0 space-y-3">
                 <TodoCard productId={id} todos={todos} warnings={warnings} score={data.score} />
+                <VariantStock productId={id} product={data.product} />
                 <HealthPreviewPanel productId={id} inputs={data.inputs} todos={todos} score={data.score} status={data.status} />
                 <SourceFooter meta={meta} />
               </div>

@@ -16,13 +16,13 @@ function priceText(min: number | null, max: number | null): string {
   return min === max ? money(min) : `${money(min)} – ${money(max)}`;
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({ label, value, hint, warn }: { label: string; value: string; hint?: string; warn?: boolean }) {
   return (
     <div className="min-w-0 lg:border-l lg:border-stone-100 lg:pl-4 lg:first:border-l-0 lg:first:pl-0">
       <dt className="text-xs font-medium text-stone-500">{label}</dt>
       <dd className="m-0 mt-0.5 text-base font-bold tabular-nums text-stone-900">
         {value}
-        {hint && <span className="ml-1 text-xs font-normal text-stone-500">{hint}</span>}
+        {hint && <span className={`ml-1 text-xs font-normal ${warn ? 'font-semibold text-red-700' : 'text-stone-500'}`}>{hint}</span>}
       </dd>
     </div>
   );
@@ -30,6 +30,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 
 export function ListingHeader({ data }: { data: ListingHealthDetailFull }) {
   const { product, sales } = data;
+  const soldOut = (product.variants ?? []).filter(v => v.stock === 0).length;
   const title = data.title || 'Sản phẩm';
   return (
     <header className="rounded-md border border-stone-200 bg-white">
@@ -64,7 +65,11 @@ export function ListingHeader({ data }: { data: ListingHealthDetailFull }) {
       </div>
       <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-stone-100 px-4 py-3 sm:grid-cols-3 lg:grid-cols-5">
         <Stat label="Giá bán" value={priceText(product.price_min, product.price_max)} />
-        <Stat label="Tồn kho" value={count(product.stock_total)} hint="món" />
+        {product.product_type === 'READY_TO_SHIP' ? (
+          <Stat label="Tồn kho" value={count(product.stock_total)} hint={soldOut ? `món · ${soldOut} phân loại hết` : 'món'} warn={soldOut > 0} />
+        ) : (
+          <Stat label="Tồn kho" value="Làm theo đơn" hint="không cần trữ hàng" />
+        )}
         <Stat label="Lượt xem 30 ngày" value={count(sales.views_30d)} />
         <Stat label="Đã bán 30 ngày" value={count(sales.units_30d)} hint={`món · ${count(sales.orders_30d)} đơn`} />
         <Stat label="Doanh thu 30 ngày" value={money(sales.revenue_30d)} />

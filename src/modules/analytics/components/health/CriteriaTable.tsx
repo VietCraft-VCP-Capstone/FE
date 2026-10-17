@@ -3,9 +3,8 @@ import type { HealthInputs } from '../../healthTypes';
 import type { ConversionDetail, HealthAxis } from '../../types';
 import { AXIS_ORDER, AXIS_WEIGHT, effectiveWeights } from '../HealthParts';
 import { InfoTip } from '../ui';
-import { BAND_COLOR, bandOf } from './healthStats';
+import { BAND_COLOR, bandOf, MOC } from './healthStats';
 
-const MOC = { images: 5, description: 150, tags: 3, freshDays: 90, zeroDays: 365 };
 const part = (value: number, target: number) => Math.round(Math.min(100, Math.max(0, (value / target) * 100)));
 
 const NAME: Record<HealthAxis, string> = {

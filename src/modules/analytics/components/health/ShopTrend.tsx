@@ -7,17 +7,14 @@ import type { HealthSummaryPoint } from '../../healthTypes';
 import type { InsightState } from '../../hooks/useInsight';
 import type { HealthStatus } from '../../types';
 import { InfoTip, InsightCard, Note, Skeleton } from '../ui';
+import { HEALTH_BANDS } from '../HealthParts';
 import { BAND_COLOR, bandOf } from './healthStats';
 
 export const TREND_DAYS = [30, 90] as const;
 
-const STACK: { key: HealthStatus; label: string }[] = [
-  { key: 'good', label: 'Tốt' },
-  { key: 'needs_improvement', label: 'Cần cải thiện' },
-  { key: 'poor', label: 'Kém' },
-];
+const STACK: { key: HealthStatus; label: string }[] = HEALTH_BANDS.map(b => ({ key: b.status, label: b.label }));
 
-const INFO = 'Tỉ lệ sản phẩm Tốt, Cần cải thiện và Kém theo từng ngày. Sửa sản phẩm theo việc nên làm thì vùng xanh rộng ra, vùng đỏ và vàng thu hẹp lại.';
+const INFO = 'Mỗi ngày có bao nhiêu phần trăm sản phẩm ở mức Tốt (xanh), Nên sửa thêm (vàng), Cần sửa gấp (đỏ). Sửa theo gợi ý thì phần xanh rộng ra.';
 
 function DaysToggle({ days, onChange }: { days: number; onChange: (d: number) => void }) {
   return (
@@ -73,7 +70,7 @@ function Change({ label, now, before, goodWhenUp }: { label: string; now: number
 function ShareArea({ rows }: { rows: Row[] }) {
   const last = rows[rows.length - 1];
   return (
-    <div role="img" aria-label={`Tỉ lệ sản phẩm theo mức, ngày ${fullDate(last.date)}: Tốt ${last.good}, Cần cải thiện ${last.needs_improvement}, Kém ${last.poor}`} style={{ height: 210 }}>
+    <div role="img" aria-label={`Tỉ lệ sản phẩm theo mức, ngày ${fullDate(last.date)}: Tốt ${last.good}, Nên sửa thêm ${last.needs_improvement}, Cần sửa gấp ${last.poor}`} style={{ height: 210 }}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={rows} stackOffset="expand" margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke={CHART_INK.grid} />
@@ -104,8 +101,8 @@ function Body({ state, days }: { state: InsightState<HealthSummaryPoint[]>; days
       <ShareArea rows={rows} />
       <dl className="m-0 grid grid-cols-3 gap-3 border-t border-stone-100 pt-3">
         <Change label={`Tốt (so với ${first.label})`} now={last.good} before={first.good} goodWhenUp />
-        <Change label="Cần cải thiện" now={last.needs_improvement} before={first.needs_improvement} goodWhenUp={false} />
-        <Change label="Kém" now={last.poor} before={first.poor} goodWhenUp={false} />
+        <Change label="Nên sửa thêm" now={last.needs_improvement} before={first.needs_improvement} goodWhenUp={false} />
+        <Change label="Cần sửa gấp" now={last.poor} before={first.poor} goodWhenUp={false} />
       </dl>
     </div>
   );
@@ -155,7 +152,7 @@ function ModeToggle({ mode, onChange, trendReady }: { mode: Mode; onChange: (m: 
   );
   return (
     <div role="group" aria-label="Kiểu biểu đồ" className="inline-flex items-center rounded-md bg-stone-100 p-0.5">
-      {btn('now', 'Phân bố')}
+      {btn('now', 'Hôm nay')}
       {btn('trend', 'Theo ngày', !trendReady)}
       {!trendReady && <span className="px-1.5"><InfoTip text="Điểm được lưu mỗi ngày. Từ ngày thứ hai sẽ xem được xu hướng." label="Vì sao chưa xem theo ngày" /></span>}
     </div>
@@ -175,9 +172,9 @@ export function ShopTrend({ state, scores, days, onDaysChange, className }: {
   const bodyRef = useEnterMotion<HTMLDivElement>([mode]);
   return (
     <InsightCard
-      title="Điểm sản phẩm"
+      title="Điểm của các sản phẩm"
       info={mode === 'now'
-        ? 'Có bao nhiêu sản phẩm ở mỗi khoảng điểm. Đỏ là Kém (dưới 50), vàng là Cần cải thiện (50–79), xanh là Tốt (từ 80). Càng nhiều cột xanh bên phải càng tốt.'
+        ? 'Mỗi cột là số sản phẩm trong một khoảng điểm. Xanh là Tốt (từ 80), vàng là Nên sửa thêm (50–79), đỏ là Cần sửa gấp (dưới 50). Cột xanh càng cao càng tốt.'
         : INFO}
       action={
         <div className="flex flex-wrap items-center gap-2">

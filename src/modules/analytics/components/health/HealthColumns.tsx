@@ -1,52 +1,10 @@
 import { Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { CheckCircle2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { count, money } from '../../../../shared/utils/format';
-import { editLink, healthTone } from '../HealthParts';
-import { Chip } from '../ui';
-import { HEALTH_STATUS_LABEL } from '../../format';
 import type { ListingHealthItem } from '../../healthTypes';
-import { FOCUS } from './healthStats';
-
-function TagList({ tags }: { tags: ListingHealthItem['tags'] }) {
-  if (tags.length === 0) return <span className="text-xs text-stone-500">Chưa có tag</span>;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {tags.map(t =>
-        t.pending ? (
-          <Tooltip key={t.name} title="Đang chờ duyệt, người mua chưa thấy">
-            <span tabIndex={0} className={`cursor-help rounded border border-dashed border-stone-300 px-1.5 py-0.5 text-[11.5px] text-stone-500 ${FOCUS}`}>{t.name}</span>
-          </Tooltip>
-        ) : (
-          <span key={t.name} className="rounded bg-stone-100 px-1.5 py-0.5 text-[11.5px] font-medium text-stone-700">{t.name}</span>
-        ),
-      )}
-    </div>
-  );
-}
-
-function NextStep({ item }: { item: ListingHealthItem }) {
-  if (item.score === null) return <span className="text-xs text-stone-500">Đang chấm, có điểm sau khoảng 1 phút</span>;
-  const first = item.todos[0] ?? item.warnings[0];
-  if (!first) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#2f7d32]">
-        <CheckCircle2 size={14} aria-hidden /> Đã ổn, không cần sửa
-      </span>
-    );
-  }
-  const others = item.todos.length + item.warnings.length - 1;
-  return (
-    <div className="text-[13px] leading-snug">
-      <span className={first.type === 'warning' ? 'text-amber-800' : 'text-stone-700'}>{first.message}</span>
-      {first.impact != null && first.impact > 0 && (
-        <span className="ml-1.5 whitespace-nowrap text-xs font-semibold text-[#005B00]">+{Math.max(1, Math.round(first.impact))} điểm</span>
-      )}
-      {others > 0 && <span className="ml-1.5 whitespace-nowrap text-xs text-stone-500">+{others} việc khác</span>}
-    </div>
-  );
-}
+import type { HealthAxis } from '../../types';
+import { AxisCell, NextStep, ProductCell, RowActions, ScoreCell } from './HealthCells';
+import { AXIS_SHORT, axisValue } from './healthStats';
 
 const num = (value: number) => <span className="tabular-nums text-stone-800">{count(value)}</span>;
 
@@ -54,52 +12,30 @@ export const HEALTH_COLUMNS: ColumnsType<ListingHealthItem> = [
   {
     title: 'Sản phẩm',
     key: 'title',
-    width: 240,
+    width: 260,
     fixed: 'left',
-    render: (_, item) => (
-      <span className="flex min-w-0 items-center gap-2.5">
-        {item.thumbnail ? (
-          <img src={item.thumbnail} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
-        ) : (
-          <span className="h-10 w-10 shrink-0 rounded bg-stone-100" aria-hidden />
-        )}
-        <Link
-          to={`/seller/insights/listings/${item.product_id}`}
-          className={`line-clamp-2 rounded font-semibold text-stone-800 no-underline transition-colors duration-150 hover:text-[#007700] motion-reduce:transition-none ${FOCUS}`}
-        >
-          {item.title}
-        </Link>
-      </span>
-    ),
+    render: (_, item) => <ProductCell item={item} />,
   },
   {
-    title: 'Điểm',
+    title: <Tooltip title="Điểm 0–100, càng cao càng dễ bán">Điểm</Tooltip>,
     key: 'score',
-    width: 140,
+    width: 170,
     defaultSortOrder: 'ascend',
     sorter: (a, b) => (a.score ?? 101) - (b.score ?? 101),
-    render: (_, item) =>
-      item.score === null || !item.status ? (
-        <Chip tone="neutral">Chưa chấm</Chip>
-      ) : (
-        <span className="inline-flex items-center gap-2">
-          <span className="w-7 text-right font-semibold tabular-nums text-stone-900">{Math.round(item.score)}</span>
-          <Chip tone={healthTone(item.status)}>{HEALTH_STATUS_LABEL[item.status] ?? item.status}</Chip>
-        </span>
-      ),
+    render: (_, item) => <ScoreCell item={item} />,
   },
   {
-    title: <Tooltip title="Lượt xem trang sản phẩm trong 30 ngày">Lượt xem</Tooltip>,
+    title: <Tooltip title="Số lần khách mở trang sản phẩm trong 30 ngày">Lượt xem</Tooltip>,
     key: 'views',
-    width: 104,
+    width: 92,
     align: 'right',
     sorter: (a, b) => a.sales.views_30d - b.sales.views_30d,
     render: (_, item) => num(item.sales.views_30d),
   },
   {
-    title: <Tooltip title="Số món đã bán trong 30 ngày (đơn không huỷ)">Đã bán</Tooltip>,
+    title: <Tooltip title="Số món đã bán trong 30 ngày (không tính đơn huỷ)">Đã bán</Tooltip>,
     key: 'units',
-    width: 90,
+    width: 88,
     align: 'right',
     sorter: (a, b) => a.sales.units_30d - b.sales.units_30d,
     render: (_, item) => (
@@ -110,35 +46,36 @@ export const HEALTH_COLUMNS: ColumnsType<ListingHealthItem> = [
     ),
   },
   {
-    title: <Tooltip title="Số món × giá bán, 30 ngày, đơn không huỷ">Doanh thu</Tooltip>,
+    title: <Tooltip title="Tiền bán được trong 30 ngày (không tính đơn huỷ)">Doanh thu</Tooltip>,
     key: 'revenue',
-    width: 110,
+    width: 112,
     align: 'right',
     sorter: (a, b) => a.sales.revenue_30d - b.sales.revenue_30d,
-    render: (_, item) => <span className="tabular-nums font-semibold text-stone-800">{money(item.sales.revenue_30d)}</span>,
+    render: (_, item) => <span className="font-semibold tabular-nums text-stone-800">{money(item.sales.revenue_30d)}</span>,
   },
-  { title: 'Tag', key: 'tags', width: 150, render: (_, item) => <TagList tags={item.tags} /> },
-  { title: 'Việc nên làm', key: 'next', render: (_, item) => <NextStep item={item} /> },
+  { title: 'Nên làm gì', key: 'next', width: 240, render: (_, item) => <NextStep item={item} /> },
   {
-    title: <span className="sr-only">Hành động</span>,
+    title: 'Thao tác',
     key: 'actions',
-    width: 72,
+    width: 108,
+    align: 'right',
     fixed: 'right',
-    render: (_, item) => {
-      const first = item.todos[0] ?? item.warnings[0];
-      return (
-        <span className="flex items-center justify-end">
-          <Link
-            to={editLink(item.product_id, first?.field)}
-            aria-label={`Sửa ${item.title}`}
-            className={`inline-flex h-8 items-center rounded-md bg-[#007700] px-3 text-xs font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] motion-reduce:transition-none ${FOCUS}`}
-          >
-            Sửa
-          </Link>
-        </span>
-      );
-    },
+    render: (_, item) => <RowActions id={item.product_id} title={item.title} field={(item.todos[0] ?? item.warnings[0])?.field} />,
   },
 ];
 
-export const HEALTH_TABLE_WIDTH = 1120;
+export const HEALTH_TABLE_WIDTH = 1118;
+
+export function healthColumns(axis: HealthAxis | null): ColumnsType<ListingHealthItem> {
+  if (!axis) return HEALTH_COLUMNS;
+  const column: ColumnsType<ListingHealthItem>[number] = {
+    title: `Điểm ${AXIS_SHORT[axis].label.toLowerCase()}`,
+    key: `axis-${axis}`,
+    width: 130,
+    defaultSortOrder: 'ascend',
+    sorter: (a, b) => (axisValue(a, axis) ?? 101) - (axisValue(b, axis) ?? 101),
+    render: (_, item) => <AxisCell item={item} axis={axis} />,
+  };
+  const compactScore = { width: 72, defaultSortOrder: undefined, render: (_: unknown, item: ListingHealthItem) => <ScoreCell item={item} compact /> };
+  return HEALTH_COLUMNS.flatMap(c => (c.key === 'score' ? [{ ...c, ...compactScore }, column] : [c]));
+}

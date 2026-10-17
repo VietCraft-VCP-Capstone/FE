@@ -3,25 +3,25 @@ import { SERIES } from '../../../../shared/components/charts/chartTheme';
 import { TrendLegend } from '../../../../shared/components/charts/TrendChart';
 import { count, money } from '../../../../shared/utils/format';
 import { RangeTabs } from '../../../seller/components/dashboard/SellerDashboardUi';
-import { RANGE_OPTIONS, fullDate, pct, shortDate } from '../../format';
-import type { InsightMeta, ListingTimeseries, TimeRange, TrendDirection } from '../../types';
+import { RANGE_OPTIONS, decimal, fullDate, shortDate } from '../../format';
+import type { InsightMeta, ListingTimeseries, TimeRange } from '../../types';
 import { DailyBars } from '../charts/DailyBars';
 import { SourceFooter } from '../SourceFooter';
 import { Chip, InsightCard, Note, type Tone } from '../ui';
 
-const TREND: Record<string, { word: string; tone: Tone; Icon: typeof TrendingUp }> = {
-  up: { word: 'đang tăng', tone: 'good', Icon: TrendingUp },
-  down: { word: 'đang giảm', tone: 'bad', Icon: TrendingDown },
-  flat: { word: 'đi ngang', tone: 'neutral', Icon: Minus },
-};
-
-function TrendPill({ direction, slope, what }: { direction: TrendDirection | null; slope: number | null; what: string }) {
-  const info = direction ? TREND[direction] : null;
-  if (!info) return <Chip tone="neutral">{what}: chưa đủ dữ liệu</Chip>;
+function HalfChange({ values, what, unit }: { values: number[]; what: string; unit: string }) {
+  const half = Math.floor(values.length / 2);
+  if (half < 3) return <Chip tone="neutral">{what}: chưa đủ ngày để so sánh</Chip>;
+  const before = values.slice(-2 * half, -half).reduce((s, v) => s + v, 0);
+  const after = values.slice(-half).reduce((s, v) => s + v, 0);
+  const change = before ? Math.round(((after - before) / before) * 100) : after ? 100 : 0;
+  const flat = Math.abs(change) < 5;
+  const Icon = flat ? Minus : change > 0 ? TrendingUp : TrendingDown;
+  const tone: Tone = flat ? 'neutral' : change > 0 ? 'good' : 'bad';
   return (
-    <Chip tone={info.tone} icon={<info.Icon size={12} aria-hidden />}>
-      {what} {info.word}
-      {slope !== null && <span className="font-normal opacity-80"> ({pct(slope, 2)} mỗi ngày)</span>}
+    <Chip tone={tone} icon={<Icon size={12} aria-hidden />}>
+      {what} {flat ? 'gần như không đổi' : `${change > 0 ? 'tăng' : 'giảm'} ${Math.abs(change)}%`}
+      <span className="font-normal opacity-80"> · {count(after)} {unit} trong {half} ngày gần đây, trước đó {count(before)}</span>
     </Chip>
   );
 }
@@ -45,14 +45,14 @@ export function DailyCards({ data, meta, timeRange, setRange }: {
   return (
     <>
       <InsightCard
-        title="Lượt xem theo ngày"
-        description={coTrungVi ? 'Cột là lượt xem của sản phẩm, đường là mức thường gặp trong danh mục.' : 'Lượt xem của sản phẩm mỗi ngày.'}
+        title="Mỗi ngày có bao nhiêu người xem"
+        description={coTrungVi ? 'Cột xanh lá là số lượt xem sản phẩm này. Đường xanh dương là mức thường gặp của sản phẩm cùng loại.' : 'Mỗi cột là số lượt khách mở trang sản phẩm trong ngày.'}
         action={<RangeTabs<TimeRange> value={timeRange} onChange={setRange} options={[...RANGE_OPTIONS]} label="Khoảng thời gian" />}
         footer={<SourceFooter meta={meta} />}
       >
         <div className="mb-4 flex flex-wrap gap-2">
-          <TrendPill direction={data.trend?.views ?? null} slope={data.trend?.views_slope_pct_per_day ?? null} what="Lượt xem" />
-          <TrendPill direction={data.trend?.orders ?? null} slope={data.trend?.orders_slope_pct_per_day ?? null} what="Đơn hàng" />
+          <HalfChange values={data.series.map(p => p.views)} what="Lượt xem" unit="lượt" />
+          <HalfChange values={data.series.map(p => p.orders)} what="Đơn hàng" unit="đơn" />
         </div>
         <DailyBars
           data={rows}
@@ -66,35 +66,43 @@ export function DailyCards({ data, meta, timeRange, setRange }: {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <TrendLegend
             items={[
-              { name: 'Lượt xem trong kỳ', color: SERIES.green, total: count(data.totals.views) },
+              { name: 'Tổng lượt xem', color: SERIES.green, total: count(data.totals.views) },
               ...(coTrungVi ? [{ name: 'Thường gặp trong danh mục', color: SERIES.blue, total: '' }] : []),
             ]}
           />
-          <span className="text-xs text-stone-500">Tỉ lệ mua trong kỳ <strong className="tabular-nums text-stone-800">{pct(data.totals.conversion_pct, 2)}</strong></span>
+          {data.totals.conversion_pct != null && (
+            <span className="text-xs text-stone-500">Cứ 100 người xem có khoảng <strong className="tabular-nums text-stone-800">{decimal(data.totals.conversion_pct, 1)}</strong> người đặt mua</span>
+          )}
         </div>
       </InsightCard>
 
-      <InsightCard title="Thêm giỏ và đặt mua theo ngày">
+      <InsightCard
+        title="Mỗi ngày có bao nhiêu người cho vào giỏ và đặt mua"
+        description="Cột xanh dương là số lần khách cho sản phẩm vào giỏ. Cột xanh lá là số đơn khách đã đặt."
+      >
         <DailyBars
           data={rows}
           series={[
-            { key: 'carts', name: 'Thêm giỏ', color: SERIES.blue, kind: 'bar' },
-            { key: 'orders', name: 'Đơn hàng', color: SERIES.green, kind: 'bar' },
+            { key: 'carts', name: 'Cho vào giỏ', color: SERIES.blue, kind: 'bar' },
+            { key: 'orders', name: 'Đặt mua', color: SERIES.green, kind: 'bar' },
           ]}
           formatValue={count}
           height={220}
-          ariaLabel={`Số lần thêm giỏ và số đơn mỗi ngày ${khoang}`}
+          ariaLabel={`Số lần cho vào giỏ và số đơn đặt mua mỗi ngày ${khoang}`}
         />
         <div className="mt-3">
           <TrendLegend
             items={[
-              { name: 'Tổng thêm giỏ', color: SERIES.blue, total: count(data.totals.carts) },
-              { name: 'Tổng đơn', color: SERIES.green, total: count(data.totals.orders) },
+              { name: 'Lần cho vào giỏ', color: SERIES.blue, total: count(data.totals.carts) },
+              { name: 'Đơn đặt mua', color: SERIES.green, total: count(data.totals.orders) },
             ]}
           />
         </div>
         <div className="mt-3">
-          <Note>Doanh thu của sản phẩm trong kỳ: {money(data.totals.revenue_vnd)}.</Note>
+          <Note>
+            {data.totals.carts > 0 && <>Cứ 10 lần khách cho vào giỏ thì có khoảng <b>{decimal((data.totals.orders / data.totals.carts) * 10, 1)}</b> đơn được đặt. </>}
+            Tiền bán được trong kỳ: <b>{money(data.totals.revenue_vnd)}</b>.
+          </Note>
         </div>
       </InsightCard>
     </>

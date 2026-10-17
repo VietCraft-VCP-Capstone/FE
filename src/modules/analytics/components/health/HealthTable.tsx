@@ -1,11 +1,12 @@
 import { useEnterMotion } from '../../../../shared/hooks/useMotion';
-
 import { Grid, Input, Select, Table } from 'antd';
 import { Search } from 'lucide-react';
-import { HEALTH_BANDS, TodoItem, WarningItem } from '../HealthParts';
+import { AXIS_ORDER, HEALTH_BANDS, TodoItem, WarningItem } from '../HealthParts';
 import type { ListingHealthItem } from '../../healthTypes';
-import { HEALTH_COLUMNS, HEALTH_TABLE_WIDTH } from './HealthColumns';
-import { FOCUS, ISSUES, hasIssue, needsWork } from './healthStats';
+import type { HealthAxis } from '../../types';
+import { HEALTH_TABLE_WIDTH, healthColumns } from './HealthColumns';
+import { FilterEmpty } from './FilterEmpty';
+import { AXIS_SHORT, ISSUES, axisValue, hasIssue, needsWork } from './healthStats';
 
 function tagOptions(items: ListingHealthItem[]) {
   const counts = new Map<string, number>();
@@ -15,10 +16,13 @@ function tagOptions(items: ListingHealthItem[]) {
     .map(([name, n]) => ({ value: name, label: `${name} (${n})` }));
 }
 
-export function HealthTable({ items, issue, band, query, tags, setParam, setTags, clearFilters }: {
+export const TABLE_ID = 'health-table';
+
+export function HealthTable({ items, issue, band, axis, query, tags, setParam, setTags, clearFilters }: {
   items: ListingHealthItem[];
   issue: string;
   band: string;
+  axis: HealthAxis | null;
   query: string;
   tags: string[];
   setParam: (key: string, value: string) => void;
@@ -26,20 +30,31 @@ export function HealthTable({ items, issue, band, query, tags, setParam, setTags
   clearFilters: () => void;
 }) {
   const wide = Grid.useBreakpoint().md ?? true;
-  const columns = wide ? HEALTH_COLUMNS : HEALTH_COLUMNS.map(c => ({ ...c, fixed: undefined }));
+  const all = healthColumns(axis);
+  const columns = wide ? all : all.map(c => ({ ...c, fixed: undefined }));
   const needle = query.trim().toLowerCase();
   const rows = items
     .filter(item => !issue || hasIssue(item, issue))
     .filter(item => !band || item.status === band)
+    .filter(item => !axis || axisValue(item, axis) !== null)
     .filter(item => !needle || item.title.toLowerCase().includes(needle))
     .filter(item => tags.length === 0 || item.tags.some(t => tags.includes(t.name)));
 
-  const ref = useEnterMotion<HTMLElement>([issue, band, query, tags.join('|')], { selector: '.ant-table-tbody > tr', stagger: 0.015, y: 4 });
+  const bandLabel = HEALTH_BANDS.find(b => b.status === band)?.label;
+  const issueLabel = ISSUES.find(i => i.key === issue)?.label;
+  const active = [
+    band && { label: `mức ${bandLabel}`, clear: () => setParam('health', '') },
+    issue && { label: `lỗi "${issueLabel}"`, clear: () => setParam('issue', '') },
+    needle && { label: `tìm "${query.trim()}"`, clear: () => setParam('q', '') },
+    tags.length > 0 && { label: 'tag', clear: () => setTags([]) },
+  ].filter((f): f is { label: string; clear: () => void } => Boolean(f));
+
+  const ref = useEnterMotion<HTMLElement>([issue, band, axis, query, tags.join('|')], { selector: '.ant-table-tbody > tr', stagger: 0.015, y: 4 });
 
   return (
-    <section ref={ref} className="overflow-hidden rounded-md border border-stone-200 bg-white">
+    <section ref={ref} id={TABLE_ID} className="scroll-mt-4 overflow-hidden rounded-md border border-stone-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-stone-100 px-4 py-3">
-        <h2 className="m-0 mr-2 text-sm font-bold text-stone-900">Tất cả sản phẩm</h2>
+        <h2 className="m-0 mr-2 text-sm font-bold text-stone-900">Danh sách sản phẩm</h2>
         <Input
           allowClear
           value={query}
@@ -59,9 +74,16 @@ export function HealthTable({ items, issue, band, query, tags, setParam, setTags
         <Select
           value={issue}
           onChange={value => setParam('issue', value)}
-          aria-label="Lọc theo việc cần sửa"
-          className="w-full sm:w-40"
-          options={[{ value: '', label: 'Mọi việc cần sửa' }, ...ISSUES.map(i => ({ value: i.key, label: i.label }))]}
+          aria-label="Lọc theo lỗi"
+          className="w-full sm:w-44"
+          options={[{ value: '', label: 'Mọi lỗi' }, ...ISSUES.map(i => ({ value: i.key, label: i.label }))]}
+        />
+        <Select
+          value={axis ?? ''}
+          onChange={value => setParam('axis', value)}
+          aria-label="Xếp bảng theo"
+          className="w-full sm:w-48"
+          options={[{ value: '', label: 'Xếp theo điểm tổng' }, ...AXIS_ORDER.map(a => ({ value: a, label: `Xếp theo ${AXIS_SHORT[a].label.toLowerCase()}` }))]}
         />
         <Select
           mode="multiple"
@@ -75,14 +97,16 @@ export function HealthTable({ items, issue, band, query, tags, setParam, setTags
           options={tagOptions(items)}
           notFoundContent="Shop chưa gắn tag nào"
         />
-        <span className="ml-auto text-xs text-stone-500">Số bán tính 30 ngày gần nhất</span>
+        <span className="ml-auto text-xs text-stone-500">Lượt xem, số bán tính trong 30 ngày gần nhất</span>
       </div>
       <Table<ListingHealthItem>
+        key={axis ?? 'score'}
         rowKey="product_id"
         size="middle"
+        tableLayout="fixed"
         columns={columns}
         dataSource={rows}
-        scroll={{ x: HEALTH_TABLE_WIDTH }}
+        scroll={{ x: HEALTH_TABLE_WIDTH + (axis ? 32 : 0) }}
         sticky
         pagination={{
           defaultPageSize: 20,
@@ -103,12 +127,7 @@ export function HealthTable({ items, issue, band, query, tags, setParam, setTags
         }}
         locale={{
           emptyText: (
-            <div className="py-8 text-sm text-stone-600">
-              Không có sản phẩm nào khớp bộ lọc.{' '}
-              <button type="button" onClick={clearFilters} className={`cursor-pointer rounded border-none bg-transparent p-0 font-semibold text-[#007700] hover:underline ${FOCUS}`}>
-                Xoá bộ lọc
-              </button>
-            </div>
+            <FilterEmpty active={active} clearAll={clearFilters} />
           ),
         }}
       />

@@ -10,7 +10,7 @@ const WHAT_IS_IT = (
   <>
     <strong>Điểm sức khoẻ</strong> (0–100) cho biết sản phẩm đã sẵn sàng để bán tới đâu: ảnh, mô tả, tag, tồn kho,
     độ cập nhật; khi có đủ dữ liệu sẽ tính thêm đánh giá và tỉ lệ người xem mua hàng.
-    <br />Tốt từ 80 · Cần cải thiện 50–79 · Kém dưới 50.
+    <br />Tốt từ 80 · Nên sửa thêm 50–79 · Cần sửa gấp dưới 50.
     <br />Không ảnh hưởng thứ hạng tìm kiếm. Sửa sản phẩm xong khoảng 1 phút điểm cập nhật.
   </>
 );
@@ -32,8 +32,8 @@ function BandScale({ score }: { score: number }) {
         <span className="absolute -top-1 h-4 w-1 -translate-x-1/2 rounded-sm bg-stone-900 ring-2 ring-white" style={{ left: `${left}%` }} />
       </div>
       <div className="mt-1 flex text-[11px] text-stone-500">
-        <span style={{ width: '50%' }}>Kém</span>
-        <span style={{ width: '30%' }}>50 · Cần cải thiện</span>
+        <span style={{ width: '50%' }}>Cần sửa gấp</span>
+        <span style={{ width: '30%' }}>50 · Nên sửa thêm</span>
         <span style={{ width: '20%' }}>80 · Tốt</span>
       </div>
     </div>

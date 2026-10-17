@@ -44,6 +44,7 @@ export interface ListingHealthItem {
 
 export interface ListingSales {
   views_30d: number;
+  carts_30d: number;
   orders_30d: number;
   units_30d: number;
   revenue_30d: number;
@@ -68,6 +69,7 @@ export interface ListingProductInfo {
   price_min: number | null;
   price_max: number | null;
   stock_total: number;
+  variants: { label: string; stock: number }[];
 }
 
 export interface ListingHealthDetailFull extends ListingHealthDetail {

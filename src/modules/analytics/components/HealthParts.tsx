@@ -48,8 +48,8 @@ export const AXIS_INFO: Record<HealthAxis, { label: string; measures: string; wh
 
 export const HEALTH_BANDS: { status: HealthStatus; label: string; range: string; tone: Tone }[] = [
   { status: 'good', label: 'Tốt', range: 'từ 80 điểm', tone: 'good' },
-  { status: 'needs_improvement', label: 'Cần cải thiện', range: '50 đến 79', tone: 'warn' },
-  { status: 'poor', label: 'Kém', range: 'dưới 50', tone: 'bad' },
+  { status: 'needs_improvement', label: 'Nên sửa thêm', range: '50–79 điểm', tone: 'warn' },
+  { status: 'poor', label: 'Cần sửa gấp', range: 'dưới 50 điểm', tone: 'bad' },
 ];
 
 export function healthTone(status: HealthStatus | null | undefined): Tone {
