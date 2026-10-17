@@ -35,6 +35,8 @@ import {
   type SellerOverviewData,
 } from '../services/sellerDashboardService';
 import type { ProductItem } from '../../product/types/product';
+import { sellerSettingsService } from '../services/sellerSettingsService';
+import { ShopReputationCard } from '../components/dashboard/ShopReputationCard';
 import { PRODUCT_CREATE_PATH } from '../featureFlags';
 
 type RangeKey = '7' | '30' | '90';
@@ -94,13 +96,15 @@ export function SellerDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [range, setRange] = useState<RangeKey>('30');
+  const [reputation, setReputation] = useState<any>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const [overviewResult, seasonalRes] = await Promise.allSettled([
+      const [overviewResult, seasonalRes, repRes] = await Promise.allSettled([
         sellerDashboardService.loadOverview(),
         analyticsApi.get<any>('/forecast/seasonal'),
+        sellerSettingsService.getReputation(),
       ]);
 
       if (overviewResult.status === 'fulfilled') {
@@ -109,6 +113,7 @@ export function SellerDashboard() {
       if (seasonalRes.status === 'fulfilled' && seasonalRes.value?.data?.events?.length > 0) {
         setSeasonalEvent(seasonalRes.value.data.events[0]);
       }
+      if (repRes.status === 'fulfilled') setReputation(repRes.value.profile);
       setLoadedAt(new Date());
     } finally {
       setLoading(false);
@@ -228,6 +233,8 @@ export function SellerDashboard() {
           <span>{msg}</span>
         </div>
       ))}
+
+      {reputation && <ShopReputationCard profile={reputation} />}
 
       {/* Smart Seasonal Opportunity Banner */}
       {seasonalEvent && (

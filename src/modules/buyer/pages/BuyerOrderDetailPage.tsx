@@ -416,7 +416,7 @@ export function BuyerOrderDetailPage() {
                                     Đơn hàng đang có yêu cầu đổi trả / hoàn tiền
                                 </h3>
                                 <span className="bg-indigo-200/70 text-indigo-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                    Return v3
+                                    Đổi trả POD
                                 </span>
                             </div>
                             <p className="text-xs text-indigo-700 mt-0.5">

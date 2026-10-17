@@ -8,6 +8,8 @@ import { HeaderNotificationDropdown } from '../../notification/components/Header
 import { favoritesService } from '../../product/services/favoritesService';
 import { userService } from '../../user/services/userService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { SearchPopover } from './SearchPopover';
+import { useSearchSuggest } from '../hooks/useSearchSuggest';
 
 interface BuyerHeaderProps {
   user: any;
@@ -24,6 +26,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const searchBox = useSearchSuggest(search, setSearch);
 
   useEffect(() => {
     setCurrentUser(user);
@@ -178,26 +181,21 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
         <nav className="buyer-nav-menu">
           <a onClick={() => handleNav('home')} className={location.pathname === '/' ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Khám phá</a>
           <a onClick={() => handleNav('gifts')} className={isActive('/gifts') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Quà tặng</a>
-          <a onClick={() => handleNav('collections')} className={isActive('/collections') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Bộ sưu tập</a>
-          <a onClick={() => handleNav('vouchers')} className={isActive('/vouchers') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Voucher</a>
+          <a onClick={() => handleNav('collections')} className={`buyer-nav-optional ${isActive('/collections') ? 'nav-active' : ''}`} style={{ cursor: 'pointer' }}>Bộ sưu tập</a>
+          <a onClick={() => handleNav('vouchers')} className={`buyer-nav-optional ${isActive('/vouchers') ? 'nav-active' : ''}`} style={{ cursor: 'pointer' }}>Voucher</a>
           <a
             onClick={() => navigate(user?.role?.toLowerCase() === 'seller' ? '/seller' : '/seller/register')}
-            className={location.pathname.startsWith('/seller') ? 'nav-active text-[#007700] font-bold' : 'text-[#007700] font-semibold hover:text-[#005B00]'}
+            className={`buyer-nav-optional ${location.pathname.startsWith('/seller') ? 'nav-active text-[#007700] font-bold' : 'text-[#007700] font-semibold hover:text-[#005B00]'}`}
             style={{ cursor: 'pointer' }}
           >
             Kênh Người Bán
           </a>
         </nav>
 
-        {/* Search Bar */}
-        <div className="buyer-search-bar">
-          <Search className="search-icon" size={16} />
-          <input
-            type="text"
-            placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="buyer-search-bar" ref={searchBox.containerRef} style={{ position: 'relative' }}>
+          <Search className="search-icon" size={16} style={{ cursor: 'pointer' }} onClick={() => searchBox.onExecuteSearch()} />
+          <input type="text" placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..." {...searchBox.inputProps} />
+          <SearchPopover {...searchBox.popoverProps} />
         </div>
 
         {/* Action Icons (Đã dời Thông báo sang bên phải, cạnh Avatar và Chat) */}

@@ -282,6 +282,16 @@ export const sellerSettingsService = {
     return initial;
   },
 
+  getReputation: async (): Promise<{ profile: any; logs: any[] }> => {
+    try {
+      const res = await api.get('/seller/settings/reputation');
+      return res.data || { profile: null, logs: [] };
+    } catch (e) {
+      console.warn('Could not load seller reputation:', e);
+      return { profile: null, logs: [] };
+    }
+  },
+
   saveOnboardingState: (state: OnboardingState): OnboardingState => {
     localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(state));
     return state;

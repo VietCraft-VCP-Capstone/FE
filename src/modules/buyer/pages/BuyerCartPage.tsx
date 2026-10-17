@@ -154,10 +154,22 @@ const mapBackendCart = (cartData: any): CartItem[] => {
     if (!cartData || !Array.isArray(cartData.items)) {
         return [];
     }
-    return cartData.items.map((item: any) => {
+
+    const mergedList: CartItem[] = [];
+
+    for (const item of cartData.items) {
         const prod = item.product_id || {};
         const variant = item.variant_id || {};
-        
+        const pId = String(prod._id || prod.id || '');
+        const vId = String(variant._id || variant.id || '');
+
+        // Nếu sản phẩm và biến thể đã tồn tại trong danh sách, chỉ cộng dồn số lượng
+        const existing = mergedList.find(it => it.productId === pId && it.variantId === vId);
+        if (existing) {
+            existing.quantity += (Number(item.quantity) || 1);
+            continue;
+        }
+
         const shopName = prod.shop_id?.shop_name || 'VietCraft Selection';
         const shopId = prod.shop_id?._id?.toString() || prod.shop_id?.toString() || prod.sellerId?.toString() || '';
         
@@ -191,21 +203,23 @@ const mapBackendCart = (cartData: any): CartItem[] => {
 
         const image = resolveCartItemImage(variant, prod);
 
-        return {
+        mergedList.push({
             id: item._id, // Cart item DB MongoDB ObjectId
-            productId: prod._id || prod.id || '',
-            variantId: variant._id || variant.id || '',
+            productId: pId,
+            variantId: vId,
             shopId,
             title: prod.title || 'Sản phẩm VietCraft',
             shopName,
             variantName,
             price,
-            quantity: item.quantity || 1,
+            quantity: Number(item.quantity) || 1,
             image,
             checked: item.is_selected !== undefined ? item.is_selected : true,
             productType: prod.product_type
-        };
-    });
+        });
+    }
+
+    return mergedList;
 };
 
 export function BuyerCartPage() {

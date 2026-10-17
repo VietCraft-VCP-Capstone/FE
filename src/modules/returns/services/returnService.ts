@@ -73,6 +73,33 @@ export interface ReturnEligibilityItem {
   remainingQuantity: number;
   activeRequestId?: string;
 }
+export interface ShopAuditRisk {
+  shop_id: string;
+  shop_name: string;
+  reputation_score: number;
+  reputation_tier: 'TRUSTED' | 'NORMAL' | 'WARNING' | 'RESTRICTED';
+  clean_streak_orders: number;
+  dispute_count_30d: number;
+  penalty_points_30d: number;
+  average_rating: number;
+  rating_count: number;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  recommendation: string;
+}
+
+export interface BuyerAuditRisk {
+  buyer_id: string;
+  total_delivered_orders: number;
+  total_return_requests: number;
+  dispute_rate_pct: number;
+  is_flagged_for_abuse: boolean;
+}
+
+export interface DisputeAuditProfile {
+  shop: ShopAuditRisk | null;
+  buyer: BuyerAuditRisk;
+}
+
 export interface PrinterDecision { action: ReturnAction; reason: string; proposedFault?: FaultParty; proposedClassification?: string }
 export interface AdminDecision { resolution: ReturnResolution | null; faultParty: FaultParty | null; reason: string; amountMinor?: number; currency?: string }
 export interface ReturnRequestPage { items: ReturnRequest[]; total: number; page: number; pageSize: number }
@@ -88,6 +115,7 @@ export const returnService = {
   listPage: async (status?: string, page = 1, pageSize = 20): Promise<ReturnRequestPage> => unwrap(await api.get('/returns/v3/requests', { params: { status: status || undefined, page, pageSize } })),
   list: async (status?: string): Promise<ReturnRequest[]> => collectRequestPages(page => returnService.listPage(status, page, 100)),
   detail: async (id: string): Promise<ReturnDetail> => unwrap(await api.get<ReturnDetail>(`/returns/v3/requests/${encodeURIComponent(id)}`)),
+  auditProfile: async (id: string): Promise<DisputeAuditProfile> => unwrap(await api.get<DisputeAuditProfile>(`/returns/v3/requests/${encodeURIComponent(id)}/audit-profile`)),
   dispute: async (id: string, reason: string): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/dispute`, { reason })),
   addEvidence: async (id: string, evidence: ReturnEvidence[]): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/evidence`, { evidence })),
   printerDecision: async (id: string, payload: PrinterDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/printer-decision`, payload)),

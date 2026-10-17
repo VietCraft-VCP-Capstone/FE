@@ -1,5 +1,12 @@
 import api from '../../../infrastructure/api/interceptors';
-import { ProductItem, ProductFormData, ProductFilterState, PaginatedProductsResult } from '../types/product';
+import {
+  ProductItem,
+  ProductFormData,
+  ProductFilterState,
+  PaginatedProductsResult,
+  SearchFilterState,
+  SuggestResult
+} from '../types/product';
 import { invalidateInsights } from '../../analytics/hooks/useInsight';
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
@@ -44,6 +51,40 @@ export const productsService = {
     } catch (err) {
       console.error('Error fetching products from API:', err);
       return { items: [], total: 0, page: 1, limit: 6, totalPages: 1 };
+    }
+  },
+
+  search: async (params?: Partial<SearchFilterState>): Promise<PaginatedProductsResult> => {
+    try {
+      const res = await api.get('/products/search', { params });
+      return toPaginated(res.data);
+    } catch (err) {
+      console.error('Error searching products from API:', err);
+      return { items: [], total: 0, page: 1, limit: 12, totalPages: 1 };
+    }
+  },
+
+  trackSearchClick: (logId: string, productId: string, position: number): void => {
+    api.post('/products/search/click', { logId, productId, position }).catch(() => {});
+  },
+
+  suggest: async (q: string, signal?: AbortSignal): Promise<SuggestResult> => {
+    const empty = { keywords: [], shops: [], categories: [] };
+    if (!q.trim()) return empty;
+    try {
+      const res = await api.get('/products/suggest', { params: { q: q.trim() }, signal });
+      return res.data || empty;
+    } catch {
+      return empty;
+    }
+  },
+
+  getTrendingKeywords: async (limit = 8): Promise<string[]> => {
+    try {
+      const res = await api.get('/products/meta/trending-keywords', { params: { limit } });
+      return Array.isArray(res.data) ? res.data : [];
+    } catch {
+      return [];
     }
   },
 

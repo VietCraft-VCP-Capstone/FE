@@ -19,6 +19,8 @@ export interface ShopDetail {
   listingCount: number;
   followersCount: number;
   isFollowing: boolean;
+  reputation_score?: number;
+  reputation_tier?: string;
   createdAt?: string | Date;
   shippingSettings?: {
     pricingType?: 'FLAT_RATE' | 'ZONE_BASED';

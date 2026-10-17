@@ -59,6 +59,10 @@ export interface ProductItem {
     rating: number;
   };
   sellerId?: string;
+  rating?: number;
+  ratingCount?: number;
+  productType?: string;
+  soldCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -116,4 +120,36 @@ export interface PaginatedProductsResult {
   page: number;
   limit: number;
   totalPages: number;
+  searchLogId?: string;
 }
+
+export interface SearchFilterState {
+  q?: string;
+  category?: string;
+  productType?: string;
+  rating?: number | string;
+  minPrice?: number | string;
+  maxPrice?: number | string;
+  sort?: string;
+  page?: number;
+  limit?: number;
+  inStockOnly?: boolean;
+}
+
+export interface SuggestResult {
+  keywords: string[];
+  shops: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string;
+    reputationScore: number;
+    reputationTier: string;
+  }>;
+  categories: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
+}
+
