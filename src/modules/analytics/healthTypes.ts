@@ -1,7 +1,4 @@
-/**
- * Kiểu của lịch sử điểm và "xem điểm nếu sửa" (F29). Tách khỏi `types.ts` vì file đó
- * đã quá dài.
- */
+/** Kiểu F29: lịch sử điểm và tính thử điểm. */
 
 import type { HealthAxis, HealthStatus, HealthTodo, ListingHealthDetail } from './types';
 

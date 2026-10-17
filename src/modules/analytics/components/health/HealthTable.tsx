@@ -1,8 +1,5 @@
 import { useEnterMotion } from '../../../../shared/hooks/useMotion';
-/**
- * Bảng mọi sản phẩm của shop, điểm thấp lên trước. Bộ lọc nằm trên URL:
- * `issue`, `health`, `q`, `tag` (lặp lại được).
- */
+/** Bảng mọi sản phẩm, điểm thấp trước; bộ lọc lưu trên URL. */
 
 import { Grid, Input, Select, Table } from 'antd';
 import { Search } from 'lucide-react';

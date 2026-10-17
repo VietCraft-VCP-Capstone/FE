@@ -9,10 +9,7 @@ export const MOTION_DURATION = 0.2;
 export const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/**
- * Hiện dần + trượt nhẹ lên các phần tử khớp `selector` bên trong ref (mặc định: con trực tiếp),
- * chạy lại mỗi khi `deps` đổi. Dùng cho chuyển trang và nội dung đổi sau tương tác.
- */
+/** Hiện dần và trượt nhẹ các phần tử khớp selector, chạy lại khi deps đổi. */
 export function useEnterMotion<T extends HTMLElement>(
   deps: DependencyList = [],
   { selector = ':scope > *', stagger = 0.03, y = 6 }: { selector?: string; stagger?: number; y?: number } = {},

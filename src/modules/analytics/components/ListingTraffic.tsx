@@ -1,11 +1,4 @@
-/**
- * F28 phễu mua + F27 diễn biến theo ngày của MỘT sản phẩm.
- *
- *   GET /seller/analytics/listings/{id}/conversion
- *   GET /seller/analytics/listings/{id}/timeseries
- * Chỉ vẽ đầy đủ khi cả hai đã có số. Một trong hai chưa đủ dữ liệu thì gộp thành một
- * dòng tiến độ lượt xem, thay vì hai khối "Chưa đủ dữ liệu" to.
- */
+/** F28 phễu mua + F27 diễn biến theo ngày; thiếu dữ liệu thì gộp thành một dòng tiến độ. */
 
 import { Eye, Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';

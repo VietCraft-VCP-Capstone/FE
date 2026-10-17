@@ -1,11 +1,4 @@
-/**
- * F29 cho MỘT sản phẩm, dạng bảng điều khiển hai cột (xếp chồng trên điện thoại):
- * trái giải thích điểm (điểm là gì, 5 tiêu chí, điểm theo ngày), phải là việc cần làm
- * và "Tính thử điểm". Không gập gì để seller đọc một lượt là hiểu.
- *
- *   GET /seller/analytics/listings/{id}/health   điểm, việc cần làm, giá trị đầu vào, số bán 30 ngày
- * F28 + F27 (lượt xem, phễu mua) nằm ở `ListingTraffic`, tự gọi endpoint riêng.
- */
+/** F29 · Chi tiết sức khoẻ một sản phẩm: giải thích điểm bên trái, việc cần làm và tính thử bên phải. */
 
 import { useParams } from 'react-router-dom';
 import { TodoItem, WarningItem } from '../components/HealthParts';

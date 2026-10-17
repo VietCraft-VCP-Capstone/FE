@@ -2,8 +2,7 @@ import { RefObject, useEffect, useRef } from 'react';
 
 export type ProductFormFocusTarget = 'images' | 'title' | 'tags' | 'price' | 'stock' | 'description';
 
-// Khoá `field` do AI F29 trả về (xem vc-ai/.../f29/todos.py, calculator.py) → ô tương ứng trong form.
-// weight_g / dimensions_cm / moderation_status chưa có ô nào trong form nên rơi về "chỉ mở modal".
+// Map field của todo F29 sang ô trong form; field chưa có ô thì chỉ mở modal.
 const FIELD_TO_TARGET: Record<string, ProductFormFocusTarget> = {
   images: 'images',
   description: 'description',
@@ -32,10 +31,7 @@ function firstFocusable(box: HTMLElement): HTMLElement | undefined {
   return pick('input, textarea, select') ?? pick('button');
 }
 
-/**
- * Cuộn tới, focus và nháy viền ô ứng với `field` một lần mỗi lần modal mở.
- * Chờ `ready` (catalog tải xong) vì danh sách thẻ làm layout xê dịch.
- */
+/** Cuộn tới và nháy viền ô cần sửa mỗi lần modal mở, chờ catalog tải xong. */
 export function useFocusFormField(
   containerRef: RefObject<HTMLElement | null>,
   isOpen: boolean,

@@ -70,9 +70,7 @@ export function NichesPage() {
       >
         {(data, meta) => {
           const niches = data.niches;
-          // Shop thật: phần CUNG có thể null (chưa đủ listing thật gắn tag để so — xem
-          // meta.unlock). Không vẽ được một điểm mà trục hoành không có giá trị, nên bỏ
-          // qua các ngách đó trên biểu đồ bốn góc; bảng bên dưới vẫn liệt kê đủ.
+          // Bỏ ngách chưa có số cung khỏi biểu đồ; bảng vẫn liệt kê đủ.
           const points = niches
             .filter((n): n is Niche & { supply_pct: number } => n.supply_pct !== null)
             .map(n => ({

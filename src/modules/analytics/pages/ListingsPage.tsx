@@ -1,11 +1,4 @@
-/**
- * F29 · Sức khoẻ sản phẩm: bảng điều khiển cả shop rồi tới bảng mọi sản phẩm.
- *
- * Nguồn: `GET /seller/analytics/listings/health` (mọi sản phẩm, tính tổng ở máy) và
- * `GET /seller/analytics/listings/health/summary` (điểm trung bình theo ngày).
- * Bấm thẻ "Phân bố mức điểm" hoặc "Lỗi phổ biến" để lọc bảng. Bộ lọc nằm trên URL:
- * `issue`, `health`, `q`, `tag` (lặp lại), `days`.
- */
+/** F29 · Sức khoẻ sản phẩm cả shop: tổng quan rồi bảng mọi sản phẩm; bộ lọc lưu trên URL. */
 
 import { PackagePlus } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';

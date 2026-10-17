@@ -1,6 +1,4 @@
-/**
- * Bốn ô số liệu đầu trang: điểm trung bình, số sản phẩm đạt Tốt, việc cần làm, cảnh báo.
- */
+/** Bốn ô số liệu đầu trang. */
 
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 import { SERIES } from '../../../../shared/components/charts/chartTheme';

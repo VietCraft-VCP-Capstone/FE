@@ -1,6 +1,4 @@
-/**
- * Cột của bảng "Tất cả sản phẩm": điểm, số bán 30 ngày, tag, việc nên làm.
- */
+/** Cột bảng "Tất cả sản phẩm": điểm, số bán 30 ngày, tag, việc nên làm. */
 
 import { Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';

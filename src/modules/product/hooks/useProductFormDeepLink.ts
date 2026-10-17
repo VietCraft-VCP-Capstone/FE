@@ -7,11 +7,7 @@ import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 type OpenForm = (product: ProductItem | null, focusField?: string | null) => void;
 type ShowToast = (message: string, type: 'error') => void;
 
-/**
- * `?new=1` mở modal tạo mới; `?edit=<id>#<field>` (việc cần sửa F29 ở khu "Phân tích & AI")
- * mở modal sửa đúng sản phẩm và trỏ tới ô `field`. Đọc xong thì xoá khỏi URL để
- * tải lại trang không mở lại modal, và bấm lại cùng đường dẫn vẫn mở được.
- */
+/** ?new=1 mở form tạo, ?edit=<id>#<field> mở form sửa đúng ô; đọc xong xoá khỏi URL. */
 export function useProductFormDeepLink(openForm: OpenForm, showToast: ShowToast) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { hash } = useLocation();
@@ -39,8 +35,7 @@ export function useProductFormDeepLink(openForm: OpenForm, showToast: ShowToast)
     const editId = searchParams.get('edit');
     if (!editId) return;
     const focusField = hash ? decodeURIComponent(hash.slice(1)) : null;
-    // Không huỷ theo cleanup của effect: xoá `edit` khỏi URL làm effect chạy lại ngay,
-    // cleanup sẽ bỏ mất kết quả. Chỉ bỏ khi đã có yêu cầu mới hơn hoặc trang đã unmount.
+    // Không huỷ trong cleanup vì xoá param làm effect chạy lại ngay.
     const requestId = ++latestRequestRef.current;
     const isCurrent = () => mountedRef.current && requestId === latestRequestRef.current;
     (async () => {

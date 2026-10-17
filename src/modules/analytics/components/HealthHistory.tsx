@@ -1,7 +1,4 @@
-/**
- * F29 · Điểm sức khoẻ theo ngày của một sản phẩm: seller thấy điểm nhảy sau khi sửa và
- * tụt dần khi lâu không cập nhật nội dung.
- */
+/** Điểm theo ngày của một sản phẩm. */
 
 import { useState } from 'react';
 import { SERIES } from '../../../shared/components/charts/chartTheme';

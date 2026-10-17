@@ -33,10 +33,7 @@ function Panel({ icon, title, body, action, compact }: {
   );
 }
 
-/**
- * Thanh tiến độ "đang có bao nhiêu / cần bao nhiêu" (plan §9.2) — thay cho câu thông
- * báo chay khi một tính năng mở theo ngưỡng dữ liệu sàn thật (ví dụ "12/20 đơn").
- */
+/** Thanh tiến độ "đang có / cần" khi tính năng chờ đủ dữ liệu thật. */
 function UnlockProgress({ unlock }: { unlock: InsightUnlock }) {
   const pct = unlock.target > 0 ? Math.max(0, Math.min(100, Math.round((unlock.current / unlock.target) * 100))) : 0;
   return (

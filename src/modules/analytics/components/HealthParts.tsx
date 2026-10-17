@@ -1,10 +1,4 @@
-/**
- * Phần dùng chung của F29 (Sức khoẻ sản phẩm) cho trang danh sách và trang chi tiết.
- *
- * Mọi câu chữ giải thích tiêu chí nằm ở đây để hai trang luôn nói cùng một điều.
- * Số mốc (5 ảnh, 150 ký tự, 3 tag, 90 ngày, 100 lượt xem) phải khớp
- * `vc-ai/AI-Analysic/app/core/f29/` và `HEALTH_SPEC.md`.
- */
+/** Phần dùng chung của F29; mốc phải khớp app/core/f29 và HEALTH_SPEC.md. */
 
 import { AlertTriangle, CheckCircle2, Circle, CircleDashed } from 'lucide-react';
 import { Link } from 'react-router-dom';

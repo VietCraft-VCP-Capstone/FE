@@ -1,6 +1,4 @@
-/**
- * Một ô của "Tính thử điểm": nhãn kèm giá trị hiện tại và mốc nên có, nút −/+ và ô số.
- */
+/** Một ô "Tính thử điểm": nhãn, giá trị hiện tại, mốc, nút −/+. */
 
 import { useId } from 'react';
 import { Minus, Plus } from 'lucide-react';

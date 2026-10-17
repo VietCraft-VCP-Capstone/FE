@@ -114,8 +114,7 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     setErrors({});
   }, [product, isOpen]);
 
-  // ProductItem chỉ mang TÊN danh mục/thẻ (BE trả `categories[0]` và `tags[]`),
-  // nên khi sửa phải dò ngược sang id — và chỉ làm được sau khi catalog tải xong.
+  // Form chỉ có tên danh mục/thẻ: đợi catalog tải xong rồi dò ra id.
   useEffect(() => {
     if (!product || categories.length === 0) return;
     const key = (x?: string) => (x || '').trim().toLowerCase();
@@ -130,8 +129,7 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     }));
   }, [product, categories, tags]);
 
-  // Mức hoa hồng phụ thuộc danh mục: đổi danh mục là mức có thể đổi theo, nên phải hỏi lại.
-  // Hàng ở form này luôn là READY_TO_SHIP.
+  // Đổi danh mục thì mức hoa hồng có thể đổi; hàng ở form này luôn READY_TO_SHIP.
   useEffect(() => {
     if (!isOpen) return;
     let alive = true;
@@ -142,8 +140,7 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     return () => { alive = false; };
   }, [isOpen, formData.categoryId]);
 
-  // API trả về giá NIÊM YẾT (đã gồm hoa hồng), còn ô "Giá bán" là giá người bán NHẬN.
-  // Không bóc lại thì mỗi lần lưu là hoa hồng cộng chồng thêm một lớp.
+  // API trả giá niêm yết; bóc hoa hồng ra để lưu không bị cộng chồng.
   useEffect(() => {
     if (!product || commissionPercent === null) return;
     setFormData(prev => ({ ...prev, price: netFromGross(product.price || 0, commissionPercent) }));

@@ -11,10 +11,7 @@ export type InsightStatus = 'ok' | 'partial' | 'insufficient_data';
 /** live: dữ liệu thật · seed_demo: dữ liệu mô phỏng · derived: suy ra từ cả hai. */
 export type SourceMode = 'live' | 'seed_demo' | 'derived';
 
-/**
- * Tiến độ mở khoá một tính năng đang `insufficient_data`/`partial` vì thiếu dữ liệu
- * sàn thật — "đang có bao nhiêu / cần bao nhiêu" để vẽ thanh tiến độ (plan §9.2).
- */
+/** Tiến độ mở khoá khi thiếu dữ liệu thật: đang có / cần bao nhiêu. */
 export interface InsightUnlock {
   requirement: string;
   current: number;
@@ -135,20 +132,12 @@ export interface ListingConversion {
 }
 
 /* ------------------------------------------------------------ F29 -------- */
-/**
- * Hình dạng health-1.0 (plan v7 §4–§5): BE đọc thẳng `listing_health_scores`, không
- * còn qua AI gateway. Trục nào thiếu dữ liệu thì bị LOẠI khỏi phép tính (không phải
- * chấm 0) và liệt tên trong `axes_missing`.
- */
+/** health-1.0: trục thiếu dữ liệu bị loại khỏi phép tính, ghi trong axes_missing. */
 export type HealthStatus = 'good' | 'needs_improvement' | 'poor';
 
 export type HealthAxis = 'conversion' | 'rating' | 'content' | 'inventory' | 'freshness';
 
-/**
- * Một mục do engine F29 sinh ra (`vc-ai/AI-Analysic/app/core/f29/todos.py`, plan §4.3).
- *   type 'todo'    — việc tăng điểm, đã sắp theo lợi ích/công sức.
- *   type 'warning' — cần kiểm tra, KHÔNG trừ điểm (lỗ vốn, cân nặng mặc định, ...).
- */
+/** Mục do engine F29 sinh: 'todo' tăng điểm, 'warning' chỉ nhắc, không trừ điểm. */
 export interface HealthTodo {
   type: 'todo' | 'warning' | string;
   message: string;

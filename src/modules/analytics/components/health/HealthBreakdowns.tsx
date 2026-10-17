@@ -1,7 +1,4 @@
-/**
- * Ba thẻ phân tích dưới biểu đồ xu hướng: phân bố mức điểm, lỗi phổ biến, điểm từng
- * tiêu chí. Hai thẻ đầu bấm được để lọc bảng sản phẩm.
- */
+/** Ba thẻ phân tích dưới biểu đồ xu hướng; hai thẻ đầu bấm để lọc bảng. */
 
 import { ChevronRight, X } from 'lucide-react';
 import { Link } from 'react-router-dom';

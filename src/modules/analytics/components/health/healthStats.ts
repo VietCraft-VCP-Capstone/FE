@@ -1,6 +1,4 @@
-/**
- * Số liệu tổng của trang "Sức khoẻ sản phẩm", tính từ danh sách sản phẩm ở máy.
- */
+/** Số liệu tổng của trang, tính ở máy từ danh sách sản phẩm. */
 
 import type { HealthAxis, HealthStatus } from '../../types';
 import type { ListingHealthItem } from '../../healthTypes';

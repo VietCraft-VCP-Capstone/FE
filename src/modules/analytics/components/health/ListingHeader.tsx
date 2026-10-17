@@ -1,6 +1,4 @@
-/**
- * Dải đầu trang chi tiết: ảnh, tên, giá, tồn kho và số bán 30 ngày của sản phẩm.
- */
+/** Dải đầu trang chi tiết: ảnh, tên, giá, tồn kho, số bán 30 ngày. */
 
 import { ExternalLink, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
