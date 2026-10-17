@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Heart, ShoppingCart } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cartService } from '../../order/services/cartService';
+import { productsService } from '../../product/services/productsService';
+import { SuggestResult } from '../../product/types/product';
+import { SearchPopover } from '../../buyer/components/SearchPopover';
 
 interface LandingHeaderProps {
   user: any;
@@ -25,6 +28,12 @@ export function LandingHeader({
   onDashboard,
 }: LandingHeaderProps) {
   const [cartCount, setCartCount] = useState<number>(0);
+  const [isSearchPopoverOpen, setIsSearchPopoverOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestResult>({ keywords: [], shops: [], categories: [] });
+  const [isSuggestLoading, setIsSuggestLoading] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const isComposingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     cartService.getCart()
@@ -48,11 +57,55 @@ export function LandingHeader({
     };
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsSearchPopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSuggestions({ keywords: [], shops: [], categories: [] });
+      setIsSuggestLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      if (isComposingRef.current) return;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      setIsSuggestLoading(true);
+      try {
+        const result = await productsService.suggest(trimmed, controller.signal);
+        setSuggestions(result);
+      } catch (err: any) {
+        if (err.name !== 'AbortError' && err.name !== 'CanceledError') {
+          setSuggestions({ keywords: [], shops: [], categories: [] });
+        }
+      } finally {
+        setIsSuggestLoading(false);
+      }
+    }, 180);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const navigate = useNavigate();
 
-  const handleExecuteSearch = () => {
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+  const handleExecuteSearch = (targetKeyword?: string) => {
+    const kw = targetKeyword !== undefined ? targetKeyword : searchQuery;
+    setIsSearchPopoverOpen(false);
+    if (kw && kw.trim()) {
+      navigate(`/search?q=${encodeURIComponent(kw.trim())}`);
     } else {
       navigate('/search');
     }
@@ -81,24 +134,44 @@ export function LandingHeader({
           </Link>
         </nav>
 
-        {/* Search Bar */}
-        <div className="flex-1 max-w-lg relative group">
+        {/* Search Bar with Live Suggestion Popover */}
+        <div className="flex-1 max-w-lg min-w-[160px] relative group" ref={searchContainerRef}>
           <Search
             className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#007700] transition-colors cursor-pointer"
-            onClick={handleExecuteSearch}
+            onClick={() => handleExecuteSearch()}
           />
           <input
             type="text"
             placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onCompositionStart={() => { isComposingRef.current = true; }}
+            onCompositionEnd={() => { isComposingRef.current = false; }}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setIsSearchPopoverOpen(true);
+            }}
+            onFocus={() => setIsSearchPopoverOpen(true)}
+            onClick={() => setIsSearchPopoverOpen(true)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
                 handleExecuteSearch();
+              } else if (e.key === 'Escape') {
+                setIsSearchPopoverOpen(false);
               }
             }}
             className="w-full bg-stone-50 border border-stone-200 focus:border-[#007700] focus:bg-white rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none transition-all shadow-inner"
+          />
+
+          {/* Instant Search Popover Dropdown */}
+          <SearchPopover
+            isOpen={isSearchPopoverOpen}
+            search={searchQuery}
+            setSearch={setSearchQuery}
+            isSuggestLoading={isSuggestLoading}
+            suggestions={suggestions}
+            onExecuteSearch={handleExecuteSearch}
+            onClose={() => setIsSearchPopoverOpen(false)}
           />
         </div>
 

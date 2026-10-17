@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Heart, Bell, ShoppingBag, MessageCircle, Sparkles, Store, Tag as TagIcon, ArrowRight, Loader2 } from 'lucide-react';
+import { Search, Heart, Bell, ShoppingBag, MessageCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import { chatService } from '../../chat/services/chatService';
@@ -10,6 +10,7 @@ import { userService } from '../../user/services/userService';
 import { productsService } from '../../product/services/productsService';
 import { SuggestResult } from '../../product/types/product';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { SearchPopover } from './SearchPopover';
 
 interface BuyerHeaderProps {
   user: any;
@@ -27,20 +28,12 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isSearchPopoverOpen, setIsSearchPopoverOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<SuggestResult>({ products: [], shops: [], categories: [] });
+  const [suggestions, setSuggestions] = useState<SuggestResult>({ keywords: [], shops: [], categories: [] });
   const [isSuggestLoading, setIsSuggestLoading] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const POPULAR_SEARCHES = [
-    'Gốm Bát Tràng',
-    'Ví da thủ công',
-    'Khay trà gỗ',
-    'Bình hoa Wabi-Sabi',
-    'Túi tote canvas',
-    'Lụa Vạn Phúc'
-  ];
 
   const handleExecuteSearch = (targetKeyword?: string) => {
     const kw = targetKeyword !== undefined ? targetKeyword : search;
@@ -68,7 +61,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
     }
 
     if (!search || !search.trim()) {
-      setSuggestions({ products: [], shops: [], categories: [] });
+      setSuggestions({ keywords: [], shops: [], categories: [] });
       setIsSuggestLoading(false);
       return;
     }
@@ -87,7 +80,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
           setSuggestions(res);
         })
         .catch(() => {
-          setSuggestions({ products: [], shops: [], categories: [] });
+          setSuggestions({ keywords: [], shops: [], categories: [] });
         })
         .finally(() => {
           setIsSuggestLoading(false);
@@ -253,11 +246,11 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
         <nav className="buyer-nav-menu">
           <a onClick={() => handleNav('home')} className={location.pathname === '/' ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Khám phá</a>
           <a onClick={() => handleNav('gifts')} className={isActive('/gifts') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Quà tặng</a>
-          <a onClick={() => handleNav('collections')} className={isActive('/collections') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Bộ sưu tập</a>
-          <a onClick={() => handleNav('vouchers')} className={isActive('/vouchers') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Voucher</a>
+          <a onClick={() => handleNav('collections')} className={`buyer-nav-optional ${isActive('/collections') ? 'nav-active' : ''}`} style={{ cursor: 'pointer' }}>Bộ sưu tập</a>
+          <a onClick={() => handleNav('vouchers')} className={`buyer-nav-optional ${isActive('/vouchers') ? 'nav-active' : ''}`} style={{ cursor: 'pointer' }}>Voucher</a>
           <a
             onClick={() => navigate(user?.role?.toLowerCase() === 'seller' ? '/seller' : '/seller/register')}
-            className={location.pathname.startsWith('/seller') ? 'nav-active text-[#007700] font-bold' : 'text-[#007700] font-semibold hover:text-[#005B00]'}
+            className={`buyer-nav-optional ${location.pathname.startsWith('/seller') ? 'nav-active text-[#007700] font-bold' : 'text-[#007700] font-semibold hover:text-[#005B00]'}`}
             style={{ cursor: 'pointer' }}
           >
             Kênh Người Bán
@@ -283,6 +276,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
               setIsSearchPopoverOpen(true);
             }}
             onFocus={() => setIsSearchPopoverOpen(true)}
+            onClick={() => setIsSearchPopoverOpen(true)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -294,235 +288,15 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
           />
 
           {/* Instant Search Popover Dropdown */}
-          {isSearchPopoverOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 'calc(100% + 8px)',
-                left: 0,
-                right: 0,
-                backgroundColor: '#ffffff',
-                borderRadius: 16,
-                boxShadow: '0 12px 36px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04)',
-                border: '1px solid #e7e5e4',
-                padding: '16px',
-                zIndex: 9999,
-                maxHeight: '440px',
-                overflowY: 'auto'
-              }}
-            >
-              {/* Trường hợp 1: Chưa gõ gì -> Hiện từ khoá thịnh hành */}
-              {!search.trim() ? (
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: '#44403c', fontSize: 13, fontWeight: 700 }}>
-                    <Sparkles size={15} color="#eab308" />
-                    <span>Tìm kiếm thịnh hành</span>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {POPULAR_SEARCHES.map((item, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setSearch(item);
-                          handleExecuteSearch(item);
-                        }}
-                        style={{
-                          backgroundColor: '#f5f5f4',
-                          border: '1px solid #e7e5e4',
-                          borderRadius: 20,
-                          padding: '6px 14px',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: '#292524',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#ecfdf5';
-                          e.currentTarget.style.borderColor = '#a7f3d0';
-                          e.currentTarget.style.color = '#007700';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f5f5f4';
-                          e.currentTarget.style.borderColor = '#e7e5e4';
-                          e.currentTarget.style.color = '#292524';
-                        }}
-                      >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : isSuggestLoading ? (
-                /* Đang tải gợi ý */
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 0', gap: 8, color: '#78716c', fontSize: 13 }}>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Đang tìm kiếm gợi ý...</span>
-                </div>
-              ) : (
-                /* Trường hợp 2: Đã có kết quả gợi ý */
-                <div>
-                  {/* Danh mục gợi ý nếu có */}
-                  {suggestions.categories && suggestions.categories.length > 0 && (
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#78716c', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        <TagIcon size={13} />
-                        <span>Danh mục gợi ý</span>
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {suggestions.categories.map((c) => (
-                          <span
-                            key={c.id}
-                            onClick={() => {
-                              setIsSearchPopoverOpen(false);
-                              navigate(`/search?category=${encodeURIComponent(c.name)}`);
-                            }}
-                            style={{
-                              backgroundColor: '#f0fdf4',
-                              color: '#166534',
-                              fontSize: 12,
-                              fontWeight: 600,
-                              padding: '4px 10px',
-                              borderRadius: 12,
-                              cursor: 'pointer',
-                              border: '1px solid #bbf7d0'
-                            }}
-                          >
-                            {c.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Gian hàng gợi ý nếu có */}
-                  {suggestions.shops && suggestions.shops.length > 0 && (
-                    <div style={{ marginBottom: 14 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#78716c', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        <Store size={13} />
-                        <span>Gian hàng thủ công</span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {suggestions.shops.map((s) => (
-                          <div
-                            key={s.id}
-                            onClick={() => {
-                              setIsSearchPopoverOpen(false);
-                              navigate(`/shop/${s.slug || s.id}`);
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '6px 8px',
-                              borderRadius: 8,
-                              cursor: 'pointer',
-                              transition: 'background-color 0.15s'
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f4')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <img
-                                src={s.logo || 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?auto=format&fit=crop&q=80&w=100'}
-                                alt={s.name}
-                                style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid #e7e5e4' }}
-                              />
-                              <div>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: '#1c1917', display: 'block' }}>{s.name}</span>
-                                <span style={{ fontSize: 11, color: '#78716c' }}>Điểm uy tín: {s.reputationScore}/100</span>
-                              </div>
-                            </div>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: '#008000', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: 10 }}>
-                              Xem Shop
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Sản phẩm gợi ý */}
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#78716c', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Sản phẩm phù hợp
-                    </div>
-                    {suggestions.products && suggestions.products.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {suggestions.products.map((p) => (
-                          <div
-                            key={p.id}
-                            onClick={() => {
-                              setIsSearchPopoverOpen(false);
-                              navigate(`/product/${p.slug || p.id}`);
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 12,
-                              padding: '6px 8px',
-                              borderRadius: 8,
-                              cursor: 'pointer',
-                              transition: 'background-color 0.15s'
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f4')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                          >
-                            <img
-                              src={p.thumbnail || 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&q=80&w=100'}
-                              alt={p.title}
-                              style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
-                            />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1c1917', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {p.title}
-                              </p>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: '#008000' }}>
-                                  {p.price > 0 ? `${p.price.toLocaleString('vi-VN')}đ` : 'Liên hệ'}
-                                </span>
-                                {p.average_rating > 0 && (
-                                  <span style={{ fontSize: 11, color: '#d97706', display: 'flex', alignItems: 'center', gap: 2 }}>
-                                    ★ {p.average_rating.toFixed(1)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p style={{ fontSize: 13, color: '#a8a29e', margin: '8px 0', fontStyle: 'italic' }}>
-                        Không có gợi ý xem nhanh. Nhấn Enter để tìm kiếm toàn bộ sàn.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Nút xem toàn bộ kết quả */}
-                  <div
-                    onClick={() => handleExecuteSearch()}
-                    style={{
-                      marginTop: 14,
-                      paddingTop: 10,
-                      borderTop: '1px solid #f5f5f4',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      color: '#008000',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <span>Xem tất cả kết quả cho "{search}"</span>
-                    <ArrowRight size={14} />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <SearchPopover
+            isOpen={isSearchPopoverOpen}
+            search={search}
+            setSearch={setSearch}
+            isSuggestLoading={isSuggestLoading}
+            suggestions={suggestions}
+            onExecuteSearch={handleExecuteSearch}
+            onClose={() => setIsSearchPopoverOpen(false)}
+          />
         </div>
 
         {/* Action Icons (Đã dời Thông báo sang bên phải, cạnh Avatar và Chat) */}

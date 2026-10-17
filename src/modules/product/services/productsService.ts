@@ -63,13 +63,30 @@ export const productsService = {
     }
   },
 
+  trackSearchClick: (logId: string, productId: string, position: number): void => {
+    api.post('/products/search/click', { logId, productId, position }).catch(() => {});
+  },
+
   suggest: async (q: string, signal?: AbortSignal): Promise<SuggestResult> => {
     try {
-      if (!q || !q.trim()) return { products: [], shops: [], categories: [] };
+      if (!q || !q.trim()) return { keywords: [], shops: [], categories: [] };
       const res = await api.get('/products/suggest', { params: { q: q.trim() }, signal });
-      return res.data || { products: [], shops: [], categories: [] };
+      return res.data || { keywords: [], shops: [], categories: [] };
     } catch (err: any) {
-      return { products: [], shops: [], categories: [] };
+      return { keywords: [], shops: [], categories: [] };
+    }
+  },
+
+  getTrendingKeywords: async (limit = 8): Promise<string[]> => {
+    try {
+      const res = await api.get('/products/meta/trending-keywords', { params: { limit } });
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        return res.data;
+      }
+      return [];
+    } catch (err) {
+      console.warn('Error fetching trending keywords from AI analyst:', err);
+      return [];
     }
   },
 

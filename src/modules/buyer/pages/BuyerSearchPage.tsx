@@ -12,6 +12,7 @@ import { SearchActiveFilterTags } from '../components/search/SearchActiveFilterT
 import { SearchProductCard } from '../components/search/SearchProductCard';
 import { SearchPagination } from '../components/search/SearchPagination';
 import { SearchEmptyState } from '../components/search/SearchEmptyState';
+import { addRecentSearch } from '../components/search/recentSearchStorage';
 import '../../../shared/components/layouts.css';
 
 const SORT_OPTIONS = [
@@ -23,14 +24,6 @@ const SORT_OPTIONS = [
   { key: 'rating_desc', label: 'Đánh giá cao' }
 ];
 
-const POPULAR_KEYWORDS = [
-  'Gốm Bát Tràng',
-  'Ví da thủ công',
-  'Khay trà gỗ',
-  'Bình hoa Wabi-Sabi',
-  'Túi tote canvas',
-  'Lụa Vạn Phúc'
-];
 
 export function BuyerSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -51,10 +44,27 @@ export function BuyerSearchPage() {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [searchLogId, setSearchLogId] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [popularKeywords, setPopularKeywords] = useState<string[]>([
+    'Quà Tặng',
+    'Áo Đồng Phục',
+    'Áo Thun',
+    'Quà Sinh Nhật',
+    'Móc Khóa',
+    'Túi Tote'
+  ]);
+
+  useEffect(() => {
+    productsService.getTrendingKeywords(6)
+      .then((kws) => {
+        if (kws && kws.length > 0) setPopularKeywords(kws);
+      })
+      .catch(() => {});
+  }, []);
 
   const triggerToast = (message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
@@ -121,6 +131,10 @@ export function BuyerSearchPage() {
     setSearchParams(next);
   }, [searchParams, setSearchParams]);
 
+  useEffect(() => {
+    if (qParam) addRecentSearch(qParam);
+  }, [qParam]);
+
   // Main search API caller
   useEffect(() => {
     setIsLoading(true);
@@ -143,6 +157,7 @@ export function BuyerSearchPage() {
         setProducts(res.items as ProductItem[]);
         setTotal(res.total);
         setTotalPages(res.totalPages || 1);
+        setSearchLogId(res.searchLogId);
       })
       .catch((err) => {
         console.error('Search error:', err);
@@ -233,7 +248,7 @@ export function BuyerSearchPage() {
         query={qParam}
         category={categoryParam}
         total={total}
-        popularKeywords={POPULAR_KEYWORDS}
+        popularKeywords={popularKeywords}
         onSelectKeyword={(kw) => updateQuery({ q: kw })}
       />
 
@@ -344,7 +359,7 @@ export function BuyerSearchPage() {
             <SearchEmptyState
               query={qParam}
               hasActiveFilters={hasActiveFilters}
-              popularKeywords={POPULAR_KEYWORDS}
+              popularKeywords={popularKeywords}
               onSelectKeyword={(kw) => updateQuery({ q: kw, category: undefined, minPrice: undefined, maxPrice: undefined })}
               onResetFilters={handleResetFilters}
             />
@@ -352,13 +367,16 @@ export function BuyerSearchPage() {
             /* Results Grid */
             <>
               <div className="buyer-grid-4">
-                {products.map((p) => (
+                {products.map((p, idx) => (
                   <SearchProductCard
                     key={p.id}
                     product={p}
                     isFavorited={favoritedProductIds.includes(p.id)}
                     onToggleFavorite={handleToggleFavorite}
-                    onClick={() => navigate(`/product/${p.id}`)}
+                    onClick={() => {
+                      if (searchLogId) productsService.trackSearchClick(searchLogId, p.id, idx);
+                      navigate(`/product/${p.id}`);
+                    }}
                   />
                 ))}
               </div>

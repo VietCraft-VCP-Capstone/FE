@@ -107,6 +107,7 @@ export interface PaginatedProductsResult {
   page: number;
   limit: number;
   totalPages: number;
+  searchLogId?: string;
 }
 
 export interface SearchFilterState {
@@ -126,14 +127,7 @@ export interface SearchFilterState {
 }
 
 export interface SuggestResult {
-  products: Array<{
-    id: string;
-    title: string;
-    thumbnail: string;
-    price: number;
-    average_rating: number;
-    slug?: string;
-  }>;
+  keywords: string[];
   shops: Array<{
     id: string;
     name: string;
