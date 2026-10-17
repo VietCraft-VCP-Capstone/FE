@@ -122,7 +122,8 @@ export function DistributionRuler({ min, max, bandLow, bandHigh, ticks, formatVa
               />
               <span
                 className={`absolute whitespace-nowrap text-[10.5px] ${t.mine ? 'font-bold text-stone-800' : 'text-stone-500'}`}
-                style={t.mine ? { top: -20 } : { top: 20 }}
+                // Vạch sát mép thì nhãn mọc vào trong, không tràn khỏi thẻ.
+                style={{ top: t.mine ? -20 : 20, ...(posOf(t.at) > 80 ? { right: 0 } : posOf(t.at) < 20 ? { left: 0 } : {}) }}
               >
                 {t.label}
               </span>

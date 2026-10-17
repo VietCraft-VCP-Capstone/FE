@@ -61,14 +61,15 @@ export const INSIGHTS_NAV: InsightNavGroup[] = [
     ],
   },
   {
-    label: 'Nhìn sang ngang',
-    hint: 'So với người bán cùng ngách',
+    // Đặt theo câu hỏi của người bán mới, xếp theo thứ tự nên đi: tìm -> theo dõi -> so -> sửa giá, từ khoá.
+    label: 'So với đối thủ',
+    hint: 'Ai bán chạy, tôi đứng ở đâu',
     items: [
-      { to: `${INSIGHTS_ROOT}/competitors`, label: 'Đối thủ cùng danh mục', icon: Users, feature: 'F32' },
-      { to: `${INSIGHTS_ROOT}/benchmark`, label: 'So sánh 5 trục', icon: Crosshair, feature: 'F33' },
-      { to: `${INSIGHTS_ROOT}/tag-gap`, label: 'Tag còn thiếu', icon: Tags, feature: 'F34' },
-      { to: `${INSIGHTS_ROOT}/pricing`, label: 'Mặt bằng giá', icon: Target, feature: 'F35' },
-      { to: `${INSIGHTS_ROOT}/tracking`, label: 'Theo dõi đối thủ', icon: Radar, feature: 'F36' },
+      { to: `${INSIGHTS_ROOT}/competitors`, label: 'Ai đang bán chạy', icon: Users, feature: 'F32' },
+      { to: `${INSIGHTS_ROOT}/tracking`, label: 'Đối thủ đang theo dõi', icon: Radar, feature: 'F36' },
+      { to: `${INSIGHTS_ROOT}/benchmark`, label: 'Tôi mạnh, yếu ở đâu', icon: Crosshair, feature: 'F33' },
+      { to: `${INSIGHTS_ROOT}/pricing`, label: 'Giá tôi đắt hay rẻ', icon: Target, feature: 'F35' },
+      { to: `${INSIGHTS_ROOT}/tag-gap`, label: 'Từ khoá nên thêm', icon: Tags, feature: 'F34' },
     ],
   },
   {

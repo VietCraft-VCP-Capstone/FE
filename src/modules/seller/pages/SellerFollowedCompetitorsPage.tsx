@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Store, Star, Package, TrendingUp, RefreshCw } from 'lucide-react';
+import { Store, Star, Package, TrendingUp, RefreshCw, Sparkles } from 'lucide-react';
 import { shopService, ShopDetail } from '../../product/services/shopService';
 import { useToast } from '../../../shared/components/Toast';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
@@ -56,24 +56,34 @@ export function SellerFollowedCompetitorsPage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-extrabold text-stone-900 tracking-tight">
-              Theo dõi đối thủ (Competitor Benchmarking)
+              Đối thủ đang theo dõi
             </h1>
             <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
               {shops.length} gian hàng
             </span>
           </div>
           <p className="text-sm text-stone-500 mt-1">
-            Theo dõi các gian hàng cùng ngành hàng để cập nhật xu hướng giá, sản phẩm mới và chiến lược bán lẻ.
+            Bấm vào một gian hàng để xem sản phẩm, giá và khuyến mãi của họ.
           </p>
         </div>
-        <button
-          onClick={fetchCompetitors}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-stone-200 text-stone-700 text-xs font-bold hover:bg-stone-50 transition-colors shadow-sm self-start sm:self-auto cursor-pointer"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          Làm mới
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {/* Cùng danh sách follow; khu Phân tích có hàng mới của đối thủ, so sánh và giá. */}
+          <button
+            onClick={() => navigate('/seller/insights/tracking')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold transition-colors shadow-sm cursor-pointer"
+          >
+            <Sparkles size={14} />
+            Phân tích chuyên sâu đối thủ
+          </button>
+          <button
+            onClick={fetchCompetitors}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-stone-200 text-stone-700 text-xs font-bold hover:bg-stone-50 transition-colors shadow-sm cursor-pointer"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Làm mới
+          </button>
+        </div>
       </div>
 
       {/* Overview Stat Cards */}
@@ -130,14 +140,15 @@ export function SellerFollowedCompetitorsPage() {
             Chưa theo dõi gian hàng đối thủ nào
           </h3>
           <p className="text-sm text-stone-500 leading-relaxed mb-6">
-            Khám phá các gian hàng thủ công trên VietCraft và bấm <strong>Theo dõi</strong> để so sánh và cập nhật xu hướng cạnh tranh.
+            Xem các gian hàng bán chạy cùng danh mục với bạn và bấm <strong>Theo dõi</strong> để so sánh và cập nhật xu hướng cạnh tranh.
           </p>
+          {/* Trang F32: nhóm shop cùng danh mục có sẵn nút Theo dõi (dùng chung danh sách follow này) */}
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/seller/insights/competitors')}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
           >
             <Store size={15} />
-            Khám phá gian hàng trên sàn
+            Tìm đối thủ cùng danh mục
           </button>
         </div>
       ) : (

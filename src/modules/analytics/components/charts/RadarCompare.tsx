@@ -20,10 +20,15 @@ import { DataTable } from '../ui';
 
 export interface RadarSeries {
   name: string;
-  values: number[];
+  /** null = trục đó chưa có dữ liệu. Không vẽ thành 0; bảng số hiện "Chưa có". */
+  values: (number | null)[];
   color: string;
   /** Đường của chính shop mình: tô đậm hơn để nổi giữa nhóm đối thủ. */
   primary?: boolean;
+}
+
+function isNumber(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 export function RadarCompare({ axes, series, height = 320, unitHint }: {
@@ -33,40 +38,54 @@ export function RadarCompare({ axes, series, height = 320, unitHint }: {
   unitHint?: string;
 }) {
   const rows = axes.map((axis, i) => {
-    const row: Record<string, string | number> = { axis };
+    const row: Record<string, string | number | null> = { axis };
     series.forEach(s => {
-      row[s.name] = s.values[i] ?? 0;
+      row[s.name] = isNumber(s.values[i]) ? s.values[i] : null;
     });
     return row;
   });
+  // Trục có shop thiếu số thì không vẽ lên radar: vẽ 0 là nói sai rằng shop đó kém nhất.
+  // Bảng bên dưới vẫn liệt kê đủ mọi trục.
+  const complete = axes.map((_, i) => series.every(s => isNumber(s.values[i])));
+  const chartRows = rows.filter((_, i) => complete[i]);
+  const hiddenAxes = axes.filter((_, i) => !complete[i]);
 
   return (
     <div className="space-y-4">
-      <div role="img" aria-label={`Biểu đồ radar so sánh ${axes.length} tiêu chí`} style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={rows} outerRadius="72%">
-            <PolarGrid stroke={CHART_INK.grid} />
-            <PolarAngleAxis dataKey="axis" tick={{ fill: CHART_INK.axis, fontSize: 11 }} />
-            <PolarRadiusAxis domain={[0, 100]} tick={{ fill: CHART_INK.axis, fontSize: 10 }} tickCount={3} />
-            <Tooltip
-              contentStyle={{ borderRadius: 10, border: '1px solid #e3e6e3', fontSize: 12 }}
-              formatter={(v: any) => decimal(Number(v))}
-            />
-            {series.map(s => (
-              <Radar
-                key={s.name}
-                name={s.name}
-                dataKey={s.name}
-                stroke={s.color}
-                fill={s.color}
-                fillOpacity={s.primary ? 0.22 : 0.04}
-                strokeWidth={s.primary ? 2.5 : 1.25}
-                isAnimationActive={false}
+      {hiddenAxes.length > 0 && (
+        <p className="m-0 text-xs leading-relaxed text-stone-500">
+          Không vẽ trục {hiddenAxes.join(', ')} vì có shop chưa có dữ liệu ở trục này. Bảng bên dưới vẫn có đủ các trục.
+        </p>
+      )}
+      {chartRows.length >= 3 ? (
+        <div role="img" aria-label={`Biểu đồ radar so sánh ${chartRows.length} tiêu chí`} style={{ height }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart data={chartRows} outerRadius="72%">
+              <PolarGrid stroke={CHART_INK.grid} />
+              <PolarAngleAxis dataKey="axis" tick={{ fill: CHART_INK.axis, fontSize: 11 }} />
+              <PolarRadiusAxis domain={[0, 100]} tick={{ fill: CHART_INK.axis, fontSize: 10 }} tickCount={3} />
+              <Tooltip
+                contentStyle={{ borderRadius: 10, border: '1px solid #e3e6e3', fontSize: 12 }}
+                formatter={(v: any) => decimal(Number(v))}
               />
-            ))}
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
+              {series.map(s => (
+                <Radar
+                  key={s.name}
+                  name={s.name}
+                  dataKey={s.name}
+                  stroke={s.color}
+                  fill={s.color}
+                  fillOpacity={s.primary ? 0.22 : 0.04}
+                  strokeWidth={s.primary ? 2.5 : 1.25}
+                  isAnimationActive={false}
+                />
+              ))}
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <p className="m-0 text-xs leading-relaxed text-stone-500">Chưa đủ 3 trục có dữ liệu để vẽ radar. Xem số trong bảng bên dưới.</p>
+      )}
 
       <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0 text-xs text-stone-600">
         {series.map(s => (
@@ -93,7 +112,7 @@ export function RadarCompare({ axes, series, height = 320, unitHint }: {
             <td className="font-medium text-stone-700">{row.axis}</td>
             {series.map(s => (
               <td key={s.name} className={`text-right tabular-nums ${s.primary ? 'font-bold text-stone-900' : 'text-stone-600'}`}>
-                {decimal(Number(row[s.name]))}
+                {decimal(row[s.name] as number | null)}
               </td>
             ))}
           </tr>

@@ -165,12 +165,15 @@ function humanize(id: string): string {
   return id.replace(/[_-]+/g, ' ').trim();
 }
 
-export function categoryLabel(id: string | null | undefined): string {
+/** `name` là tên service trả kèm cho danh mục của sàn thật; có thì dùng trước bảng nhãn cứng. */
+export function categoryLabel(id: string | null | undefined, name?: string | null): string {
+  if (name) return name;
   if (!id) return 'Chưa rõ danh mục';
   return CATEGORY_LABELS[id] ?? humanize(id);
 }
 
-export function productTypeLabel(id: string | null | undefined): string {
+export function productTypeLabel(id: string | null | undefined, name?: string | null): string {
+  if (name) return name;
   if (!id) return 'Chưa rõ loại phôi';
   return PRODUCT_TYPE_LABELS[id] ?? humanize(id);
 }

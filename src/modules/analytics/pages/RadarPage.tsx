@@ -52,7 +52,7 @@ export function RadarPage() {
                 footer={<SourceFooter meta={meta} limitation={data.limitation} />}
               >
                 <RadarCompare
-                  axes={data.radar.axes.map(categoryLabel)}
+                  axes={data.radar.axes.map(axis => categoryLabel(axis))}
                   series={[
                     {
                       name: 'Nhu cầu tìm kiếm',
