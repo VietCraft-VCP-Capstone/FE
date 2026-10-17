@@ -562,7 +562,15 @@ export function AdminCategories() {
                     )}
                     {cat.proposed_by && (
                       <p className="text-[11px] text-amber-800/80 mt-0.5">
-                        Đề xuất bởi: <b>{cat.proposed_by.name || cat.proposed_by.full_name || cat.proposed_by.email || 'Người bán'}</b>
+                        Đề xuất bởi:{' '}
+                        {cat.proposed_by.shop_name ? (
+                          <>
+                            Shop <b className="text-stone-900 font-semibold">{cat.proposed_by.shop_name}</b>
+                            <span className="text-stone-500 font-normal"> ({cat.proposed_by.full_name || (cat.proposed_by as any).name || cat.proposed_by.email})</span>
+                          </>
+                        ) : (
+                          <b>{cat.proposed_by.full_name || (cat.proposed_by as any).name || cat.proposed_by.email || 'Người bán'}</b>
+                        )}
                       </p>
                     )}
                   </div>

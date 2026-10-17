@@ -100,13 +100,25 @@ export function SellerCatalogPage() {
     const rows = useMemo(() => {
         const q = norm(search);
         return data.categories
-            .map(c => ({ ...c, items: productsByCategory.get(norm(c.name)) || [] }))
+            .map(c => {
+                const byName = productsByCategory.get(norm(c.name)) || [];
+                const bySlug = c.slug ? (productsByCategory.get(norm(c.slug)) || []) : [];
+                const seenIds = new Set<string>();
+                const combined: CatalogProduct[] = [];
+                for (const p of [...byName, ...bySlug]) {
+                    if (!seenIds.has(p.id)) {
+                        seenIds.add(p.id);
+                        combined.push(p);
+                    }
+                }
+                return { ...c, items: combined };
+            })
             .filter(c => !q || norm(c.name).includes(q) || norm(c.slug || '').includes(q))
             .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name, 'vi'));
     }, [data.categories, productsByCategory, search]);
 
     const orphans = useMemo(() => {
-        const known = new Set(data.categories.map(c => norm(c.name)));
+        const known = new Set(data.categories.flatMap(c => [norm(c.name), norm(c.slug || '')]).filter(Boolean));
         const map = new Map<string, CatalogProduct[]>();
         for (const p of data.products) {
             const key = norm(p.category);

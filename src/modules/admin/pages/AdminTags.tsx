@@ -349,6 +349,19 @@ export function AdminTags() {
               <li key={t._id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[18px] py-2.5">
                 <span className="min-w-0 flex-1 basis-[160px]">
                   <TagChip name={t.name} color={t.color} />
+                  {t.proposed_by && (
+                    <div className="text-[11px] text-amber-800/80 mt-1">
+                      Đề xuất bởi:{' '}
+                      {t.proposed_by.shop_name ? (
+                        <>
+                          Shop <b className="text-stone-900 font-semibold">{t.proposed_by.shop_name}</b>
+                          <span className="text-stone-500 font-normal"> ({t.proposed_by.full_name || (t.proposed_by as any).name || t.proposed_by.email})</span>
+                        </>
+                      ) : (
+                        <b>{t.proposed_by.full_name || (t.proposed_by as any).name || t.proposed_by.email || 'Người bán'}</b>
+                      )}
+                    </div>
+                  )}
                 </span>
                 <span className={cx('truncate text-[12.5px] text-admin-muted xl:w-[240px] xl:shrink-0', MONO)}>
                   /{t.slug}

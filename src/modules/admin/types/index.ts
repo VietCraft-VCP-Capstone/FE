@@ -16,7 +16,7 @@ export interface Category {
   sort_order: number;
   is_active: boolean;
   status?: 'active' | 'pending';
-  proposed_by?: { _id: string; full_name?: string; email?: string } | null;
+  proposed_by?: { _id: string; full_name?: string; email?: string; shop_name?: string; shop_slug?: string } | null;
   created_at: string;
   updated_at: string;
   children?: Category[];
@@ -59,6 +59,8 @@ export interface Tag {
   slug: string;
   color: string;
   product_count: number;
+  status?: 'active' | 'pending';
+  proposed_by?: { _id: string; full_name?: string; email?: string; shop_name?: string; shop_slug?: string } | null;
   created_at: string;
   updated_at: string;
 }
