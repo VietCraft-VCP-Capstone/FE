@@ -5,6 +5,7 @@ import { AdminDashboard } from './AdminDashboard';
 import { AdminModeration } from './AdminModeration';
 import { AdminCategories } from './AdminCategories';
 import { AdminTags } from './AdminTags';
+import { AdminBannedKeywords } from './AdminBannedKeywords';
 import { AdminSellers } from './AdminSellers';
 import { AdminFinanceSimulationPage } from './AdminFinanceSimulationPage';
 import { AdminCommission } from './AdminCommission';
@@ -168,6 +169,7 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="sellers" element={<AdminSellers />} />
         <Route path="categories" element={<AdminCategories />} />
         <Route path="tags" element={<AdminTags />} />
+        <Route path="banned-keywords" element={<AdminBannedKeywords />} />
         <Route path="disputes" element={<AdminDisputes />} />
         <Route path="refund-requests" element={<Navigate to="/admin/disputes" replace />} />
         <Route path="returns" element={<AdminReturnsPage />} />

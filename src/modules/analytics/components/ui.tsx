@@ -103,17 +103,37 @@ export function Chip({ tone = 'neutral', icon, children, className }: {
 /* -------------------------------------------------------------- biến động -- */
 
 /** Mũi tên + chữ. Màu chỉ là kênh phụ: chiều tăng/giảm luôn nằm trong chữ và icon. */
-export function DeltaBadge({ value, invert = false }: { value: number | null | undefined; invert?: boolean }) {
+export function DeltaBadge({
+  value,
+  invert = false,
+  fallbackLabel = 'Kỳ đầu',
+}: {
+  value: number | null | undefined;
+  invert?: boolean;
+  fallbackLabel?: string;
+}) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
-    return <span className="text-xs text-stone-500">Chưa so được</span>;
+    return (
+      <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-500">
+        {fallbackLabel}
+      </span>
+    );
   }
   const up = value > 0;
   const flat = value === 0;
   const good = flat ? null : invert ? !up : up;
   const Icon = flat ? Minus : up ? ArrowUpRight : ArrowDownRight;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${good === null ? 'text-stone-500' : good ? 'text-[#005B00]' : 'text-red-700'}`}>
-      <Icon size={14} strokeWidth={2.25} aria-hidden />
+    <span
+      className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
+        good === null
+          ? 'bg-stone-100 text-stone-600'
+          : good
+          ? 'bg-[#EAF0E2] text-[#005B00]'
+          : 'bg-red-50 text-red-700'
+      }`}
+    >
+      <Icon size={13} strokeWidth={2.25} aria-hidden />
       {delta(value)}
       <span className="sr-only">{up ? 'tăng' : flat ? 'không đổi' : 'giảm'} so với kỳ trước</span>
     </span>
@@ -122,20 +142,53 @@ export function DeltaBadge({ value, invert = false }: { value: number | null | u
 
 /* ------------------------------------------------------------- ô số liệu -- */
 
-export function KpiTile({ label, value, hint, trailing }: {
+export function KpiTile({
+  label,
+  value,
+  hint,
+  trailing,
+  icon,
+  iconBg = 'bg-stone-100 text-stone-600',
+  isUnavailable = false,
+  unavailableText = 'Chưa đo lường',
+}: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   hint?: React.ReactNode;
   trailing?: React.ReactNode;
+  icon?: React.ReactNode;
+  iconBg?: string;
+  isUnavailable?: boolean;
+  unavailableText?: string;
 }) {
+  const isNa = isUnavailable || value === '—' || value === 'Chưa có' || value === null || value === undefined;
+
   return (
-    <div className="min-w-0 rounded-md border border-stone-200 bg-white px-4 py-3">
-      <span className="block text-xs font-semibold text-stone-500">{label}</span>
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="font-jakarta text-2xl font-extrabold leading-none text-stone-900">{value}</span>
-        {trailing}
+    <div className="group relative flex min-w-0 flex-col justify-between rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">{label}</span>
+        {icon && (
+          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105 ${iconBg}`}>
+            {icon}
+          </div>
+        )}
       </div>
-      {hint && <div className="mt-1.5 text-xs text-stone-500">{hint}</div>}
+      <div className="mt-3">
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          {isNa ? (
+            <div className="flex items-baseline gap-2">
+              <span className="font-jakarta text-2xl font-light text-stone-300">—</span>
+              <span className="inline-flex items-center rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-500">
+                {unavailableText}
+              </span>
+            </div>
+          ) : (
+            <span className="font-jakarta text-2xl font-extrabold leading-none text-stone-900">{value}</span>
+          )}
+          {trailing}
+        </div>
+        {hint && <div className="mt-2 text-xs leading-relaxed text-stone-400">{hint}</div>}
+      </div>
     </div>
   );
 }

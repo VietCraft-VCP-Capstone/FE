@@ -34,7 +34,8 @@ export function DemoBanner() {
     );
   }
 
-  if (!context?.demo || dismissed) return null;
+  // Nếu seller đã có gian hàng thật (live_shop_id) thì không hiển thị banner shop mẫu
+  if (!context?.demo || Boolean(context?.live_shop_id) || dismissed) return null;
 
   const dismiss = () => {
     setDismissed(true);

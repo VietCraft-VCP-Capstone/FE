@@ -78,6 +78,7 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
   const [catalogError, setCatalogError] = useState('');
 
   const [formData, setFormData] = useState<ProductFormData>(EMPTY_FORM);
+  const [newTagNames, setNewTagNames] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [commissionPercent, setCommissionPercent] = useState<number | null>(null);
 
@@ -108,6 +109,7 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
 
   useEffect(() => {
     setFormData(product ? formFromProduct(product) : newProductForm());
+    setNewTagNames([]);
     setErrors({});
   }, [product, isOpen]);
 
@@ -149,11 +151,31 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     }));
   };
 
+  const addTag = (name: string) => {
+    const key = name.toLowerCase();
+    const matched = tags.find(t => t.name.toLowerCase() === key);
+    if (matched) {
+      setFormData(prev => (prev.tagIds.includes(matched._id) ? prev : { ...prev, tagIds: [...prev.tagIds, matched._id] }));
+    } else {
+      setNewTagNames(prev => (prev.some(t => t.toLowerCase() === key) ? prev : [...prev, name]));
+    }
+  };
+
+  const removeNewTag = (name: string) => setNewTagNames(prev => prev.filter(t => t !== name));
+
+  const categoryCreated = async (name: string) => {
+    const c = await productsService.getCategories();
+    if (!Array.isArray(c)) return;
+    setCategories(c);
+    const created = c.find(it => (it.name || '').toLowerCase() === name.toLowerCase());
+    if (created) setFormData(prev => ({ ...prev, categoryId: created._id, category: created.name }));
+  };
+
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!formData.title.trim()) errs.title = 'Vui lòng nhập tên sản phẩm';
     if (!formData.categoryId) errs.category = 'Vui lòng chọn danh mục';
-    if (formData.tagIds.length === 0) errs.tags = 'Vui lòng chọn ít nhất 1 thẻ';
+    if (formData.tagIds.length === 0 && newTagNames.length === 0) errs.tags = 'Vui lòng chọn hoặc đề xuất ít nhất 1 thẻ';
     if (formData.price <= 0) errs.price = 'Giá bán phải lớn hơn 0';
     if (formData.stock < 0) errs.stock = 'Tồn kho không được âm';
     setErrors(errs);
@@ -166,7 +188,7 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     if (targetCover && finalImages.includes(targetCover)) {
       finalImages = [targetCover, ...finalImages.filter(img => img !== targetCover)];
     }
-    return { ...formData, images: finalImages, thumbnail: targetCover };
+    return { ...formData, newTagNames, images: finalImages, thumbnail: targetCover };
   };
 
   return {
@@ -180,6 +202,10 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     catalogError,
     commissionPercent,
     toggleTag,
+    newTagNames,
+    addTag,
+    removeNewTag,
+    categoryCreated,
     validate,
     buildSubmitData,
   };

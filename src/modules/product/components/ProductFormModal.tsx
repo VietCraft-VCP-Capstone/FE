@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { ModalOverlay } from '../../../shared/components/ModalOverlay';
 import { ProductItem, ProductFormData } from '../types/product';
@@ -8,6 +8,7 @@ import { ProductFormImageManager } from './ProductFormImageManager';
 import { ProductFormColorManager } from './ProductFormColorManager';
 import { ProductFormBasicFields } from './ProductFormBasicFields';
 import { ProductFormDescriptionEditor } from './ProductFormDescriptionEditor';
+import { ProposeCategoryModal } from './ProposeCategoryModal';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -40,9 +41,14 @@ export function ProductFormModal({
     catalogError,
     commissionPercent,
     toggleTag,
+    newTagNames,
+    addTag,
+    removeNewTag,
+    categoryCreated,
     validate,
     buildSubmitData,
   } = useProductFormState(isOpen, product);
+  const [showCatModal, setShowCatModal] = useState(false);
 
   useFocusFormField(formRef, isOpen, focusField, catalogSettled);
 
@@ -102,6 +108,10 @@ export function ProductFormModal({
             commissionPercent={commissionPercent}
             onPatch={patch}
             onToggleTag={toggleTag}
+            newTagNames={newTagNames}
+            onAddTag={addTag}
+            onRemoveNewTag={removeNewTag}
+            onProposeCategory={() => setShowCatModal(true)}
           />
 
           <ProductFormColorManager
@@ -135,6 +145,9 @@ export function ProductFormModal({
           </button>
         </div>
       </div>
+      {showCatModal && (
+        <ProposeCategoryModal categories={categories} onClose={() => setShowCatModal(false)} onCreated={categoryCreated} />
+      )}
     </ModalOverlay>
   );
 }

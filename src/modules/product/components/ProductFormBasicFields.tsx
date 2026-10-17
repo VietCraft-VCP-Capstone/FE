@@ -1,6 +1,8 @@
 import { ProductFormData, CatalogOption } from '../types/product';
 import { commissionAmount, withCommission } from '../../../shared/utils/commission';
 import { money } from '../../../shared/utils/format';
+import { Plus } from 'lucide-react';
+import { ProductFormTagField } from './ProductFormTagField';
 
 interface ProductFormBasicFieldsProps {
   formData: ProductFormData;
@@ -11,6 +13,10 @@ interface ProductFormBasicFieldsProps {
   commissionPercent: number | null;
   onPatch: (patch: Partial<ProductFormData>) => void;
   onToggleTag: (id: string) => void;
+  newTagNames: string[];
+  onAddTag: (name: string) => void;
+  onRemoveNewTag: (name: string) => void;
+  onProposeCategory: () => void;
 }
 
 const LABEL_CLASS = 'block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta';
@@ -24,6 +30,10 @@ export function ProductFormBasicFields({
   commissionPercent,
   onPatch,
   onToggleTag,
+  newTagNames,
+  onAddTag,
+  onRemoveNewTag,
+  onProposeCategory,
 }: ProductFormBasicFieldsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -46,9 +56,18 @@ export function ProductFormBasicFields({
 
       {/* Category */}
       <div className="space-y-1.5">
-        <label className={LABEL_CLASS}>
-          Danh mục <span className="text-rose-500">*</span>
-        </label>
+        <div className="flex items-center justify-between">
+          <label className={LABEL_CLASS}>
+            Danh mục <span className="text-rose-500">*</span>
+          </label>
+          <button
+            type="button"
+            onClick={onProposeCategory}
+            className="text-xs font-semibold text-[#007700] hover:text-[#005B00] hover:underline cursor-pointer flex items-center gap-1"
+          >
+            <Plus size={13} /> Đề xuất danh mục
+          </button>
+        </div>
         <select
           value={formData.categoryId}
           disabled={catalogLoading || categories.length === 0}
@@ -72,44 +91,17 @@ export function ProductFormBasicFields({
         {errors.category && <p className="text-xs text-rose-500">{errors.category}</p>}
       </div>
 
-      {/* Thẻ sản phẩm — bắt buộc ít nhất 1, chọn từ thẻ sàn đã duyệt */}
-      <div className="md:col-span-2 space-y-1.5" data-focus-target="tags">
-        <label className={LABEL_CLASS}>
-          Thẻ sản phẩm <span className="text-rose-500">*</span>
-          <span className="ml-2 font-medium normal-case tracking-normal text-stone-400">
-            Đã chọn {formData.tagIds.length}
-          </span>
-        </label>
-        <div
-          className={`flex flex-wrap gap-2 p-3 bg-stone-50/80 border rounded-xl min-h-[52px] ${
-            errors.tags ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
-          }`}
-        >
-          {catalogLoading && <span className="text-xs text-stone-400">Đang tải thẻ...</span>}
-          {!catalogLoading && tags.length === 0 && (
-            <span className="text-xs text-stone-400">Sàn chưa duyệt thẻ nào.</span>
-          )}
-          {tags.map((tag) => {
-            const picked = formData.tagIds.includes(tag._id);
-            return (
-              <button
-                key={tag._id}
-                type="button"
-                onClick={() => onToggleTag(tag._id)}
-                className={`px-3 py-1.5 rounded-full text-xs border transition-all cursor-pointer ${
-                  picked
-                    ? 'font-bold text-white border-transparent shadow-xs'
-                    : 'font-medium text-stone-600 bg-white border-stone-200 hover:border-stone-400'
-                }`}
-                style={picked ? { backgroundColor: tag.color || '#007700' } : undefined}
-              >
-                {tag.name}
-              </button>
-            );
-          })}
-        </div>
-        {errors.tags && <p className="text-xs text-rose-500">{errors.tags}</p>}
-      </div>
+      <ProductFormTagField
+        tags={tags}
+        tagIds={formData.tagIds}
+        newTagNames={newTagNames}
+        catalogLoading={catalogLoading}
+        error={errors.tags}
+        labelClass={LABEL_CLASS}
+        onToggleTag={onToggleTag}
+        onAddTag={onAddTag}
+        onRemoveNewTag={onRemoveNewTag}
+      />
 
       {/* Price */}
       <div className="space-y-1.5" data-focus-target="price">

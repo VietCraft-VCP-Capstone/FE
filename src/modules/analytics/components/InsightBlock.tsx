@@ -48,20 +48,20 @@ function UnlockProgress({ unlock }: { unlock: InsightUnlock }) {
   );
 }
 
-function RetryButton({ onClick }: { onClick: () => void }) {
+function RetryButton({ onClick, label = 'Thử lại' }: { onClick: () => void; label?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] active:translate-y-px motion-reduce:transition-none"
     >
-      <RefreshCw size={13} aria-hidden /> Thử lại
+      <RefreshCw size={13} aria-hidden /> {label}
     </button>
   );
 }
 
 const UNAVAILABLE_TEXT: Record<string, string> = {
-  ai_timeout: 'Dịch vụ phân tích phản hồi quá 5 giây nên yêu cầu đã dừng.',
+  ai_timeout: 'Dịch vụ phân tích AI đang xử lý hoặc phản hồi chậm. Vui lòng bấm Thử lại.',
   ai_unavailable: 'Chưa kết nối được tới dịch vụ phân tích.',
   ai_gateway_not_configured: 'Máy chủ chưa được cấu hình khoá kết nối tới dịch vụ phân tích.',
   ai_gateway_rejected: 'Dịch vụ phân tích từ chối khoá kết nối của máy chủ. Cần kiểm tra lại cấu hình.',
@@ -102,6 +102,7 @@ export function InsightStatusView<T>({ state, onRetry, compact, skeleton }: {
               {state.meta?.unlock && <UnlockProgress unlock={state.meta.unlock} />}
             </>
           }
+          action={onRetry && <RetryButton onClick={onRetry} label="Kiểm tra lại dữ liệu" />}
         />
       );
     case 'not_ready':

@@ -388,11 +388,84 @@ export interface RevenueForecast {
 
 /* ------------------------------------------------------------ F38 -------- */
 
+export interface ReadyToShipIdea {
+  title: string;
+  category: string;
+  market_price_range: string;
+  sourcing_tip: string;
+  why_it_sells?: string;
+  expected_profit_margin?: string;
+  upsell_bundle_tip?: string;
+  target_buyer?: string;
+}
+
+export interface PodBlankSuggestion {
+  blank_type: string;
+  title: string;
+  category: string;
+  suggested_theme: string;
+  design_hook?: string;
+  color_palette?: string;
+  estimated_profit?: string;
+  target_audience?: string;
+  matched_blank?: {
+    _id: string;
+    title: string;
+    category: string;
+    default_image: string;
+    base_cost: number;
+    printer_name: string;
+    is_connected: boolean;
+  };
+}
+
+export interface MatchingShopProduct {
+  _id: string;
+  title: string;
+  slug?: string;
+  images?: string[];
+  categories?: string[];
+  product_type?: string;
+  original_price?: number;
+}
+
 export interface SeasonalEvent {
   name: string;
   peak_week_of_year: number;
   amplitude: number;
   launch_window: { peak_week: string; peak_date: string; start: string; end: string; basis: string };
+  ready_to_ship_ideas?: ReadyToShipIdea[];
+  pod_blanks?: PodBlankSuggestion[];
+  matching_shop_products?: MatchingShopProduct[];
+}
+
+export interface CampaignRadar {
+  axes: string[];
+  current_values: number[];
+  benchmark_values: number[];
+  takeaways?: string[];
+  overall_score?: number;
+}
+
+export interface SeasonalCampaign {
+  id: string;
+  name: string;
+  icon: string;
+  badge: string;
+  months: number[];
+  peak_week: number;
+  description: string;
+  launch_window: { peak_week: string; peak_date: string; start: string; end: string; basis: string };
+  timing: {
+    status: 'active' | 'upcoming' | 'passed';
+    label: string;
+    badge_tone: 'good' | 'warn' | 'neutral';
+    days_diff: number;
+    is_current: boolean;
+  };
+  category_summary: string;
+  search_keywords: string[];
+  radar?: CampaignRadar;
 }
 
 export interface SeasonalForecast {
@@ -402,9 +475,26 @@ export interface SeasonalForecast {
   amplitude: number;
   n_points: number;
   events: SeasonalEvent[];
+  all_campaigns?: SeasonalCampaign[];
+  active_campaign?: SeasonalCampaign;
+  campaign_radar?: CampaignRadar;
+  seller_shop_name?: string;
+  seller_category?: { slug: string; name: string };
+  is_live_shop?: boolean;
+  ready_to_ship_ideas?: ReadyToShipIdea[];
+  pod_blanks?: PodBlankSuggestion[];
+  ai_model?: string;
   flat_keywords: string[];
   method: string;
   limitation: string | null;
+  all_seller_blanks?: {
+    _id: string;
+    title: string;
+    category: string;
+    default_image: string;
+    base_cost: number;
+    printer_name?: string;
+  }[];
 }
 
 /* ------------------------------------------------------------ F39 -------- */
