@@ -224,19 +224,24 @@ export function ProductFormModal({
         parent_id: catParentId || undefined,
         description: catDesc.trim() || undefined,
       });
-      setCatMsg({ text: 'Đã gửi yêu cầu thêm danh mục! Đang chờ Ban quản trị duyệt.', ok: true });
-      setTimeout(async () => {
+      setCatMsg({ text: 'Đã tạo danh mục thành công và có thể dùng ngay!', ok: true });
+      const c = await productsService.getCategories();
+      if (Array.isArray(c)) {
+        setCategories(c);
+        const createdCat = c.find((it: any) => (it.name || '').toLowerCase() === catName.trim().toLowerCase());
+        if (createdCat) {
+          setFormData(prev => ({ ...prev, categoryId: createdCat._id || createdCat.id }));
+        }
+      }
+      setTimeout(() => {
         setShowCatModal(false);
         setCatName('');
         setCatParentId('');
         setCatDesc('');
         setCatMsg(null);
-        // Tải lại danh mục
-        const c = await productsService.getCategories();
-        if (Array.isArray(c)) setCategories(c);
-      }, 1500);
+      }, 1000);
     } catch (err: any) {
-      setCatMsg({ text: err.response?.data?.error || 'Gửi đề xuất danh mục thất bại.', ok: false });
+      setCatMsg({ text: err.response?.data?.error || err.message || 'Gửi đề xuất danh mục thất bại.', ok: false });
     } finally {
       setSubmittingCat(false);
     }

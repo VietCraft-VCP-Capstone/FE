@@ -15,6 +15,8 @@ import type {
   PendingProductsResponse,
   CommissionOverview,
   FinanceOverview,
+  BannedKeyword,
+  BannedKeywordStats,
 } from '../types';
 
 export interface ListParams {
@@ -119,6 +121,14 @@ export const adminService = {
     return asPage<Category>(data.data);
   },
 
+  async getRejectedCategories(params: ListParams = {}): Promise<Paginated<Category>> {
+    const { data } = await api.get(`${ADMIN_BASE}/categories/rejected`, {
+      params,
+      headers: authHeader(),
+    });
+    return asPage<Category>(data.data);
+  },
+
   async approveCategory(id: string): Promise<Category> {
     const { data } = await api.post(`${ADMIN_BASE}/categories/${id}/approve`, {}, {
       headers: authHeader(),
@@ -126,8 +136,15 @@ export const adminService = {
     return data.data;
   },
 
-  async rejectCategory(id: string): Promise<void> {
-    await api.post(`${ADMIN_BASE}/categories/${id}/reject`, {}, {
+  async restoreCategory(id: string): Promise<Category> {
+    const { data } = await api.post(`${ADMIN_BASE}/categories/${id}/restore`, {}, {
+      headers: authHeader(),
+    });
+    return data.data;
+  },
+
+  async rejectCategory(id: string, reason?: string): Promise<void> {
+    await api.post(`${ADMIN_BASE}/categories/${id}/reject`, { reason }, {
       headers: authHeader(),
     });
   },
@@ -148,6 +165,14 @@ export const adminService = {
     return asPage<Tag>(data.data, 8);
   },
 
+  async getRejectedTags(params: ListParams = {}): Promise<Paginated<Tag>> {
+    const { data } = await api.get(`${ADMIN_BASE}/tags/rejected`, {
+      params,
+      headers: authHeader(),
+    });
+    return asPage<Tag>(data.data, 8);
+  },
+
   async getTagStats(): Promise<TagStats> {
     const { data } = await api.get(`${ADMIN_BASE}/tags/stats`, { headers: authHeader() });
     return data.data;
@@ -158,8 +183,13 @@ export const adminService = {
     return data.data;
   },
 
-  async rejectProposedTag(id: string): Promise<void> {
-    await api.post(`${ADMIN_BASE}/tags/${id}/reject`, null, { headers: authHeader() });
+  async restoreTag(id: string): Promise<Tag> {
+    const { data } = await api.post(`${ADMIN_BASE}/tags/${id}/restore`, null, { headers: authHeader() });
+    return data.data;
+  },
+
+  async rejectProposedTag(id: string, reason?: string): Promise<void> {
+    await api.post(`${ADMIN_BASE}/tags/${id}/reject`, { reason }, { headers: authHeader() });
   },
 
   async getTag(id: string): Promise<Tag> {
@@ -280,5 +310,39 @@ export const adminService = {
       { headers: authHeader() }
     );
     return data.data.percent;
+  },
+
+  /* ---------------- Banned Keywords (Quản lý từ khóa cấm) ---------------- */
+  async getBannedKeywords(params: { search?: string; page?: number; limit?: number; scope?: 'all' | 'custom' | 'system' } = {}): Promise<Paginated<BannedKeyword>> {
+    const { data } = await api.get(`${ADMIN_BASE}/banned-keywords`, {
+      params,
+      headers: authHeader(),
+    });
+    return asPage<BannedKeyword>(data.data, 20);
+  },
+
+  async getBannedKeywordStats(): Promise<BannedKeywordStats> {
+    const { data } = await api.get(`${ADMIN_BASE}/banned-keywords/stats`, { headers: authHeader() });
+    return data.data;
+  },
+
+  async createBannedKeyword(payload: { keyword: string; reason?: string }): Promise<BannedKeyword> {
+    const { data } = await api.post(`${ADMIN_BASE}/banned-keywords`, payload, {
+      headers: authHeader(),
+    });
+    return data.data;
+  },
+
+  async deleteBannedKeyword(id: string): Promise<void> {
+    await api.delete(`${ADMIN_BASE}/banned-keywords/${id}`, {
+      headers: authHeader(),
+    });
+  },
+
+  async seedBannedKeywords(): Promise<{ added: number }> {
+    const { data } = await api.post(`${ADMIN_BASE}/banned-keywords/seed`, {}, {
+      headers: authHeader(),
+    });
+    return data;
   },
 };
