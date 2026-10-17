@@ -68,6 +68,16 @@ export const catalogService = {
             truncated: totalProducts > products.length,
         };
     },
+
+    async proposeCategory(data: { name: string; description?: string; parent_id?: string }): Promise<any> {
+        const res = await api.post('/categories/propose', data);
+        return res.data;
+    },
+
+    async proposeTag(name: string): Promise<any> {
+        const res = await api.post('/tags/propose', { name });
+        return res.data;
+    },
 };
 
 export default catalogService;

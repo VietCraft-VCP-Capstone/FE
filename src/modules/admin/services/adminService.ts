@@ -111,6 +111,27 @@ export const adminService = {
     });
   },
 
+  async getPendingCategories(params: ListParams = {}): Promise<Paginated<Category>> {
+    const { data } = await api.get(`${ADMIN_BASE}/categories/pending`, {
+      params,
+      headers: authHeader(),
+    });
+    return asPage<Category>(data.data);
+  },
+
+  async approveCategory(id: string): Promise<Category> {
+    const { data } = await api.post(`${ADMIN_BASE}/categories/${id}/approve`, {}, {
+      headers: authHeader(),
+    });
+    return data.data;
+  },
+
+  async rejectCategory(id: string): Promise<void> {
+    await api.post(`${ADMIN_BASE}/categories/${id}/reject`, {}, {
+      headers: authHeader(),
+    });
+  },
+
   async getTags(params: TagListParams = {}): Promise<Paginated<Tag>> {
     const { data } = await api.get(`${ADMIN_BASE}/tags`, {
       params,

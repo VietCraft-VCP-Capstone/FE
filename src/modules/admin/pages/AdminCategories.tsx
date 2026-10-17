@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Clock,
   Eye,
   EyeOff,
   Folder,
@@ -14,9 +16,10 @@ import {
   Plus,
   SearchX,
   Trash2,
+  X,
 } from 'lucide-react';
 import { adminService } from '../services/adminService';
-import type { Category, CategoryOption, CategoryStats, CategoryStatusFilter, CategoryTreePage } from '../types';
+import type { Category, CategoryOption, CategoryStats, CategoryStatusFilter, CategoryTreePage, Paginated } from '../types';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import {
   BTN_PRIMARY,
@@ -250,13 +253,15 @@ function CategoryNode({
 /* ----------------------------------------------------------- Admin Categories Page */
 
 const EMPTY_FORM = { name: '', slug: '', description: '', icon: '', parent_id: '', sort_order: 0, is_active: true };
-const EMPTY_STATS: CategoryStats = { total: 0, active: 0, hidden: 0, roots: 0 };
+const EMPTY_STATS: CategoryStats = { total: 0, active: 0, hidden: 0, roots: 0, pending: 0 };
 const EMPTY_TREE: CategoryTreePage = { items: [], total: 0, page: 1, limit: 15, totalPages: 1, totalNodes: 0 };
+const emptyPendingPage = (limit: number): Paginated<Category> => ({ items: [], total: 0, page: 1, limit, totalPages: 1 });
 
 export function AdminCategories() {
   /* Yêu cầu gửi lên máy chủ. */
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
+  const [pendingPageNo, setPendingPageNo] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CategoryStatusFilter>('all');
   // Lọc đã chuyển xuống máy chủ, nên phải chờ người dùng gõ xong mới gọi.
@@ -264,6 +269,7 @@ export function AdminCategories() {
 
   /* Kết quả từ máy chủ. */
   const [tree, setTree] = useState<CategoryTreePage>(EMPTY_TREE);
+  const [pending, setPending] = useState<Paginated<Category>>(emptyPendingPage(8));
   const [stats, setStats] = useState<CategoryStats>(EMPTY_STATS);
   // Ô chọn danh mục cha phải thấy MỌI danh mục, kể cả mục nằm ngoài trang đang xem.
   const [options, setOptions] = useState<CategoryOption[]>([]);
@@ -279,6 +285,9 @@ export function AdminCategories() {
   const [slugTouched, setSlugTouched] = useState(false);
 
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
+  const [pendingRejectCat, setPendingRejectCat] = useState<Category | null>(null);
+  const [pendingQueueBusyId, setPendingQueueBusyId] = useState<string | null>(null);
+  const [rejectingBusy, setRejectingBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
@@ -318,6 +327,16 @@ export function AdminCategories() {
     }
   }, [page, limit, debouncedSearch, status]);
 
+  const loadPending = useCallback(async () => {
+    try {
+      const data = await adminService.getPendingCategories({ page: pendingPageNo, limit: 8 });
+      setPending(data);
+      if (data.page !== pendingPageNo) setPendingPageNo(data.page);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Không thể tải danh mục chờ duyệt');
+    }
+  }, [pendingPageNo]);
+
   const loadStats = useCallback(async () => {
     try {
       setStats(await adminService.getCategoryStats());
@@ -336,6 +355,7 @@ export function AdminCategories() {
   }, []);
 
   useEffect(() => { loadTree(); }, [loadTree]);
+  useEffect(() => { loadPending(); }, [loadPending]);
   useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { loadOptions(); }, [loadOptions]);
 
@@ -343,8 +363,8 @@ export function AdminCategories() {
   useEffect(() => { setPage(1); }, [debouncedSearch, status]);
 
   const reloadAll = useCallback(async () => {
-    await Promise.all([loadTree(), loadStats(), loadOptions()]);
-  }, [loadTree, loadStats, loadOptions]);
+    await Promise.all([loadTree(), loadPending(), loadStats(), loadOptions()]);
+  }, [loadTree, loadPending, loadStats, loadOptions]);
 
   const filtering = debouncedSearch.trim() !== '' || status !== 'all';
 
@@ -453,6 +473,35 @@ export function AdminCategories() {
     }
   };
 
+  const handleApproveCategory = async (cat: Category) => {
+    setPendingQueueBusyId(cat._id);
+    setError('');
+    try {
+      await adminService.approveCategory(cat._id);
+      await reloadAll();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Duyệt thất bại');
+    } finally {
+      setPendingQueueBusyId(null);
+    }
+  };
+
+  const confirmRejectCategory = async () => {
+    if (!pendingRejectCat) return;
+    setRejectingBusy(true);
+    setError('');
+    try {
+      await adminService.rejectCategory(pendingRejectCat._id);
+      setPendingRejectCat(null);
+      await reloadAll();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Từ chối thất bại');
+      setPendingRejectCat(null);
+    } finally {
+      setRejectingBusy(false);
+    }
+  };
+
   /* ------------------------------------------------------------------ UI Render */
 
   const deleteChildCount = pendingDelete
@@ -479,11 +528,89 @@ export function AdminCategories() {
         loading={loading}
         items={[
           { label: 'Tổng danh mục', value: stats.total },
+          { label: 'Chờ duyệt', value: stats.pending || 0, dot: (stats.pending || 0) > 0 ? '#ea580c' : '#cbd5d0' },
           { label: 'Đang hoạt động', value: stats.active, dot: '#1a6b1a' },
           { label: 'Đang ẩn', value: stats.hidden, dot: '#cbd5d0' },
           { label: 'Danh mục gốc', value: stats.roots },
         ]}
       />
+
+      {/* Pending Categories Queue Section */}
+      {pending.total > 0 && (
+        <section className={cx(CARD, 'mb-4 border-[#fdba74]')} aria-labelledby="pending-cat-heading">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[#fed7aa] bg-[#fff7ed] px-[18px] py-3">
+            <Clock size={16} className="shrink-0 text-[#9a3412]" aria-hidden />
+            <h2 id="pending-cat-heading" className="m-0 text-[14px] font-bold text-[#9a3412]">
+              Danh mục chờ duyệt ({pending.total})
+            </h2>
+            <span className="text-[12px] text-[#a16207]">Duyệt để đưa vào cây danh mục chính thức của sàn, hoặc từ chối yêu cầu</span>
+          </div>
+          <ul className="list-none divide-y divide-admin-line-soft p-0">
+            {pending.items.map((cat: any) => {
+              const parentName = options.find(o => o._id === (typeof cat.parent_id === 'object' ? cat.parent_id?._id : cat.parent_id))?.name
+                || (typeof cat.parent_id === 'object' && cat.parent_id?.name ? cat.parent_id.name : null);
+
+              return (
+                <li key={cat._id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[18px] py-3">
+                  <div className="min-w-0 flex-1 basis-[200px]">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-stone-900 text-sm">{cat.name}</span>
+                      {cat.slug && <span className={cx('text-[12px] text-admin-muted', MONO)}>/{cat.slug}</span>}
+                    </div>
+                    {cat.description && (
+                      <p className="text-xs text-stone-500 mt-0.5 line-clamp-1">{cat.description}</p>
+                    )}
+                    {cat.proposed_by && (
+                      <p className="text-[11px] text-amber-800/80 mt-0.5">
+                        Đề xuất bởi: <b>{cat.proposed_by.name || cat.proposed_by.full_name || cat.proposed_by.email || 'Người bán'}</b>
+                      </p>
+                    )}
+                  </div>
+                  {parentName && (
+                    <span className="text-[12px] text-stone-600 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-md">
+                      Thuộc: {parentName}
+                    </span>
+                  )}
+                  <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5 md:w-[84px]">
+                    <button
+                      type="button"
+                      className={ICON_BTN}
+                      onClick={() => handleApproveCategory(cat)}
+                      disabled={pendingQueueBusyId === cat._id}
+                      aria-label={`Duyệt danh mục ${cat.name}`}
+                      title="Duyệt"
+                    >
+                      {pendingQueueBusyId === cat._id ? (
+                        <Loader2 size={15} className="animate-spin motion-reduce:animate-none" aria-hidden />
+                      ) : (
+                        <Check size={15} aria-hidden />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className={ICON_BTN_DANGER}
+                      onClick={() => setPendingRejectCat(cat)}
+                      disabled={pendingQueueBusyId === cat._id}
+                      aria-label={`Từ chối danh mục ${cat.name}`}
+                      title="Từ chối"
+                    >
+                      <X size={15} aria-hidden />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <Pagination
+            page={pending.page}
+            totalPages={pending.totalPages}
+            total={pending.total}
+            limit={pending.limit}
+            itemLabel="đề xuất"
+            onPageChange={setPendingPageNo}
+          />
+        </section>
+      )}
 
       {/* Toolbar Section */}
       <div className={TOOLBAR}>
@@ -763,6 +890,24 @@ export function AdminCategories() {
         confirmLabel="Xoá danh mục"
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      {/* Reject Proposed Category Confirmation Dialog */}
+      <ConfirmDialog
+        open={pendingRejectCat !== null}
+        busy={rejectingBusy}
+        title="Từ chối đề xuất danh mục?"
+        tone="danger"
+        message={
+          <>
+            Bạn có chắc muốn từ chối đề xuất danh mục{' '}
+            <strong className="font-semibold text-admin-ink">{pendingRejectCat?.name}</strong>?
+            Yêu cầu này sẽ bị xoá khỏi danh sách chờ xét duyệt.
+          </>
+        }
+        confirmLabel="Từ chối đề xuất"
+        onConfirm={confirmRejectCategory}
+        onCancel={() => !rejectingBusy && setPendingRejectCat(null)}
       />
     </div>
   );

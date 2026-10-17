@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Archive, Search, RefreshCw, ChevronDown, ChevronRight, PackageOpen,
-    AlertTriangle, Tag as TagIcon, Layers, Boxes, PlusCircle,
+    AlertTriangle, Tag as TagIcon, Layers, Boxes, PlusCircle, Plus, X, Loader2, Check
 } from 'lucide-react';
 import { catalogService, CatalogData, CatalogProduct } from '../services/catalogService';
 import { ProductImage } from '../../product/components/ProductImage';
@@ -24,6 +24,17 @@ export function SellerCatalogPage() {
     const [search, setSearch] = useState('');
     const [expanded, setExpanded] = useState<string | null>(null);
 
+    // Modal state
+    const [showCatModal, setShowCatModal] = useState(false);
+    const [catName, setCatName] = useState('');
+    const [catParentId, setCatParentId] = useState('');
+    const [catDesc, setCatDesc] = useState('');
+    const [submittingCat, setSubmittingCat] = useState(false);
+
+    const [showTagModal, setShowTagModal] = useState(false);
+    const [tagName, setTagName] = useState('');
+    const [submittingTag, setSubmittingTag] = useState(false);
+
     const load = useCallback(async (silent = false) => {
         silent ? setRefreshing(true) : setLoading(true);
         try {
@@ -37,6 +48,44 @@ export function SellerCatalogPage() {
     }, [showToast]);
 
     useEffect(() => { load(); }, [load]);
+
+    const handleProposeCategory = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!catName.trim()) return;
+        setSubmittingCat(true);
+        try {
+            await catalogService.proposeCategory({
+                name: catName.trim(),
+                parent_id: catParentId || undefined,
+                description: catDesc.trim() || undefined,
+            });
+            showToast('Đã gửi yêu cầu thêm danh mục! Vui lòng chờ Ban quản trị duyệt.', 'success');
+            setShowCatModal(false);
+            setCatName('');
+            setCatParentId('');
+            setCatDesc('');
+        } catch (err: any) {
+            showToast(getApiErrorMessage(err, 'Gửi yêu cầu danh mục thất bại.'), 'error');
+        } finally {
+            setSubmittingCat(false);
+        }
+    };
+
+    const handleProposeTag = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!tagName.trim()) return;
+        setSubmittingTag(true);
+        try {
+            await catalogService.proposeTag(tagName.trim());
+            showToast('Đã gửi yêu cầu thêm thẻ! Vui lòng chờ Ban quản trị duyệt.', 'success');
+            setShowTagModal(false);
+            setTagName('');
+        } catch (err: any) {
+            showToast(getApiErrorMessage(err, 'Gửi yêu cầu thẻ thất bại.'), 'error');
+        } finally {
+            setSubmittingTag(false);
+        }
+    };
 
     const productsByCategory = useMemo(() => {
         const map = new Map<string, CatalogProduct[]>();
@@ -99,19 +148,33 @@ export function SellerCatalogPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight font-jakarta">
-                        Danh mục sản phẩm
+                        Danh mục & Thẻ sản phẩm
                     </h1>
                     <p className="text-sm text-stone-500 mt-1">
-                        Danh mục và thẻ do sàn quản lý. Bạn chọn từ đây khi đăng bán — không tự tạo được danh mục mới.
+                        Xem cấu trúc danh mục và thẻ phân loại trên sàn. Bạn có thể gửi yêu cầu đề xuất thêm danh mục hoặc thẻ mới để Ban quản trị xét duyệt.
                     </p>
                 </div>
-                <button
-                    onClick={() => load(true)}
-                    disabled={refreshing}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-stone-50 text-stone-700 text-sm font-semibold rounded-xl border border-stone-200 shadow-xs transition-all cursor-pointer disabled:opacity-50 font-jakarta"
-                >
-                    <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} /> Làm mới
-                </button>
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                        onClick={() => setShowCatModal(true)}
+                        className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-stone-50 text-[#007700] border border-[#007700]/30 hover:border-[#007700] text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer font-jakarta"
+                    >
+                        <Plus size={14} /> Đề xuất danh mục
+                    </button>
+                    <button
+                        onClick={() => setShowTagModal(true)}
+                        className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 hover:border-stone-400 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer font-jakarta"
+                    >
+                        <TagIcon size={14} /> Đề xuất thẻ
+                    </button>
+                    <button
+                        onClick={() => load(true)}
+                        disabled={refreshing}
+                        className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-stone-50 text-stone-700 text-xs font-semibold rounded-xl border border-stone-200 shadow-xs transition-all cursor-pointer disabled:opacity-50 font-jakarta"
+                    >
+                        <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Làm mới
+                    </button>
+                </div>
             </div>
 
             {/* Stat tiles */}
@@ -293,6 +356,145 @@ export function SellerCatalogPage() {
                     </div>
                 )}
             </div>
+
+            {/* Modal đề xuất danh mục */}
+            {showCatModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-md w-full p-6 relative">
+                        <button
+                            onClick={() => setShowCatModal(false)}
+                            className="absolute top-4 right-4 p-1.5 text-stone-400 hover:text-stone-600 rounded-lg hover:bg-stone-100 transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+
+                        <div className="flex items-center gap-2 mb-2 text-[#007700]">
+                            <Layers size={20} />
+                            <h3 className="text-base font-bold text-stone-900 font-jakarta">Đề xuất danh mục mới</h3>
+                        </div>
+                        <p className="text-xs text-stone-500 mb-5 leading-relaxed">
+                            Yêu cầu sẽ được gửi tới Ban quản trị VietCraft. Sau khi được duyệt, danh mục sẽ hiển thị trên toàn hệ thống và trong bộ lọc sản phẩm.
+                        </p>
+
+                        <form onSubmit={handleProposeCategory} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                    Tên danh mục <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Ví dụ: Đồ gốm men lam, Nến thơm..."
+                                    value={catName}
+                                    onChange={e => setCatName(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#007700] focus:border-[#007700]"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                    Danh mục cha (tuỳ chọn)
+                                </label>
+                                <select
+                                    value={catParentId}
+                                    onChange={e => setCatParentId(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#007700] focus:border-[#007700]"
+                                >
+                                    <option value="">-- Thuộc cấp cao nhất (Không có cha) --</option>
+                                    {data.categories.map(c => (
+                                        <option key={c._id} value={c._id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                    Mô tả / Lý do đề xuất (tuỳ chọn)
+                                </label>
+                                <textarea
+                                    rows={3}
+                                    placeholder="Nêu đặc điểm hoặc lý do nên mở thêm danh mục này..."
+                                    value={catDesc}
+                                    onChange={e => setCatDesc(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#007700] focus:border-[#007700]"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2.5 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCatModal(false)}
+                                    className="px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-100 rounded-xl transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submittingCat || !catName.trim()}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-[#007700] hover:bg-[#005B00] text-white text-xs font-bold rounded-xl shadow-xs disabled:opacity-50 transition-all font-jakarta"
+                                >
+                                    {submittingCat ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Gửi đề xuất
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal đề xuất thẻ */}
+            {showTagModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-sm w-full p-6 relative">
+                        <button
+                            onClick={() => setShowTagModal(false)}
+                            className="absolute top-4 right-4 p-1.5 text-stone-400 hover:text-stone-600 rounded-lg hover:bg-stone-100 transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+
+                        <div className="flex items-center gap-2 mb-2 text-[#007700]">
+                            <TagIcon size={20} />
+                            <h3 className="text-base font-bold text-stone-900 font-jakarta">Đề xuất thẻ phân loại mới</h3>
+                        </div>
+                        <p className="text-xs text-stone-500 mb-5 leading-relaxed">
+                            Thẻ giúp khách hàng tìm kiếm nhanh sản phẩm của bạn. Thẻ mới sẽ vào danh sách chờ Ban quản trị duyệt.
+                        </p>
+
+                        <form onSubmit={handleProposeTag} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                    Tên thẻ <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Ví dụ: GomBatTrang, ThuanChay..."
+                                    value={tagName}
+                                    onChange={e => setTagName(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#007700] focus:border-[#007700]"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2.5 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowTagModal(false)}
+                                    className="px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-100 rounded-xl transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submittingTag || !tagName.trim()}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-[#007700] hover:bg-[#005B00] text-white text-xs font-bold rounded-xl shadow-xs disabled:opacity-50 transition-all font-jakarta"
+                                >
+                                    {submittingTag ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Gửi đề xuất
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

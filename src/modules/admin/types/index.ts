@@ -11,10 +11,12 @@ export interface Category {
   name: string;
   slug: string;
   description?: string;
-  parent_id?: string | null;
+  parent_id?: string | null | any;
   icon?: string;
   sort_order: number;
   is_active: boolean;
+  status?: 'active' | 'pending';
+  proposed_by?: { _id: string; full_name?: string; email?: string } | null;
   created_at: string;
   updated_at: string;
   children?: Category[];
@@ -38,6 +40,7 @@ export interface CategoryStats {
   active: number;
   hidden: number;
   roots: number;
+  pending?: number;
 }
 
 export interface TagStats {
