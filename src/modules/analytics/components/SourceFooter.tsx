@@ -17,8 +17,8 @@ export const SOURCE_LABEL: Record<SourceMode, { label: string; tone: Tone; hint:
   derived: { label: 'Kết hợp', tone: 'info', hint: 'Kết hợp nhu cầu thật (Google Trends) với nguồn cung trong dữ liệu mô phỏng.' },
 };
 
-export function SourceChip({ mode }: { mode: SourceMode }) {
-  const s = SOURCE_LABEL[mode] ?? SOURCE_LABEL.seed_demo;
+export function SourceChip({ mode }: { mode?: SourceMode }) {
+  const s = (mode && SOURCE_LABEL[mode]) ? SOURCE_LABEL[mode] : SOURCE_LABEL.seed_demo;
   return (
     <Chip tone={s.tone} icon={<Database size={12} aria-hidden />}>
       <span title={s.hint}>{s.label}</span>
@@ -27,7 +27,7 @@ export function SourceChip({ mode }: { mode: SourceMode }) {
 }
 
 export function SourceFooter({ meta, limitation, method }: {
-  meta: InsightMeta;
+  meta?: InsightMeta | null;
   /** Giới hạn do service AI tự khai (trường `limitation` / `note`). */
   limitation?: string | null;
   /** Phương pháp tính, nếu muốn nêu. */
@@ -35,6 +35,19 @@ export function SourceFooter({ meta, limitation, method }: {
 }) {
   const [open, setOpen] = useState(false);
   const hasDetail = Boolean(limitation || method);
+
+  if (!meta || !meta.source) {
+    if (!hasDetail) return null;
+    return (
+      <div className="text-xs text-stone-500">
+        <div className="space-y-1.5 rounded-xl bg-stone-50 px-3 py-2.5 leading-relaxed text-stone-600">
+          {method && <p className="m-0"><strong className="text-stone-700">Phương pháp:</strong> {method}</p>}
+          {limitation && <p className="m-0"><strong className="text-stone-700">Giới hạn:</strong> {limitation}</p>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="text-xs text-stone-500">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">

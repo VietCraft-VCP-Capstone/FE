@@ -105,7 +105,14 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
     window.addEventListener('vietcraft-notification-unread-updated', onNotifUpdate);
     window.addEventListener('vietcraft-notification-received', onNotifUpdate);
 
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
     return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
       window.removeEventListener('vietcraft-chat-unread-updated', onUnreadUpdate);
       window.removeEventListener('vietcraft-message-received', onUnreadUpdate);
       window.removeEventListener('vietcraft-notification-unread-updated', onNotifUpdate);

@@ -47,7 +47,7 @@ export function PrinterSettingsTab() {
         setPrinterData({
           printer_name: res.printer.printer_name || '',
           api_url: res.printer.api_url || res.defaultApiUrl || 'http://localhost:8880',
-          api_key: res.printer.api_key || '',
+          api_key: '',
           seller_printing_email: res.printer.seller_printing_email,
           is_connected: Boolean(res.printer.is_connected),
           connected_at: res.printer.connected_at,
@@ -227,7 +227,7 @@ export function PrinterSettingsTab() {
                     <div className="flex justify-between items-center text-[11.5px]">
                       <span className="text-stone-400">Khóa API Key:</span>
                       <span className="font-mono text-stone-700 font-semibold text-[11px] bg-stone-100 px-2 py-0.5 rounded border border-stone-200">
-                        {p.api_key ? (p.api_key.slice(0, 12) + '...' + p.api_key.slice(-6)) : 'psk_live_...'}
+                        {p.api_key ? (p.api_key.includes('...') ? p.api_key : (p.api_key.slice(0, 12) + '...' + p.api_key.slice(-6))) : 'psk_live_...'}
                       </span>
                     </div>
                     {p.connected_at && (

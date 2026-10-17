@@ -46,7 +46,7 @@ function RetryButton({ onClick }: { onClick: () => void }) {
 }
 
 const UNAVAILABLE_TEXT: Record<string, string> = {
-  ai_timeout: 'Dịch vụ phân tích phản hồi quá 5 giây nên yêu cầu đã dừng.',
+  ai_timeout: 'Dịch vụ phân tích AI đang xử lý hoặc phản hồi chậm. Vui lòng bấm Thử lại.',
   ai_unavailable: 'Chưa kết nối được tới dịch vụ phân tích.',
   ai_gateway_not_configured: 'Máy chủ chưa được cấu hình khoá kết nối tới dịch vụ phân tích.',
   ai_gateway_rejected: 'Dịch vụ phân tích từ chối khoá kết nối của máy chủ. Cần kiểm tra lại cấu hình.',
