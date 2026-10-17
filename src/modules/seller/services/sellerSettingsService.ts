@@ -130,13 +130,30 @@ function filterOutViettel(settings: SellerSettingsState): SellerSettingsState {
   return settings;
 }
 
+function sanitizeForLocalStorage(settings: SellerSettingsState): SellerSettingsState {
+  try {
+    const copy = JSON.parse(JSON.stringify(settings));
+    if (copy.payment?.bankAccounts) {
+      copy.payment.bankAccounts = copy.payment.bankAccounts.map((b: any) => ({
+        ...b,
+        accountNumber: b.accountNumber
+          ? (b.accountNumber.startsWith('*') ? b.accountNumber : `**** **** ${String(b.accountNumber).slice(-4)}`)
+          : ''
+      }));
+    }
+    return copy;
+  } catch {
+    return settings;
+  }
+}
+
 export const sellerSettingsService = {
   getSettings: async (): Promise<SellerSettingsState> => {
     try {
       const res = await api.get('/seller/settings');
       if (res.data && res.data.brand) {
         const clean = filterOutViettel(res.data);
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(clean));
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitizeForLocalStorage(clean)));
         return clean;
       }
     } catch (e) {
@@ -169,7 +186,7 @@ export const sellerSettingsService = {
       const res = await api.put('/seller/settings', payload);
       if (res.data && res.data.brand) {
         const clean = filterOutViettel(res.data);
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(clean));
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitizeForLocalStorage(clean)));
         return clean;
       }
     } catch (e) {
@@ -179,7 +196,7 @@ export const sellerSettingsService = {
 
     const current = sellerSettingsService.getCachedSettings();
     const merged = filterOutViettel({ ...current, ...payload, updatedAt: new Date().toISOString() });
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitizeForLocalStorage(merged)));
     return merged;
   },
 

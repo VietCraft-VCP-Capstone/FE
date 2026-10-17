@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ProductItem, ProductFormData, ProductFilterState } from '../types/product';
 import { productsService } from '../services/productsService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
@@ -8,16 +8,12 @@ import { ProductTable } from '../components/ProductTable';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { ProductDeleteModal } from '../components/ProductDeleteModal';
+import { ProductBatchActionsBar } from '../components/ProductBatchActionsBar';
+import { ProductPagination } from '../components/ProductPagination';
+import { useProductFormDeepLink } from '../hooks/useProductFormDeepLink';
 import { useToast } from '../../../shared/components/Toast';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
-import {
-  Plus,
-  Trash2,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles
-} from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 
 
 const INITIAL_FILTER: ProductFilterState = {
@@ -42,6 +38,7 @@ export function ProductListingPage() {
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
+  const [focusField, setFocusField] = useState<string | null>(null);
 
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [viewingProduct, setViewingProduct] = useState<ProductItem | null>(null);
@@ -52,15 +49,12 @@ export function ProductListingPage() {
 
   const [actionLoading, setActionLoading] = useState(false);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  useEffect(() => {
-    if (searchParams.get('new') !== '1') return;
-    setEditingProduct(null);
+  const openForm = useCallback((product: ProductItem | null, field: string | null = null) => {
+    setEditingProduct(product);
+    setFocusField(field);
     setIsFormOpen(true);
-    const next = new URLSearchParams(searchParams);
-    next.delete('new');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, []);
+  useProductFormDeepLink(openForm, showToast);
 
   const debounceTimerRef = useRef<any>(null);
   const cacheRef = useRef<Map<string, { items: ProductItem[]; total: number; totalPages: number }>>(new Map());
@@ -230,15 +224,9 @@ export function ProductListingPage() {
     }
   };
 
-  const handleOpenCreate = () => {
-    setEditingProduct(null);
-    setIsFormOpen(true);
-  };
+  const handleOpenCreate = () => openForm(null);
 
-  const handleOpenEdit = (p: ProductItem) => {
-    setEditingProduct(p);
-    setIsFormOpen(true);
-  };
+  const handleOpenEdit = (p: ProductItem) => openForm(p);
 
   const handleOpenDetail = (p: ProductItem) => {
     setViewingProduct(p);
@@ -291,46 +279,12 @@ export function ProductListingPage() {
       />
 
       {/* Batch Actions Bar (Sleek, brand-aligned green theme) */}
-      {selectedIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-[#EAF0E2] border border-[#BECAB6] rounded-2xl shadow-xs animate-fade-in">
-          <div className="flex items-center gap-2.5 pl-2">
-            <div className="w-7 h-7 rounded-full bg-[#007700] text-white flex items-center justify-center shadow-2xs">
-              <CheckCircle2 size={16} />
-            </div>
-            <div className="flex items-center">
-              <span className="text-sm font-bold text-[#005B00] font-jakarta">
-                Đã chọn {selectedIds.length} sản phẩm
-              </span>
-              <button
-                onClick={() => setSelectedIds([])}
-                className="ml-3 text-xs font-semibold text-stone-500 hover:text-stone-800 underline underline-offset-2 cursor-pointer"
-              >
-                Bỏ chọn
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleBatchStatus('ACTIVE')}
-              className="px-3.5 py-2 bg-white hover:bg-emerald-50 text-[#007700] text-xs font-bold rounded-xl border border-emerald-300 shadow-2xs transition-all cursor-pointer font-jakarta"
-            >
-              Chuyển Đang bán
-            </button>
-            <button
-              onClick={() => handleBatchStatus('INACTIVE')}
-              className="px-3.5 py-2 bg-white hover:bg-stone-100 text-stone-700 text-xs font-semibold rounded-xl border border-stone-200 shadow-2xs transition-all cursor-pointer font-jakarta"
-            >
-              Chuyển Tạm dừng
-            </button>
-            <button
-              onClick={handleBatchDelete}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-[#BA1A1A] text-xs font-bold rounded-xl border border-rose-200 shadow-2xs transition-all cursor-pointer font-jakarta"
-            >
-              <Trash2 size={14} /> Xóa đã chọn
-            </button>
-          </div>
-        </div>
-      )}
+      <ProductBatchActionsBar
+        selectedCount={selectedIds.length}
+        onClearSelection={() => setSelectedIds([])}
+        onSetStatus={handleBatchStatus}
+        onDelete={handleBatchDelete}
+      />
 
       {/* Main Product Table */}
       <ProductTable
@@ -345,56 +299,14 @@ export function ProductListingPage() {
       />
 
       {/* Server-Side Pagination Footer */}
-      {totalResults > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-          <div className="text-xs text-stone-500 font-medium">
-            Hiển thị{' '}
-            <span className="font-bold text-stone-800">
-              {(currentPage - 1) * filter.pageSize + 1}
-            </span>{' '}
-            -{' '}
-            <span className="font-bold text-stone-800">
-              {Math.min(currentPage * filter.pageSize, totalResults)}
-            </span>{' '}
-            trên <span className="font-bold text-stone-800">{totalResults}</span> sản phẩm
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setFilter((prev) => ({ ...prev, page: Math.max(1, currentPage - 1) }))}
-              disabled={currentPage === 1 || loading}
-              className="p-2 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition-colors"
-              title="Trang trước"
-            >
-              <ChevronLeft size={16} />
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-              <button
-                key={pageNum}
-                onClick={() => setFilter((prev) => ({ ...prev, page: pageNum }))}
-                disabled={loading}
-                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer font-jakarta ${
-                  currentPage === pageNum
-                    ? 'bg-[#007700] text-white shadow-xs'
-                    : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-100'
-                }`}
-              >
-                {pageNum}
-              </button>
-            ))}
-
-            <button
-              onClick={() => setFilter((prev) => ({ ...prev, page: Math.min(totalPages, currentPage + 1) }))}
-              disabled={currentPage === totalPages || loading}
-              className="p-2 rounded-lg border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition-colors"
-              title="Trang sau"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+      <ProductPagination
+        currentPage={currentPage}
+        pageSize={filter.pageSize}
+        totalPages={totalPages}
+        totalResults={totalResults}
+        loading={loading}
+        onPageChange={(page) => setFilter((prev) => ({ ...prev, page }))}
+      />
 
       {/* Create / Edit Modal */}
       <ProductFormModal
@@ -403,6 +315,7 @@ export function ProductListingPage() {
         onSubmit={handleFormSubmit}
         product={editingProduct}
         loading={actionLoading}
+        focusField={focusField}
       />
 
       {/* View Details & Inventory Trends Modal */}

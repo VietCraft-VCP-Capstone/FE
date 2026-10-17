@@ -1,5 +1,6 @@
 import api from '../../../infrastructure/api/interceptors';
 import { ProductItem, ProductFormData, ProductFilterState, PaginatedProductsResult } from '../types/product';
+import { invalidateInsights } from '../../analytics/hooks/useInsight';
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
 const absImg = (u: any) => (typeof u === 'string' && u.startsWith('/') ? ORIGIN + u : u);
@@ -83,24 +84,29 @@ export const productsService = {
 
   create: async (productData: ProductFormData | any): Promise<ProductItem | any> => {
     const res = await api.post('/products', productData);
+    invalidateInsights('');
     return resolveImages(res.data);
   },
 
   update: async (id: string, productData: Partial<ProductFormData> | any): Promise<ProductItem | any> => {
     const res = await api.put(`/products/${id}`, productData);
+    invalidateInsights('');
     return resolveImages(res.data);
   },
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/products/${id}`);
+    invalidateInsights('');
   },
 
   batchDelete: async (ids: string[]): Promise<void> => {
     await api.post('/products/batch-delete', { ids });
+    invalidateInsights('');
   },
 
   updateStatus: async (ids: string[], status: ProductItem['status']): Promise<void> => {
     await api.patch('/products/batch-status', { ids, status });
+    invalidateInsights('');
   },
 
   getCategories: async () => {

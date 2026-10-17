@@ -77,6 +77,7 @@ export interface ProductFormData {
   category: string;
   categoryId: string;
   tagIds: string[];
+  newTagNames?: string[];
   price: number;
   stock: number;
   sku: string;
