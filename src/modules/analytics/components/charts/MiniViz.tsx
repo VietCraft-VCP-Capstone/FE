@@ -1,7 +1,7 @@
 import React from 'react';
 import { SERIES } from '../../../../shared/components/charts/chartTheme';
-import { compactMoney, count as fmtCount } from '../../../../shared/utils/format';
-import { NA, pct } from '../../format';
+import { compactMoney } from '../../../../shared/utils/format';
+import { NA } from '../../format';
 
 /**
  * Các hình nhỏ đi kèm số liệu: đường xu hướng tí hon, phễu chuyển đổi, thước phân bố
@@ -32,48 +32,6 @@ export function Sparkline({ values, width = 72, height = 22, color = SERIES.gree
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel || 'Xu hướng 7 kỳ gần nhất'} className="overflow-visible">
       <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-/* -------------------------------------------------------------- phễu ------ */
-
-export interface FunnelStep {
-  label: string;
-  value: number;
-  /** Tỉ lệ chuyển từ bậc trước sang bậc này. */
-  convPct?: number | null;
-  /** Bậc yếu nhất: tô cảnh báo và ghi rõ bằng chữ. */
-  weakest?: boolean;
-}
-
-export function FunnelBars({ steps }: { steps: FunnelStep[] }) {
-  const top = steps[0]?.value || 1;
-  return (
-    <ol className="m-0 list-none space-y-2.5 p-0">
-      {steps.map((s, i) => {
-        const widthPct = Math.max(4, Math.round((s.value / top) * 100));
-        return (
-          <li key={s.label}>
-            <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-[13px]">
-              <span className="font-semibold text-stone-700">
-                {s.label}
-                {s.weakest && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">khâu yếu nhất</span>}
-              </span>
-              <span className="tabular-nums text-stone-600">
-                {fmtCount(s.value)}
-                {i > 0 && <span className="ml-2 text-stone-500">{s.convPct == null ? NA : pct(s.convPct)} từ bậc trên</span>}
-              </span>
-            </div>
-            <div className="h-7 w-full overflow-hidden rounded-lg bg-stone-100">
-              <div
-                className="h-7 rounded-lg transition-[width] duration-500 motion-reduce:transition-none"
-                style={{ width: `${widthPct}%`, background: s.weakest ? '#d97706' : SERIES.green, opacity: s.weakest ? 0.85 : 1 - i * 0.18 }}
-              />
-            </div>
-          </li>
-        );
-      })}
-    </ol>
   );
 }
 
@@ -196,7 +154,7 @@ export function QuadrantScatter({ points, onSelect, selectedId }: {
   const CUT_LOW = 30;
   const CUT_HIGH = 70;
   return (
-    <div className="relative aspect-[4/3] w-full rounded-xl border border-stone-200 bg-white">
+    <div className="relative aspect-[4/3] w-full rounded-md border border-stone-200 bg-white">
       {/* Vùng cơ hội: cầu cao, cung thấp. */}
       <div className="pointer-events-none absolute left-0 top-0 rounded-tl-xl bg-[#EAF0E2]/70" style={{ width: `${CUT_LOW}%`, height: `${100 - CUT_HIGH}%` }} aria-hidden />
       <span className="pointer-events-none absolute left-2 top-2 text-[10.5px] font-bold uppercase tracking-wide text-[#005B00]">Cơ hội</span>

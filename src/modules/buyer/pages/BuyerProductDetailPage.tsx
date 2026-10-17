@@ -10,6 +10,7 @@ import { reviewService } from '../../product/services/reviewService';
 import { cartService } from '../../order/services/cartService';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { getSessionId, recordProductViewEvent } from '../services/eventService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Variant { id: string; name: string; color?: string; size?: string; material?: string; price: number; stock: number; mockupImage?: string; }
@@ -295,6 +296,17 @@ export function BuyerProductDetailPage() {
     }
   }, [id]);
 
+  // Record product view event
+  useEffect(() => {
+    if (!id || !product) return;
+
+    const sessionId = getSessionId();
+    recordProductViewEvent(id, sessionId)
+      .catch((err) => {
+        console.warn('Failed to record product view event:', err);
+      });
+  }, [id, product]);
+
   // Derive unique option sets from variants
   const colors = [...new Set((product?.variants || []).map(v => v.color).filter(Boolean))] as string[];
   const sizes = [...new Set((product?.variants || []).map(v => v.size).filter(Boolean))] as string[];
@@ -532,6 +544,7 @@ export function BuyerProductDetailPage() {
 
     const checkoutItem = {
       productId: product.id || (product as any)._id,
+      shopId: product.shopInfo?.id || (product as any)?.shop_id?._id || (product as any)?.shop_id,
       variantId: targetVariantId ? String(targetVariantId) : '',
       title: product.title || 'Sản phẩm VietCraft',
       shopName: product.shopInfo?.name || (product as any)?.shop_id?.shop_name || 'VietCraft Shop',

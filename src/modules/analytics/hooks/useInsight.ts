@@ -88,7 +88,11 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
           res.meta?.status === 'insufficient_data' || res.data === null
             ? { kind: 'insufficient', reason: res.meta?.reason || 'Chưa đủ dữ liệu để tính.', meta: res.meta, viewer: res.viewer }
             : { kind: 'ready', data: res.data as T, meta: res.meta, viewer: res.viewer };
-        cache.set(key, { at: Date.now(), value });
+        // Chỉ lưu cache khi có dữ liệu (ready). Trạng thái 'insufficient' không lưu cache dài
+        // để khi người bán có đơn mới thì dữ liệu được cập nhật ngay lập tức.
+        if (value.kind === 'ready') {
+          cache.set(key, { at: Date.now(), value });
+        }
         setState(value);
       })
       .catch(err => {
@@ -100,9 +104,10 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
 
   const reload = useCallback(() => {
     if (key) cache.delete(key);
+    if (path) invalidateInsights(path);
     forceRef.current = true;
     setNonce(n => n + 1);
-  }, [key]);
+  }, [key, path]);
 
   return { state, reload };
 }

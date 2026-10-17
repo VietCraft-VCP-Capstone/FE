@@ -88,13 +88,13 @@ export function TrackingPage() {
                       onChange={e => setShopId(e.target.value)}
                       placeholder="shp_00042"
                       disabled={full || busy}
-                      className="h-9 w-48 rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none transition-colors duration-150 hover:border-stone-300 focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20 disabled:bg-stone-50 disabled:text-stone-400 motion-reduce:transition-none"
+                      className="h-9 w-48 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none transition-colors duration-150 hover:border-stone-300 focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20 disabled:bg-stone-50 disabled:text-stone-400 motion-reduce:transition-none"
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={full || busy || !shopId.trim()}
-                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl bg-[#007700] px-4 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] active:translate-y-px disabled:cursor-not-allowed disabled:bg-stone-300 motion-reduce:transition-none"
+                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-[#007700] px-4 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] active:translate-y-px disabled:cursor-not-allowed disabled:bg-stone-300 motion-reduce:transition-none"
                   >
                     <Plus size={15} aria-hidden />
                     {busy ? 'Đang xử lý' : 'Thêm vào danh sách'}
@@ -118,7 +118,7 @@ export function TrackingPage() {
 
               <InsightCard
                 title="Shop đang theo dõi"
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 footer={<SourceFooter meta={meta} limitation={data.limitation} />}
               >
                 {data.tracked.length === 0 ? (
@@ -137,7 +137,7 @@ export function TrackingPage() {
                     </div>
                     <Link
                       to="/seller/insights/competitors"
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-stone-700 no-underline transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] motion-reduce:transition-none"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-stone-700 no-underline transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] motion-reduce:transition-none"
                     >
                       Xem đối thủ cùng danh mục
                       <ArrowRight size={15} aria-hidden />
@@ -181,7 +181,7 @@ export function TrackingPage() {
               <InsightCard
                 title={data.alerts_total > 0 ? `${count(data.alerts_total)} sản phẩm mới trong ngách của bạn` : 'Sản phẩm mới trong ngách của bạn'}
                 description="Chỉ báo những sản phẩm có tag trùng với ngách bạn đang bán."
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 footer={<SourceFooter meta={meta} limitation={data.limitation} />}
               >
                 {data.alerts.length === 0 ? (

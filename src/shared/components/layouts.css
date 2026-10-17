@@ -17,9 +17,16 @@
 
 
 /* ============ SELLER LAYOUT ============ */
+html:has(.seller-layout),
+body:has(.seller-layout) {
+    overflow: hidden !important;
+    height: 100% !important;
+}
+
 .seller-layout {
     display: flex;
     height: 100vh;
+    height: 100dvh;
     background: #f8fafb;
     font-family: system-ui, -apple-system, sans-serif;
     overflow: hidden;

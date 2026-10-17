@@ -43,7 +43,7 @@ export function TagGapPage() {
           return (
             <div className="space-y-5">
               {!trusted && (
-                <section className="rounded-2xl border border-amber-300 bg-amber-50 p-5" role="note">
+                <section className="rounded-md border border-amber-300 bg-amber-50 p-5" role="note">
                   <div className="flex items-start gap-3">
                     <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-700" aria-hidden />
                     <div>
@@ -61,13 +61,13 @@ export function TagGapPage() {
               )}
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Đối thủ đã quét" value={count(data.competitors_scanned)} hint="Nhóm bán chạy nhất trong danh mục" />
                 </InsightCard>
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Tag shop bạn đang dùng" value={count(data.my_tags.length)} />
                 </InsightCard>
-                <InsightCard bodyClassName="px-5 py-4">
+                <InsightCard bodyClassName="px-4 py-3">
                   <MiniStat label="Tag họ có mà bạn chưa" value={count(rows.length)} />
                 </InsightCard>
               </div>
@@ -75,7 +75,7 @@ export function TagGapPage() {
               <InsightCard
                 title="Tag nhóm bán chạy dùng nhiều hơn mặt bằng"
                 description="Độ vượt trội là tỉ lệ dùng tag trong nhóm bán chạy chia cho tỉ lệ dùng của toàn danh mục. Vượt trội 2 lần nghĩa là nhóm dẫn đầu dùng tag đó gấp đôi mặt bằng."
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 action={
                   <SelectField
                     label="Danh mục"
@@ -129,7 +129,7 @@ export function TagGapPage() {
                   </DataTable>
                 )}
 
-                <div className="mt-4 flex items-start gap-2 rounded-xl bg-stone-50 px-3.5 py-3">
+                <div className="mt-4 flex items-start gap-2 rounded-md bg-stone-50 px-3.5 py-3">
                   <AlertTriangle size={15} className="mt-0.5 shrink-0 text-stone-500" aria-hidden />
                   <p className="m-0 text-xs leading-relaxed text-stone-600">
                     {data.note} Con số "traffic có thể tăng" là một khoảng ước lượng, không phải mức chắc chắn đạt được, và

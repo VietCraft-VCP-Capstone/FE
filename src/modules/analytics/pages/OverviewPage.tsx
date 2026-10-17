@@ -11,7 +11,7 @@
  *     phải hôm nay. Phải nói ra, nếu không người bán sẽ tưởng hệ thống mất số liệu.
  */
 
-import { ChevronRight, Star } from 'lucide-react';
+import { ChevronRight, Coins, Eye, RotateCw, ShoppingBag, Star, TrendingUp } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SERIES } from '../../../shared/components/charts/chartTheme';
 import { TrendChart, TrendLegend } from '../../../shared/components/charts/TrendChart';
@@ -27,15 +27,6 @@ import { useInsight } from '../hooks/useInsight';
 import type { ShopOverview, TimeRange } from '../types';
 
 const RANGES: TimeRange[] = ['7d', '30d', '90d', '180d', '365d'];
-
-/** Số đếm: null là "Chưa có", không phải 0. */
-function countOrNa(value: number | null | undefined): string {
-  return value === null || value === undefined ? NA : count(value);
-}
-
-function moneyOrNa(value: number | null | undefined): string {
-  return value === null || value === undefined ? NA : money(value);
-}
 
 /**
  * `recent_feedback` chưa có hợp đồng kiểu (types.ts khai là unknown[]), nên đọc từng
@@ -56,10 +47,10 @@ function PageSkeleton() {
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map(i => (
-          <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          <Skeleton key={i} className="h-24 w-full rounded-md" />
         ))}
       </div>
-      <Skeleton className="h-64 w-full rounded-2xl" />
+      <Skeleton className="h-64 w-full rounded-md" />
     </div>
   );
 }
@@ -82,12 +73,27 @@ export function OverviewPage() {
       title="Tổng quan shop"
       question="Shop đang chạy ra sao so với kỳ trước?"
       actions={
-        <RangeTabs<TimeRange>
-          value={timeRange}
-          onChange={setRange}
-          options={[...RANGE_OPTIONS]}
-          label="Khoảng thời gian"
-        />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <RangeTabs<TimeRange>
+            value={timeRange}
+            onChange={setRange}
+            options={[...RANGE_OPTIONS]}
+            label="Khoảng thời gian"
+          />
+          <button
+            type="button"
+            onClick={reload}
+            disabled={state.kind === 'loading'}
+            title="Làm mới số liệu từ máy chủ"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-700 shadow-sm transition-all duration-150 hover:border-[#007700] hover:bg-[#EAF0E2]/30 hover:text-[#005B00] active:scale-95 disabled:pointer-events-none disabled:opacity-60"
+          >
+            <RotateCw
+              size={13.5}
+              className={`transition-transform duration-300 ${state.kind === 'loading' ? 'animate-spin text-[#007700]' : 'text-stone-500'}`}
+            />
+            <span>{state.kind === 'loading' ? 'Đang tải...' : 'Làm mới'}</span>
+          </button>
+        </div>
       }
     >
       <InsightBlock state={state} onRetry={reload} skeleton={<PageSkeleton />}>
@@ -117,27 +123,39 @@ export function OverviewPage() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <KpiTile
                     label="Lượt xem"
-                    value={countOrNa(data.kpi.views.value)}
-                    trailing={<DeltaBadge value={data.kpi.views.pop_pct} />}
-                    hint={`So với ${compare}`}
+                    value={data.kpi.views.value !== null ? count(data.kpi.views.value) : '—'}
+                    isUnavailable={data.kpi.views.value === null}
+                    unavailableText="Chưa đo lường"
+                    icon={<Eye size={17} />}
+                    iconBg="bg-amber-50 text-amber-600 ring-1 ring-amber-500/20"
+                    trailing={<DeltaBadge value={data.kpi.views.pop_pct} fallbackLabel="Chưa so" />}
+                    hint="Sàn chưa bật theo dõi lượt xem"
                   />
                   <KpiTile
                     label="Đơn hàng"
-                    value={countOrNa(data.kpi.orders.value)}
-                    trailing={<DeltaBadge value={data.kpi.orders.pop_pct} />}
-                    hint={`So với ${compare}`}
+                    value={data.kpi.orders.value !== null ? count(data.kpi.orders.value) : '—'}
+                    icon={<ShoppingBag size={17} />}
+                    iconBg="bg-blue-50 text-blue-600 ring-1 ring-blue-500/20"
+                    trailing={<DeltaBadge value={data.kpi.orders.pop_pct} fallbackLabel="Kỳ đầu" />}
+                    hint={data.kpi.orders.pop_pct === null ? 'Kỳ trước chưa có đơn để so' : `So với ${compare}`}
                   />
                   <KpiTile
                     label="Doanh thu"
-                    value={moneyOrNa(data.kpi.revenue_vnd.value)}
-                    trailing={<DeltaBadge value={data.kpi.revenue_vnd.pop_pct} />}
-                    hint={`So với ${compare}`}
+                    value={data.kpi.revenue_vnd.value !== null ? money(data.kpi.revenue_vnd.value) : '—'}
+                    icon={<Coins size={17} />}
+                    iconBg="bg-emerald-50 text-emerald-600 ring-1 ring-emerald-500/20"
+                    trailing={<DeltaBadge value={data.kpi.revenue_vnd.pop_pct} fallbackLabel="Kỳ đầu" />}
+                    hint={data.kpi.revenue_vnd.pop_pct === null ? 'Kỳ trước chưa có số để so' : `So với ${compare}`}
                   />
                   <KpiTile
                     label="Tỉ lệ chuyển đổi"
-                    value={pct(data.kpi.conversion_pct.value, 2)}
-                    trailing={<DeltaBadge value={data.kpi.conversion_pct.pop_pct} />}
-                    hint={`Số đơn chia lượt xem. So với ${compare}`}
+                    value={data.kpi.conversion_pct.value !== null ? pct(data.kpi.conversion_pct.value, 2) : '—'}
+                    isUnavailable={data.kpi.conversion_pct.value === null}
+                    unavailableText="Cần lượt xem"
+                    icon={<TrendingUp size={17} />}
+                    iconBg="bg-purple-50 text-purple-600 ring-1 ring-purple-500/20"
+                    trailing={<DeltaBadge value={data.kpi.conversion_pct.pop_pct} fallbackLabel="Chưa so" />}
+                    hint="Tính theo: Đơn hàng ÷ Lượt xem"
                   />
                 </div>
                 {data.anchored_to_latest_data && (
@@ -218,7 +236,7 @@ export function OverviewPage() {
               <InsightCard
                 title="5 sản phẩm bán chạy nhất"
                 description="Bấm vào một sản phẩm để xem sức khoẻ, phễu chuyển đổi và diễn biến của riêng nó."
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 footer={<SourceFooter meta={meta} />}
               >
                 {data.top_products.length === 0 ? (
