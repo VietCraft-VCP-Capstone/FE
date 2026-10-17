@@ -63,7 +63,8 @@ export function SellerCompetitorDetailPage() {
           setIsFollowing(Boolean(shopDetail.isFollowing));
         }
         setProducts(productsData.items || []);
-        setVouchers(Array.isArray(couponsData) ? couponsData : []);
+        // Chỉ tính voucher do chính gian hàng đối thủ phát hành, bỏ voucher toàn sàn
+        setVouchers(Array.isArray(couponsData) ? couponsData.filter((c: CouponDTO) => !(c.is_platform ?? !c.shop_id)) : []);
       })
       .finally(() => {
         if (alive) setLoading(false);

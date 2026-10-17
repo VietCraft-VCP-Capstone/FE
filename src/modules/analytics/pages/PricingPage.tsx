@@ -112,7 +112,7 @@ export function PricingPage() {
                             type="button"
                             onClick={() => patch('productId', p.product_id)}
                             aria-pressed={picked}
-                            className={`w-full cursor-pointer rounded-xl border px-3.5 py-2.5 text-left transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007700] motion-reduce:transition-none ${
+                            className={`w-full cursor-pointer rounded-md border px-3.5 py-2.5 text-left transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007700] motion-reduce:transition-none ${
                               picked ? 'border-[#007700] bg-[#EAF0E2]' : 'border-stone-200 bg-white hover:border-stone-300'
                             }`}
                           >
@@ -160,12 +160,12 @@ export function PricingPage() {
                         value={priceInput}
                         onChange={e => setPriceInput(e.target.value)}
                         placeholder="ví dụ 250000"
-                        className="h-9 w-40 rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none transition-colors duration-150 hover:border-stone-300 focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20 motion-reduce:transition-none"
+                        className="h-9 w-40 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none transition-colors duration-150 hover:border-stone-300 focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20 motion-reduce:transition-none"
                       />
                     </div>
                     <button
                       type="submit"
-                      className="h-9 cursor-pointer rounded-xl bg-[#007700] px-4 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] active:translate-y-px motion-reduce:transition-none"
+                      className="h-9 cursor-pointer rounded-md bg-[#007700] px-4 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] active:translate-y-px motion-reduce:transition-none"
                     >
                       Xem vị trí
                     </button>
@@ -173,7 +173,7 @@ export function PricingPage() {
                       <button
                         type="button"
                         onClick={() => patch('price', '')}
-                        className="h-9 cursor-pointer rounded-xl border border-stone-200 bg-white px-3 text-[13px] font-semibold text-stone-600 transition-colors duration-150 hover:border-stone-300 hover:text-stone-800 motion-reduce:transition-none"
+                        className="h-9 cursor-pointer rounded-md border border-stone-200 bg-white px-3 text-[13px] font-semibold text-stone-600 transition-colors duration-150 hover:border-stone-300 hover:text-stone-800 motion-reduce:transition-none"
                       >
                         Dùng giá thật
                       </button>
@@ -221,7 +221,7 @@ export function PricingPage() {
                       thị trường, chưa có kết luận nào về shop bạn.
                     </Note>
                   ) : data.handmade_hint ? (
-                    <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 px-3.5 py-3">
+                    <div className="flex items-start gap-2.5 rounded-md bg-amber-50 px-3.5 py-3">
                       <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700" aria-hidden />
                       <div className="space-y-1.5">
                         <p className="m-0 text-[13px] font-bold text-amber-900">
@@ -249,7 +249,7 @@ export function PricingPage() {
                   )}
 
                   {data.suggested_range && (
-                    <div className="rounded-xl bg-[#EAF0E2] p-4">
+                    <div className="rounded-md bg-[#EAF0E2] p-4">
                       <p className="m-0 text-[13px] font-bold text-[#005B00]">
                         Khoảng giá của nhóm bán chạy: {money(data.suggested_range.low)} đến {money(data.suggested_range.high)}
                       </p>

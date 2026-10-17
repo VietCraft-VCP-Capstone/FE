@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
-import { Heart, Star, ArrowRight, CheckCircle2, Info, Ticket, Flame } from 'lucide-react';
+import { Heart, Star, ArrowRight, CheckCircle2, Info, Ticket, Flame, UserPlus, Store } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { shopService } from '../../product/services/shopService';
 import { promotionService } from '../../promotion/services/promotionService';
@@ -12,6 +12,7 @@ import '../../../shared/components/layouts.css';
 let homeDataCache: {
   products: any[];
   shops: any[];
+  suggestedShops: any[];
   coupons: any[];
   timestamp: number;
 } | null = null;
@@ -24,6 +25,8 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
   const [allProducts, setAllProducts] = useState<any[]>(() => homeDataCache?.products || []);
   const [shopList, setShopList] = useState<any[]>(() => homeDataCache?.shops || []);
+  const [suggestedShopList, setSuggestedShopList] = useState<any[]>(() => homeDataCache?.suggestedShops || []);
+  const [followingShopId, setFollowingShopId] = useState<string | null>(null);
   const [couponList, setCouponList] = useState<any[]>(() => homeDataCache?.coupons || []);
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
@@ -76,20 +79,28 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
     Promise.all([
       productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
+      // Chỉ lấy đúng các shop người dùng đang theo dõi, không fallback sang toàn bộ shop
       isLoggedIn()
-        ? shopService.getFollowedShops()
-            .then(followed => (Array.isArray(followed) && followed.length > 0 ? followed : productsService.getFeaturedShops()))
-            .catch(() => productsService.getFeaturedShops().catch(() => []))
-        : productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
+        ? shopService.getFollowedShops().catch((err) => { console.error('Failed to fetch followed shops', err); return []; })
+        : Promise.resolve([]),
+      productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
       promotionService.getAll().catch((err) => { console.error('Failed to fetch coupons', err); return []; }),
-    ]).then(([products, shops, coupons]) => {
+    ]).then(([products, followed, featured, coupons]) => {
       const productList = Array.isArray(products) ? products : (products as any)?.items || [];
+      const followedShops = Array.isArray(followed) ? followed : [];
+      const followedIds = new Set(followedShops.map((s: any) => (s._id || s.id)?.toString()));
+      // Gợi ý: các shop nổi bật mà người dùng chưa theo dõi
+      const suggestedShops = (Array.isArray(featured) ? featured : [])
+        .filter((s: any) => !followedIds.has((s._id || s.id)?.toString()))
+        .slice(0, 6);
       setAllProducts(productList);
-      setShopList(shops || []);
+      setShopList(followedShops);
+      setSuggestedShopList(suggestedShops);
       setCouponList(coupons || []);
       homeDataCache = {
         products: productList,
-        shops: shops || [],
+        shops: followedShops,
+        suggestedShops,
         coupons: coupons || [],
         timestamp: Date.now()
       };
@@ -123,6 +134,33 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
     } catch (err) {
       console.error('toggleFavorite failed', err);
       triggerToast('Không thể cập nhật yêu thích, vui lòng thử lại.', 'info');
+    }
+  };
+
+  const handleFollowShop = async (shopId: string, shopName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isLoggedIn()) {
+      navigate('/login');
+      return;
+    }
+    if (!shopId || followingShopId) return;
+    setFollowingShopId(shopId);
+    try {
+      await shopService.follow(shopId);
+      const followedShop = suggestedShopList.find((s: any) => (s._id || s.id)?.toString() === shopId);
+      const nextFollowed = followedShop ? [...shopList, followedShop] : shopList;
+      const nextSuggested = suggestedShopList.filter((s: any) => (s._id || s.id)?.toString() !== shopId);
+      setShopList(nextFollowed);
+      setSuggestedShopList(nextSuggested);
+      if (homeDataCache) {
+        homeDataCache = { ...homeDataCache, shops: nextFollowed, suggestedShops: nextSuggested };
+      }
+      triggerToast(`Đã theo dõi gian hàng "${shopName}"`, 'success');
+    } catch (err) {
+      console.error('followShop failed', err);
+      triggerToast('Không thể theo dõi gian hàng, vui lòng thử lại.', 'info');
+    } finally {
+      setFollowingShopId(null);
     }
   };
 
@@ -361,9 +399,9 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
     };
   });
 
-  const subbedShops = useMemo(() => {
-    if (!shopList || shopList.length === 0) return [];
-    return shopList.map((shop: any) => {
+  const toShopCards = (shops: any[]) => {
+    if (!shops || shops.length === 0) return [];
+    return shops.map((shop: any) => {
       const sId = (shop._id || shop.id)?.toString();
       const sSlug = shop.slug;
       const targetShop = sId || sSlug;
@@ -381,6 +419,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
       return {
         id: targetShop,
+        shopId: sId,
         slug: sSlug,
         name: shop.shop_name || shop.name || shop.shopName || 'Gian hàng',
         caption: `Đã thêm ${shop.listing_count || shop.listingCount || (shopProds.length > 0 ? shopProds.length : 1)} sản phẩm mới`,
@@ -388,7 +427,10 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         thumbnails
       };
     });
-  }, [shopList, allProducts]);
+  };
+
+  const subbedShops = useMemo(() => toShopCards(shopList), [shopList, allProducts]);
+  const suggestedShops = useMemo(() => toShopCards(suggestedShopList), [suggestedShopList, allProducts]);
 
   const searchedProducts = allProducts.filter((p: any) =>
     (p.title || p.name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -831,6 +873,69 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         <div className="section-head" style={{ marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Cập nhật từ gian hàng bạn theo dõi</h2>
         </div>
+        {subbedShops.length === 0 ? (
+          <>
+            <div style={{ padding: '20px 16px', textAlign: 'center', background: '#fafaf9', border: '1px dashed #d6d3d1', borderRadius: 12, color: '#57534e' }}>
+              <Store size={28} style={{ color: '#a8a29e', margin: '0 auto 8px' }} />
+              <p style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#292524' }}>Bạn chưa theo dõi gian hàng nào</p>
+              <p style={{ fontSize: 12, margin: '4px 0 0' }}>Theo dõi gian hàng yêu thích để nhận cập nhật sản phẩm mới tại đây.</p>
+            </div>
+
+            {suggestedShops.length > 0 && (
+              <>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#330033', margin: '20px 0 12px' }}>Gợi ý gian hàng nên theo dõi</h3>
+                <div className="buyer-grid-3">
+                  {suggestedShops.map((shop, i) => {
+                    const targetShop = shop.id || shop.slug;
+                    const isFollowing = followingShopId === shop.shopId;
+                    return (
+                      <div
+                        key={shop.id || i}
+                        className="shop-update-card cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => {
+                          if (targetShop) navigate(`/shop/${targetShop}`);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title={`Xem gian hàng ${shop.name}`}
+                      >
+                        <div className="shop-head" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <img src={shop.image} alt={shop.name} className="shop-avatar" style={{ border: '1px solid #ebd0eb' }} />
+                          <div>
+                            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{shop.name}</h3>
+                            <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{shop.caption}</p>
+                          </div>
+                        </div>
+                        <div className="shop-thumbnails">
+                          {shop.thumbnails.map((t: string, idx: number) => (
+                            <img key={idx} src={t} alt="thumbnail" />
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="shop-view-btn"
+                          disabled={isFollowing}
+                          onClick={(e) => handleFollowShop(shop.shopId, shop.name, e)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            cursor: isFollowing ? 'wait' : 'pointer',
+                            opacity: isFollowing ? 0.7 : 1
+                          }}
+                          title={`Theo dõi gian hàng ${shop.name}`}
+                        >
+                          <UserPlus size={12} />
+                          <span>{isFollowing ? 'Đang theo dõi...' : 'Theo dõi'}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </>
+        ) : (
         <div className="buyer-grid-3">
           {subbedShops.map((shop, i) => {
             const targetShop = shop.id || shop.slug;
@@ -889,6 +994,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
             );
           })}
         </div>
+        )}
       </section>
 
       {/* Styles Discovery Section */}

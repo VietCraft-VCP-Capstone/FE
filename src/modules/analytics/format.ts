@@ -5,7 +5,7 @@
  * với bằng không. Không dùng gạch ngang dài làm ký hiệu trống.
  */
 
-export const NA = 'Chưa có';
+export const NA = '—';
 
 const VI = 'vi-VN';
 
@@ -17,7 +17,7 @@ export function pct(value: number | null | undefined, digits = 1): string {
 
 /** Biến động so kỳ trước: "+12,4%" / "-3,1%". */
 export function delta(value: number | null | undefined, digits = 1): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return 'Chưa so được';
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
   const text = Math.abs(value).toLocaleString(VI, { maximumFractionDigits: digits });
   if (value > 0) return `+${text}%`;
   if (value < 0) return `-${text}%`;
@@ -59,3 +59,10 @@ export const RANGE_OPTIONS = [
   { value: '180d', label: '6 tháng' },
   { value: '365d', label: '1 năm' },
 ] as const;
+
+/** Nhãn BR-182: >= 80 · 50-79 · < 50. */
+export const HEALTH_STATUS_LABEL: Record<string, string> = {
+  good: 'Tốt',
+  needs_improvement: 'Nên sửa thêm',
+  poor: 'Cần sửa gấp',
+};

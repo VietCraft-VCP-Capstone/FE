@@ -11,10 +11,16 @@ export interface Category {
   name: string;
   slug: string;
   description?: string;
-  parent_id?: string | null;
+  parent_id?: string | null | any;
   icon?: string;
   sort_order: number;
   is_active: boolean;
+  status?: 'active' | 'pending' | 'banned';
+  review_status?: 'pending' | 'approved' | 'rejected' | 'banned';
+  proposed_by?: { _id: string; full_name?: string; email?: string; shop_name?: string; shop_slug?: string } | null;
+  rejected_at?: string | null;
+  rejected_by?: { _id: string; full_name?: string; email?: string } | null;
+  reject_reason?: string | null;
   created_at: string;
   updated_at: string;
   children?: Category[];
@@ -38,11 +44,14 @@ export interface CategoryStats {
   active: number;
   hidden: number;
   roots: number;
+  pending?: number;
+  rejected?: number;
 }
 
 export interface TagStats {
   total: number;
   pending: number;
+  rejected?: number;
   tagged: number;
   unused: number;
 }
@@ -56,8 +65,30 @@ export interface Tag {
   slug: string;
   color: string;
   product_count: number;
+  status?: 'active' | 'pending' | 'banned';
+  review_status?: 'pending' | 'approved' | 'rejected' | 'banned';
+  proposed_by?: { _id: string; full_name?: string; email?: string; shop_name?: string; shop_slug?: string } | null;
+  rejected_at?: string | null;
+  rejected_by?: { _id: string; full_name?: string; email?: string } | null;
+  reject_reason?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface BannedKeyword {
+  _id: string;
+  keyword: string;
+  reason?: string;
+  created_by?: { _id: string; full_name?: string; email?: string } | null;
+  created_at: string;
+  updated_at: string;
+  is_system?: boolean;
+}
+
+export interface BannedKeywordStats {
+  total: number;
+  customCount: number;
+  systemCount: number;
 }
 
 export interface ModerateProduct {

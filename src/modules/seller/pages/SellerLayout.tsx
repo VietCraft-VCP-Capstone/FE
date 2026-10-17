@@ -106,7 +106,14 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
     window.addEventListener('vietcraft-notification-unread-updated', onNotifUpdate);
     window.addEventListener('vietcraft-notification-received', onNotifUpdate);
 
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
     return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
       window.removeEventListener('vietcraft-chat-unread-updated', onUnreadUpdate);
       window.removeEventListener('vietcraft-message-received', onUnreadUpdate);
       window.removeEventListener('vietcraft-notification-unread-updated', onNotifUpdate);
@@ -127,7 +134,16 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
 
   const currentPath = location.pathname === '/seller/product-listing' ? '/seller/products' : location.pathname;
   const navGroups = groups ?? OPS_GROUPS;
-  const isActive = (to: string) => currentPath === to || currentPath.startsWith(`${to}/`);
+  const allNavItems = navGroups.flatMap(g => g.items);
+  const activeNavTo = allNavItems
+    .map(i => i.to)
+    .filter(to => {
+      if (currentPath === to) return true;
+      if (to === '/seller/products' && currentPath.startsWith('/seller/products/new')) return false;
+      return currentPath.startsWith(`${to}/`);
+    })
+    .sort((a, b) => b.length - a.length)[0];
+  const isActive = (to: string) => to === activeNavTo;
 
   return (
     <div className="seller-layout">

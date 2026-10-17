@@ -1,5 +1,7 @@
 import api from '../../../infrastructure/api/interceptors';
-import type { InsightContext, InsightEnvelope } from '../types';
+import type { HealthStatus, InsightContext, InsightEnvelope } from '../types';
+import type { ListingHealthList } from '../healthTypes';
+import type { HealthPreview, PreviewInputs } from '../healthTypes';
 
 /**
  * Gọi 16 tính năng phân tích qua cổng BE /api/seller/analytics.
@@ -33,6 +35,18 @@ export const analyticsApi = {
     return res.data.data;
   },
 
+  /** F29 · danh sách sản phẩm thật của shop kèm điểm sức khoẻ mới nhất. */
+  async listingsHealth(status?: HealthStatus, signal?: AbortSignal): Promise<InsightEnvelope<ListingHealthList>> {
+    const res = await api.get(`${BASE}/listings/health`, { params: clean({ status }), signal });
+    return res.data;
+  },
+
+  /** F29 · chấm thử điểm với giá trị giả định. Chỉ gửi lever người bán đã chỉnh. */
+  async healthPreview(productId: string, body: PreviewInputs, signal?: AbortSignal): Promise<InsightEnvelope<HealthPreview>> {
+    const res = await api.post(`${BASE}/listings/${productId}/health/preview`, body, { signal });
+    return res.data;
+  },
+
   async trackCompetitor(shopId: string) {
     const res = await api.post(`${BASE}/competitor-tracking`, { shop_id: shopId });
     return res.data;
@@ -42,7 +56,47 @@ export const analyticsApi = {
     const res = await api.delete(`${BASE}/competitor-tracking`, { data: { shop_id: shopId } });
     return res.data;
   },
+
+  async getSmartProductSuggestion(params: {
+    category_id?: string;
+    category_name?: string;
+    product_type?: string;
+    keywords?: string;
+    blank_cost?: number;
+  }, signal?: AbortSignal) {
+    const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
+    return res.data?.data;
+  },
 };
+
+export interface SmartProductSuggestionResult {
+  category_detected: string;
+  product_type: string;
+  noun: string;
+  suggested_titles: string[];
+  pricing_insight: {
+    recommended_price: number;
+    recommended_markup: number;
+    price_range: {
+      low: number;
+      median: number;
+      high: number;
+      premium: number;
+    };
+    market_sample_count: number;
+    summary: string;
+  };
+  trending_keywords: Array<{
+    keyword: string;
+    growth: string;
+    demand_index: number;
+    gap_score: number;
+    is_hot: boolean;
+    tag_id?: string;
+  }>;
+  suggested_tags: string[];
+  seo_description: string;
+}
 
 /** Câu thông báo cho các mã lỗi riêng của khu phân tích (400 do AI trả về theo hợp đồng). */
 export function analyticsErrorMessage(err: any, fallback = 'Không thực hiện được, vui lòng thử lại.'): string {
