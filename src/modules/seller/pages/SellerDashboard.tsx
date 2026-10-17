@@ -272,15 +272,15 @@ export function SellerDashboard() {
                   <span className="text-2xl font-extrabold leading-none text-stone-900 font-jakarta">
                     {reputation.profile.clean_streak_orders || 0}
                   </span>
-                  <span className="text-xs text-stone-400">/ 20 đơn</span>
+                  <span className="text-xs text-stone-400">/ 10 đơn</span>
                 </dd>
                 <div className="mt-2 h-2 w-32 rounded-full bg-stone-100 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-[#007700] transition-all duration-300"
-                    style={{ width: `${Math.min(100, ((reputation.profile.clean_streak_orders || 0) / 20) * 100)}%` }}
+                    style={{ width: `${Math.min(100, ((reputation.profile.clean_streak_orders || 0) / 10) * 100)}%` }}
                   />
                 </div>
-                <dd className="m-0 mt-1 text-[11px] text-stone-400">Đạt 20 đơn: +5 điểm SRS</dd>
+                <dd className="m-0 mt-1 text-[11px] text-stone-400">Đạt 10 đơn: +5 điểm SRS</dd>
               </div>
 
               <div>

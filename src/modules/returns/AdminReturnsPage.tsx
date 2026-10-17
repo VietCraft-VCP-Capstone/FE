@@ -176,11 +176,11 @@ export function AdminReturnsPage() {
                 </p>
                 <div className="flex justify-between text-stone-600">
                   <span>Điểm Uy Tín (SRS):</span>
-                  <strong className="text-emerald-700 font-jakarta">{auditProfile.shop?.reputation_score ?? 100} / 100</strong>
+                  <strong className="text-emerald-700 font-jakarta">{auditProfile.shop?.reputation_score ?? 80} / 100</strong>
                 </div>
                 <div className="flex justify-between text-stone-600">
                   <span>Chuỗi đơn:</span>
-                  <span>{auditProfile.shop?.clean_streak_orders ?? 0} / 20 đơn</span>
+                  <span>{auditProfile.shop?.clean_streak_orders ?? 0} / 10 đơn</span>
                 </div>
                 <div className="flex justify-between text-stone-600">
                   <span>Khiếu nại trong 30 ngày:</span>
