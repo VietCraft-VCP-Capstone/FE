@@ -68,6 +68,54 @@ export const catalogService = {
             truncated: totalProducts > products.length,
         };
     },
+
+    async proposeCategory(data: { name: string; description?: string; parent_id?: string }): Promise<any> {
+        const res = await api.post('/categories/propose', data);
+        return res.data;
+    },
+
+    async proposeTag(name: string): Promise<any> {
+        const res = await api.post('/tags/propose', { name });
+        return res.data;
+    },
+
+    async getMyProposals(): Promise<ProposalItem[]> {
+        const [catRes, tagRes] = await Promise.all([
+            api.get('/categories/my-proposals').catch(() => ({ data: { data: [] } })),
+            api.get('/tags/my-proposals').catch(() => ({ data: { data: [] } })),
+        ]);
+        const cats: any[] = catRes.data?.data || [];
+        const tags: any[] = tagRes.data?.data || [];
+
+        const catProposals: ProposalItem[] = cats.map(c => ({
+            ...c,
+            type: 'category' as const,
+        }));
+        const tagProposals: ProposalItem[] = tags.map(t => ({
+            ...t,
+            type: 'tag' as const,
+        }));
+
+        return [...catProposals, ...tagProposals].sort(
+            (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        );
+    },
 };
+
+export interface ProposalItem {
+    _id: string;
+    name: string;
+    slug?: string;
+    type: 'category' | 'tag';
+    description?: string;
+    color?: string;
+    product_count?: number;
+    status: 'active' | 'pending' | 'banned';
+    review_status: 'pending' | 'approved' | 'rejected' | 'banned';
+    reject_reason?: string | null;
+    rejected_at?: string | null;
+    created_at: string;
+    updated_at: string;
+}
 
 export default catalogService;

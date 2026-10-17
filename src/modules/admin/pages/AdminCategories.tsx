@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Clock,
   Eye,
   EyeOff,
   Folder,
@@ -14,11 +16,15 @@ import {
   Plus,
   SearchX,
   Trash2,
+  RotateCcw,
+  Ban,
+  AlertTriangle,
 } from 'lucide-react';
 import { adminService } from '../services/adminService';
-import type { Category, CategoryOption, CategoryStats, CategoryStatusFilter, CategoryTreePage } from '../types';
+import type { Category, CategoryOption, CategoryStats, CategoryStatusFilter, CategoryTreePage, Paginated } from '../types';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import {
+  BTN_DANGER,
   BTN_PRIMARY,
   BTN_SECONDARY,
   BTN_SECONDARY_SM,
@@ -250,13 +256,15 @@ function CategoryNode({
 /* ----------------------------------------------------------- Admin Categories Page */
 
 const EMPTY_FORM = { name: '', slug: '', description: '', icon: '', parent_id: '', sort_order: 0, is_active: true };
-const EMPTY_STATS: CategoryStats = { total: 0, active: 0, hidden: 0, roots: 0 };
+const EMPTY_STATS: CategoryStats = { total: 0, active: 0, hidden: 0, roots: 0, pending: 0 };
 const EMPTY_TREE: CategoryTreePage = { items: [], total: 0, page: 1, limit: 15, totalPages: 1, totalNodes: 0 };
+const emptyPendingPage = (limit: number): Paginated<Category> => ({ items: [], total: 0, page: 1, limit, totalPages: 1 });
 
 export function AdminCategories() {
   /* Yêu cầu gửi lên máy chủ. */
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
+  const [pendingPageNo, setPendingPageNo] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CategoryStatusFilter>('all');
   // Lọc đã chuyển xuống máy chủ, nên phải chờ người dùng gõ xong mới gọi.
@@ -264,6 +272,7 @@ export function AdminCategories() {
 
   /* Kết quả từ máy chủ. */
   const [tree, setTree] = useState<CategoryTreePage>(EMPTY_TREE);
+  const [pending, setPending] = useState<Paginated<Category>>(emptyPendingPage(8));
   const [stats, setStats] = useState<CategoryStats>(EMPTY_STATS);
   // Ô chọn danh mục cha phải thấy MỌI danh mục, kể cả mục nằm ngoài trang đang xem.
   const [options, setOptions] = useState<CategoryOption[]>([]);
@@ -279,8 +288,16 @@ export function AdminCategories() {
   const [slugTouched, setSlugTouched] = useState(false);
 
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
+  const [pendingRejectCat, setPendingRejectCat] = useState<Category | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [pendingQueueBusyId, setPendingQueueBusyId] = useState<string | null>(null);
+  const [rejectingBusy, setRejectingBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<'tree' | 'pending' | 'rejected'>('tree');
+  const [rejected, setRejected] = useState<Paginated<Category>>(emptyPendingPage(8));
+  const [rejectedPageNo, setRejectedPageNo] = useState(1);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -318,6 +335,26 @@ export function AdminCategories() {
     }
   }, [page, limit, debouncedSearch, status]);
 
+  const loadPending = useCallback(async () => {
+    try {
+      const data = await adminService.getPendingCategories({ page: pendingPageNo, limit: 8 });
+      setPending(data);
+      if (data.page !== pendingPageNo) setPendingPageNo(data.page);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Không thể tải danh mục chờ duyệt');
+    }
+  }, [pendingPageNo]);
+
+  const loadRejected = useCallback(async () => {
+    try {
+      const data = await adminService.getRejectedCategories({ page: rejectedPageNo, limit: 8 });
+      setRejected(data);
+      if (data.page !== rejectedPageNo) setRejectedPageNo(data.page);
+    } catch {
+      // Bỏ qua lỗi
+    }
+  }, [rejectedPageNo]);
+
   const loadStats = useCallback(async () => {
     try {
       setStats(await adminService.getCategoryStats());
@@ -336,6 +373,8 @@ export function AdminCategories() {
   }, []);
 
   useEffect(() => { loadTree(); }, [loadTree]);
+  useEffect(() => { loadPending(); }, [loadPending]);
+  useEffect(() => { loadRejected(); }, [loadRejected]);
   useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { loadOptions(); }, [loadOptions]);
 
@@ -343,8 +382,8 @@ export function AdminCategories() {
   useEffect(() => { setPage(1); }, [debouncedSearch, status]);
 
   const reloadAll = useCallback(async () => {
-    await Promise.all([loadTree(), loadStats(), loadOptions()]);
-  }, [loadTree, loadStats, loadOptions]);
+    await Promise.all([loadTree(), loadPending(), loadRejected(), loadStats(), loadOptions()]);
+  }, [loadTree, loadPending, loadRejected, loadStats, loadOptions]);
 
   const filtering = debouncedSearch.trim() !== '' || status !== 'all';
 
@@ -453,6 +492,49 @@ export function AdminCategories() {
     }
   };
 
+  const handleApproveCategory = async (cat: Category) => {
+    setPendingQueueBusyId(cat._id);
+    setError('');
+    try {
+      await adminService.approveCategory(cat._id);
+      await reloadAll();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Duyệt thất bại');
+    } finally {
+      setPendingQueueBusyId(null);
+    }
+  };
+
+  const confirmRejectCategory = async () => {
+    if (!pendingRejectCat) return;
+    setRejectingBusy(true);
+    setError('');
+    try {
+      await adminService.rejectCategory(pendingRejectCat._id, rejectReason.trim() || undefined);
+      setPendingRejectCat(null);
+      setRejectReason('');
+      await reloadAll();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Từ chối thất bại');
+      setPendingRejectCat(null);
+    } finally {
+      setRejectingBusy(false);
+    }
+  };
+
+  const handleRestoreCategory = async (cat: Category) => {
+    setPendingQueueBusyId(cat._id);
+    setError('');
+    try {
+      await adminService.restoreCategory(cat._id);
+      await reloadAll();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Khôi phục danh mục thất bại');
+    } finally {
+      setPendingQueueBusyId(null);
+    }
+  };
+
   /* ------------------------------------------------------------------ UI Render */
 
   const deleteChildCount = pendingDelete
@@ -479,14 +561,296 @@ export function AdminCategories() {
         loading={loading}
         items={[
           { label: 'Tổng danh mục', value: stats.total },
+          { label: 'Chờ duyệt', value: stats.pending || 0, dot: (stats.pending || 0) > 0 ? '#ea580c' : '#cbd5d0' },
           { label: 'Đang hoạt động', value: stats.active, dot: '#1a6b1a' },
           { label: 'Đang ẩn', value: stats.hidden, dot: '#cbd5d0' },
+          { label: 'Đã từ chối', value: stats.rejected || 0, dot: (stats.rejected || 0) > 0 ? '#dc2626' : '#cbd5d0' },
           { label: 'Danh mục gốc', value: stats.roots },
         ]}
       />
 
-      {/* Toolbar Section */}
-      <div className={TOOLBAR}>
+      {/* Tab Navigation */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-admin-line">
+        <button
+          type="button"
+          onClick={() => setActiveTab('tree')}
+          className={cx(
+            'flex items-center gap-2 px-4 py-2.5 text-[13.5px] font-bold transition-all border-b-2 -mb-[2px] cursor-pointer',
+            activeTab === 'tree'
+              ? 'border-admin-brand text-admin-brand bg-emerald-50/50 rounded-t-lg'
+              : 'border-transparent text-admin-muted hover:text-admin-ink'
+          )}
+        >
+          <FolderTree size={16} />
+          <span>Cây danh mục</span>
+          <span
+            className={cx(
+              'ml-1 px-2 py-0.5 rounded-full text-[11px] font-semibold',
+              activeTab === 'tree' ? 'bg-admin-brand text-white' : 'bg-stone-100 text-stone-600'
+            )}
+          >
+            {stats.total}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('pending')}
+          className={cx(
+            'flex items-center gap-2 px-4 py-2.5 text-[13.5px] font-bold transition-all border-b-2 -mb-[2px] cursor-pointer',
+            activeTab === 'pending'
+              ? 'border-[#ea580c] text-[#ea580c] bg-orange-50/50 rounded-t-lg'
+              : 'border-transparent text-admin-muted hover:text-admin-ink'
+          )}
+        >
+          <Clock size={16} />
+          <span>Chờ xem xét</span>
+          {(stats.pending || pending.total) > 0 ? (
+            <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#ea580c] text-white animate-pulse">
+              {stats.pending || pending.total}
+            </span>
+          ) : (
+            <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-stone-100 text-stone-600">
+              0
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('rejected')}
+          className={cx(
+            'flex items-center gap-2 px-4 py-2.5 text-[13.5px] font-bold transition-all border-b-2 -mb-[2px] cursor-pointer',
+            activeTab === 'rejected'
+              ? 'border-rose-600 text-rose-700 bg-rose-50/50 rounded-t-lg'
+              : 'border-transparent text-admin-muted hover:text-admin-ink'
+          )}
+        >
+          <Ban size={16} />
+          <span>Đã từ chối / Cấm</span>
+          <span
+            className={cx(
+              'ml-1 px-2 py-0.5 rounded-full text-[11px] font-semibold',
+              activeTab === 'rejected' ? 'bg-rose-600 text-white' : 'bg-stone-100 text-stone-600'
+            )}
+          >
+            {stats.rejected || rejected.total}
+          </span>
+        </button>
+      </div>
+
+      {/* TAB 2: CHỜ XEM XÉT */}
+      {activeTab === 'pending' && (
+        <div className={CARD}>
+          <div className={CARD_HEADER}>
+            <div>
+              <span className="text-[13px] font-bold text-admin-ink">
+                Hàng đợi kiểm duyệt danh mục đề xuất ({pending.total})
+              </span>
+              <p className="m-0 mt-0.5 text-[12px] text-admin-muted">
+                Danh mục do người bán đề xuất trong lúc tạo sản phẩm. Bạn có thể duyệt để chuyển thành danh mục chính thức hoặc Từ chối / Cấm.
+              </p>
+            </div>
+          </div>
+
+          {pending.items.length === 0 ? (
+            <EmptyState
+              icon={Clock}
+              title="Không có danh mục nào chờ duyệt"
+              description="Tất cả các đề xuất danh mục mới từ người bán đã được xử lý xong."
+            />
+          ) : (
+            <>
+              <ul className="list-none divide-y divide-admin-line-soft p-0 m-0">
+                {pending.items.map((cat: any) => {
+                  const parentName =
+                    options.find(o => o._id === (typeof cat.parent_id === 'object' ? cat.parent_id?._id : cat.parent_id))?.name ||
+                    (typeof cat.parent_id === 'object' && cat.parent_id?.name ? cat.parent_id.name : null);
+
+                  return (
+                    <li key={cat._id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[18px] py-3 hover:bg-stone-50/50 transition-colors">
+                      <div className="min-w-0 flex-1 basis-[220px]">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-stone-900 text-sm">{cat.name}</span>
+                          {cat.slug && <span className={cx('text-[12px] text-admin-muted', MONO)}>/{cat.slug}</span>}
+                        </div>
+                        {cat.description && (
+                          <p className="text-xs text-stone-500 mt-0.5 line-clamp-1 m-0">{cat.description}</p>
+                        )}
+                        {cat.proposed_by && (
+                          <p className="text-[11px] text-amber-800/90 mt-1 m-0">
+                            Đề xuất bởi:{' '}
+                            {cat.proposed_by.shop_name ? (
+                              <>
+                                Shop <b className="text-stone-900 font-semibold">{cat.proposed_by.shop_name}</b>
+                                <span className="text-stone-500 font-normal">
+                                  {' '}({cat.proposed_by.full_name || (cat.proposed_by as any).name || cat.proposed_by.email})
+                                </span>
+                              </>
+                            ) : (
+                              <b>{cat.proposed_by.full_name || (cat.proposed_by as any).name || cat.proposed_by.email || 'Người bán'}</b>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      {parentName && (
+                        <span className="text-[12px] text-stone-600 bg-stone-100 border border-stone-200 px-2.5 py-0.5 rounded-md font-medium">
+                          Thuộc: {parentName}
+                        </span>
+                      )}
+                      <div className="ml-auto flex shrink-0 items-center justify-end gap-2 md:w-[100px]">
+                        <button
+                          type="button"
+                          className={cx(
+                            ICON_BTN,
+                            'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300'
+                          )}
+                          onClick={() => handleApproveCategory(cat)}
+                          disabled={pendingQueueBusyId === cat._id}
+                          aria-label={`Duyệt danh mục ${cat.name}`}
+                          title="Duyệt thành danh mục chính thức"
+                        >
+                          {pendingQueueBusyId === cat._id ? (
+                            <Loader2 size={15} className="animate-spin motion-reduce:animate-none" aria-hidden />
+                          ) : (
+                            <Check size={16} aria-hidden />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          className={ICON_BTN_DANGER}
+                          onClick={() => {
+                            setRejectReason('');
+                            setPendingRejectCat(cat);
+                          }}
+                          disabled={pendingQueueBusyId === cat._id}
+                          aria-label={`Từ chối danh mục ${cat.name}`}
+                          title="Từ chối / Cấm danh mục này"
+                        >
+                          <Ban size={15} aria-hidden />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              <Pagination
+                page={pending.page}
+                totalPages={pending.totalPages}
+                total={pending.total}
+                limit={pending.limit}
+                itemLabel="đề xuất"
+                onPageChange={setPendingPageNo}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: ĐÃ TỪ CHỐI / CẤM */}
+      {activeTab === 'rejected' && (
+        <div className={CARD}>
+          <div className={CARD_HEADER}>
+            <div>
+              <span className="text-[13px] font-bold text-admin-ink">
+                Danh sách danh mục đã từ chối / cấm ({stats.rejected || rejected.total})
+              </span>
+              <p className="m-0 mt-0.5 text-[12px] text-admin-muted">
+                Các danh mục đã bị vô hiệu hóa và ẩn khỏi marketplace. Bạn có thể khôi phục lại bất kỳ lúc nào hoặc xóa vĩnh viễn.
+              </p>
+            </div>
+          </div>
+
+          {rejected.items.length === 0 ? (
+            <EmptyState
+              icon={Ban}
+              title="Không có danh mục nào bị từ chối / cấm"
+              description="Chưa có danh mục nào nằm trong danh sách cấm hoặc bị từ chối."
+            />
+          ) : (
+            <>
+              <ul className="list-none divide-y divide-admin-line-soft p-0 m-0">
+                {rejected.items.map((cat: any) => (
+                  <li
+                    key={cat._id}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 px-[18px] py-3 bg-rose-50/20 hover:bg-rose-50/40 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1 basis-[220px]">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-stone-900 text-sm line-through text-stone-500">
+                          {cat.name}
+                        </span>
+                        {cat.slug && <span className={cx('text-[12px] text-admin-muted', MONO)}>/{cat.slug}</span>}
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-semibold border border-rose-200">
+                          Đã từ chối / Cấm
+                        </span>
+                      </div>
+                      {cat.proposed_by && (
+                        <p className="text-[11px] text-stone-600 mt-1 m-0">
+                          Người đề xuất:{' '}
+                          {cat.proposed_by.shop_name ? (
+                            <>
+                              Shop <b>{cat.proposed_by.shop_name}</b> ({cat.proposed_by.full_name || cat.proposed_by.email})
+                            </>
+                          ) : (
+                            <b>{cat.proposed_by.full_name || cat.proposed_by.email || 'Người bán'}</b>
+                          )}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-rose-700 mt-1 m-0">
+                        Lý do: <b>{cat.reject_reason || 'Không phù hợp'}</b>
+                        {cat.rejected_at && (
+                          <span className="text-stone-400 font-normal">
+                            {' '}• {new Date(cat.rejected_at).toLocaleString('vi-VN')}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="ml-auto flex shrink-0 items-center justify-end gap-2 md:w-[130px]">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-emerald-50 text-stone-700 hover:text-emerald-700 border border-stone-200 hover:border-emerald-300 transition-colors cursor-pointer shadow-2xs"
+                        onClick={() => handleRestoreCategory(cat)}
+                        disabled={pendingQueueBusyId === cat._id}
+                        title="Khôi phục lại danh mục này"
+                      >
+                        {pendingQueueBusyId === cat._id ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <RotateCcw size={13} />
+                        )}
+                        <span>Khôi phục</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={ICON_BTN_DANGER}
+                        onClick={() => setPendingDelete(cat)}
+                        title="Xóa vĩnh viễn khỏi hệ thống"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <Pagination
+                page={rejected.page}
+                totalPages={rejected.totalPages}
+                total={rejected.total}
+                limit={rejected.limit}
+                itemLabel="danh mục bị từ chối"
+                onPageChange={setRejectedPageNo}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* TAB 1: CÂY DANH MỤC */}
+      {activeTab === 'tree' && (
+        <>
+          {/* Toolbar Section */}
+          <div className={TOOLBAR}>
         <SearchField
           label="Tìm kiếm danh mục"
           placeholder="Tìm theo tên hoặc slug..."
@@ -614,6 +978,8 @@ export function AdminCategories() {
           </>
         )}
       </div>
+    </>
+  )}
 
       {/* Category Modal Form Section */}
 
@@ -764,6 +1130,141 @@ export function AdminCategories() {
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
       />
+
+      {/* Reject Proposed Category Modal with Reason */}
+      <Modal
+        open={pendingRejectCat !== null}
+        onClose={() => !rejectingBusy && setPendingRejectCat(null)}
+        title="Từ chối / Cấm đề xuất danh mục"
+        description="Danh mục sẽ bị vô hiệu hoá và tự động gỡ liên kết khỏi toàn bộ sản phẩm liên quan"
+        maxWidth="520px"
+        footer={
+          <>
+            <button
+              type="button"
+              className={BTN_SECONDARY}
+              onClick={() => setPendingRejectCat(null)}
+              disabled={rejectingBusy}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className={cx(
+                BTN_DANGER,
+                'border-rose-600 bg-rose-600 hover:bg-rose-700 hover:shadow-[0_4px_12px_rgba(225,29,72,0.25)]'
+              )}
+              onClick={confirmRejectCategory}
+              disabled={rejectingBusy}
+            >
+              {rejectingBusy ? (
+                <Loader2 size={15} className="animate-spin motion-reduce:animate-none" />
+              ) : (
+                <Ban size={15} />
+              )}
+              <span>Xác nhận từ chối / Cấm</span>
+            </button>
+          </>
+        }
+      >
+        <div className={MODAL_BODY}>
+          {pendingRejectCat && (
+            <div className="space-y-4">
+              {/* Category info card */}
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50/80 px-4 py-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white border border-stone-200 text-stone-700 shadow-2xs font-semibold text-sm">
+                    {pendingRejectCat.icon ? pendingRejectCat.icon : <Folder size={16} className="text-amber-600" />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-stone-900 text-sm truncate m-0">
+                      {pendingRejectCat.name}
+                    </p>
+                    <p className={cx('truncate text-xs text-stone-500 m-0', MONO)}>
+                      /{pendingRejectCat.slug}
+                    </p>
+                  </div>
+                </div>
+                {pendingRejectCat.proposed_by && (
+                  <div className="shrink-0 text-right text-xs text-stone-600">
+                    <span className="text-stone-400">Đề xuất bởi:</span>{' '}
+                    <b className="text-stone-800">
+                      {pendingRejectCat.proposed_by.shop_name || pendingRejectCat.proposed_by.full_name || 'Người bán'}
+                    </b>
+                  </div>
+                )}
+              </div>
+
+              {/* Warning note */}
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs text-amber-900 leading-relaxed">
+                <AlertTriangle size={17} className="mt-0.5 shrink-0 text-amber-600" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-amber-950 m-0">Ảnh hưởng của thao tác:</p>
+                  <p className="m-0 text-amber-900/90">
+                    Danh mục sẽ được chuyển vào mục <b>"Đã từ chối / Cấm"</b> và ẩn khỏi marketplace. Toàn bộ sản phẩm đã gắn danh mục này sẽ tự động được gỡ liên kết. Bạn có thể xem lại hoặc khôi phục danh mục này bất cứ lúc nào.
+                  </p>
+                </div>
+              </div>
+
+              {/* Reason input with quick suggestion chips */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="cat-reject-reason" className={FIELD_LABEL}>
+                    Lý do từ chối <span className="font-normal text-stone-400 text-xs">(tùy chọn)</span>
+                  </label>
+                  {rejectReason && (
+                    <button
+                      type="button"
+                      onClick={() => setRejectReason('')}
+                      className="text-[11px] text-stone-400 hover:text-stone-600 underline cursor-pointer"
+                    >
+                      Xóa lý do
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick suggestions */}
+                <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+                  <span className="text-[11px] font-medium text-stone-400 mr-0.5">Gợi ý:</span>
+                  {[
+                    'Tên danh mục trùng lặp',
+                    'Không đúng ngành hàng sàn',
+                    'Tên danh mục không rõ nghĩa',
+                    'Vi phạm quy định đặt tên',
+                  ].map(reason => (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() => setRejectReason(reason)}
+                      className={cx(
+                        'cursor-pointer rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                        rejectReason === reason
+                          ? 'border-rose-400 bg-rose-50 text-rose-700 font-semibold'
+                          : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50'
+                      )}
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  id="cat-reject-reason"
+                  rows={3}
+                  className={cx(
+                    FIELD,
+                    'resize-none focus:border-rose-500 focus:shadow-[0_0_0_3px_rgba(244,63,94,0.12)]'
+                  )}
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  placeholder="Ví dụ: Tên danh mục trùng lặp với danh mục hiện có, không phù hợp ngành hàng thủ công..."
+                  autoFocus
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

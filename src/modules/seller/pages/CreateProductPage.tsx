@@ -137,6 +137,8 @@ export function CreateProductPage() {
     const [searchParams] = useSearchParams();
     const [step, setStep] = useState(1);
     const [categories, setCategories] = useState<any[]>([]);
+    const [availableTags, setAvailableTags] = useState<any[]>([]);
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [blanks, setBlanks] = useState<any[]>([]);
     const [designs, setDesigns] = useState<any[]>([]);
     const [loadErr, setLoadErr] = useState('');
@@ -171,14 +173,22 @@ export function CreateProductPage() {
         return () => { alive = false; };
     }, [categoryId]);
 
+    const reloadCategories = () => {
+        productsService.getCategories().then(c => {
+            setCategories(Array.isArray(c) ? c : []);
+        }).catch(() => {});
+    };
+
     useEffect(() => {
         Promise.allSettled([
             productsService.getCategories(),
+            productsService.getTags(),
             productsService.getBlanks(),
             productsService.getMyDesigns(),
             sellerPrinterService.getSettings()
-        ]).then(([catRes, blankRes, desRes, printerRes]) => {
+        ]).then(([catRes, tagRes, blankRes, desRes, printerRes]) => {
             const c = catRes.status === 'fulfilled' ? catRes.value : [];
+            const t = tagRes.status === 'fulfilled' && Array.isArray(tagRes.value) ? tagRes.value : [];
             const b = blankRes.status === 'fulfilled' && Array.isArray(blankRes.value) ? blankRes.value : [];
             const d = desRes.status === 'fulfilled' ? desRes.value : [];
             const pData = printerRes.status === 'fulfilled' ? printerRes.value : null;
@@ -186,6 +196,7 @@ export function CreateProductPage() {
             const pList = pData?.printers && pData.printers.length > 0 ? pData.printers : (p?.is_connected ? [p] : []);
 
             setCategories(Array.isArray(c) ? c : []);
+            setAvailableTags(t);
             setBlanks(Array.isArray(b) ? b : []);
             setDesigns(Array.isArray(d) ? d : []);
             setConnectedPrinter(p);
@@ -411,11 +422,20 @@ export function CreateProductPage() {
             finalImages = [coverImage, ...finalImages];
         }
 
+        const tagIds = availableTags
+            .filter((t: any) => selectedTags.some(st => st.trim().toLowerCase() === (t.name || '').trim().toLowerCase()))
+            .map((t: any) => t._id);
+        const newTagNames = selectedTags.filter(st =>
+            !availableTags.some((t: any) => (t.name || '').trim().toLowerCase() === st.trim().toLowerCase())
+        );
+
         try {
             await productsService.create({ 
                 title, 
                 description, 
                 categoryId, 
+                tagIds,
+                newTagNames,
                 blankId: blank._id, 
                 printerId: blank.printer_id || connectedPrinter?.printer_id || 'vietcraft-direct',
                 printerName: blank.printer_name || connectedPrinter?.printer_name || 'Xưởng in đối tác',
@@ -520,6 +540,10 @@ export function CreateProductPage() {
                         categories={categories}
                         categoryId={categoryId}
                         setCategoryId={setCategoryId}
+                        availableTags={availableTags}
+                        selectedTags={selectedTags}
+                        setSelectedTags={setSelectedTags}
+                        onCategoryProposed={reloadCategories}
                         blank={blank}
                         selectedVariants={selectedVariants}
                         setSelectedVariants={setSelectedVariants}

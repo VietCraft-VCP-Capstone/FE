@@ -13,8 +13,13 @@ import {
   List,
   ListOrdered,
   Link as LinkIcon,
-  Minus
+  Minus,
+  Plus,
+  Loader2,
+  Check,
+  Layers,
 } from 'lucide-react';
+import { catalogService } from '../../seller/services/catalogService';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -59,6 +64,18 @@ export function ProductFormModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   /** % hoa hồng sàn. null = chưa tải được, khi đó không hiện giá niêm yết. */
   const [commissionPercent, setCommissionPercent] = useState<number | null>(null);
+
+  // Đề xuất thẻ mới
+  const [newTagInput, setNewTagInput] = useState('');
+  const [newTagNames, setNewTagNames] = useState<string[]>([]);
+
+  // Đề xuất danh mục mới
+  const [showCatModal, setShowCatModal] = useState(false);
+  const [catName, setCatName] = useState('');
+  const [catParentId, setCatParentId] = useState('');
+  const [catDesc, setCatDesc] = useState('');
+  const [submittingCat, setSubmittingCat] = useState(false);
+  const [catMsg, setCatMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -174,13 +191,69 @@ export function ProductFormModal({
     }));
   };
 
+  const handleAddTag = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const val = newTagInput.trim();
+    if (!val) return;
+    // Kiểm tra xem có trùng thẻ đã duyệt trên sàn không
+    const matched = tags.find(t => t.name.toLowerCase() === val.toLowerCase());
+    if (matched) {
+      if (!formData.tagIds.includes(matched._id)) {
+        setFormData(prev => ({ ...prev, tagIds: [...prev.tagIds, matched._id] }));
+      }
+    } else {
+      if (!newTagNames.some(t => t.toLowerCase() === val.toLowerCase())) {
+        setNewTagNames(prev => [...prev, val]);
+      }
+    }
+    setNewTagInput('');
+  };
+
+  const removeNewTag = (name: string) => {
+    setNewTagNames(prev => prev.filter(t => t !== name));
+  };
+
+  const handleProposeCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!catName.trim()) return;
+    setSubmittingCat(true);
+    setCatMsg(null);
+    try {
+      await catalogService.proposeCategory({
+        name: catName.trim(),
+        parent_id: catParentId || undefined,
+        description: catDesc.trim() || undefined,
+      });
+      setCatMsg({ text: 'Đã tạo danh mục thành công và có thể dùng ngay!', ok: true });
+      const c = await productsService.getCategories();
+      if (Array.isArray(c)) {
+        setCategories(c);
+        const createdCat = c.find((it: any) => (it.name || '').toLowerCase() === catName.trim().toLowerCase());
+        if (createdCat) {
+          setFormData(prev => ({ ...prev, categoryId: createdCat._id || createdCat.id }));
+        }
+      }
+      setTimeout(() => {
+        setShowCatModal(false);
+        setCatName('');
+        setCatParentId('');
+        setCatDesc('');
+        setCatMsg(null);
+      }, 1000);
+    } catch (err: any) {
+      setCatMsg({ text: err.response?.data?.error || err.message || 'Gửi đề xuất danh mục thất bại.', ok: false });
+    } finally {
+      setSubmittingCat(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!formData.title.trim()) errs.title = 'Vui lòng nhập tên sản phẩm';
     if (!formData.categoryId) errs.category = 'Vui lòng chọn danh mục';
-    if (formData.tagIds.length === 0) errs.tags = 'Vui lòng chọn ít nhất 1 thẻ';
+    if (formData.tagIds.length === 0 && newTagNames.length === 0) errs.tags = 'Vui lòng chọn hoặc đề xuất ít nhất 1 thẻ';
     if (formData.price <= 0) errs.price = 'Giá bán phải lớn hơn 0';
     if (formData.stock < 0) errs.stock = 'Tồn kho không được âm';
     setErrors(errs);
@@ -197,6 +270,7 @@ export function ProductFormModal({
     }
     onSubmit({
       ...formData,
+      newTagNames,
       images: finalImages,
       thumbnail: targetCover,
     });
@@ -271,9 +345,18 @@ export function ProductFormModal({
 
             {/* Category */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
-                Danh mục <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
+                  Danh mục <span className="text-rose-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowCatModal(true)}
+                  className="text-xs font-semibold text-[#007700] hover:text-[#005B00] hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <Plus size={13} /> Đề xuất danh mục
+                </button>
+              </div>
               <select
                 value={formData.categoryId}
                 disabled={catalogLoading || categories.length === 0}
@@ -297,23 +380,68 @@ export function ProductFormModal({
               {errors.category && <p className="text-xs text-rose-500">{errors.category}</p>}
             </div>
 
-            {/* Thẻ sản phẩm — bắt buộc ít nhất 1, chọn từ thẻ sàn đã duyệt */}
-            <div className="md:col-span-2 space-y-1.5">
-              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
-                Thẻ sản phẩm <span className="text-rose-500">*</span>
-                <span className="ml-2 font-medium normal-case tracking-normal text-stone-400">
-                  Đã chọn {formData.tagIds.length}
-                </span>
-              </label>
+            {/* Thẻ sản phẩm — chọn thẻ sẵn có hoặc gõ đề xuất thẻ mới */}
+            <div className="md:col-span-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
+                  Thẻ sản phẩm <span className="text-rose-500">*</span>
+                  <span className="ml-2 font-medium normal-case tracking-normal text-stone-400">
+                    Đã chọn {formData.tagIds.length + newTagNames.length}
+                  </span>
+                </label>
+              </div>
+
+              {/* Input gõ thêm / đề xuất thẻ mới */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Gõ tên thẻ và nhấn Enter hoặc nút Thêm (ví dụ: GomBatTrang, Linen)..."
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  className="flex-1 px-3.5 py-2 bg-stone-50/80 border border-stone-200 rounded-xl text-xs text-stone-800 focus:outline-none focus:ring-1 focus:ring-[#007700] focus:border-[#007700]"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddTag()}
+                  disabled={!newTagInput.trim()}
+                  className="px-3.5 py-2 bg-white hover:bg-stone-50 border border-stone-200 hover:border-stone-400 text-stone-700 text-xs font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition-all flex items-center gap-1 font-jakarta"
+                >
+                  <Plus size={13} /> Thêm thẻ
+                </button>
+              </div>
+
+              {/* Danh sách thẻ đang chọn & đề xuất */}
               <div
                 className={`flex flex-wrap gap-2 p-3 bg-stone-50/80 border rounded-xl min-h-[52px] ${
                   errors.tags ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
                 }`}
               >
                 {catalogLoading && <span className="text-xs text-stone-400">Đang tải thẻ...</span>}
-                {!catalogLoading && tags.length === 0 && (
-                  <span className="text-xs text-stone-400">Sàn chưa duyệt thẻ nào.</span>
-                )}
+
+                {/* Thẻ đề xuất mới của người bán */}
+                {newTagNames.map((name) => (
+                  <span
+                    key={`new-${name}`}
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-amber-900 bg-amber-50 border border-amber-300 shadow-xs"
+                  >
+                    #{name} <span className="text-[10px] text-amber-700 font-normal">(Chờ duyệt)</span>
+                    <button
+                      type="button"
+                      onClick={() => removeNewTag(name)}
+                      className="ml-1 text-amber-600 hover:text-amber-900 cursor-pointer"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+
+                {/* Thẻ sẵn có của sàn */}
                 {tags.map((tag) => {
                   const picked = formData.tagIds.includes(tag._id);
                   return (
@@ -528,6 +656,96 @@ export function ProductFormModal({
           </button>
         </div>
       </div>
+
+      {/* Modal đề xuất danh mục mới */}
+      {showCatModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-md w-full p-6 relative">
+            <button
+              onClick={() => { setShowCatModal(false); setCatMsg(null); }}
+              className="absolute top-4 right-4 p-1.5 text-stone-400 hover:text-stone-600 rounded-lg hover:bg-stone-100 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-2 mb-2 text-[#007700]">
+              <Layers size={20} />
+              <h3 className="text-base font-bold text-stone-900 font-jakarta">Đề xuất danh mục mới</h3>
+            </div>
+            <p className="text-xs text-stone-500 mb-5 leading-relaxed">
+              Yêu cầu sẽ được gửi tới Ban quản trị VietCraft. Sau khi được duyệt, danh mục sẽ hiển thị trên toàn hệ thống và trong bộ lọc sản phẩm.
+            </p>
+
+            {catMsg && (
+              <div className={`p-3 rounded-xl text-xs mb-4 ${catMsg.ok ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                {catMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={handleProposeCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Tên danh mục <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: Đồ gốm men lam, Nến thơm..."
+                  value={catName}
+                  onChange={e => setCatName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#007700] focus:border-[#007700]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Danh mục cha (tuỳ chọn)
+                </label>
+                <select
+                  value={catParentId}
+                  onChange={e => setCatParentId(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#007700] focus:border-[#007700]"
+                >
+                  <option value="">-- Thuộc cấp cao nhất (Không có cha) --</option>
+                  {categories.map(c => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Mô tả / Lý do đề xuất (tuỳ chọn)
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Nêu đặc điểm hoặc lý do nên mở thêm danh mục này..."
+                  value={catDesc}
+                  onChange={e => setCatDesc(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-stone-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#007700] focus:border-[#007700]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowCatModal(false); setCatMsg(null); }}
+                  className="px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingCat || !catName.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#007700] hover:bg-[#005B00] text-white text-xs font-bold rounded-xl shadow-xs disabled:opacity-50 transition-all font-jakarta cursor-pointer"
+                >
+                  {submittingCat ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Gửi đề xuất
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </ModalOverlay>
   );
 }
