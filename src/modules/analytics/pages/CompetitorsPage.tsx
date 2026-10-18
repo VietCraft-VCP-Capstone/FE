@@ -11,7 +11,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Radar, UserPlus } from 'lucide-react';
 import { invalidateInsights, useInsight } from '../hooks/useInsight';
 import { analyticsApi, analyticsErrorMessage } from '../services/analyticsApi';
-import type { CompetitorTracking, Competitors } from '../types';
+import type { CompetitorBrief, CompetitorTracking, Competitors } from '../types';
 import { InsightPage } from '../components/InsightPage';
 import { InsightBlock, InsightStatusView } from '../components/InsightBlock';
 import { SourceFooter } from '../components/SourceFooter';
@@ -163,6 +163,48 @@ function DirectRivalsCard({ listings, canTrack, trackedIds, pendingShop, onTrack
   );
 }
 
+/** Kế hoạch tuần này: điều đáng làm nhất từ các tab đối thủ. Shop mẫu không có nên ẩn hẳn. */
+function WeeklyPlanCard() {
+  const { state, reload } = useInsight<CompetitorBrief>('/competitor-brief');
+  if (state.kind === 'insufficient') return null;
+  return (
+    <InsightCard
+      title="Kế hoạch tuần này"
+      description="AI gom điều đáng chú ý nhất ở 5 tab đối thủ thành việc nên làm. Việc quan trọng nhất ở trên cùng."
+      footer={state.kind === 'ready' && (
+        <span className="text-xs text-stone-500">
+          {state.data.source === 'llm'
+            ? `Câu chữ do mô hình ngôn ngữ (${state.data.provider}) viết. Mọi con số đã được đối chiếu với số liệu gốc.`
+            : 'Lập tự động từ số liệu của các tab. Mỗi việc đều kèm con số làm căn cứ.'}
+        </span>
+      )}
+    >
+      {state.kind !== 'ready' ? (
+        <InsightStatusView state={state} onRetry={reload} compact />
+      ) : state.data.actions.length === 0 ? (
+        <Note>Tuần này chưa có việc gì gấp: giá, từ khoá và đối thủ của bạn đều chưa có gì đáng lo.</Note>
+      ) : (
+        <ol className="m-0 list-none space-y-2 p-0">
+          {state.data.actions.map((a, i) => (
+            <li key={i} className="flex items-start gap-3 rounded-md border border-stone-200 bg-white px-4 py-3">
+              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#EAF0E2] text-xs font-bold text-[#005B00]" aria-hidden>
+                {i + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="m-0 text-sm font-semibold text-stone-900">{a.action}</p>
+                {a.why && <p className="m-0 mt-0.5 text-[13px] text-stone-600">{a.why}</p>}
+              </div>
+              {a.link && (
+                <Link to={a.link} className="shrink-0 text-[13px] font-medium text-[#007700] no-underline hover:underline">Xem</Link>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </InsightCard>
+  );
+}
+
 export function CompetitorsPage() {
   const [params, setParams] = useSearchParams();
   const urlCategory = params.get('categoryId') || '';
@@ -226,6 +268,7 @@ export function CompetitorsPage() {
         )
       }
     >
+      <WeeklyPlanCard />
       {state.kind !== 'ready' ? (
         <InsightCard>
           <InsightStatusView state={state} onRetry={reload} />

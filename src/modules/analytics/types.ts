@@ -219,6 +219,16 @@ export interface CategoryRevenue {
 
 /* ------------------------------------------------------------ F32 -------- */
 
+/** GET /competitor-brief: việc nên làm tuần này, gom từ F32–F36. Chỉ có cho gian hàng thật. */
+export interface CompetitorBrief {
+  /** rules = lập theo luật; llm = mô hình ngôn ngữ viết lại, số đã đối chiếu với số liệu gốc. */
+  source: 'rules' | 'llm';
+  provider: string | null;
+  actions: { action: string; why: string; link: string | null }[];
+  facts_count: number;
+  generated_at: string;
+}
+
 /** Sản phẩm của shop khác giống sản phẩm của bạn nhất (AI so nội dung, chỉ trong cùng loại hàng). */
 export interface DirectRival {
   product_id: string;
