@@ -17,14 +17,30 @@ import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { SourceFooter } from '../components/SourceFooter';
 import { MiniStat } from '../components/charts/MiniViz';
-import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, Takeaway } from '../components/ui';
+import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, Takeaway, type Tone } from '../components/ui';
 import { fullDate } from '../format';
 import { useInsight, invalidateInsights } from '../hooks/useInsight';
 import { analyticsApi, analyticsErrorMessage } from '../services/analyticsApi';
 import { categoryLabel, tagLabel } from '../labels';
-import type { CompetitorTracking, Competitors } from '../types';
+import type { CompetitorTracking, Competitors, Threat } from '../types';
 
 const ROOT = '/seller/insights';
+
+const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> = {
+  high: { label: 'Đe doạ cao', tone: 'bad' },
+  medium: { label: 'Đe doạ vừa', tone: 'warn' },
+  low: { label: 'Đe doạ thấp', tone: 'neutral' },
+};
+
+const thuongDau = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+/** Lý do AI chấm đe doạ, nói bằng lời. */
+function lyDoDeDoa(t: Threat): string {
+  if (!t.matched_title) return 'Bạn chưa bán loại hàng này';
+  const phan = [`Giống ${Math.round(t.similarity * 100)}% "${t.matched_title}" của bạn`];
+  if (t.price_gap_pct !== null && t.price_gap_pct > 0) phan.push(`rẻ hơn ${t.price_gap_pct}%`);
+  return phan.join(', ');
+}
 
 const FIELD_CLASS =
   'h-9 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none transition-colors duration-150 hover:border-stone-300 focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20 disabled:bg-stone-50 disabled:text-stone-400 motion-reduce:transition-none';
@@ -124,7 +140,12 @@ export function TrackingPage() {
                 ) : latest ? (
                   <>
                     {live ? 'Trong 7 ngày qua' : 'Gần đây'}, đối thủ ra <strong>{count(data.alerts_total)} sản phẩm mới</strong> cùng nhóm hàng
-                    với bạn. Mới nhất: <strong>{latest.title || latest.listing_id}</strong> của {latest.shop_name || latest.shop_id}.
+                    với bạn.{' '}
+                    {latest.threat ? (
+                      <>Đáng chú ý nhất: <strong>{latest.title || latest.listing_id}</strong> của {latest.shop_name || latest.shop_id} ({MUC_DE_DOA[latest.threat.level].label.toLowerCase()}: {thuongDau(lyDoDeDoa(latest.threat))}).</>
+                    ) : (
+                      <>Mới nhất: <strong>{latest.title || latest.listing_id}</strong> của {latest.shop_name || latest.shop_id}.</>
+                    )}
                   </>
                 ) : (
                   <>{count(data.tracked.length)} shop bạn theo dõi chưa ra hàng mới cùng nhóm hàng với bạn trong 7 ngày qua.</>
@@ -145,11 +166,31 @@ export function TrackingPage() {
                 )}
               </div>
 
+              {(data.surging?.length ?? 0) > 0 && (
+                <InsightCard
+                  title="Đối thủ đang tăng tốc"
+                  description="Shop bạn theo dõi có tuần vừa rồi bán vượt hẳn các tuần trước (AI so với nhịp bán 7 tuần trước đó)."
+                  bodyClassName="px-4 py-3"
+                >
+                  <ul className="m-0 list-none space-y-2 p-0">
+                    {data.surging!.map(s => (
+                      <li key={s.shop_id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                        <Chip tone="warn">Tăng tốc</Chip>
+                        <Link to={`/seller/competitors/${s.shop_id}`} className="font-semibold text-stone-800 no-underline hover:text-[#007700]">{s.shop_name || s.shop_id}</Link>
+                        <span className="text-stone-600">
+                          tuần vừa rồi bán {count(s.last_week)} sản phẩm, thường chỉ khoảng {count(Math.round(s.baseline))}/tuần{s.ratio ? ` (gấp ${s.ratio} lần)` : ''}.
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </InsightCard>
+              )}
+
               <InsightCard
                 title="Hàng mới của đối thủ"
                 description={
                   live
-                    ? `Sản phẩm các shop bạn theo dõi đăng trong 7 ngày gần nhất, cùng từ khoá hoặc danh mục với shop bạn.${data.alerts_computed_at ? ` Cập nhật ${timeAgo(data.alerts_computed_at)}.` : ''}`
+                    ? `Sản phẩm các shop bạn theo dõi đăng trong 7 ngày gần nhất, cùng từ khoá hoặc danh mục với shop bạn. AI xếp mức đe doạ cao lên đầu.${data.alerts_computed_at ? ` Cập nhật ${timeAgo(data.alerts_computed_at)}.` : ''}`
                     : 'Sản phẩm có từ khoá trùng với nhóm hàng bạn đang bán.'
                 }
                 bodyClassName="px-4 py-3"
@@ -168,6 +209,7 @@ export function TrackingPage() {
                       <>
                         <th scope="col">Sản phẩm</th>
                         <th scope="col">Shop</th>
+                        {live && <th scope="col">Mức đe doạ</th>}
                         <th scope="col">Vì sao báo cho bạn</th>
                         <th scope="col">{live ? 'Ngày đăng' : 'Hệ thống soát lúc'}</th>
                       </>
@@ -185,7 +227,13 @@ export function TrackingPage() {
                             alert.shop_name || alert.shop_id
                           )}
                         </td>
+                        {live && (
+                          <td>
+                            {alert.threat && <Chip tone={MUC_DE_DOA[alert.threat.level].tone}>{MUC_DE_DOA[alert.threat.level].label} · {count(alert.threat.score)}</Chip>}
+                          </td>
+                        )}
                         <td>
+                          {alert.threat && <span className="mb-1 block text-xs text-stone-700">{lyDoDeDoa(alert.threat)}</span>}
                           <div className="flex flex-wrap items-center gap-1">
                             {alert.matched_tags.length > 0 ? (
                               <>

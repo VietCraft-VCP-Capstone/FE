@@ -7,6 +7,7 @@
  */
 
 import { Check, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { count } from '../../../shared/utils/format';
 import { InsightBlock } from '../components/InsightBlock';
@@ -17,6 +18,42 @@ import { decimal, pct } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import { categoryLabel, tagLabel } from '../labels';
 import type { TagGap } from '../types';
+
+/** AI gợi ý từ khoá riêng cho một sản phẩm: lấy từ sản phẩm giống nó, bù bằng độ phổ biến trong cùng loại hàng. */
+function PerProductTags({ rows, name }: { rows: NonNullable<TagGap['per_product']>; name: (id: string) => string }) {
+  const [chon, setChon] = useState('');
+  const sp = rows.find(r => r.product_id === chon) ?? rows[0];
+  return (
+    <InsightCard
+      title="Gợi ý cho từng sản phẩm"
+      description="AI xem các sản phẩm của shop khác giống sản phẩm này nhất đang gắn từ khoá gì mà nó chưa có."
+      bodyClassName="px-4 py-3"
+    >
+      {!sp ? (
+        <Note>Sản phẩm của bạn đã có đủ từ khoá mà các sản phẩm giống đang dùng.</Note>
+      ) : (
+        <div className="space-y-3">
+          {rows.length > 1 && (
+            <SelectField label="Sản phẩm" value={sp.product_id} onChange={setChon} options={rows.map(r => ({ value: r.product_id, label: r.title ?? r.product_id }))} />
+          )}
+          <ul className="m-0 list-none space-y-2 p-0">
+            {sp.suggestions.map(g => (
+              <li key={g.tag_id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                <Chip tone="brand" icon={<Plus size={12} aria-hidden />}>{name(g.tag_id)}</Chip>
+                <span className="text-stone-600">
+                  {g.used_by > 0
+                    ? `${count(g.used_by)} sản phẩm giống đang dùng${g.better_sellers > 0 ? `, ${count(g.better_sellers)} trong đó bán chạy hơn bạn` : ''}`
+                    : `phổ biến trong cùng loại hàng (${count(g.popular_in_type)} sản phẩm dùng)`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Note>Gợi ý là tương quan: sản phẩm giống bạn hay dùng từ khoá này, không bảo đảm thêm vào là bán được nhiều hơn.</Note>
+        </div>
+      )}
+    </InsightCard>
+  );
+}
 
 export function TagGapPage() {
   const [params, setParams] = useSearchParams();
@@ -97,6 +134,8 @@ export function TagGapPage() {
                   </ul>
                 )}
               </InsightCard>
+
+              {data.per_product && data.per_product.length > 0 && <PerProductTags rows={data.per_product} name={id => name(id)} />}
 
               {rows.length > 0 && (
                 <InsightCard

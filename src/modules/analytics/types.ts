@@ -313,6 +313,12 @@ export interface TagGap {
   tag_names?: Record<string, string>;
   /** Tag nhóm bán chạy hay dùng, kể cả tag shop mình đã có. */
   leader_tags?: { tag_id: string; used_by: number; mine: boolean }[];
+  /** Chỉ có ở shop thật: AI gợi ý riêng cho từng sản phẩm (lai: sản phẩm giống + độ phổ biến cùng loại). */
+  per_product?: {
+    product_id: string;
+    title: string | null;
+    suggestions: { tag_id: string; score: number; used_by: number; better_sellers: number; popular_in_type: number }[];
+  }[];
   missing_tags: {
     tag_id: string;
     name: string;
@@ -398,6 +404,18 @@ export interface PricingAnalysis {
 
 /* ------------------------------------------------------------ F36 -------- */
 
+/** AI chấm mức đe doạ của một sản phẩm mới của đối thủ. */
+export interface Threat {
+  score: number;
+  level: 'high' | 'medium' | 'low';
+  similarity: number;
+  matched_product_id: string | null;
+  matched_title: string | null;
+  /** > 0: đối thủ rẻ hơn sản phẩm khớp của bạn bao nhiêu %. */
+  price_gap_pct: number | null;
+  shop_strength: number;
+}
+
 export interface CompetitorTracking {
   tracked: { shop_id: string; shop_name: string | null; added_at: string | null; listings_total: number }[];
   slots_used: number;
@@ -416,8 +434,11 @@ export interface CompetitorTracking {
     product_id?: string | null;
     matched_category?: string | null;
     category_name?: string | null;
+    threat?: Threat | null;
   }[];
   alerts_total: number;
+  /** Chỉ có ở shop thật: shop đang theo dõi có tuần gần nhất bán vượt hẳn các tuần trước. */
+  surging?: { shop_id: string; shop_name: string | null; last_week: number; baseline: number; ratio: number | null; z: number }[];
   my_niche_tags: string[];
   /** Chỉ có ở shop thật: slug tag -> tên hiển thị. */
   tag_names?: Record<string, string>;
