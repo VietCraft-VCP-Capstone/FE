@@ -276,6 +276,23 @@ export interface Competitors {
 
 /* ------------------------------------------------------------ F33 -------- */
 
+/** Nhóm chiến lược: AI phân cụm (KMeans) các shop cùng danh mục, PCA để vẽ 2 chiều. */
+export interface StrategicGroups {
+  k: number;
+  /** Độ tách nhóm, từ 0,25 là rõ. */
+  silhouette: number;
+  clear: boolean;
+  features: string[];
+  axes: { x: string; y: string | null };
+  groups: { id: number; label: string; size: number; avg_price_vnd: number; avg_revenue_90d_vnd: number }[];
+  points: { shop_id: string; shop_name: string | null; x: number; y: number; group: number; me: boolean }[];
+  my_group: number;
+  /** null khi sàn chưa có đơn để biết nhóm nào bán tốt hơn. */
+  best_group: number | null;
+  gaps: { feature: 'gia' | 'sao' | 'phan_hoi' | 'so_sp' | 'doanh_so'; name: string; mine: number; theirs: number }[];
+  method: string;
+}
+
 export interface ShopComparison {
   segment: string;
   /** Chỉ có ở shop thật: tên danh mục của phân khúc. */
@@ -296,6 +313,9 @@ export interface ShopComparison {
     est_revenue_90d_vnd: number;
   }[];
   shops_in_segment: number;
+  /** Chỉ có ở shop thật. */
+  strategic_groups?: StrategicGroups | null;
+  strategic_groups_reason?: string | null;
   /** Trục của chính shop bạn đang thiếu dữ liệu. */
   axes_missing?: string[];
 }

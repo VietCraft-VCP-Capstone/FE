@@ -9,17 +9,18 @@
  */
 
 import { Link } from 'react-router-dom';
-import { money } from '../../../shared/utils/format';
+import { count, money } from '../../../shared/utils/format';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { SourceFooter } from '../components/SourceFooter';
 import { MiniStat } from '../components/charts/MiniViz';
 import { RADAR_COLORS, RADAR_ME_COLOR, RadarCompare } from '../components/charts/RadarCompare';
+import { StrategyMap } from '../components/charts/StrategyMap';
 import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, Takeaway, type Tone } from '../components/ui';
 import { decimal } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import { categoryLabel } from '../labels';
-import type { ShopComparison } from '../types';
+import type { ShopComparison, StrategicGroups } from '../types';
 
 const so = (v: number) => decimal(v, Number.isInteger(v) ? 0 : 1);
 
@@ -54,6 +55,24 @@ function Bar({ value, color }: { value: number | null; color: string }) {
       {value !== null && <div className="h-2 rounded-full" style={{ width: `${Math.max(3, Math.min(100, value))}%`, background: color }} />}
     </div>
   );
+}
+
+const DON_VI: Record<StrategicGroups['gaps'][number]['feature'], (v: number) => string> = {
+  gia: v => money(Math.round(v)),
+  sao: v => `${decimal(v, 1)} / 5`,
+  phan_hoi: v => `${decimal(v, 0)} phút`,
+  so_sp: v => `${decimal(v, 0)} sản phẩm`,
+  doanh_so: v => money(Math.round(v)),
+};
+
+/** Một câu: tôi thuộc nhóm nào, nhóm nào bán tốt hơn và khác tôi ở đâu. */
+function nhomKetLuan(g: StrategicGroups): string {
+  const ten = (id: number) => g.groups.find(x => x.id === id)?.label ?? '';
+  const dau = `Bạn thuộc nhóm "${ten(g.my_group)}".`;
+  if (g.best_group === null) return `${dau} Sàn chưa có đơn đã giao nên chưa biết nhóm nào bán tốt hơn.`;
+  if (g.best_group === g.my_group) return `${dau} Đây đang là nhóm bán tốt nhất trong danh mục.`;
+  const khac = g.gaps.map(x => `${x.name.toLowerCase()} ${DON_VI[x.feature](x.theirs)} (bạn ${DON_VI[x.feature](x.mine)})`).join(', ');
+  return `${dau} Nhóm "${ten(g.best_group)}" đang bán tốt hơn${khac ? `: ${khac}` : ''}.`;
 }
 
 export function BenchmarkPage() {
@@ -173,6 +192,27 @@ export function BenchmarkPage() {
                   </div>
                 </details>
               </InsightCard>
+
+              {(data.strategic_groups || data.strategic_groups_reason) && (
+                <InsightCard
+                  title="Bản đồ nhóm chiến lược"
+                  description={`AI chia ${count(data.shops_in_segment)} shop cùng danh mục thành các nhóm có cách bán giống nhau (giá, đánh giá, thời gian trả lời, số mẫu, doanh thu).`}
+                  bodyClassName="px-4 py-3"
+                >
+                  {data.strategic_groups ? (
+                    <div className="space-y-3">
+                      <p className="m-0 text-[13px] leading-relaxed text-stone-800">{nhomKetLuan(data.strategic_groups)}</p>
+                      <StrategyMap data={data.strategic_groups} />
+                      {!data.strategic_groups.clear && (
+                        <Note tone="warn">Các shop chưa tách nhóm rõ (độ tách {decimal(data.strategic_groups.silhouette, 2)}), nên đọc bản đồ để tham khảo.</Note>
+                      )}
+                      <Note>Vị trí trên bản đồ chỉ cho thấy shop nào giống shop nào. Hai trục là hướng khác nhau nhiều nhất giữa các shop, không phải thang điểm.</Note>
+                    </div>
+                  ) : (
+                    <Note>{data.strategic_groups_reason}.</Note>
+                  )}
+                </InsightCard>
+              )}
 
               <InsightCard title="5 shop đang được so" bodyClassName="px-4 py-3">
                 <DataTable
