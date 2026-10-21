@@ -68,7 +68,7 @@ export function SellerFollowedCompetitorsPage() {
         <div className="flex items-center gap-2 self-start sm:self-auto">
           {/* Cùng danh sách follow; khu Phân tích có hàng mới của đối thủ, so sánh và giá. */}
           <button
-            onClick={() => navigate('/seller/insights/tracking')}
+            onClick={() => navigate('/seller/insights/competitors#theo-doi')}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold transition-colors shadow-sm cursor-pointer"
           >
             <Sparkles size={14} />

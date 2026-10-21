@@ -4,7 +4,6 @@ import { DemoBanner } from '../components/DemoBanner';
 import { INSIGHTS_NAV } from '../nav';
 import { ActionsPage } from './ActionsPage';
 import { AlertsPage } from './AlertsPage';
-import { BenchmarkPage } from './BenchmarkPage';
 import { CategoriesPage } from './CategoriesPage';
 import { CompetitorsPage } from './CompetitorsPage';
 import { ForecastPage } from './ForecastPage';
@@ -16,7 +15,6 @@ import { PricingPage } from './PricingPage';
 import { RadarPage } from './RadarPage';
 import { SeasonalPage } from './SeasonalPage';
 import { TagGapPage } from './TagGapPage';
-import { TrackingPage } from './TrackingPage';
 
 /**
  * Khu "Phân tích & AI" của người bán — 16 tính năng F26–F41.
@@ -40,10 +38,11 @@ export function InsightsPortal({ user, onLogout }: { user: any; onLogout: () => 
         <Route path="listings/:id" element={<ListingDetailPage />} />
 
         <Route path="competitors" element={<CompetitorsPage />} />
-        <Route path="benchmark" element={<BenchmarkPage />} />
+        {/* Hai tab cũ đã gộp vào Phân tích đối thủ; giữ đường dẫn để link cũ vẫn tới đúng phần. */}
+        <Route path="benchmark" element={<Navigate to="/seller/insights/competitors#manh-yeu" replace />} />
         <Route path="tag-gap" element={<TagGapPage />} />
         <Route path="pricing" element={<PricingPage />} />
-        <Route path="tracking" element={<TrackingPage />} />
+        <Route path="tracking" element={<Navigate to="/seller/insights/competitors#theo-doi" replace />} />
 
         <Route path="forecast" element={<ForecastPage />} />
         <Route path="seasonal" element={<SeasonalPage />} />

@@ -1,5 +1,5 @@
 /**
- * F36 — Theo dõi đối thủ; cùng danh sách follow với khu Vận hành /seller/competitors.
+ * F36 — phần Theo dõi đối thủ của trang Phân tích đối thủ; cùng danh sách follow với khu Vận hành /seller/competitors.
  *
  * Hai chế độ, nhận ra bằng `meta.source.mode`:
  *   live       gian hàng thật. Danh sách là follow của sàn (dùng chung nút "Theo dõi" trên trang
@@ -8,34 +8,29 @@
  */
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, Crosshair, Plus, Tags, Target, Trash2, UserPlus, Users } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Plus, Trash2, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ConfirmModal } from '../../../shared/components/ConfirmModal';
-import { count, timeAgo } from '../../../shared/utils/format';
-import { InsightBlock } from '../components/InsightBlock';
-import { InsightPage } from '../components/InsightPage';
-import { SourceFooter } from '../components/SourceFooter';
-import { MiniStat } from '../components/charts/MiniViz';
-import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, Takeaway, type Tone } from '../components/ui';
-import { fullDate } from '../format';
-import { useInsight, invalidateInsights } from '../hooks/useInsight';
-import { analyticsApi, analyticsErrorMessage } from '../services/analyticsApi';
-import { categoryLabel, tagLabel } from '../labels';
-import type { CompetitorTracking, Competitors, Threat } from '../types';
+import { ConfirmModal } from '../../../../shared/components/ConfirmModal';
+import { count, timeAgo } from '../../../../shared/utils/format';
+import { InsightBlock } from '../InsightBlock';
+import { SourceFooter } from '../SourceFooter';
+import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, type Tone } from '../ui';
+import { fullDate } from '../../format';
+import { invalidateInsights, type InsightState } from '../../hooks/useInsight';
+import { analyticsApi, analyticsErrorMessage } from '../../services/analyticsApi';
+import { categoryLabel, tagLabel } from '../../labels';
+import type { CompetitorTracking, Competitors, Threat } from '../../types';
 
-const ROOT = '/seller/insights';
-
-const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> = {
+export const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> = {
   high: { label: 'Đe doạ cao', tone: 'bad' },
   medium: { label: 'Đe doạ vừa', tone: 'warn' },
   low: { label: 'Đe doạ thấp', tone: 'neutral' },
 };
 
-const thuongDau = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+export const thuongDau = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /** Lý do AI chấm đe doạ, nói bằng lời. */
-function lyDoDeDoa(t: Threat): string {
+export function lyDoDeDoa(t: Threat): string {
   if (!t.matched_title) return 'Bạn chưa bán loại hàng này';
   const phan = [`Giống ${Math.round(t.similarity * 100)}% "${t.matched_title}" của bạn`];
   if (t.price_gap_pct !== null && t.price_gap_pct > 0) phan.push(`rẻ hơn ${t.price_gap_pct}%`);
@@ -47,32 +42,27 @@ const FIELD_CLASS =
 
 const LINK_CLASS = 'font-semibold text-[#007700] no-underline hover:text-[#005B00]';
 
-const BUOC_TIEP: { to: string; icon: LucideIcon; title: string; say: string }[] = [
-  { to: `${ROOT}/competitors`, icon: Users, title: 'Đối thủ bán chạy', say: 'Tìm thêm shop bán chạy cùng danh mục để theo dõi.' },
-  { to: `${ROOT}/benchmark`, icon: Crosshair, title: 'Điểm mạnh & điểm yếu', say: 'So shop bạn với 5 shop dẫn đầu theo từng tiêu chí.' },
-  { to: `${ROOT}/pricing`, icon: Target, title: 'So sánh giá', say: 'Xem giá từng sản phẩm so với thị trường.' },
-  { to: `${ROOT}/tag-gap`, icon: Tags, title: 'Gợi ý từ khoá', say: 'Từ khoá shop bán chạy dùng mà bạn chưa có.' },
-];
-
-export function TrackingPage() {
-  const { state, reload } = useInsight<CompetitorTracking>('/competitor-tracking');
+export function TrackingSection({ state, reload, rivals }: {
+  state: InsightState<CompetitorTracking>;
+  reload: () => void;
+  /** Bảng bán chạy đang mở trên trang: gian hàng thật chọn shop để theo dõi từ đây thay vì gõ mã. */
+  rivals: Competitors | null;
+}) {
   const live = state.kind === 'ready' && state.meta.source.mode === 'live';
-  // Gian hàng thật chọn shop từ nhóm bán chạy cùng danh mục chính (F32) thay vì gõ mã.
-  const rivals = useInsight<Competitors>(live ? '/competitors' : null);
   const [shopId, setShopId] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
   const [removing, setRemoving] = useState<{ id: string; name: string | null } | null>(null);
 
   const rivalOptions = useMemo(() => {
-    if (rivals.state.kind !== 'ready' || state.kind !== 'ready') return [];
+    if (!live || !rivals || state.kind !== 'ready') return [];
     const tracked = new Set(state.data.tracked.map(t => t.shop_id));
     const shops = new Map<string, string>();
-    for (const row of rivals.state.data.competitors) {
+    for (const row of rivals.competitors) {
       if (row.shop_id && !tracked.has(row.shop_id) && !shops.has(row.shop_id)) shops.set(row.shop_id, row.shop_name);
     }
     return [...shops].map(([value, label]) => ({ value, label }));
-  }, [rivals.state, state]);
+  }, [live, rivals, state]);
 
   const refresh = () => {
     invalidateInsights('/competitor-tracking');
@@ -114,58 +104,15 @@ export function TrackingPage() {
   };
 
   return (
-    <InsightPage title="Theo dõi đối thủ" question="Đối thủ của tôi vừa ra hàng gì, và tôi nên xem gì tiếp?">
+    <>
       <InsightBlock state={state} onRetry={reload}>
         {(data, meta) => {
           const full = data.slots_used >= data.slots_limit;
           const tagName = (tag: string) => tagLabel(data.tag_names?.[tag] ?? null, tag);
           const moiTheoShop = data.alerts.reduce<Record<string, number>>((m, a) => ({ ...m, [a.shop_id]: (m[a.shop_id] ?? 0) + 1 }), {});
-          const latest = data.alerts[0];
 
           return (
             <div className="space-y-5">
-              <Takeaway
-                action={
-                  data.tracked.length === 0 ? (
-                    <Link to={`${ROOT}/competitors`} className={ACTION_CLASS}>Tìm shop bán chạy <ArrowRight size={15} aria-hidden /></Link>
-                  ) : latest && live ? (
-                    <Link to={`/seller/competitors/${latest.shop_id}`} className={ACTION_CLASS}>Xem shop {latest.shop_name}</Link>
-                  ) : (
-                    <Link to={`${ROOT}/benchmark`} className={ACTION_CLASS}>Xem điểm mạnh & điểm yếu</Link>
-                  )
-                }
-              >
-                {data.tracked.length === 0 ? (
-                  <>Bạn chưa theo dõi đối thủ nào. Hãy theo dõi vài shop bán chạy để được báo khi họ ra hàng mới cùng nhóm hàng với bạn.</>
-                ) : latest ? (
-                  <>
-                    {live ? 'Trong 7 ngày qua' : 'Gần đây'}, đối thủ ra <strong>{count(data.alerts_total)} sản phẩm mới</strong> cùng nhóm hàng
-                    với bạn.{' '}
-                    {latest.threat ? (
-                      <>Đáng chú ý nhất: <strong>{latest.title || latest.listing_id}</strong> của {latest.shop_name || latest.shop_id} ({MUC_DE_DOA[latest.threat.level].label.toLowerCase()}: {thuongDau(lyDoDeDoa(latest.threat))}).</>
-                    ) : (
-                      <>Mới nhất: <strong>{latest.title || latest.listing_id}</strong> của {latest.shop_name || latest.shop_id}.</>
-                    )}
-                  </>
-                ) : (
-                  <>{count(data.tracked.length)} shop bạn theo dõi chưa ra hàng mới cùng nhóm hàng với bạn trong 7 ngày qua.</>
-                )}
-              </Takeaway>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <InsightCard bodyClassName="px-4 py-3">
-                  <MiniStat label="Đang theo dõi" value={`${count(data.slots_used)} / ${count(data.slots_limit)} shop`} hint={full ? 'Đã đủ chỗ. Bỏ bớt một shop để thêm shop mới.' : undefined} />
-                </InsightCard>
-                <InsightCard bodyClassName="px-4 py-3">
-                  <MiniStat label="Hàng mới của đối thủ" value={`${count(data.alerts_total)} sản phẩm`} hint="Cùng nhóm hàng với bạn" />
-                </InsightCard>
-                {live && (
-                  <InsightCard bodyClassName="px-4 py-3">
-                    <MiniStat label="Shop bán chạy bạn chưa theo dõi" value={`${count(rivalOptions.length)} shop`} hint="Trong danh mục chính của bạn" />
-                  </InsightCard>
-                )}
-              </div>
-
               {(data.surging?.length ?? 0) > 0 && (
                 <InsightCard
                   title="Đối thủ đang tăng tốc"
@@ -320,10 +267,11 @@ export function TrackingPage() {
                   </button>
                   {live && (
                     <span className="self-center text-xs text-stone-500">
-                      Hoặc mở <Link to={`${ROOT}/competitors`} className={LINK_CLASS}>Đối thủ bán chạy</Link> để chọn ở danh mục khác.
+                      Hoặc đổi danh mục ở phần <a href="#ban-chay" className={LINK_CLASS}>Ai đang bán chạy</a> để chọn shop khác.
                     </span>
                   )}
                 </form>
+                {full && <p className="mb-3 mt-0 text-xs text-stone-500">Đã đủ chỗ. Bỏ bớt một shop để thêm shop mới.</p>}
                 {message && (
                   <p aria-live="polite" className={`mb-3 mt-0 text-[13px] font-medium ${message.tone === 'good' ? 'text-[#005B00]' : 'text-red-700'}`}>
                     {message.text}
@@ -386,25 +334,6 @@ export function TrackingPage() {
                   </DataTable>
                 )}
               </InsightCard>
-
-              <section aria-labelledby="buoc-tiep" className="space-y-3">
-                <h2 id="buoc-tiep" className="m-0 text-sm font-bold text-stone-900">Bước tiếp theo</h2>
-                <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4">
-                  {BUOC_TIEP.map(b => (
-                    <li key={b.to}>
-                      <Link
-                        to={b.to}
-                        className="flex h-full flex-col gap-1.5 rounded-md border border-stone-200 bg-white p-4 no-underline transition-colors duration-150 hover:border-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
-                      >
-                        <span className="inline-flex items-center gap-2 text-[13px] font-bold text-stone-900">
-                          <b.icon size={16} className="text-[#007700]" aria-hidden /> {b.title}
-                        </span>
-                        <span className="text-xs leading-relaxed text-stone-500">{b.say}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
             </div>
           );
         }}
@@ -424,6 +353,6 @@ export function TrackingPage() {
         onConfirm={remove}
         onCancel={() => setRemoving(null)}
       />
-    </InsightPage>
+    </>
   );
 }
