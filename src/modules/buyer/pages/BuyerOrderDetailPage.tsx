@@ -95,7 +95,7 @@ export function BuyerOrderDetailPage() {
         setHasLegacyRefund(false);
         void Promise.all([
             refundService.getForOrder(order.id).catch(() => null),
-            order.status === 'completed' && order._id ? returnService.eligibility(order._id).catch(() => []) : Promise.resolve([]),
+            ['completed', 'shipping'].includes(order.status) && order._id ? returnService.eligibility(order._id).catch(() => []) : Promise.resolve([]),
         ]).then(([legacyRefund, eligibility]) => {
             if (cancelled) return;
             setHasLegacyRefund(legacyRefund !== null);
@@ -530,6 +530,7 @@ export function BuyerOrderDetailPage() {
                     items={orderItems}
                     eligibilityItems={eligibilityItems}
                     completed={order.status === 'completed'}
+                    returnable={['completed', 'shipping'].includes(order.status)}
                     onReview={handleOpenReview}
                     onReorder={handleReorder}
                 />

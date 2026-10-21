@@ -6,12 +6,13 @@ interface Props {
   orderId: string;
   item: OrderItemResponse;
   completed: boolean;
+  returnable: boolean;
   eligibility?: ReturnEligibilityItem;
   onReview: (productId: string) => void;
   onReorder: (item: OrderItemResponse) => void;
 }
 
-export function OrderItemRow({ orderId, item, completed, eligibility, onReview, onReorder }: Props) {
+export function OrderItemRow({ orderId, item, completed, returnable, eligibility, onReview, onReorder }: Props) {
   return (
     <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 lg:flex-row lg:items-start lg:justify-between">
       <div className="flex min-w-0 flex-1 items-start gap-4">
@@ -27,12 +28,12 @@ export function OrderItemRow({ orderId, item, completed, eligibility, onReview, 
           <h4 className="line-clamp-1 text-sm font-extrabold leading-snug text-gray-900">{item.title}</h4>
           <p className="mt-1 text-[11px] text-gray-400">Phân loại: {item.color || 'Trắng'}{item.size ? ` · ${item.size}` : ''}</p>
           <p className="mt-0.5 text-xs font-semibold text-gray-500">x{item.quantity}</p>
-          {completed && <OrderItemEligibilityNote eligibility={eligibility} />}
+          {returnable && <OrderItemEligibilityNote eligibility={eligibility} />}
         </div>
       </div>
       <div className="flex flex-col items-end gap-3 lg:max-w-[60%]">
         <span className="text-sm font-extrabold text-gray-900">{((item.price || 0) * (item.quantity || 0)).toLocaleString('vi-VN')}đ</span>
-        {completed && <OrderItemActions orderId={orderId} item={item} eligibility={eligibility} onReview={onReview} onReorder={onReorder} />}
+        {returnable && <OrderItemActions orderId={orderId} item={item} reviewable={completed} eligibility={eligibility} onReview={onReview} onReorder={onReorder} />}
       </div>
     </div>
   );

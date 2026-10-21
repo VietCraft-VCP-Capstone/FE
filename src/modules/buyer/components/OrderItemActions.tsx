@@ -7,6 +7,7 @@ interface Props {
   orderId: string;
   item: OrderItemResponse;
   eligibility?: ReturnEligibilityItem;
+  reviewable: boolean;
   onReview: (productId: string) => void;
   onReorder: (item: OrderItemResponse) => void;
 }
@@ -23,7 +24,7 @@ export function OrderItemEligibilityNote({ eligibility }: { eligibility?: Return
   </div>;
 }
 
-export function OrderItemActions({ orderId, item, eligibility, onReview, onReorder }: Props) {
+export function OrderItemActions({ orderId, item, eligibility, reviewable, onReview, onReorder }: Props) {
   const query = new URLSearchParams({ orderId, quantity: String(eligibility?.remainingQuantity ?? item.quantity ?? 1) });
   if (item.order_item_id) query.set('orderItemId', item.order_item_id);
   if (item.title) query.set('title', item.title);
@@ -34,6 +35,7 @@ export function OrderItemActions({ orderId, item, eligibility, onReview, onReord
 
   return (
     <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+      {reviewable && <>
       <button
         type="button"
         onClick={() => onReview(item.productId)}
@@ -50,6 +52,7 @@ export function OrderItemActions({ orderId, item, eligibility, onReview, onReord
       >
         Mua lại
       </button>
+      </>}
       {eligibility?.activeRequestId ? (
         <Link to={`/returns/${encodeURIComponent(eligibility.activeRequestId)}`} className={`${buttonClass} border-indigo-700 bg-indigo-700 text-white hover:bg-indigo-800`}>
           Theo dõi yêu cầu
