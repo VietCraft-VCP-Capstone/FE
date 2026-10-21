@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Circle,
+  Clock,
   Flame,
   Gift,
   GraduationCap,
@@ -13,12 +14,14 @@ import {
   Hourglass,
   Lightbulb,
   Package,
+  Percent,
   Plus,
   ShoppingBag,
   Sparkles,
   Store,
   Sun,
   Trees,
+  TrendingUp,
 } from 'lucide-react';
 import { count, money } from '../../../shared/utils/format';
 import { InsightBlock } from '../components/InsightBlock';
@@ -54,21 +57,80 @@ function getCampaignLucideIcon(campId: string) {
   }
 }
 
-/** Biểu đồ Radar 5 trục tùy chỉnh bằng SVG sắc nét */
+/** Phân tích chi tiết và lời khuyên theo từng trục của biểu đồ Radar */
+function getAxisAnalysis(axisName: string, _idx: number, campName: string) {
+  if (axisName.includes('cầu') || axisName.includes('thị trường')) {
+    return {
+      icon: TrendingUp,
+      title: 'Sức cầu thị trường',
+      summary: `Nhu cầu tìm kiếm và lượng truy cập toàn sàn dịp ${campName} bùng nổ (+45% so với ngày thường). Khách hàng chủ động gom đơn sớm để tránh tăng giá.`,
+      advice: 'Tối ưu ngay tiêu đề & thẻ tag với các từ khoá ngách đón lượt tìm kiếm sớm trước khi đối thủ đẩy mạnh.',
+    };
+  }
+  if (axisName.includes('chuẩn bị') || axisName.includes('cửa sổ')) {
+    return {
+      icon: Clock,
+      title: 'Cửa sổ chuẩn bị',
+      summary: `Thời gian vàng chuẩn bị kéo dài 4-6 tuần trước mùa cao điểm. Chuẩn bị đúng nhịp quyết định 80% thắng lợi của chiến dịch.`,
+      advice: 'Cần hoàn tất chốt mẫu thử, nhập phôi sẵn/nguyên phụ liệu và chụp ảnh concept trước tuần T-3 để sẵn sàng giao ngay.',
+    };
+  }
+  if (axisName.includes('lợi nhuận') || axisName.includes('biên')) {
+    return {
+      icon: Percent,
+      title: 'Biên lợi nhuận',
+      summary: 'Khách hàng mùa lễ hội ít nhạy cảm về giá hơn, sẵn sàng chi trả cao cho các thiết kế độc đáo và bao bì chỉn chu (+86/100).',
+      advice: 'Tung phiên bản giới hạn (Limited Edition) hoặc bán theo combo 2-3 món để đẩy biên lợi nhuận gộp lên 55-70%.',
+    };
+  }
+  if (axisName.includes('quà') || axisName.includes('biếu')) {
+    return {
+      icon: Gift,
+      title: 'Sức mua làm quà',
+      summary: 'Động cơ mua biếu tặng người thân, bạn bè, đồng nghiệp chiếm tỉ trọng cao nhất (+92/100) trong cơ cấu doanh số mùa này.',
+      advice: 'Bắt buộc đóng hộp quà sang trọng, kèm thiệp viết tay hoặc dịch vụ in tên / lời chúc cá nhân hoá để tăng giá trị đơn.',
+    };
+  }
+  if (axisName.includes('chốt') || axisName.includes('chuyển đổi') || axisName.includes('tỉ lệ')) {
+    return {
+      icon: CheckCircle2,
+      title: 'Tỉ lệ chốt đơn',
+      summary: 'Tỉ lệ chuyển đổi (CVR) tăng mạnh trong 2 tuần cao điểm sát thềm lễ hội do tâm lý mua gấp, sợ cháy hàng hoặc giao trễ (+85/100).',
+      advice: 'Bật giao hoả tốc, cam kết đóng gói trong ngày và gắn huy hiệu hàng sẵn để tăng tốc độ ra quyết định của khách hàng.',
+    };
+  }
+  return {
+    icon: Sparkles,
+    title: axisName,
+    summary: `Chỉ số ${axisName} phản ánh mức độ tiềm năng vượt trội trong mùa ${campName} so với các giai đoạn thường trong năm.`,
+    advice: 'Tận dụng đòn bẩy mùa vụ để gia tăng doanh số và tối ưu tỷ suất lợi nhuận trên mỗi đơn hàng.',
+  };
+}
+
+/** Biểu đồ Radar 5 trục tùy chỉnh bằng SVG sắc nét kèm tooltip và phân tích tương tác khi rê chuột */
 function SeasonalRadar({
   axes,
   currentValues,
   benchmarkValues,
+  overallScore = 88,
+  takeaways = [],
+  campaignName = 'Giáng Sinh',
 }: {
   axes: string[];
   currentValues: number[];
   benchmarkValues: number[];
+  overallScore?: number;
+  takeaways?: string[];
+  campaignName?: string;
 }) {
-  const size = 310;
+  const size = 320;
   const cx = size / 2;
-  const cy = 130;
+  const cy = 135;
   const R = 85;
   const total = axes.length;
+
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [isPolygonHovered, setIsPolygonHovered] = useState(false);
 
   const getPoint = (val: number, index: number) => {
     const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
@@ -81,7 +143,7 @@ function SeasonalRadar({
 
   const getLabelPoint = (index: number) => {
     const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
-    const r = R + 22;
+    const r = R + 24;
     return {
       x: cx + r * Math.cos(angle),
       y: cy + r * Math.sin(angle),
@@ -98,61 +160,276 @@ function SeasonalRadar({
   const benchPath =
     benchPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z';
 
+  // Xác định nội dung phân tích hiện tại để hiển thị trong panel
+  const activeAxisIdx = hoveredIndex !== null ? hoveredIndex : 3; // Mặc định hiển thị "Sức mua làm quà" (index 3)
+  const currentAxisName = axes[activeAxisIdx] || axes[0];
+  const currentAxisVal = currentValues[activeAxisIdx] ?? 85;
+  const currentAxisBench = benchmarkValues[activeAxisIdx] ?? 50;
+  const analysisDetail = getAxisAnalysis(currentAxisName, activeAxisIdx, campaignName);
+
+  let displayAnalysis = {
+    icon: analysisDetail.icon,
+    title: hoveredIndex !== null ? `Phân tích: ${analysisDetail.title}` : `Điểm nhấn: ${analysisDetail.title}`,
+    badge: `${currentAxisVal}/100 (+${currentAxisVal - currentAxisBench}đ)`,
+    summary: analysisDetail.summary,
+    advice: analysisDetail.advice,
+  };
+
+  if (isPolygonHovered && hoveredIndex === null) {
+    displayAnalysis = {
+      icon: Sparkles,
+      title: `Tiềm năng tổng thể mùa ${campaignName}`,
+      badge: `${overallScore}/100`,
+      summary:
+        takeaways[0] ||
+        `Mùa vụ ${campaignName} có mức độ tập trung sức mua và tiềm năng doanh số vượt trội hơn 45% so với mức trung bình ngày thường.`,
+      advice:
+        takeaways[1] ||
+        'Tập trung đóng gói combo quà tặng, chuẩn bị hình ảnh concept sớm và gắn từ khoá ngách đón tìm kiếm.',
+    };
+  }
+
   return (
     <div className="flex flex-col items-center">
-      <svg width={size} height={250} className="overflow-visible select-none">
-        {/* Các vòng ngũ giác đồng tâm */}
-        {levels.map((lvl, lIdx) => {
-          const pts = axes.map((_, i) => getPoint(lvl * 100, i));
-          const pStr = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z';
-          return <path key={lIdx} d={pStr} fill="none" stroke="#e2e8f0" strokeWidth={1} />;
-        })}
+      <div className="relative w-full flex justify-center">
+        {/* Tooltip nổi tương tác trên biểu đồ khi rê chuột vào đỉnh */}
+        {hoveredIndex !== null && currentPoints[hoveredIndex] && (
+          <div
+            className="pointer-events-none absolute z-30 rounded-xl border border-stone-700/80 bg-stone-900/95 px-3 py-2 text-white shadow-xl backdrop-blur-md transition-all duration-150 animate-in fade-in zoom-in-95"
+            style={{
+              left: Math.max(10, Math.min(size - 200, currentPoints[hoveredIndex].x - 90)),
+              top: currentPoints[hoveredIndex].y < 90 ? currentPoints[hoveredIndex].y + 15 : currentPoints[hoveredIndex].y - 75,
+              width: '190px',
+            }}
+          >
+            <div className="flex items-center justify-between gap-1.5 border-b border-stone-700/60 pb-1 text-xs font-bold text-emerald-400">
+              <span className="flex items-center gap-1 truncate">
+                <analysisDetail.icon className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                {currentAxisName}
+              </span>
+              <span className="rounded bg-emerald-500/25 px-1.5 py-0.5 text-[10px] text-emerald-300">
+                {currentAxisVal}/100
+              </span>
+            </div>
+            <div className="mt-1 text-[10.5px] font-medium leading-tight text-stone-200">
+              {analysisDetail.summary}
+            </div>
+            <div className="mt-1 flex items-center justify-between text-[9.5px] text-emerald-300 font-semibold">
+              <span>vs ngày thường ({currentAxisBench}):</span>
+              <span>+{currentAxisVal - currentAxisBench} điểm</span>
+            </div>
+          </div>
+        )}
 
-        {/* Các tia nối từ tâm */}
-        {axes.map((_, i) => {
-          const outer = getPoint(100, i);
-          return <line key={i} x1={cx} y1={cy} x2={outer.x} y2={outer.y} stroke="#e2e8f0" strokeWidth={1} />;
-        })}
+        {/* Tooltip khi rê chuột vào vùng đa giác tổng thể */}
+        {isPolygonHovered && hoveredIndex === null && (
+          <div
+            className="pointer-events-none absolute z-30 rounded-xl border border-emerald-600/60 bg-stone-900/95 px-3 py-2 text-white shadow-xl backdrop-blur-md transition-all duration-150 animate-in fade-in zoom-in-95"
+            style={{
+              left: '50%',
+              top: '115px',
+              transform: 'translate(-50%, -50%)',
+              width: '210px',
+            }}
+          >
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+              <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+              Điểm tổng thể: {overallScore}/100
+            </div>
+            <p className="mt-1 mb-0 text-[10.5px] leading-tight text-stone-200">
+              Tiềm năng mùa {campaignName} cao vượt trội so với ngày thường.
+            </p>
+            <p className="mt-1 mb-0 text-[9.5px] text-stone-400">
+              Rê chuột vào từng đỉnh hoặc bảng bên dưới để xem chi tiết.
+            </p>
+          </div>
+        )}
 
-        {/* Đa giác mức ngày thường (nét đứt) */}
-        <path d={benchPath} fill="none" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 3" />
+        <svg width={size} height={260} className="overflow-visible select-none">
+          {/* Các vòng ngũ giác đồng tâm */}
+          {levels.map((lvl, lIdx) => {
+            const pts = axes.map((_, i) => getPoint(lvl * 100, i));
+            const pStr = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z';
+            return <path key={lIdx} d={pStr} fill="none" stroke="#e2e8f0" strokeWidth={1} />;
+          })}
 
-        {/* Đa giác tiềm năng mùa vụ hiện tại */}
-        <path d={currentPath} fill="rgba(34, 197, 94, 0.22)" stroke="#16a34a" strokeWidth={2.5} />
+          {/* Các tia nối từ tâm */}
+          {axes.map((_, i) => {
+            const outer = getPoint(100, i);
+            const isHovered = hoveredIndex === i;
+            return (
+              <line
+                key={i}
+                x1={cx}
+                y1={cy}
+                x2={outer.x}
+                y2={outer.y}
+                stroke={isHovered ? '#16a34a' : '#e2e8f0'}
+                strokeWidth={isHovered ? 2 : 1}
+                className="transition-colors duration-150"
+              />
+            );
+          })}
 
-        {/* Các đỉnh điểm số */}
-        {currentPoints.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={4.5} fill="#15803d" stroke="#ffffff" strokeWidth={2} />
-        ))}
+          {/* Đa giác mức ngày thường (nét đứt) */}
+          <path d={benchPath} fill="none" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 3" />
 
-        {/* Nhãn 5 trục */}
-        {axes.map((axis, i) => {
-          const lp = getLabelPoint(i);
-          let textAnchor: 'middle' | 'start' | 'end' = 'middle';
-          if (i === 1 || i === 2) textAnchor = 'start';
-          if (i === 3 || i === 4) textAnchor = 'end';
+          {/* Đa giác tiềm năng mùa vụ hiện tại */}
+          <path
+            d={currentPath}
+            fill={isPolygonHovered || hoveredIndex !== null ? 'rgba(34, 197, 94, 0.32)' : 'rgba(34, 197, 94, 0.22)'}
+            stroke={isPolygonHovered || hoveredIndex !== null ? '#15803d' : '#16a34a'}
+            strokeWidth={isPolygonHovered || hoveredIndex !== null ? 3 : 2.5}
+            className="cursor-pointer transition-all duration-200"
+            onMouseEnter={() => setIsPolygonHovered(true)}
+            onMouseLeave={() => setIsPolygonHovered(false)}
+          />
+
+          {/* Các đỉnh điểm số */}
+          {currentPoints.map((p, i) => {
+            const isHovered = hoveredIndex === i;
+            return (
+              <g key={i}>
+                {/* Vòng hào quang khi rê chuột */}
+                {isHovered && (
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={12}
+                    fill="rgba(34, 197, 94, 0.3)"
+                    stroke="#16a34a"
+                    strokeWidth={1.5}
+                    className="animate-pulse"
+                  />
+                )}
+                {/* Điểm nút */}
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={isHovered ? 6.5 : 4.5}
+                  fill="#15803d"
+                  stroke="#ffffff"
+                  strokeWidth={isHovered ? 2.5 : 2}
+                  className="transition-all duration-150"
+                />
+                {/* Vùng cảm ứng chuột mở rộng */}
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={16}
+                  fill="transparent"
+                  className="cursor-pointer"
+                  onMouseEnter={() => setHoveredIndex(i)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                />
+              </g>
+            );
+          })}
+
+          {/* Nhãn 5 trục */}
+          {axes.map((axis, i) => {
+            const lp = getLabelPoint(i);
+            const isHovered = hoveredIndex === i;
+            let textAnchor: 'middle' | 'start' | 'end' = 'middle';
+            if (i === 1 || i === 2) textAnchor = 'start';
+            if (i === 3 || i === 4) textAnchor = 'end';
+            return (
+              <text
+                key={i}
+                x={lp.x}
+                y={lp.y + 4}
+                textAnchor={textAnchor}
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                className={`cursor-pointer transition-all duration-150 ${
+                  isHovered
+                    ? 'fill-emerald-800 text-[11.5px] font-bold underline decoration-emerald-500 underline-offset-2'
+                    : 'fill-stone-600 text-[11px] font-semibold hover:fill-emerald-700'
+                }`}
+              >
+                {axis}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Bảng giá trị 5 trục bên dưới có hỗ trợ rê chuột đồng bộ */}
+      <div className="w-full space-y-1 px-1 pt-2">
+        {axes.map((axis, idx) => {
+          const isHovered = hoveredIndex === idx;
+          const diff = (currentValues[idx] ?? 85) - (benchmarkValues[idx] ?? 50);
           return (
-            <text
-              key={i}
-              x={lp.x}
-              y={lp.y + 4}
-              textAnchor={textAnchor}
-              className="fill-stone-600 text-[11px] font-semibold"
+            <div
+              key={axis}
+              onMouseEnter={() => setHoveredIndex(idx)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              className={`flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg cursor-pointer transition-all ${
+                isHovered
+                  ? 'bg-emerald-50 text-emerald-950 font-bold ring-1 ring-emerald-300 shadow-xs'
+                  : 'text-stone-700 hover:bg-stone-50 font-medium'
+              }`}
             >
-              {axis}
-            </text>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full transition-all ${
+                    isHovered ? 'bg-emerald-600 ring-2 ring-emerald-300' : 'bg-stone-300'
+                  }`}
+                />
+                <span className={isHovered ? 'text-emerald-950' : 'text-stone-600'}>{axis}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {isHovered && (
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/90 px-1.5 py-0.5 rounded">
+                    +{diff} vs thường
+                  </span>
+                )}
+                <span
+                  className={`tabular-nums transition-all ${
+                    isHovered ? 'font-extrabold text-emerald-800 text-sm' : 'font-bold text-stone-900'
+                  }`}
+                >
+                  {currentValues[idx] ?? 85}
+                </span>
+              </div>
+            </div>
           );
         })}
-      </svg>
+      </div>
 
-      {/* Bảng giá trị 5 trục bên dưới */}
-      <div className="w-full space-y-1.5 px-4 pt-2">
-        {axes.map((axis, idx) => (
-          <div key={axis} className="flex items-center justify-between text-xs">
-            <span className="text-stone-500 font-medium">{axis}</span>
-            <span className="font-bold text-stone-900 tabular-nums">{currentValues[idx] ?? 85}</span>
+      {/* Khối phân tích biểu đồ chuyên sâu tương tác khi rê chuột */}
+      <div className="mt-3.5 w-full rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-stone-50/40 to-white p-3.5 shadow-xs transition-all duration-200">
+        <div className="flex items-center justify-between gap-2 border-b border-emerald-100/80 pb-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950">
+            <displayAnalysis.icon className="h-4 w-4 text-emerald-700 shrink-0" />
+            <span>{displayAnalysis.title}</span>
           </div>
-        ))}
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+            {displayAnalysis.badge}
+          </span>
+        </div>
+
+        {/* Nội dung phân tích chi tiết */}
+        <p className="mt-2 mb-1.5 text-xs text-stone-700 leading-relaxed font-normal">
+          {displayAnalysis.summary}
+        </p>
+
+        {/* Lời khuyên hành động */}
+        <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-white/90 p-2 text-[11px] text-stone-600 border border-emerald-100/70">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-emerald-600 mt-0.5" />
+          <div>
+            <span className="font-semibold text-emerald-900">Chiến lược đề xuất: </span>
+            <span>{displayAnalysis.advice}</span>
+          </div>
+        </div>
+
+        {/* Ghi chú gợi ý rê chuột */}
+        <div className="mt-2 flex items-center justify-between text-[10px] text-stone-400">
+          <span>Rê chuột vào các đỉnh biểu đồ để xem phân tích từng trục</span>
+          {hoveredIndex !== null && (
+            <span className="font-semibold text-emerald-700">Đang chọn: {axes[hoveredIndex]}</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -527,6 +804,9 @@ export function SeasonalPage() {
                           axes={radarInfo.axes}
                           currentValues={radarInfo.current_values}
                           benchmarkValues={radarInfo.benchmark_values}
+                          overallScore={radarInfo.overall_score || 88}
+                          takeaways={radarInfo.takeaways}
+                          campaignName={campName}
                         />
                       </div>
                     </div>
