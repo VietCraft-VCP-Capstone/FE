@@ -83,7 +83,7 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
 
     notificationService.getUnreadCount()
       .then(c => setUnreadNotifCount(c))
-      .catch(() => {});
+      .catch(err => console.warn('MSG134', err));
 
     const onUnreadUpdate = (e: any) => {
       if (typeof e.detail?.unreadCount === 'number') {

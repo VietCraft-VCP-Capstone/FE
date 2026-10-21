@@ -7,7 +7,8 @@ import {
   Package,
   Store,
   CheckCheck,
-  Info
+  Info,
+  TrendingUp
 } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
 import { NotificationItem } from '../types/notificationTypes';
@@ -48,6 +49,11 @@ function getNotificationIcon(type: string) {
     case 'PROMOTION':
       return {
         icon: <Tag size={18} className="text-amber-600" />,
+        bg: 'bg-amber-50 border-amber-100'
+      };
+    case 'ANALYTICS_ALERT':
+      return {
+        icon: <TrendingUp size={18} className="text-amber-600" />,
         bg: 'bg-amber-50 border-amber-100'
       };
     case 'LOW_STOCK':

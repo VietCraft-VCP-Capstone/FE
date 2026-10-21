@@ -76,7 +76,8 @@ export const INITIAL_SELLER_SETTINGS: SellerSettingsState = {
     },
     analytics: {
       weeklyReport: { email: true, app: false },
-      promotions: { email: false, app: true }
+      promotions: { email: false, app: true },
+      performanceAlert: { email: false, app: true }
     }
   },
   updatedAt: new Date().toISOString()
