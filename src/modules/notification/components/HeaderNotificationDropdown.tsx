@@ -8,7 +8,8 @@ import {
   Store,
   CheckCheck,
   Info,
-  TrendingUp
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
 import { NotificationItem } from '../types/notificationTypes';
@@ -39,7 +40,7 @@ function formatRelativeTime(dateStr: string): string {
   }
 }
 
-function getNotificationIcon(type: string) {
+function getNotificationIcon(type: string, direction?: string) {
   switch (type) {
     case 'ORDER_UPDATE':
       return {
@@ -52,10 +53,9 @@ function getNotificationIcon(type: string) {
         bg: 'bg-amber-50 border-amber-100'
       };
     case 'ANALYTICS_ALERT':
-      return {
-        icon: <TrendingUp size={18} className="text-amber-600" />,
-        bg: 'bg-amber-50 border-amber-100'
-      };
+      return direction === 'drop'
+        ? { icon: <TrendingDown size={18} className="text-rose-600" />, bg: 'bg-rose-50 border-rose-100' }
+        : { icon: <TrendingUp size={18} className="text-emerald-600" />, bg: 'bg-emerald-50 border-emerald-100' };
     case 'LOW_STOCK':
     case 'PRODUCT_UNPUBLISHED':
     case 'PRODUCT_REPUBLISHED':
@@ -302,7 +302,7 @@ export function HeaderNotificationDropdown({
         ) : (
           displayList.map((item) => {
             const id = item.id || item._id;
-            const { icon, bg } = getNotificationIcon(item.type);
+            const { icon, bg } = getNotificationIcon(item.type, item.metadata?.direction);
             const timeAgo = formatRelativeTime(item.created_at);
 
             return (
