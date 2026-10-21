@@ -4,7 +4,7 @@
  * Đọc GET /seller/analytics/alerts (tham số period = 7d · 30d · 90d · all, mặc định 30d).
  */
 
-import { ShieldCheck } from 'lucide-react';
+import { Hourglass, ShieldCheck } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { count, money } from '../../../shared/utils/format';
 import { RangeTabs } from '../../seller/components/dashboard/SellerDashboardUi';
@@ -53,30 +53,34 @@ export function AlertsPage() {
           const revenue = alerts.filter(a => a.metric === 'revenue').length;
           const views = alerts.length - revenue;
           const t = data.threshold;
+          const idle = !data.shop_was_analysed && alerts.length === 0;
+          const kpi = (n: number) => (idle ? '—' : count(n));
 
           return (
             <div className="space-y-5">
               <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-                <KpiTile label="Cảnh báo" value={count(data.total)} hint={period === 'all' ? 'Trên toàn bộ lịch sử' : `Trong ${period.replace('d', ' ngày')} gần nhất`} />
-                <KpiTile label="Tụt xuống" value={count(drops)} hint="Thấp hơn mức thường" />
-                <KpiTile label="Vọt lên" value={count(spikes)} hint="Cao hơn mức thường" />
-                <KpiTile label="Doanh thu" value={count(revenue)} hint="Cảnh báo theo doanh thu" />
-                <KpiTile label="Lượt xem" value={count(views)} hint="Cảnh báo theo lượt xem" />
+                <KpiTile label="Cảnh báo" value={kpi(data.total)} hint={period === 'all' ? 'Trên toàn bộ lịch sử' : `Trong ${period.replace('d', ' ngày')} gần nhất`} />
+                <KpiTile label="Tụt xuống" value={kpi(drops)} hint="Thấp hơn mức thường" />
+                <KpiTile label="Vọt lên" value={kpi(spikes)} hint="Cao hơn mức thường" />
+                <KpiTile label="Doanh thu" value={kpi(revenue)} hint="Cảnh báo theo doanh thu" />
+                <KpiTile label="Lượt xem" value={kpi(views)} hint="Cảnh báo theo lượt xem" />
               </div>
 
               <InsightCard
-                title={alerts.length > 0 ? `${alerts.length} cảnh báo` : 'Không có cảnh báo nào'}
+                title={alerts.length > 0 ? `${alerts.length} cảnh báo` : idle ? 'Chưa đủ dữ liệu để dò bất thường' : 'Không có cảnh báo nào'}
                 description="Sắp xếp theo ngày mới nhất trước."
                 bodyClassName={alerts.length > 0 ? 'px-4 py-3' : 'p-4'}
                 footer={<SourceFooter meta={meta} limitation={data.limitation} />}
               >
                 {alerts.length === 0 ? (
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EAF0E2] text-[#005B00]" aria-hidden>
-                      <ShieldCheck size={18} />
+                    <span className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${idle ? 'bg-stone-100 text-stone-500' : 'bg-[#EAF0E2] text-[#005B00]'}`} aria-hidden>
+                      {idle ? <Hourglass size={18} /> : <ShieldCheck size={18} />}
                     </span>
                     <div>
-                      <p className="m-0 text-sm font-bold text-stone-800">Không có cảnh báo nào. Đó là tin tốt.</p>
+                      <p className="m-0 text-sm font-bold text-stone-800">
+                        {idle ? 'Chưa kết luận được gì cho shop này.' : 'Không có cảnh báo nào. Đó là tin tốt.'}
+                      </p>
                       <p className="mb-0 mt-1 text-xs leading-relaxed text-stone-500">
                         {data.shop_was_analysed
                           ? 'Shop đã được phân tích đầy đủ trong kỳ này, nghĩa là doanh thu và lượt xem đi theo nhịp thường ngày.'
