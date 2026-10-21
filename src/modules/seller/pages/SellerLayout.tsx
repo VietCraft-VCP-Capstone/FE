@@ -12,6 +12,7 @@ import { chatService } from '../../chat/services/chatService';
 import { notificationService } from '../../notification/services/notificationService';
 import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
 import { WorkspaceSwitcher, rememberSellerPath } from '../../analytics/components/WorkspaceSwitcher';
+import { useSocket } from '../../../infrastructure/websocket/useSocket';
 
 export interface SellerNavItem {
   to: string;
@@ -59,6 +60,7 @@ const SIDEBAR_COLLAPSED_KEY = 'vietcraft:seller-sidebar-collapsed';
 export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  useSocket(); // mở socket để chuông nhận thông báo realtime ở mọi trang seller
   // Sidebar chỉ đóng/mở khi người bán bấm, và giữ lựa chọn đó giữa các trang lẫn lần mở sau.
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
