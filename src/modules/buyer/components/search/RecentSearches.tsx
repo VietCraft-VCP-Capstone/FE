@@ -1,18 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { History } from 'lucide-react';
-import { clearRecentSearches, getRecentSearches } from './recentSearchStorage';
+import { forgetRecentSearches, loadRecentSearches } from './recentSearchStorage';
 
 interface RecentSearchesProps {
   onSelect: (keyword: string) => void;
 }
 
 export const RecentSearches: React.FC<RecentSearchesProps> = ({ onSelect }) => {
-  const [items, setItems] = useState<string[]>(getRecentSearches);
+  const [items, setItems] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    loadRecentSearches().then((list) => { if (alive) setItems(list); });
+    return () => { alive = false; };
+  }, []);
 
   if (items.length === 0) return null;
 
-  const clear = () => {
-    clearRecentSearches();
+  const clear = async () => {
+    await forgetRecentSearches();
     setItems([]);
   };
 
