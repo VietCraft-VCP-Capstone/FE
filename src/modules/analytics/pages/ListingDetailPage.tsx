@@ -5,6 +5,7 @@ import { HealthPreviewPanel } from '../components/HealthPreviewPanel';
 import { CriteriaTable } from '../components/health/CriteriaTable';
 import { ListingHeader } from '../components/health/ListingHeader';
 import { ScoreSummary } from '../components/health/ScoreSummary';
+import { SellChanceCard } from '../components/health/SellChanceCard';
 import { VariantStock } from '../components/health/VariantStock';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
@@ -87,6 +88,7 @@ export function ListingDetailPage() {
             <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,1.75fr)_minmax(360px,1fr)]">
               <div className="min-w-0 space-y-3">
                 <ScoreSummary score={data.score} status={data.status} headline={headline(data.score, todos)} salesPending={data.axes_missing.includes('conversion')} />
+                <SellChanceCard productId={id} />
                 <CriteriaTable
                   axes={data.axes}
                   missing={data.axes_missing}

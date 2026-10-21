@@ -5,6 +5,7 @@ import { commissionAmount, withCommission } from '../../../../shared/utils/commi
 import { money } from '../../../../shared/utils/format';
 import { catalogService } from '../../services/catalogService';
 import SmartProductAiModal from '../SmartProductAiModal';
+import { IntelPreviewSection } from './IntelPreviewSection';
 
 interface Step4Props {
     title: string;
@@ -17,6 +18,8 @@ interface Step4Props {
     availableTags?: any[];
     selectedTags?: string[];
     setSelectedTags?: React.Dispatch<React.SetStateAction<string[]>>;
+    materials?: string[];
+    setMaterials?: (val: string[]) => void;
     onCategoryProposed?: () => void;
     blank: any;
     selectedVariants: Record<string, { on: boolean; markup: string; stock: string }>;
@@ -34,6 +37,8 @@ export function Step4ProductDetails({
     availableTags = [],
     selectedTags = [],
     setSelectedTags = () => {},
+    materials = [],
+    setMaterials = () => {},
     onCategoryProposed,
     blank, selectedVariants, setSelectedVariants,
     selectedImages = [],
@@ -291,6 +296,11 @@ export function Step4ProductDetails({
                             placeholder="Nhập chi tiết về sản phẩm, chất liệu, cách bảo quản..."
                         />
                     </div>
+
+                    <IntelPreviewSection
+                        source={{ title, description, categories, categoryId, tags: selectedTags, materials, images: selectedImages, blank, selectedVariants, commissionPercent }}
+                        onMaterialsChange={setMaterials}
+                    />
                 </div>
             </div>
 

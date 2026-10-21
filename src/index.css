@@ -28,6 +28,14 @@ body {
   background: #94a3b8;
 }
 
+.scroll-shadow-x {
+  background:
+    linear-gradient(to right, #fff 30%, rgba(255, 255, 255, 0)) left center / 40px 100% no-repeat local,
+    linear-gradient(to left, #fff 30%, rgba(255, 255, 255, 0)) right center / 40px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0)) left center / 16px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0)) right center / 16px 100% no-repeat scroll;
+}
+
 /* Glassmorphism utility */
 .glass-panel {
   background: rgba(30, 41, 59, 0.45);

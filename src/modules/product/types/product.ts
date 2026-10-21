@@ -27,6 +27,7 @@ export interface ProductItem {
   category: string;
   /** Tên các thẻ đang gắn — BE trả về từ product.tags. */
   tags?: string[];
+  materials?: string[];
   price: number;
   originalPrice?: number;
   stock: number;
@@ -82,6 +83,7 @@ export interface ProductFormData {
   categoryId: string;
   tagIds: string[];
   newTagNames?: string[];
+  materials?: string[];
   price: number;
   stock: number;
   sku: string;

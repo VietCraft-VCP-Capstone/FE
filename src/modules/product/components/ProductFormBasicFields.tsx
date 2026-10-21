@@ -3,6 +3,7 @@ import { commissionAmount, withCommission } from '../../../shared/utils/commissi
 import { money } from '../../../shared/utils/format';
 import { Plus } from 'lucide-react';
 import { ProductFormTagField } from './ProductFormTagField';
+import { MaterialInput } from './MaterialInput';
 
 interface ProductFormBasicFieldsProps {
   formData: ProductFormData;
@@ -102,6 +103,10 @@ export function ProductFormBasicFields({
         onAddTag={onAddTag}
         onRemoveNewTag={onRemoveNewTag}
       />
+
+      <div className="md:col-span-2" data-focus-target="materials">
+        <MaterialInput value={formData.materials || []} onChange={(materials) => onPatch({ materials })} />
+      </div>
 
       {/* Price */}
       <div className="space-y-1.5" data-focus-target="price">

@@ -20,7 +20,7 @@ export const BRAND = '#007700';
 /** Biểu tượng ⓘ: rê chuột hoặc focus bàn phím để xem chú giải, giữ màn hình ít chữ. */
 export function InfoTip({ text, label = 'Xem giải thích', wide = false }: { text: React.ReactNode; label?: string; wide?: boolean }) {
   return (
-    <Tooltip styles={wide ? { root: { maxWidth: 420 } } : undefined} title={<div className={`${wide ? 'max-w-sm' : 'max-w-xs'} text-xs leading-relaxed`}>{text}</div>}>
+    <Tooltip trigger={['hover', 'focus']} styles={wide ? { root: { maxWidth: 420 } } : undefined} title={<div className={`${wide ? 'max-w-sm' : 'max-w-xs'} text-xs leading-relaxed`}>{text}</div>}>
       <button
         type="button"
         aria-label={label}
@@ -86,14 +86,15 @@ const TONE_CLASS: Record<Tone, string> = {
   brand: 'bg-[#007700] text-white',
 };
 
-export function Chip({ tone = 'neutral', icon, children, className }: {
+export function Chip({ tone = 'neutral', icon, children, className, wrap = false }: {
   tone?: Tone;
   icon?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  wrap?: boolean;
 }) {
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-0.5 text-[11.5px] font-semibold ${TONE_CLASS[tone]} ${className || ''}`}>
+    <span className={`inline-flex items-center gap-1 ${wrap ? 'max-w-full whitespace-normal text-left' : 'whitespace-nowrap'} rounded px-2 py-0.5 text-[11.5px] font-semibold ${TONE_CLASS[tone]} ${className || ''}`}>
       {icon}
       {children}
     </span>
@@ -275,14 +276,15 @@ export function Note({ children, tone = 'neutral' }: { children: React.ReactNode
 }
 
 /** Bảng dữ liệu gọn, cuộn ngang trên màn nhỏ thay vì vỡ bố cục. */
-export function DataTable({ head, children, caption }: {
+export function DataTable({ head, children, caption, minWidth = 'min-w-[560px]' }: {
   head: React.ReactNode;
   children: React.ReactNode;
   caption?: string;
+  minWidth?: string;
 }) {
   return (
-    <div className="-mx-4 overflow-x-auto">
-      <table className="w-full min-w-[560px] border-collapse text-left text-[13px]">
+    <div className="scroll-shadow-x -mx-4 overflow-x-auto">
+      <table className={`w-full ${minWidth} border-collapse text-left text-[13px]`}>
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr className="border-b border-stone-100 text-xs font-semibold text-stone-500 [&>th]:px-4 [&>th]:py-2.5 [&>th]:font-semibold">
