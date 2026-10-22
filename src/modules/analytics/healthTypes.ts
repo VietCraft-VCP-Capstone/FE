@@ -2,6 +2,8 @@ import type { HealthAxis, HealthStatus, HealthTodo, ListingHealthDetail } from '
 
 export type HealthAxes = Partial<Record<HealthAxis, number | null>>;
 
+export type HealthFactorKey = HealthAxis;
+
 export interface HealthHistoryPoint {
   date: string;
   score: number;
@@ -9,7 +11,7 @@ export interface HealthHistoryPoint {
   axes: HealthAxes;
 }
 
-export type PreviewLever = 'n_images' | 'description_length' | 'n_tags' | 'in_stock_ratio_pct';
+export type PreviewLever = 'n_images' | 'description_length' | 'n_tags' | 'price';
 
 export type PreviewInputs = Partial<Record<PreviewLever, number>>;
 
@@ -81,6 +83,61 @@ export interface ListingHealthDetailFull extends ListingHealthDetail {
 export interface ListingHealthList {
   items: ListingHealthItem[];
   total: number;
+}
+
+export interface HealthRow {
+  product_id: string;
+  title: string;
+  thumbnail: string | null;
+  score: number | null;
+  top_todo: string | null;
+}
+
+export interface HealthFactor {
+  key: HealthFactorKey;
+  label: string;
+  weight: number;
+  sub_score: number;
+  points: number;
+  value: number | null;
+  target: number | null;
+  peer_median: number | null;
+  missing: boolean;
+  pending?: number;
+  n_good?: number;
+  reference?: { price: number | null; source: 'category' | 'group' | 'tiki' | null; n: number };
+}
+
+export interface HealthItem {
+  type: 'todo' | 'warning' | 'info';
+  code?: string;
+  field: string | null;
+  message: string;
+  current_value: number | string | null;
+  target: number | string | null;
+  impact: number;
+}
+
+export interface ListingHealth {
+  product_id: string;
+  title: string;
+  thumbnail: string | null;
+  date: string;
+  score: number | null;
+  status: HealthStatus | null;
+  model_version: 'health-2.0';
+  computed_at: string;
+  axes: Record<HealthFactorKey, number>;
+  axes_missing: string[];
+  breakdown: HealthFactor[];
+  todos: HealthItem[];
+  warnings: HealthItem[];
+  basis: {
+    weights: Record<HealthFactorKey, number>;
+    trained_on: string;
+    tiki_test_auc: number | null;
+    equal_auc: number | null;
+  };
 }
 
 export interface HealthSummaryPoint {

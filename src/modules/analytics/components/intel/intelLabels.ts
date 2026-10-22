@@ -1,4 +1,4 @@
-import type { IntelAxisKey, IntelDirection, IntelEvidence } from '../../intelTypes';
+import type { IntelAxisKey, IntelDirection, IntelEvidence, IntelIssue } from '../../intelTypes';
 import type { Tone } from '../ui';
 
 export const AXIS_KEYS: IntelAxisKey[] = ['image', 'text', 'tags', 'market', 'trend'];
@@ -49,4 +49,25 @@ export const ISSUE_LABEL: Record<string, string> = {
   bad_aspect: 'Tỉ lệ khung lạ',
 };
 
+export const issueText = (i: IntelIssue) => ISSUE_LABEL[i.code] ?? i.message ?? i.code;
+
 export const EFFORT_LABEL: Record<1 | 2 | 3, string> = { 1: 'Dễ', 2: 'Vừa', 3: 'Khó' };
+
+export const AXIS_SIMPLE: Record<IntelAxisKey, string> = {
+  image: 'Ảnh',
+  text: 'Tiêu đề, mô tả',
+  tags: 'Tag',
+  market: 'Giá, cạnh tranh',
+  trend: 'Mùa vụ',
+};
+
+export const TIER_COLOR: Record<Tone, string> = {
+  good: '#15803d', warn: '#d97706', bad: '#dc2626', neutral: '#a8a29e', info: '#0369a1', brand: '#007700',
+};
+
+export function healthTier(score: number | null): { label: string; tone: Tone } {
+  if (score === null) return { label: 'Thiếu dữ liệu', tone: 'neutral' };
+  if (score >= 80) return { label: 'Tốt', tone: 'good' };
+  if (score >= 50) return { label: 'Cần cải thiện', tone: 'warn' };
+  return { label: 'Kém', tone: 'bad' };
+}

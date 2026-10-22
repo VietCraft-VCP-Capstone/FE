@@ -2,9 +2,9 @@ import { decimal } from '../../format';
 import type { IntelModel } from '../../intelTypes';
 import { InsightCard, Note } from '../ui';
 
-export function ModelCard({ model }: { model: IntelModel }) {
+export function ModelCard({ model, bare = false }: { model: IntelModel; bare?: boolean }) {
   return (
-    <InsightCard
+    <InsightCard bare={bare}
       title="Độ tin cậy của model"
       info="AUC đo khả năng model xếp listing bán chạy lên trên listing bán chậm, trên tập kiểm tra chưa từng thấy. 0,5 là đoán ngẫu nhiên, 1 là hoàn hảo."
     >

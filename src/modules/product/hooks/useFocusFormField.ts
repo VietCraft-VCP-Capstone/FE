@@ -4,6 +4,7 @@ export type ProductFormFocusTarget = 'images' | 'title' | 'tags' | 'price' | 'st
 
 const FIELD_TO_TARGET: Record<string, ProductFormFocusTarget> = {
   images: 'images',
+  image: 'images',
   description: 'description',
   tags: 'tags',
   stock_quantity: 'stock',

@@ -8,9 +8,9 @@ const VERDICT: Record<IntelTagVerdict, { label: string; tone: Tone }> = {
   pending: { label: 'Chờ duyệt', tone: 'info' },
 };
 
-export function TagPanel({ tags, suggested }: { tags: IntelTag[]; suggested: { tag: string; reason: string }[] }) {
+export function TagPanel({ tags, suggested, bare = false }: { tags: IntelTag[]; suggested: { tag: string; reason: string }[]; bare?: boolean }) {
   return (
-    <InsightCard title="Tag" info="Tag được xét theo từ khoá bán chạy, độ trùng lặp và trạng thái duyệt.">
+    <InsightCard bare={bare} title="Tag" info="Tag được xét theo từ khoá bán chạy, độ trùng lặp và trạng thái duyệt.">
       <div className="space-y-3">
         {tags.length === 0 ? (
           <Note tone="warn">Sản phẩm chưa có tag nào.</Note>

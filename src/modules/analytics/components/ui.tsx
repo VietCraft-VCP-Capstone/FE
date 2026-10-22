@@ -40,8 +40,10 @@ export function InsightCard({
   footer,
   className,
   bodyClassName,
+  bare = false,
   children,
 }: {
+  bare?: boolean;
   title?: string;
   info?: React.ReactNode;
   description?: string;
@@ -51,6 +53,7 @@ export function InsightCard({
   bodyClassName?: string;
   children: React.ReactNode;
 }) {
+  if (bare) return <div className="min-w-0">{children}</div>;
   return (
     <section className={`flex min-w-0 flex-col rounded-md border border-stone-200 bg-white ${className || ''}`}>
       {(title || action) && (

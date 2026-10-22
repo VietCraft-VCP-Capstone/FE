@@ -4,7 +4,7 @@ import type { IntelMarket } from '../../intelTypes';
 import { InsightCard, Note } from '../ui';
 
 function priceSentence(pct: number | null) {
-  if (pct === null) return '—';
+  if (pct === null) return '-';
   return pct <= 10 ? `Giá của bạn thấp hơn ${decimal(100 - pct, 0)}% sản phẩm tương tự` : `Giá của bạn cao hơn ${decimal(pct, 0)}% sản phẩm tương tự`;
 }
 
@@ -24,9 +24,9 @@ function Stat({ label, value, hint, className = '' }: { label: string; value: st
   );
 }
 
-export function MarketPanel({ market }: { market: IntelMarket | null }) {
+export function MarketPanel({ market, bare = false }: { market: IntelMarket | null; bare?: boolean }) {
   return (
-    <InsightCard title="Thị hiếu và cạnh tranh" info="So với các listing gần giống nhất về ảnh và tiêu đề, trên sàn và trong VietCraft.">
+    <InsightCard bare={bare} title="Thị hiếu và cạnh tranh" info="So với các listing gần giống nhất về ảnh và tiêu đề, trên sàn và trong VietCraft.">
       {!market ? (
         <Note>Chưa so sánh được với listing nào gần giống.</Note>
       ) : (
@@ -37,7 +37,7 @@ export function MarketPanel({ market }: { market: IntelMarket | null }) {
             value={priceSentence(market.price_pct)}
             hint={priceHint(market.price_pct, market.neighbors)}
           />
-          <Stat label="Giá trung vị của sản phẩm tương tự" value={market.median_price === null ? '—' : money(market.median_price)} />
+          <Stat label="Giá trung vị của sản phẩm tương tự" value={market.median_price === null ? '-' : money(market.median_price)} />
           <Stat
             label="Listing gần như trùng"
             value={String(market.near_duplicates)}

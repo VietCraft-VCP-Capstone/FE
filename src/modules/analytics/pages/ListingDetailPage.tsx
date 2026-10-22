@@ -1,114 +1,118 @@
-import { useParams } from 'react-router-dom';
-import { TodoItem, WarningItem } from '../components/HealthParts';
-import { HealthHistory } from '../components/HealthHistory';
-import { HealthPreviewPanel } from '../components/HealthPreviewPanel';
-import { CriteriaTable } from '../components/health/CriteriaTable';
-import { ListingHeader } from '../components/health/ListingHeader';
-import { ScoreSummary } from '../components/health/ScoreSummary';
-import { SellChanceCard } from '../components/health/SellChanceCard';
-import { VariantStock } from '../components/health/VariantStock';
+import { useRef } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Pencil } from 'lucide-react';
+import { editLink } from '../components/HealthParts';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
+import { HealthScoreCard } from '../components/health/HealthScoreCard';
+import { HealthTodoList } from '../components/health/HealthTodoList';
+import { PartTabs } from '../components/intel/PartTabs';
+import { SeasonPanel } from '../components/intel/SeasonPanel';
 import { ListingTraffic } from '../components/ListingTraffic';
 import { SourceFooter } from '../components/SourceFooter';
-import { InfoTip, InsightCard, Note } from '../components/ui';
-import type { ListingHealthDetailFull } from '../healthTypes';
+import { ACTION_CLASS } from '../components/ui';
 import { useInsight } from '../hooks/useInsight';
-import type { HealthTodo } from '../types';
+import { INSIGHTS_ROOT } from '../nav';
+import type { ListingHealth } from '../healthTypes';
+import type { ListingIntel } from '../intelTypes';
 
-function gainOf(todos: HealthTodo[]): number {
-  return todos.reduce((s, t) => s + Math.max(0, t.impact ?? 0), 0);
-}
-
-function headline(score: number | null, todos: HealthTodo[]): string {
-  const gain = gainOf(todos);
-  if (todos.length === 0) return 'Sản phẩm đã ổn, chưa cần sửa gì.';
-  if (score === null || gain <= 0) return `Làm ${todos.length} việc bên phải để sản phẩm dễ bán hơn.`;
-  return `Làm hết việc nên làm, điểm lên khoảng ${Math.round(Math.min(100, score + Math.round(gain)))}.`;
-}
-
-function TodoCard({ productId, todos, warnings, score }: {
-  productId: string;
-  todos: HealthTodo[];
-  warnings: HealthTodo[];
-  score: number | null;
-}) {
-  const gain = gainOf(todos);
-  return (
-    <InsightCard
-      title="Việc nên làm"
-      info={todos.length ? 'Việc dễ làm mà được nhiều điểm xếp trước. "+N điểm" là điểm tăng thêm nếu làm đúng việc đó. Bấm Sửa để mở đúng ô cần sửa.' : undefined}
-      action={gain > 0 && score !== null ? (
-        <span className="whitespace-nowrap text-xs font-semibold text-[#005B00]">Làm hết: +{Math.round(gain)} điểm</span>
-      ) : undefined}
-      bodyClassName="px-4 py-2"
-    >
-      {todos.length > 0 && (
-        <ul className="m-0 list-none divide-y divide-stone-100 p-0">
-          {todos.map(t => <TodoItem key={`${t.type}-${t.field}-${t.message}`} todo={t} productId={productId} />)}
-        </ul>
-      )}
-      {warnings.length > 0 && (
-        <section className="my-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
-          <h3 className="m-0 flex items-center gap-1.5 text-[13px] font-bold text-amber-900">
-            Cần kiểm tra <InfoTip text="Không trừ điểm, nhưng có thể khiến bạn bán lỗ hoặc sản phẩm không được hiển thị." label="Vì sao cần kiểm tra" />
-          </h3>
-          <ul className="m-0 list-none p-0">
-            {warnings.map(w => <WarningItem key={`w-${w.field}-${w.message}`} todo={w} productId={productId} />)}
-          </ul>
-        </section>
-      )}
-      {todos.length === 0 && warnings.length === 0 && (
-        <div className="py-2"><Note>Không còn việc nào. Thỉnh thoảng xem lại ảnh, mô tả và giá để giữ điểm.</Note></div>
-      )}
-    </InsightCard>
-  );
-}
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const QUESTION = 'Điểm sức khoẻ và việc cần làm để sản phẩm dễ bán hơn.';
+const MAX_DAYS = 730;
+const shiftDays = (days: number) => new Date(Date.now() + days * 86_400_000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
 
 export function ListingDetailPage() {
   const { id = '' } = useParams();
-  const health = useInsight<ListingHealthDetailFull>(id ? `/listings/${id}/health` : null);
-  const ready = health.state.kind === 'ready' ? health.state.data : null;
+  return <ListingDetail key={id} id={id} />;
+}
+
+function ListingDetail({ id }: { id: string }) {
+  const [params, setParams] = useSearchParams();
+  const date = ISO_DATE.test(params.get('date') ?? '') ? (params.get('date') as string) : '';
+  const health = useInsight<ListingHealth>(id ? `/listings/${id}/health` : null);
+  const intel = useInsight<ListingIntel>(id ? `/listings/${id}/intel` : null, { date });
+  const last = useRef<{ title: string; thumbnail: string | null } | null>(null);
+  if (health.state.kind === 'ready') last.current = { title: health.state.data.title, thumbnail: health.state.data.thumbnail };
+  const ready = last.current;
   const title = ready?.title || 'Sản phẩm';
+
+  const setDate = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set('date', value);
+    else next.delete('date');
+    setParams(next, { replace: true });
+  };
+
+  const datePicker = (
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="health-date" className="whitespace-nowrap text-xs font-semibold text-stone-600">Xem điểm tại ngày</label>
+        <input
+          id="health-date"
+          type="date"
+          value={date}
+          min={shiftDays(-MAX_DAYS)}
+          max={shiftDays(MAX_DAYS)}
+          onChange={e => setDate(e.target.value)}
+          className="h-9 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20"
+        />
+        {date && (
+          <button type="button" onClick={() => setDate('')} className="h-9 cursor-pointer rounded-md border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-700 hover:border-[#007700] hover:text-[#007700]">
+            Hôm nay
+          </button>
+        )}
+      </div>
+  );
+
+  const actions = (
+    <Link to={editLink(id)} className={ACTION_CLASS}>
+      <Pencil size={15} aria-hidden /> Sửa sản phẩm
+    </Link>
+  );
 
   return (
     <InsightPage
       title={title}
-      breadcrumb={[
-        { label: 'Sức khoẻ sản phẩm', to: '/seller/insights/listings' },
-        { label: title },
-      ]}
-      header={ready ? <ListingHeader data={ready} /> : undefined}
+      question={QUESTION}
+      actions={actions}
+      breadcrumb={[{ label: 'Sức khoẻ sản phẩm', to: `${INSIGHTS_ROOT}/listings` }, { label: title }]}
+      header={ready?.title ? (
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {ready.thumbnail ? (
+              <img src={ready.thumbnail} alt="" className="h-14 w-14 shrink-0 rounded object-cover" />
+            ) : (
+              <span className="h-14 w-14 shrink-0 rounded bg-stone-100" aria-hidden />
+            )}
+            <div className="min-w-0">
+              <h1 className="m-0 line-clamp-2 font-jakarta text-lg font-extrabold leading-snug tracking-tight text-stone-900 md:text-xl">{ready.title}</h1>
+              <p className="m-0 mt-0.5 text-sm text-stone-600">{QUESTION}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        </header>
+      ) : undefined}
     >
       <InsightBlock state={health.state} onRetry={health.reload}>
-        {(data, meta) => {
-          const todos = data.todos.filter(t => t.type !== 'warning');
-          const warnings = data.todos.filter(t => t.type === 'warning');
-          return (
-            <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,1.75fr)_minmax(360px,1fr)]">
-              <div className="min-w-0 space-y-3">
-                <ScoreSummary score={data.score} status={data.status} headline={headline(data.score, todos)} salesPending={data.axes_missing.includes('conversion')} />
-                <SellChanceCard productId={id} />
-                <CriteriaTable
-                  axes={data.axes}
-                  missing={data.axes_missing}
-                  inputs={data.inputs}
-                  conversionDetail={data.conversion_detail}
-                  score={data.score}
-                />
-                <HealthHistory productId={id} />
-              </div>
-              <div className="min-w-0 space-y-3">
-                <TodoCard productId={id} todos={todos} warnings={warnings} score={data.score} />
-                <VariantStock productId={id} product={data.product} />
-                <HealthPreviewPanel productId={id} inputs={data.inputs} todos={todos} score={data.score} status={data.status} />
-                <SourceFooter meta={meta} />
-              </div>
-            </div>
-          );
-        }}
+        {(data, meta) => (
+          <div className="space-y-3">
+            <HealthScoreCard data={data} />
+            <HealthTodoList data={data} productId={id} />
+            <SourceFooter meta={meta} />
+          </div>
+        )}
       </InsightBlock>
-      {id && <ListingTraffic id={id} conversionDetail={ready?.conversion_detail ?? null} />}
+      <section className="space-y-3">
+        <h2 className="m-0 text-base font-bold text-stone-900">Phân tích chi tiết</h2>
+        <InsightBlock state={intel.state} onRetry={intel.reload}>
+          {data => (
+            <div className="space-y-4">
+              <SeasonPanel points={data.score_timeline}>{datePicker}</SeasonPanel>
+              <PartTabs data={data} productId={id} />
+            </div>
+          )}
+        </InsightBlock>
+      </section>
+      {id && <ListingTraffic id={id} conversionDetail={null} />}
     </InsightPage>
   );
 }

@@ -7,13 +7,13 @@ import { DIRECTION_LABEL, DIRECTION_TONE } from './intelLabels';
 const ICON = { up: ArrowUpRight, flat: Minus, down: ArrowDownRight };
 
 function Trend({ value }: { value: IntelKeyword['trend'] }) {
-  if (!value) return <span className="text-stone-400">—</span>;
+  if (!value) return <span className="text-stone-400">-</span>;
   const Icon = ICON[value];
   return <Chip tone={DIRECTION_TONE[value]} icon={<Icon size={12} aria-hidden />}>{DIRECTION_LABEL[value]}</Chip>;
 }
 
 function Lift({ value }: { value: number | null }) {
-  if (value === null) return <span className="text-stone-400">—</span>;
+  if (value === null) return <span className="text-stone-400">-</span>;
   if (value < 0) return <span className="text-xs text-amber-800">ít gặp ở nhóm bán chạy</span>;
   return <span className="tabular-nums">{decimal(value, 2)}</span>;
 }
@@ -25,9 +25,9 @@ function MaterialLine({ material }: { material: IntelMaterial }) {
   return <Note>Chưa khai chất liệu, nhóm sản phẩm này không bắt buộc.</Note>;
 }
 
-export function KeywordPanel({ keywords, material }: { keywords: IntelKeyword[]; material: IntelMaterial }) {
+export function KeywordPanel({ keywords, material, bare = false }: { keywords: IntelKeyword[]; material: IntelMaterial; bare?: boolean }) {
   return (
-    <InsightCard title="Từ khoá" info="Độ lift cho biết từ khoá đi cùng listing bán chạy của nhóm mạnh đến đâu. Số càng cao càng nên có trong tiêu đề. Từ khoá ít gặp ở nhóm bán chạy không giúp tăng điểm.">
+    <InsightCard bare={bare} title="Từ khoá" info="Độ lift cho biết từ khoá đi cùng listing bán chạy của nhóm mạnh đến đâu. Số càng cao càng nên có trong tiêu đề. Từ khoá ít gặp ở nhóm bán chạy không giúp tăng điểm.">
       <div className="space-y-3">
         <MaterialLine material={material} />
         {keywords.length === 0 ? (

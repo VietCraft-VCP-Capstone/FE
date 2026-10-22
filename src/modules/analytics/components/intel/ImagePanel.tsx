@@ -1,7 +1,7 @@
 import { decimal } from '../../format';
 import type { IntelImage } from '../../intelTypes';
 import { Chip, InsightCard, Note } from '../ui';
-import { issueText } from './AxisRadar';
+import { issueText } from './intelLabels';
 
 const STYLE_LABEL: Record<string, string> = {
   white_bg: 'Nền trắng',
@@ -24,9 +24,9 @@ function ImageTile({ img, index }: { img: IntelImage; index: number }) {
   );
 }
 
-export function ImagePanel({ images }: { images: IntelImage[] }) {
+export function ImagePanel({ images, bare = false }: { images: IntelImage[]; bare?: boolean }) {
   return (
-    <InsightCard title="Ảnh sản phẩm" info="Mỗi ảnh được kiểm tra độ nét, độ sáng, nền, chữ đè và độ khớp với tiêu đề.">
+    <InsightCard bare={bare} title="Ảnh sản phẩm" info="Mỗi ảnh được kiểm tra độ nét, độ sáng, nền, chữ đè và độ khớp với tiêu đề.">
       {images.length === 0 ? (
         <Note>Không có ảnh nào được chấm. Ảnh phải tải được và nằm trên kho ảnh của sàn.</Note>
       ) : (

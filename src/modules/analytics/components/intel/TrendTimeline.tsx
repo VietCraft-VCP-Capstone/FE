@@ -4,10 +4,10 @@ import { decimal, shortDate } from '../../format';
 import type { IntelTimelinePoint } from '../../intelTypes';
 import { DataTable, InsightCard, Note } from '../ui';
 
-export function TrendTimeline({ points }: { points: IntelTimelinePoint[] }) {
+export function TrendTimeline({ points, bare = false }: { points: IntelTimelinePoint[]; bare?: boolean }) {
   const marked = points.filter(p => p.events.length > 0);
   return (
-    <InsightCard
+    <InsightCard bare={bare}
       title="Điểm theo thời điểm"
       info="Điểm tổng thay đổi theo mùa vụ và đà tăng của từ khoá. Đường dọc đánh dấu tuần có sự kiện bán hàng."
     >
@@ -21,7 +21,7 @@ export function TrendTimeline({ points }: { points: IntelTimelinePoint[] }) {
                 <CartesianGrid stroke={CHART_INK.grid} vertical={false} />
                 <XAxis dataKey="week_start" tickFormatter={shortDate} tick={{ fill: CHART_INK.axis, fontSize: 11 }} />
                 <YAxis domain={[0, 100]} tick={{ fill: CHART_INK.axis, fontSize: 11 }} />
-                <Tooltip labelFormatter={(v: any) => `Tuần ${shortDate(String(v))}`} formatter={(v: any) => [v == null ? '—' : decimal(Number(v), 0), 'Điểm']} />
+                <Tooltip labelFormatter={(v: any) => `Tuần ${shortDate(String(v))}`} formatter={(v: any) => [v == null ? '-' : decimal(Number(v), 0), 'Điểm']} />
                 {marked.map((p, i) => (
                   <ReferenceLine key={p.week_start} x={p.week_start} stroke={SERIES.red} strokeDasharray="3 3" label={{ value: String(i + 1), fontSize: 10, fontWeight: 700, fill: CHART_INK.axis, position: 'top' }} />
                 ))}
@@ -47,8 +47,8 @@ export function TrendTimeline({ points }: { points: IntelTimelinePoint[] }) {
               <tr key={p.week_start}>
                 <td>{shortDate(p.week_start)}</td>
                 <td className="text-right font-bold tabular-nums">{decimal(p.score, 0)}</td>
-                <td className="text-right tabular-nums">{p.demand_factor === null ? '—' : `×${decimal(p.demand_factor, 2)}`}</td>
-                <td className="text-stone-600">{p.events.join(', ') || '—'}</td>
+                <td className="text-right tabular-nums">{p.demand_factor === null ? '-' : `×${decimal(p.demand_factor, 2)}`}</td>
+                <td className="text-stone-600">{p.events.join(', ') || '-'}</td>
               </tr>
             ))}
           </DataTable>

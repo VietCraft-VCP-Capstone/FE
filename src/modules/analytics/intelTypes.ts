@@ -98,21 +98,6 @@ export interface ListingIntel {
   capped_reason: 'no_images' | null;
 }
 
-export interface IntelListItem {
-  product_id: string;
-  title: string;
-  thumbnail: string | null;
-  score: number | null;
-  axes: Record<IntelAxisKey, number | null>;
-  trend_direction: IntelDirection | null;
-  computed_at: string | null;
-}
-
-export interface IntelList {
-  items: IntelListItem[];
-  total: number;
-}
-
 export interface IntelCalendar {
   events: {
     key: string;

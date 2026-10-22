@@ -49,8 +49,8 @@ function Body({ data }: { data: SellChance }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-        <span className="font-jakarta text-4xl font-extrabold leading-none tabular-nums text-stone-900">{data.score}</span>
-        <span className="pb-1 text-sm text-stone-500">/ 100</span>
+        <span className="font-jakarta text-4xl font-extrabold leading-none tabular-nums text-stone-900">{data.score}%</span>
+        <span className="pb-1 text-sm text-stone-500">khả năng có đơn so với sản phẩm cùng nhóm</span>
         <span className="mb-1 text-[13px] text-stone-700">
           Khả năng có đơn trong {m.horizon_days} ngày tới cao hơn {data.score}% sản phẩm trong {group} ({data.peer_group.size} sản phẩm).
         </span>

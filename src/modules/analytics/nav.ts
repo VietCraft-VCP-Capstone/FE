@@ -9,7 +9,6 @@ import {
   LineChart,
   ListChecks,
   Radar,
-  Sparkles,
   Tags,
   Target,
   Users,
@@ -59,7 +58,6 @@ export const INSIGHTS_NAV: InsightNavGroup[] = [
       { to: `${INSIGHTS_ROOT}/categories`, label: 'Doanh thu theo loại', icon: Activity, feature: 'F31' },
       { to: `${INSIGHTS_ROOT}/alerts`, label: 'Cảnh báo bất thường', icon: BellRing, feature: 'F30' },
       { to: `${INSIGHTS_ROOT}/listings`, label: 'Sức khoẻ sản phẩm', icon: Eye, feature: 'F27 · F28 · F29' },
-      { to: `${INSIGHTS_ROOT}/listing-intel`, label: 'Phân tích listing', icon: Sparkles, feature: 'F29 v2' },
     ],
   },
   {
