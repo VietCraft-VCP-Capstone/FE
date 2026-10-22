@@ -14,7 +14,7 @@ import { InsightBlock } from '../InsightBlock';
 import { SourceFooter } from '../SourceFooter';
 import { RADAR_COLORS, RADAR_ME_COLOR, RadarCompare } from '../charts/RadarCompare';
 import { StrategyMap } from '../charts/StrategyMap';
-import { Chip, DataTable, InsightCard, Note, type Tone } from '../ui';
+import { Chip, InsightCard, Note, type Tone } from '../ui';
 import { decimal } from '../../format';
 import type { InsightState } from '../../hooks/useInsight';
 import { categoryLabel } from '../../labels';
@@ -117,12 +117,16 @@ export function BenchmarkSection({ state, reload }: { state: InsightState<ShopCo
     <InsightBlock state={state} onRetry={reload}>
       {(data, meta) => {
         const { rows, weakest, catName } = soVoiDanDau(data);
+        const chonTheo = data.ranked_by === 'reviews'
+          ? 'Sàn chưa có đơn đã giao trong 90 ngày nên 5 shop được chọn theo số đánh giá; thứ hạng này chưa ổn định.'
+          : '5 shop là 5 shop có doanh thu 90 ngày cao nhất danh mục.';
+        const rawCua = (raw: Record<string, number | null> | undefined) => data.axes.map(a => giaTri(AXIS[a], num(raw?.[a])));
 
         return (
           <div className="space-y-5">
             <InsightCard
               title="Bạn so với 5 shop dẫn đầu"
-              description={`Danh mục chính của bạn là ${catName} (${decimal(data.shops_in_segment, 0)} shop, kể cả shop bạn). Mỗi dòng là một tiêu chí: số của bạn, trung bình 5 shop doanh thu 90 ngày cao nhất, và nhận xét. Chênh lệch nhỏ được tính là ngang nhóm.`}
+              description={`Danh mục chính của bạn là ${catName} (${decimal(data.shops_in_segment, 0)} shop, kể cả shop bạn). ${chonTheo}`}
               action={weakest?.info && (
                 <Link to={weakest.info.action.to} className="text-[13px] font-semibold text-[#007700] no-underline hover:text-[#005B00]">
                   {weakest.info.action.label}
@@ -130,6 +134,19 @@ export function BenchmarkSection({ state, reload }: { state: InsightState<ShopCo
               )}
               footer={<SourceFooter meta={meta} method={`Danh mục so sánh chọn tự động: ${data.segment_reason}.`} />}
             >
+              <RadarCompare
+                axes={rows.map(r => r.name)}
+                unitHint="điểm 0–100 giữa 6 shop"
+                series={[
+                  { name: 'Shop của bạn', values: data.me, color: RADAR_ME_COLOR, primary: true, raw: rawCua(data.me_raw) },
+                  ...data.competitors.map((c, i) => ({ name: c.shop_name, values: c.values, color: RADAR_COLORS[i % RADAR_COLORS.length], raw: rawCua(c.raw) })),
+                ]}
+              />
+              <p className="mb-0 mt-3 text-xs leading-relaxed text-stone-500">
+                Mỗi trục, shop có số tốt nhất trong 6 shop được 100 điểm, kém nhất được 0. Riêng giá trung bình: 100 là đắt nhất, không phải tốt hơn. Rê chuột lên biểu đồ để xem số thật.
+              </p>
+
+              <h3 className="mb-3 mt-5 text-[13px] font-bold text-stone-900">Đọc từng tiêu chí bằng số thật</h3>
               <ul className="m-0 list-none space-y-4 p-0">
                 {rows.map(r => (
                   <li key={r.axis} className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_auto] md:items-center md:gap-5">
@@ -159,19 +176,6 @@ export function BenchmarkSection({ state, reload }: { state: InsightState<ShopCo
                 )}
                 <Note>Giá cao hay thấp không tự nó là tốt hay xấu, nên trang chỉ ghi đắt hơn hay rẻ hơn nhóm.</Note>
               </div>
-              <details className="mt-4 rounded-md border border-stone-200 px-4 py-3">
-                <summary className="cursor-pointer text-[13px] font-semibold text-stone-700">Xem biểu đồ radar của từng shop</summary>
-                <div className="mt-3">
-                  <RadarCompare
-                    axes={rows.map(r => r.name)}
-                    unitHint="điểm 0-100 trong danh mục"
-                    series={[
-                      { name: 'Shop của bạn', values: data.me, color: RADAR_ME_COLOR, primary: true },
-                      ...data.competitors.map((c, i) => ({ name: c.shop_name, values: c.values, color: RADAR_COLORS[i % RADAR_COLORS.length] })),
-                    ]}
-                  />
-                </div>
-              </details>
             </InsightCard>
 
             {(data.strategic_groups || data.strategic_groups_reason) && (
@@ -194,25 +198,6 @@ export function BenchmarkSection({ state, reload }: { state: InsightState<ShopCo
                 )}
               </InsightCard>
             )}
-
-            <InsightCard title="5 shop đang được so" bodyClassName="px-4 py-3">
-              <DataTable
-                caption="Doanh thu 90 ngày của các shop được đưa vào so sánh"
-                head={
-                  <>
-                    <th scope="col">Shop</th>
-                    <th scope="col" className="text-right">Doanh thu 90 ngày (ước tính)</th>
-                  </>
-                }
-              >
-                {data.competitors.map(c => (
-                  <tr key={c.shop_id}>
-                    <td className="font-semibold text-stone-800">{c.shop_name}</td>
-                    <td className="whitespace-nowrap text-right tabular-nums text-stone-700">{money(c.est_revenue_90d_vnd)}</td>
-                  </tr>
-                ))}
-              </DataTable>
-            </InsightCard>
           </div>
         );
       }}

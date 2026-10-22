@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -25,6 +26,8 @@ export interface RadarSeries {
   color: string;
   /** Đường của chính shop mình: tô đậm hơn để nổi giữa nhóm đối thủ. */
   primary?: boolean;
+  /** Số thật từng trục đã viết thành chữ (vd "5 phút"), hiện kèm điểm ở tooltip. */
+  raw?: (string | null)[];
 }
 
 function isNumber(value: number | null | undefined): value is number {
@@ -37,6 +40,14 @@ export function RadarCompare({ axes, series, height = 320, unitHint }: {
   height?: number;
   unitHint?: string;
 }) {
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const shown = series.filter(s => !hidden.has(s.name));
+  const toggle = (name: string) => setHidden(prev => {
+    const next = new Set(prev);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    return next;
+  });
   const rows = axes.map((axis, i) => {
     const row: Record<string, string | number | null> = { axis };
     series.forEach(s => {
@@ -44,8 +55,8 @@ export function RadarCompare({ axes, series, height = 320, unitHint }: {
     });
     return row;
   });
-  // Trục có shop thiếu số thì không vẽ (vẽ 0 là nói sai shop đó kém nhất); bảng dưới vẫn đủ trục.
-  const complete = axes.map((_, i) => series.every(s => isNumber(s.values[i])));
+  // Trục có shop (đang hiện) thiếu số thì không vẽ (vẽ 0 là nói sai shop đó kém nhất); bảng dưới vẫn đủ trục.
+  const complete = axes.map((_, i) => shown.every(s => isNumber(s.values[i])));
   const chartRows = rows.filter((_, i) => complete[i]);
   const hiddenAxes = axes.filter((_, i) => !complete[i]);
 
@@ -65,9 +76,12 @@ export function RadarCompare({ axes, series, height = 320, unitHint }: {
               <PolarRadiusAxis domain={[0, 100]} tick={{ fill: CHART_INK.axis, fontSize: 10 }} tickCount={3} />
               <Tooltip
                 contentStyle={{ borderRadius: 10, border: '1px solid #e3e6e3', fontSize: 12 }}
-                formatter={(v: any) => decimal(Number(v))}
+                formatter={(v: any, name: any, item: any) => {
+                  const raw = series.find(s => s.name === name)?.raw?.[axes.indexOf(item?.payload?.axis)];
+                  return raw ? `${decimal(Number(v))} điểm · ${raw}` : decimal(Number(v));
+                }}
               />
-              {series.map(s => (
+              {shown.map(s => (
                 <Radar
                   key={s.name}
                   name={s.name}
@@ -86,11 +100,19 @@ export function RadarCompare({ axes, series, height = 320, unitHint }: {
         <p className="m-0 text-xs leading-relaxed text-stone-500">Chưa đủ 3 trục có dữ liệu để vẽ radar. Xem số trong bảng bên dưới.</p>
       )}
 
-      <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0 text-xs text-stone-600">
+      <ul aria-label="Bấm tên shop để ẩn hoặc hiện trên biểu đồ" className="m-0 flex list-none flex-wrap gap-x-2 gap-y-1.5 p-0 text-xs text-stone-600">
         {series.map(s => (
-          <li key={s.name} className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} aria-hidden />
-            <span className={s.primary ? 'font-bold text-stone-800' : ''}>{s.name}</span>
+          <li key={s.name}>
+            <button
+              type="button"
+              aria-pressed={!hidden.has(s.name)}
+              onClick={() => toggle(s.name)}
+              title={hidden.has(s.name) ? 'Hiện trên biểu đồ' : 'Ẩn khỏi biểu đồ'}
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border-none bg-transparent px-1.5 py-1 text-xs transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007700] motion-reduce:transition-none ${hidden.has(s.name) ? 'text-stone-400 line-through' : 'text-stone-600'}`}
+            >
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color, opacity: hidden.has(s.name) ? 0.35 : 1 }} aria-hidden />
+              <span className={s.primary ? 'font-bold text-stone-800' : ''}>{s.name}</span>
+            </button>
           </li>
         ))}
       </ul>

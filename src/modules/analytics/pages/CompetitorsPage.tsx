@@ -21,6 +21,7 @@ import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, SelectField, Takeaway
 import { MiniStat } from '../components/charts/MiniViz';
 import { BenchmarkSection, giaTri, soVoiDanDau } from '../components/competitors/BenchmarkSection';
 import { MUC_DE_DOA, TrackingSection, lyDoDeDoa, thuongDau } from '../components/competitors/TrackingSection';
+import { TopTwentyCharts } from '../components/competitors/TopTwentyCharts';
 import { NA, decimal } from '../format';
 import { categoryLabel } from '../labels';
 import { count, money } from '../../../shared/utils/format';
@@ -36,12 +37,12 @@ const PHAN: { id: string; icon: LucideIcon; title: string; question: string }[] 
 const PILL_CLASS =
   'inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-stone-700 no-underline transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none';
 
-/** Phân vị giá đọc thành lời. Phân vị tính cả chính mình nên giá cao nhất là 100%. */
+/** Phân vị giá đọc thành lời. Phân vị so với sản phẩm của shop khác; dưới 5 sản phẩm thì API trả null. */
 function priceWords(p: number | null | undefined): string | null {
   if (p === null || p === undefined || !Number.isFinite(p)) return null;
   if (p >= 90) return 'thuộc nhóm đắt nhất danh mục';
   if (p <= 10) return 'thuộc nhóm rẻ nhất danh mục';
-  return `đắt hơn ${p}% sản phẩm cùng danh mục`;
+  return `đắt hơn ${p}% sản phẩm của shop khác cùng danh mục`;
 }
 
 function ratingCell(rating: number | null, nReviews?: number) {
@@ -91,7 +92,8 @@ function MyListingsTable({ rows }: { rows: Competitors['my_listings'] }) {
             <td className="text-right tabular-nums">{count(row.est_sales_90d)}</td>
             <td>{ratingCell(row.rating_shrunk)}</td>
             <td className="whitespace-nowrap text-right tabular-nums text-stone-700">
-              {count(row.rank_in_cat)} / {count(row.n_in_cat)}
+              {/* 0 đơn thì hạng chỉ là thứ tự hoà, không nói lên gì. */}
+              {row.est_sales_90d > 0 ? <>{count(row.rank_in_cat)} / {count(row.n_in_cat)}</> : <span className="text-stone-500">Chưa có đơn</span>}
             </td>
           </tr>
         ))}
@@ -259,7 +261,7 @@ function TongQuan({ comp, trk, cmp, action }: {
       <Takeaway action={action}>
         {rival ? (
           <>Đối thủ trực tiếp nhất là <strong>{rival.shop_name}</strong>, có hàng giống {count(rival.overlap)} sản phẩm của bạn. </>
-        ) : top ? (
+        ) : top && top.est_sales_90d > 0 ? (
           <>Bán chạy nhất {catName} là <strong>{top.title}</strong> của {top.shop_name}. </>
         ) : null}
         {trk && (trk.data.tracked.length === 0 ? (
@@ -289,8 +291,12 @@ function TongQuan({ comp, trk, cmp, action }: {
           {comp && (
             <MiniStat
               label="Hạng bán chạy"
-              value={best ? `${count(best.rank_in_cat)} / ${count(best.n_in_cat)}` : 'Chưa có'}
-              hint={best ? `Sản phẩm tốt nhất của bạn trong ${catName}.` : `Bạn chưa có sản phẩm trong ${catName}.`}
+              value={best && best.est_sales_90d > 0 ? `${count(best.rank_in_cat)} / ${count(best.n_in_cat)}` : 'Chưa có'}
+              hint={!best
+                ? `Bạn chưa có sản phẩm trong ${catName}.`
+                : best.est_sales_90d > 0
+                  ? `Sản phẩm tốt nhất của bạn trong ${catName}.`
+                  : `Chưa có đơn đã giao trong 90 ngày nên chưa xếp hạng được.`}
             />
           )}
           {trk && (
@@ -467,9 +473,11 @@ export function CompetitorsPage() {
                       label="Điểm đánh giá của bạn"
                       value={data.my_position.my_avg_rating === null ? 'Chưa có' : `${decimal(data.my_position.my_avg_rating, 1)} / 5`}
                       hint={
-                        data.my_position.rating_percentile === null
-                          ? 'Chưa có khách đánh giá sản phẩm trong danh mục này.'
-                          : `Cao hơn ${data.my_position.rating_percentile}% sản phẩm cùng danh mục.`
+                        data.my_position.my_avg_rating === null
+                          ? 'Chưa có khách đánh giá sản phẩm của bạn trong danh mục này.'
+                          : data.my_position.rating_percentile === null
+                            ? 'Chưa đủ 5 sản phẩm của shop khác có đánh giá để so.'
+                            : `Cao hơn ${data.my_position.rating_percentile}% sản phẩm của shop khác cùng danh mục.`
                       }
                     />
                     <MiniStat
@@ -499,13 +507,14 @@ export function CompetitorsPage() {
 
                 <InsightCard
                   title="20 sản phẩm bán chạy nhất của shop khác"
-                  description="Xếp theo số đã bán trong 90 ngày. Bấm Theo dõi để được báo khi shop đó ra hàng mới."
+                  description="Xếp theo số đã bán trong 90 ngày, bằng nhau thì theo số đánh giá. Bấm Theo dõi để được báo khi shop đó ra hàng mới."
                   footer={<SourceFooter meta={meta} limitation={data.note} />}
                 >
                   {data.competitors.length === 0 ? (
                     <Note>Danh mục này chưa có sản phẩm nào của người bán khác để so sánh.</Note>
                   ) : (
                     <>
+                      <div className="mb-5"><TopTwentyCharts data={data} /></div>
                       <DataTable
                         caption="Hai mươi sản phẩm bán chạy nhất của shop khác trong danh mục"
                         head={
@@ -568,7 +577,13 @@ export function CompetitorsPage() {
                           </tr>
                         ))}
                       </DataTable>
-                      <div className="mt-4">
+                      <div className="mt-4 space-y-2">
+                        {data.competitors.some(c => c.est_sales_90d === 0) && (
+                          <Note tone="warn">
+                            {count(data.competitors.filter(c => c.est_sales_90d === 0).length)} sản phẩm trong bảng chưa có đơn đã giao trong 90 ngày,
+                            nên được xếp theo số đánh giá. Thứ hạng của chúng chưa nói lên ai bán chạy hơn.
+                          </Note>
+                        )}
                         <Note>
                           {canTrack
                             ? 'Theo dõi tối đa 10 shop. Hàng mới của họ hiện ở phần '

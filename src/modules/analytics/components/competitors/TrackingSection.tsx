@@ -192,10 +192,14 @@ export function TrackingSection({ state, reload, rivals }: {
                                   <span className="text-xs text-stone-500">và {alert.matched_tags.length - 3} từ khoá nữa</span>
                                 )}
                               </>
-                            ) : alert.matched_category ? (
+                            ) : alert.matched_type || alert.matched_category ? (
                               <>
-                                <span className="text-xs text-stone-500">cùng danh mục</span>
-                                <Chip tone="info">{categoryLabel(alert.matched_category, alert.category_name)}</Chip>
+                                <span className="text-xs text-stone-500">cùng loại hàng</span>
+                                <Chip tone="info">
+                                  {alert.matched_type
+                                    ? categoryLabel(alert.matched_type, alert.type_name ?? null)
+                                    : categoryLabel(alert.matched_category!, alert.category_name ?? null)}
+                                </Chip>
                               </>
                             ) : null}
                           </div>

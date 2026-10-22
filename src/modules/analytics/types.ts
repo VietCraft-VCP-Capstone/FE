@@ -254,7 +254,9 @@ export interface Competitors {
     price_vnd: number;
     est_sales_90d: number;
     rating_shrunk: number | null;
-    /** Hạng theo số bán 90 ngày trong danh mục. */
+    n_reviews?: number;
+    favorite_count?: number;
+    /** Hạng theo số bán 90 ngày trong danh mục; hoà thì theo số đánh giá (BR-188). */
     rank_in_cat: number;
     n_in_cat: number;
     /** Chỉ có ở shop thật. */
@@ -276,6 +278,7 @@ export interface Competitors {
     shop_id?: string;
   }[];
   my_position: {
+    /** Phân vị so với sản phẩm của shop khác; null khi dưới 5 sản phẩm để so. */
     price_percentile: number | null;
     rating_percentile: number | null;
     my_avg_price_vnd: number | null;
@@ -320,8 +323,11 @@ export interface ShopComparison {
     values: (number | null)[];
     /** Số thật từng trục, cùng đơn vị với `me_raw`. */
     raw?: Record<string, number | null>;
-    est_revenue_90d_vnd: number;
   }[];
+  /** Trục không có tốt/xấu (giá): 100 là đắt nhất, không phải tốt hơn. */
+  neutral_axes?: string[];
+  /** "reviews" khi sàn chưa có đơn nên 5 shop được chọn theo số đánh giá thay cho doanh thu. */
+  ranked_by?: 'revenue' | 'reviews';
   shops_in_segment: number;
   /** Chỉ có ở shop thật. */
   strategic_groups?: StrategicGroups | null;
@@ -464,6 +470,9 @@ export interface CompetitorTracking {
     product_id?: string | null;
     matched_category?: string | null;
     category_name?: string | null;
+    /** Shop thật: danh mục lá trùng với ngách của bạn. */
+    matched_type?: string | null;
+    type_name?: string | null;
     threat?: Threat | null;
   }[];
   alerts_total: number;
