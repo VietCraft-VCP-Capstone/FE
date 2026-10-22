@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Loader2, Lock, Plus, RefreshCw, Save, Trash2, Undo2 } from 'lucide-react';
+import { Loader2, Lock, Plus, RefreshCw, Save, Trash2, Undo2 } from 'lucide-react';
 import {
   CartesianGrid,
   Line,
@@ -417,17 +417,9 @@ export function AdminFinanceSimulationPage() {
         title="Tài chính & hòa vốn"
         description="Sàn thu được bao nhiêu, tốn bao nhiêu để vận hành và cần bao nhiêu đơn để không lỗ. Chỉ tính đơn đã thanh toán — cùng cách đếm với trang Thống kê thu nhập."
         actions={
-          <>
-            <Link
-              to="/admin/commission"
-              className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-admin-brand no-underline hover:underline"
-            >
-              Đổi mức hoa hồng <ArrowUpRight size={15} aria-hidden />
-            </Link>
-            <button type="button" className={BTN_SECONDARY} onClick={() => void load(Number(range))} disabled={loading}>
-              <RefreshCw size={15} className={cx(loading && 'animate-spin')} aria-hidden /> Làm mới
-            </button>
-          </>
+          <button type="button" className={BTN_SECONDARY} onClick={() => void load(Number(range))} disabled={loading}>
+            <RefreshCw size={15} className={cx(loading && 'animate-spin')} aria-hidden /> Làm mới
+          </button>
         }
       />
 
@@ -531,9 +523,9 @@ export function AdminFinanceSimulationPage() {
                 label="Mức hoa hồng"
                 hint={
                   <>
-                    Chỉ để thử. Muốn áp dụng thật hãy đổi ở{' '}
-                    <Link to="/admin/commission" className="text-admin-brand">
-                      Cấu hình lợi nhuận
+                    Chỉ để thử. Muốn áp dụng thật hãy đổi ở tab{' '}
+                    <Link to="/admin/finance?tab=hoa-hong" className="text-admin-brand">
+                      Cấu hình lợi nhuận (%)
                     </Link>
                     .
                   </>

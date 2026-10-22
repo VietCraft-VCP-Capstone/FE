@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { AdminDashboard } from './AdminDashboard';
 import { AdminModeration } from './AdminModeration';
@@ -15,6 +15,8 @@ import { authService } from '../../auth/services/authService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { AdminRefundRequests } from './AdminRefundRequests';
 import { AdminReturnsPage, PrinterReturnsPage } from '../../returns/ReturnPages';
+import { SegmentedControl } from '../components/AdminPrimitives';
+import { PAGE, cx } from '../components/adminUi';
 
 function AdminUsers() {
   const [users, setUsers] = useState<any[]>([]);
@@ -157,13 +159,40 @@ interface AdminPortalProps {
   onLogout: () => void;
 }
 
+/* ------------------------------------------------------------- Tài chính: 2 tab chung một mục menu */
+type FinanceTab = 'hoa-von' | 'hoa-hong';
+
+const FINANCE_TABS: { value: FinanceTab; label: string }[] = [
+  { value: 'hoa-von', label: 'Lãi lỗ & hòa vốn' },
+  { value: 'hoa-hong', label: 'Cấu hình lợi nhuận (%)' },
+];
+
+// Tab nằm trên URL (?tab=hoa-hong) để tải lại trang hay mở link vẫn đúng tab.
+function AdminFinance() {
+  const [params, setParams] = useSearchParams();
+  const tab: FinanceTab = params.get('tab') === 'hoa-hong' ? 'hoa-hong' : 'hoa-von';
+  return (
+    <>
+      <div className={cx(PAGE, 'mb-5')}>
+        <SegmentedControl<FinanceTab>
+          value={tab}
+          onChange={v => setParams(v === 'hoa-von' ? {} : { tab: v })}
+          options={FINANCE_TABS}
+          label="Mục tài chính"
+        />
+      </div>
+      {tab === 'hoa-von' ? <AdminFinanceSimulationPage /> : <AdminCommission />}
+    </>
+  );
+}
+
 /* ------------------------------------------------------------- Admin Router Portal */
 export function AdminPortal({ user, onLogout }: AdminPortalProps) {
   return (
     <AdminLayout user={user} onLogout={onLogout}>
       <Routes>
         <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="finance" element={<AdminFinanceSimulationPage />} />
+        <Route path="finance" element={<AdminFinance />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="moderation" element={<AdminModeration />} />
         <Route path="sellers" element={<AdminSellers />} />
@@ -177,7 +206,7 @@ export function AdminPortal({ user, onLogout }: AdminPortalProps) {
         <Route path="marketing" element={<AdminPromotionsPage />} />
         <Route path="promotions" element={<AdminPromotionsPage />} />
         <Route path="revenue" element={<AdminRevenue />} />
-        <Route path="commission" element={<AdminCommission />} />
+        <Route path="commission" element={<Navigate to="/admin/finance?tab=hoa-hong" replace />} />
         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
     </AdminLayout>
