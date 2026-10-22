@@ -32,7 +32,9 @@ export const thuongDau = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 /** Lý do AI chấm đe doạ, nói bằng lời. */
 export function lyDoDeDoa(t: Threat): string {
   if (!t.matched_title) return 'Bạn chưa bán loại hàng này';
-  const phan = [`Giống ${Math.round(t.similarity * 100)}% "${t.matched_title}" của bạn`];
+  const phan = [t.near_identical
+    ? `Gần như cùng sản phẩm với "${t.matched_title}" của bạn (giống ${Math.round(t.similarity * 100)}%)`
+    : `Giống ${Math.round(t.similarity * 100)}% "${t.matched_title}" của bạn`];
   if (t.price_gap_pct !== null && t.price_gap_pct > 0) phan.push(`rẻ hơn ${t.price_gap_pct}%`);
   return phan.join(', ');
 }

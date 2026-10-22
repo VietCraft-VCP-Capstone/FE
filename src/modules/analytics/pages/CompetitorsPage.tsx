@@ -129,7 +129,7 @@ function DirectRivalsCard({ listings, canTrack, trackedIds, pendingShop, onTrack
   return (
     <InsightCard
       title="Đối thủ trực tiếp của từng sản phẩm"
-      description="AI đọc tên, từ khoá và mô tả để tìm sản phẩm của shop khác giống sản phẩm của bạn nhất. Chỉ so trong cùng loại hàng."
+      description="AI đọc tên, từ khoá và mô tả để tìm sản phẩm của shop khác giống sản phẩm của bạn nhất. Chỉ so trong cùng loại hàng. Từ 35% giống trở lên là gần như cùng sản phẩm."
       footer={footer}
     >
       {!sp ? (
@@ -149,7 +149,10 @@ function DirectRivalsCard({ listings, canTrack, trackedIds, pendingShop, onTrack
                   <span className="text-[10px]">giống</span>
                 </span>
                 <div className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-semibold text-stone-900" title={r.title ?? ''}>{r.title}</span>
+                  <span className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="truncate text-[13px] font-semibold text-stone-900" title={r.title ?? ''}>{r.title}</span>
+                    {r.near_identical && <Chip tone="warn">Gần như cùng sản phẩm</Chip>}
+                  </span>
                   <span className="block text-xs text-stone-500">
                     <Link to={`/seller/competitors/${r.shop_id}`} className="font-medium text-stone-700 no-underline hover:text-[#007700]">{r.shop_name}</Link>
                     {' · '}{r.price_vnd === null ? NA : money(r.price_vnd)}{' · '}đã bán {count(r.est_sales_90d)}
@@ -171,7 +174,10 @@ function DirectRivalsCard({ listings, canTrack, trackedIds, pendingShop, onTrack
               </li>
             ))}
           </ul>
-          <Note>Ô màu là từ mà hai sản phẩm cùng có. Độ giống tính từ nội dung sản phẩm, không tính từ giá.</Note>
+          <Note>
+            Ô màu là từ mà hai sản phẩm cùng có. Độ giống tính từ nội dung sản phẩm, không tính từ giá. Hai mốc 15% (đưa vào danh sách) và 35%
+            (gần như cùng sản phẩm) được đo trên 17.000 tin thật của Shopee: từ 35% trở lên, 73% đúng là cùng một sản phẩm.
+          </Note>
         </div>
       )}
     </InsightCard>

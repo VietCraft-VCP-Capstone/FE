@@ -239,6 +239,8 @@ export interface DirectRival {
   est_sales_90d: number;
   /** 0–1, độ giống nội dung. */
   similarity: number;
+  /** Giống từ 0,35: trên Shopee, 73% cặp ở mức này là cùng một sản phẩm. */
+  near_identical?: boolean;
   /** Các từ hai sản phẩm cùng có, vd ["mèo", "cung hoàng đạo"]. */
   reasons: string[];
 }
@@ -450,6 +452,7 @@ export interface Threat {
   /** > 0: đối thủ rẻ hơn sản phẩm khớp của bạn bao nhiêu %. */
   price_gap_pct: number | null;
   shop_strength: number;
+  near_identical?: boolean;
 }
 
 export interface CompetitorTracking {
