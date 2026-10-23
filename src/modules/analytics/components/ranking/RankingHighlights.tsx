@@ -4,11 +4,11 @@ import { FOCUS } from '../health/healthStats';
 import { METRICS, ranked, valueOf } from './rankingMetrics';
 
 const METRIC_ICONS: Record<RankMetric, typeof ShoppingBag> = {
-  sales: ShoppingBag,
+  units: ShoppingBag,
   revenue: DollarSign,
   views: Eye,
-  conv: MessageSquare,
-  favs: Heart,
+  cart_rate: MessageSquare,
+  likes: Heart,
 };
 
 export function RankingHighlights({

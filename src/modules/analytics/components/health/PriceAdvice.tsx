@@ -1,4 +1,5 @@
 import { Tag } from 'antd';
+import { DollarSign, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { vnd } from '../../format';
 import type { HealthFactor, ListingHealth } from '../../healthTypes';
 import { PriceRange } from './PriceRange';
@@ -16,31 +17,78 @@ const SOURCE_TEXT: Record<Source, string> = {
 export function PriceAdvice({ data }: { data: ListingHealth }) {
   const row = data.breakdown.find(r => r.key === 'price');
   if (!row || (row.value === null && !row.suggestion)) return null;
+
   const { value, suggestion, reference } = row;
   const ref = reference?.price ?? null;
   const over = value !== null && ref ? Math.round((value / ref - 1) * 100) : 0;
+  const isHigh = over > 0;
 
   return (
-    <Section title="Giá so với sản phẩm tương tự">
-      <p className="m-0 text-sm text-stone-500">Giá bạn đang bán</p>
-      <div className="mt-0.5 flex flex-wrap items-center gap-2.5">
-        <span className="text-2xl font-bold tabular-nums text-stone-900">{value !== null ? vnd(value) : 'Chưa có giá'}</span>
-        {value !== null && ref && <Tag variant="filled" color={over > 0 ? 'orange' : 'green'} className="!m-0">{over > 0 ? `Cao hơn mức giữa ${over}%` : 'Không cao hơn mức giữa'}</Tag>}
+    <Section
+      title="Giá so với thị trường"
+      subtitle="Đối sánh giá niêm yết với mặt bằng sản phẩm cùng nhóm"
+      icon={<DollarSign size={18} />}
+    >
+      {/* Current price hero row */}
+      <div className="flex flex-wrap items-baseline justify-between gap-3 rounded-xl border border-stone-100 bg-stone-50/70 p-4">
+        <div>
+          <span className="text-xs text-stone-500">Giá bán hiện tại:</span>
+          <div className="mt-0.5 font-jakarta text-2xl font-extrabold tabular-nums text-stone-900">
+            {value !== null ? vnd(value) : 'Chưa có giá'}
+          </div>
+        </div>
+
+        {value !== null && ref && (
+          <div>
+            {isHigh ? (
+              <Tag color="orange" className="!m-0 inline-flex items-center gap-1 rounded-full px-3 py-1 font-jakarta text-xs font-bold">
+                <AlertCircle size={12} /> Cao hơn mức giữa {over}%
+              </Tag>
+            ) : (
+              <Tag color="green" className="!m-0 inline-flex items-center gap-1 rounded-full px-3 py-1 font-jakarta text-xs font-bold">
+                <CheckCircle2 size={12} /> Giá cạnh tranh tốt
+              </Tag>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Suggested range & median */}
       {suggestion && (
-        <p className="m-0 mt-2 text-[13px] text-stone-600">
-          Khoảng tham khảo <span className="font-semibold tabular-nums text-stone-900">{vnd(suggestion.low)} đến {vnd(suggestion.high)}</span>
-          {ref && <>, mức giữa <span className="font-semibold tabular-nums text-stone-900">{vnd(ref)}</span></>}
-        </p>
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between text-xs text-stone-600">
+            <span>Khoảng tham khảo:</span>
+            <span className="font-bold tabular-nums text-stone-900">
+              {vnd(suggestion.low)} – {vnd(suggestion.high)}
+            </span>
+          </div>
+
+          <PriceRange price={value} low={suggestion.low} mid={ref} high={suggestion.high} />
+        </div>
       )}
-      {suggestion && <PriceRange price={value} low={suggestion.low} mid={ref} high={suggestion.high} />}
-      <p className="m-0 mt-3 text-[13px] leading-relaxed text-stone-700">
-        {over > 0
-          ? `Nếu sản phẩm làm thủ công hoặc dùng chất liệu tốt, hãy nói rõ trong mô tả và ảnh để khách hiểu vì sao giá cao hơn.`
-          : 'Giá bạn không cao hơn mức giữa, phần giá đang được đủ điểm.'}
-      </p>
-      <p className="m-0 mt-2 text-xs leading-relaxed text-stone-500">
-        {reference?.source && `So với ${SOURCE_TEXT[reference.source]}. `}Giá gấp đôi mức giữa trở lên thì không được điểm giá. Khoảng tham khảo không phải giá bắt buộc.
+
+      {/* Guidance box */}
+      <div
+        className={`mt-5 rounded-xl border p-3.5 text-xs leading-relaxed ${
+          isHigh
+            ? 'border-amber-200/80 bg-amber-50/60 text-amber-900'
+            : 'border-emerald-200/80 bg-emerald-50/60 text-emerald-900'
+        }`}
+      >
+        <p className="m-0 font-medium">
+          {isHigh
+            ? 'Nếu sản phẩm làm thủ công tinh xảo hoặc dùng chất liệu cao cấp, hãy nhấn mạnh rõ trong mô tả và chụp cận cảnh để khách hàng cảm nhận được giá trị xứng đáng.'
+            : 'Giá của bạn đang nằm trong khoảng tối ưu, phần điểm giá đã đạt tiêu chuẩn tối đa.'}
+        </p>
+      </div>
+
+      {/* Reference meta footer */}
+      <p className="m-0 mt-3 flex items-center gap-1 text-[11px] text-stone-400">
+        <Info size={12} className="shrink-0" />
+        <span>
+          {reference?.source && `Ước tính từ ${SOURCE_TEXT[reference.source]}. `}
+          Khoảng tham khảo mang tính định hướng, không bắt buộc.
+        </span>
       </p>
     </Section>
   );

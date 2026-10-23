@@ -1,6 +1,7 @@
-import { Alert, Button } from 'antd';
+import { Alert, Button, Tag } from 'antd';
+import { ListChecks, AlertTriangle, Lightbulb, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { plainText } from '../../format';
+import { decimal, plainText } from '../../format';
 import type { ListingHealth } from '../../healthTypes';
 import { editLink } from '../HealthParts';
 import { Section } from './Section';
@@ -11,27 +12,68 @@ export function HealthTodoList({ data, productId }: { data: ListingHealth; produ
   const urgent = data.warnings.filter(w => w.type === 'warning');
   const hints = data.warnings.filter(w => w.type === 'info');
   const todos = visibleTodos(data);
+  const totalImpact = todos.reduce((sum, item) => sum + item.impact, 0);
 
   return (
-    <Section title="Nên làm theo thứ tự này">
+    <Section
+      title="Việc nên làm theo thứ tự ưu tiên"
+      subtitle="Thực hiện theo thứ tự tác động từ cao xuống thấp để tối ưu hiệu quả"
+      icon={<ListChecks size={18} />}
+      extra={
+        totalImpact > 0 ? (
+          <Tag color="green" className="!m-0 font-jakarta text-xs font-bold">
+            +{decimal(totalImpact, 1)} điểm tiềm năng
+          </Tag>
+        ) : undefined
+      }
+    >
+      {/* Urgent warnings */}
       {urgent.map(item => (
         <Alert
           key={item.message}
           type="error"
           showIcon
-          className="!mb-3"
-          title={<span className="font-medium">{plainText(item.message)}</span>}
-          action={item.field && <Link to={editLink(productId, item.field)}><Button size="small" danger>Sửa ngay</Button></Link>}
+          icon={<AlertTriangle size={16} />}
+          className="!mb-4 !rounded-xl !border-rose-200 !bg-rose-50/70"
+          title={
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-semibold text-rose-900">{plainText(item.message)}</span>
+              {item.field && (
+                <Link to={editLink(productId, item.field)}>
+                  <Button size="small" danger icon={<Pencil size={12} />} className="!flex !items-center !gap-1">
+                    Sửa ngay
+                  </Button>
+                </Link>
+              )}
+            </div>
+          }
         />
       ))}
-      {todos.length === 0
-        ? <p className="m-0 text-sm text-stone-500">Không còn việc nào cần làm.</p>
-        : <ol className="m-0 list-none divide-y divide-stone-100 p-0">{todos.map((item, i) => <TodoStep key={item.code ?? item.message} item={item} index={i + 1} productId={productId} />)}</ol>}
+
+      {/* Main todo list */}
+      {todos.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/60 p-6 text-center text-sm text-stone-500">
+          Tuyệt vời! Không còn việc nào cần làm. Listing đã hoàn thiện các tiêu chuẩn khuyến nghị.
+        </div>
+      ) : (
+        <ul className="m-0 list-none space-y-3 p-0">
+          {todos.map((item, i) => (
+            <TodoStep key={item.code ?? item.message} item={item} index={i + 1} productId={productId} />
+          ))}
+        </ul>
+      )}
+
+      {/* Additional hints */}
       {hints.length > 0 && (
-        <div className="mt-2 pt-3">
-          <p className="m-0 text-[13px] font-semibold text-stone-700">Gợi ý thêm</p>
-          <ul className="m-0 mt-1.5 list-disc space-y-1 pl-5 text-[13px] text-stone-600">
-            {hints.map(item => <li key={item.message}>{plainText(item.message)}</li>)}
+        <div className="mt-5 rounded-xl border border-stone-100 bg-stone-50/80 p-4">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
+            <Lightbulb size={14} className="text-amber-500" />
+            <span>Gợi ý tối ưu thêm</span>
+          </div>
+          <ul className="m-0 mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-stone-600">
+            {hints.map(item => (
+              <li key={item.message}>{plainText(item.message)}</li>
+            ))}
           </ul>
         </div>
       )}

@@ -58,8 +58,20 @@ export function PartTabs({ data, productId }: { data: ListingIntel; productId?: 
   });
 
   return (
-    <section className="border-t border-stone-200 pt-5">
-      <h2 className="m-0 text-base font-bold text-stone-900">Xem kỹ từng phần</h2>
+    <section className="rounded-2xl border border-stone-200/80 bg-white p-5 md:p-6 shadow-xs transition-shadow hover:shadow-sm">
+      <div className="mb-4 flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-[#007700] ring-1 ring-[#007700]/15">
+          <Layers size={18} />
+        </div>
+        <div>
+          <h2 className="m-0 font-jakarta text-base font-bold tracking-tight text-stone-900">
+            Xem kỹ từng phần (Chẩn đoán chuyên sâu)
+          </h2>
+          <p className="m-0 mt-0.5 text-xs text-stone-500">
+            Phân tích chi tiết chất lượng ảnh chụp, bộ từ khoá SEO, tag phân loại và năng lực cạnh tranh
+          </p>
+        </div>
+      </div>
       <Tabs activeKey={active} onChange={key => setActive(key as Part)} items={tabItems} className="mt-2" />
     </section>
   );

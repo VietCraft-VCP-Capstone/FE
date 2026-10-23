@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Calendar } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { scoreText, shortDate } from '../../format';
 import type { IntelTimelinePoint } from '../../intelTypes';
@@ -39,11 +40,25 @@ function TipBox({ active, payload }: { active?: boolean; payload?: { payload: Sc
 export function SeasonPanel({ points, children }: { points: IntelTimelinePoint[]; children?: ReactNode }) {
   const scored = points.filter((p): p is Scored => p.score !== null);
   if (scored.length < 2) {
-    return <Section title="Thời điểm bán tốt" extra={children}><p className="m-0 text-sm text-stone-500">Chưa có dữ liệu theo tuần.</p></Section>;
+    return (
+      <Section
+        title="Thời điểm bán tốt"
+        subtitle="Dự báo xu hướng mua sắm theo tuần"
+        icon={<Calendar size={18} />}
+        extra={children}
+      >
+        <p className="m-0 text-sm text-stone-500">Chưa có dữ liệu theo tuần.</p>
+      </Section>
+    );
   }
   const run = bestRun(scored);
   return (
-    <Section title="Thời điểm bán tốt" extra={children}>
+    <Section
+      title="Thời điểm bán tốt"
+      subtitle="Dự báo đà mua sắm và các dịp lễ cao điểm trong 8 tuần tới"
+      icon={<Calendar size={18} />}
+      extra={children}
+    >
       <p className="m-0 text-sm text-stone-800">{sentence(scored, run)}</p>
       <div className="mt-4 h-44">
         <ResponsiveContainer width="100%" height="100%">

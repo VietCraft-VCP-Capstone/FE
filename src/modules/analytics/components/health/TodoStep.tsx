@@ -1,4 +1,5 @@
 import { Button } from 'antd';
+import { Pencil, Lightbulb, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { decimal, plainText } from '../../format';
 import type { HealthItem } from '../../healthTypes';
@@ -7,17 +8,55 @@ import { TODO_HINT } from './todoHints';
 
 export function TodoStep({ item, index, productId }: { item: HealthItem; index: number; productId: string }) {
   const hint = item.code ? TODO_HINT[item.code] : undefined;
+
   return (
-    <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-2 py-4 sm:grid-cols-[1.75rem_minmax(0,1fr)_6rem_5.5rem] sm:items-start sm:gap-x-4">
-      <span className="flex h-6 w-6 items-center justify-center rounded border border-stone-300 text-xs font-bold tabular-nums text-stone-700">{index}</span>
-      <div className="min-w-0">
-        <p className="m-0 text-sm font-semibold text-stone-900">{plainText(item.message)}</p>
-        {hint && <p className="m-0 mt-1 max-w-[65ch] text-[13px] leading-relaxed text-stone-600">{hint}</p>}
-        {item.code === 'review' && <p className="m-0 mt-1 text-[13px] text-stone-500">Cách làm: nhắn khách đã nhận hàng mời đánh giá.</p>}
-      </div>
-      <p className="col-start-2 m-0 mt-2 text-sm font-semibold tabular-nums text-[#007700] sm:col-start-3 sm:mt-0 sm:text-right">+{decimal(item.impact, 1)} điểm</p>
-      <div className="col-start-2 mt-2 sm:col-start-4 sm:mt-0">
-        {item.code !== 'review' && <Link to={editLink(productId, item.field)}><Button size="small">Sửa ngay</Button></Link>}
+    <li className="group rounded-xl border border-stone-200/80 bg-white p-4 transition-all duration-200 hover:border-emerald-300 hover:bg-emerald-50/10 hover:shadow-xs">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        {/* Step number and details */}
+        <div className="flex items-start gap-3 min-w-0">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-jakarta text-xs font-extrabold text-[#007700] ring-1 ring-emerald-300/60 shadow-2xs">
+            {index}
+          </span>
+          <div className="min-w-0">
+            <h4 className="m-0 font-jakarta text-sm font-bold leading-snug text-stone-900 group-hover:text-[#007700] transition-colors">
+              {plainText(item.message)}
+            </h4>
+
+            {hint && (
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-stone-100 bg-stone-50/80 p-2.5 text-xs leading-relaxed text-stone-600">
+                <Lightbulb size={14} className="mt-0.5 shrink-0 text-amber-500" />
+                <span>{hint}</span>
+              </div>
+            )}
+
+            {item.code === 'review' && (
+              <div className="mt-2 flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50/80 p-2.5 text-xs leading-relaxed text-sky-800">
+                <MessageSquare size={14} className="mt-0.5 shrink-0 text-sky-600" />
+                <span>Cách làm: Gửi tin nhắn cảm ơn và mời khách đã nhận hàng để lại đánh giá 5 sao kèm hình ảnh.</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Impact points and action button */}
+        <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end">
+          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/90 bg-emerald-50 px-3 py-1 font-jakarta text-xs font-extrabold text-[#007700]">
+            +{decimal(item.impact, 1)} điểm
+          </span>
+
+          {item.code !== 'review' && (
+            <Link to={editLink(productId, item.field)}>
+              <Button
+                type="primary"
+                size="small"
+                icon={<Pencil size={12} />}
+                className="!flex !items-center !gap-1.5 shadow-2xs font-semibold"
+              >
+                Sửa ngay
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
     </li>
   );

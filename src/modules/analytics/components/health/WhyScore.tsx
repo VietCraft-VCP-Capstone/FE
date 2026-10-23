@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Collapse } from 'antd';
+import { Collapse, Tag } from 'antd';
+import { HelpCircle, Database, ShieldCheck, Info } from 'lucide-react';
 import { decimal } from '../../format';
 import type { HealthFactorKey, ListingHealth } from '../../healthTypes';
 import { PART, SOURCE } from './whyText';
@@ -12,17 +13,20 @@ function liftText(markets: ListingHealth['basis']['markets']): string | null {
   return lo === hi ? `${lo} lần` : `${lo} đến ${hi} lần`;
 }
 
-function Block({ title, children }: { title: string; children: ReactNode }) {
+function SectionCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <div>
-      <p className="m-0 text-[13px] font-semibold text-stone-900">{title}</p>
-      <div className="mt-1 text-[13px] leading-relaxed text-stone-700">{children}</div>
+    <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-4 transition-colors">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[#007700]">{icon}</span>
+        <h4 className="m-0 font-jakarta text-xs font-bold text-stone-900">{title}</h4>
+      </div>
+      <div className="text-xs leading-relaxed text-stone-600">{children}</div>
     </div>
   );
 }
 
 function Body({ data }: { data: ListingHealth }) {
-  const { weights, markets, ranges, sources } = data.basis;
+  const { weights, markets, sources } = data.basis;
   const lift = liftText(markets);
   const parts = (Object.keys(weights) as HealthFactorKey[]).sort((a, b) => weights[b] - weights[a]);
   const top = parts.slice(0, 3).map(k => PART[k].label.toLowerCase());
@@ -31,41 +35,64 @@ function Body({ data }: { data: ListingHealth }) {
   const pool = learned.reduce((sum, k) => sum + weights[k], 0);
 
   return (
-    <div className="space-y-6">
-      <Block title="1. Điểm 100 được chia cho 6 phần">
-        <p className="m-0">Phần nào ảnh hưởng nhiều đến việc bán được hàng thì được nhiều điểm hơn.</p>
-        <ul className="m-0 mt-3 grid list-none gap-x-8 gap-y-1 p-0 md:grid-cols-2 xl:grid-cols-3">
-          {parts.map(k => (
-            <li key={k} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 border-t border-stone-100 py-2.5">
-              <span className="font-semibold tabular-nums text-stone-900">{PART[k].label}<span className="block text-xs font-normal text-stone-500">tối đa {weights[k]}</span></span>
-              <span>
-                {PART[k].why}
-                {sources?.[k] && <span className="mt-0.5 block text-xs text-stone-500">{SOURCE[sources[k]!]}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Block>
-      <div className="grid gap-6 md:grid-cols-3">
-      <Block title={`2. Vì sao ${learned.map(k => `${PART[k].label.toLowerCase()} ${weights[k]}`).join(', ') || 'có các mức này'}?`}>
-        {fixed.length > 0 && <p className="m-0">{fixed.map(k => `${PART[k].label} ${weights[k]}`).join(', ')} là mức cố định, không tính từ dữ liệu.</p>}
-        {learned.length > 0 && (
-          <p className="m-0 mt-1.5">
-            {pool} điểm còn lại chia cho {learned.map(k => PART[k].label.toLowerCase()).join(', ')}. Chúng tôi xem hơn 33 nghìn sản phẩm đã bán thật, đo xem mỗi phần khác nhau bao nhiêu giữa hàng bán chạy và hàng bán chậm, rồi chia điểm theo đúng tỉ lệ đó. {PART[learned[0]].label} tạo khác biệt lớn nhất nên được nhiều điểm nhất.
-          </p>
-        )}
-        {lift && <p className="m-0 mt-1.5">Kiểm tra lại trên Tiki và Shopee: sản phẩm điểm cao bán chạy gấp {lift} so với sản phẩm điểm thấp.</p>}
-      </Block>
-      <Block title="3. Con số có chắc chắn không?">
-        <p className="m-0">
-          Đây là ước lượng, không phải con số tuyệt đối.
-          {ranges?.image && ` Ví dụ ảnh đang tối đa ${weights.image} điểm, nhưng tính lại với nhóm dữ liệu khác thì có thể từ ${ranges.image[0]} đến ${ranges.image[1]} điểm.`}
-          {` Điều gần như không đổi là thứ tự quan trọng: ${top.join(', rồi ')}. Vì vậy hãy ưu tiên sửa theo thứ tự đó.`}
+    <div className="space-y-6 pt-2">
+      {/* 6 parts breakdown cards */}
+      <div>
+        <p className="m-0 mb-3 text-xs font-semibold text-stone-700">
+          1. Thang điểm 100 được phân bổ theo mức độ ảnh hưởng đến quyết định mua hàng:
         </p>
-      </Block>
-      <Block title="4. Điểm này không phải là gì">
-        <p className="m-0">Điểm cao không có nghĩa là chắc chắn bán được, và điểm không ảnh hưởng đến thứ hạng khi khách tìm kiếm trên sàn. Điểm chỉ giúp bạn biết tin đăng còn thiếu gì.</p>
-      </Block>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {parts.map(k => (
+            <div key={k} className="flex flex-col justify-between rounded-xl border border-stone-150 bg-white p-3.5 shadow-2xs">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-jakarta text-xs font-bold text-stone-900">{PART[k].label}</span>
+                  <Tag color="green" className="!m-0 text-[11px] font-bold">
+                    Tối đa {weights[k]} điểm
+                  </Tag>
+                </div>
+                <p className="m-0 text-xs leading-relaxed text-stone-600">{PART[k].why}</p>
+              </div>
+              {sources?.[k] && (
+                <div className="mt-2.5 pt-2 border-t border-stone-100 text-[11px] text-stone-400">
+                  {SOURCE[sources[k]!]}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 3 informative cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <SectionCard title="2. Cơ sở dữ liệu thực nghiệm" icon={<Database size={15} />}>
+          {fixed.length > 0 && <p className="m-0 mb-1">{fixed.map(k => `${PART[k].label} (${weights[k]}đ)`).join(', ')} là tiêu chuẩn kỹ thuật sàn.</p>}
+          {learned.length > 0 && (
+            <p className="m-0">
+              {pool} điểm còn lại chia theo mô hình phân tích hơn <strong>33.000 sản phẩm đã bán thật</strong>, đo lường sự chênh lệch giữa sản phẩm bán chạy và bán chậm.
+            </p>
+          )}
+          {lift && <p className="m-0 mt-2 font-semibold text-[#007700]">Kiểm chứng: Sản phẩm điểm cao có tỷ lệ bán chạy gấp {lift} sản phẩm điểm thấp.</p>}
+        </SectionCard>
+
+        <SectionCard title="3. Thứ tự ưu tiên tối ưu" icon={<ShieldCheck size={15} />}>
+          <p className="m-0">
+            Trọng số có thể biến thiên nhẹ theo nhóm ngành hàng, nhưng thứ tự ưu tiên cốt lõi luôn là:{' '}
+            <strong className="text-stone-900">{top.join(' → ')}</strong>.
+          </p>
+          <p className="m-0 mt-2">
+            Hãy tập trung hoàn thiện ảnh và nội dung mô tả trước khi xét đến các yếu tố khác.
+          </p>
+        </SectionCard>
+
+        <SectionCard title="4. Mục đích sử dụng điểm" icon={<Info size={15} />}>
+          <p className="m-0">
+            Điểm sức khoẻ là công cụ chẩn đoán giúp bạn phát hiện điểm yếu để hoàn thiện tin đăng.
+          </p>
+          <p className="m-0 mt-2 text-stone-500">
+            Điểm cao không cam kết chắc chắn 100% ra đơn và không ảnh hưởng trực tiếp đến thuật toán tìm kiếm của sàn.
+          </p>
+        </SectionCard>
       </div>
     </div>
   );
@@ -73,8 +100,32 @@ function Body({ data }: { data: ListingHealth }) {
 
 export function WhyScore({ data }: { data: ListingHealth }) {
   return (
-    <div className="border-t border-stone-200">
-      <Collapse ghost expandIconPlacement="end" items={[{ key: 'why', label: <span className="font-semibold text-stone-900">Vì sao điểm được tính như vậy?</span>, children: <Body data={data} /> }]} />
+    <div className="rounded-2xl border border-stone-200/80 bg-white p-2 shadow-xs transition-shadow hover:shadow-sm">
+      <Collapse
+        ghost
+        expandIconPlacement="end"
+        items={[
+          {
+            key: 'why',
+            label: (
+              <div className="flex items-center gap-3 py-1">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
+                  <HelpCircle size={16} />
+                </div>
+                <div>
+                  <h3 className="m-0 font-jakarta text-sm font-bold text-stone-900">
+                    Vì sao điểm được tính như vậy? (Giải thích phương pháp)
+                  </h3>
+                  <p className="m-0 mt-0.5 text-xs text-stone-500 font-normal">
+                    Minh bạch cơ sở dữ liệu huấn luyện và trọng số của 6 tiêu chí chấm điểm
+                  </p>
+                </div>
+              </div>
+            ),
+            children: <Body data={data} />,
+          },
+        ]}
+      />
     </div>
   );
 }

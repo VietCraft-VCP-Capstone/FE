@@ -85,7 +85,7 @@ export function ListingsPage() {
             {(data, meta) => {
               const rows = toRows(data.items);
               return (
-                <div className="space-y-8">
+                <div className="space-y-6">
                   {data.items.length === 0 ? (
                     <Note>Shop chưa có sản phẩm nào để chấm.</Note>
                   ) : (
