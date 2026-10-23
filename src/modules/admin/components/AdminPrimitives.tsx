@@ -156,6 +156,42 @@ export function SegmentedControl<T extends string>({
   );
 }
 
+/** Tab điều hướng giữa các mục của một trang (gạch chân), khác SegmentedControl dùng để lọc. */
+export function TabNav<T extends string>({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+  label: string;
+}) {
+  return (
+    <div role="tablist" aria-label={label} className="mb-5 flex gap-1 overflow-x-auto border-b border-admin-line">
+      {options.map(opt => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.value)}
+            className={cx(
+              '-mb-px cursor-pointer whitespace-nowrap border-0 border-b-2 border-solid bg-transparent px-4 py-2.5 text-[14px] font-semibold transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-admin-brand motion-reduce:transition-none',
+              active ? 'border-admin-brand text-admin-brand' : 'border-transparent text-admin-muted hover:text-admin-ink'
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 const PILL_TONES = {
   brand: 'bg-admin-brand-050 text-admin-brand-600',
   neutral: 'bg-admin-line-soft text-[#7c8a83]',

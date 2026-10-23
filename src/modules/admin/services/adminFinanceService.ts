@@ -21,7 +21,21 @@ export interface FinanceConfig {
     monthly_costs: MonthlyCost[];
     payment_fees: PaymentFee[];
     notification_per_order: number;
+    /** Vốn dự phòng hiện có (đ), để tính sàn trụ được bao lâu khi đang lỗ. */
+    cash_reserve: number;
     updated_at?: string | null;
+}
+
+export interface TrendMonth {
+    month: string;
+    orders: number;
+    gmv: number;
+    net_revenue: number;
+    contribution: number;
+    fixed_costs: number;
+    net_profit: number;
+    /** Tháng đang chạy: chi phí cố định chỉ tính số ngày đã qua. */
+    partial: boolean;
 }
 
 export interface FinanceOverview {
@@ -31,6 +45,8 @@ export interface FinanceOverview {
     gmv: number;
     shipping: number;
     paid_amount: number;
+    /** Tổng giảm giá của đơn đã thanh toán (voucher sàn + voucher shop). */
+    discount: number;
     pnl: {
         commission: number;
         platform_voucher: number;
@@ -46,12 +62,18 @@ export interface FinanceOverview {
     payment_mix: { method: string; name: string; orders: number; amount: number; fee: number }[];
     take_rate: number | null;
     contribution_per_order: number | null;
+    /** Kỳ liền trước cùng độ dài, để so sánh tăng/giảm. */
+    previous: { orders: number; gmv: number; net_revenue: number; contribution: number; net_profit: number };
     monthly: {
         fixed_costs: number;
         orders: number;
+        net_profit: number;
         break_even_orders: number | null;
+        break_even_gmv: number | null;
         margin_of_safety: number | null;
+        runway_months: number | null;
     };
+    trend: TrendMonth[];
     baseline: {
         aov: number | null;
         shipping_per_order: number | null;
@@ -64,6 +86,9 @@ export interface FinanceOverview {
     };
 }
 
+/** Kỳ báo cáo: N ngày gần nhất, hoặc từ ngày đến ngày (YYYY-MM-DD, giờ VN). */
+export type OverviewQuery = { days: number } | { from: string; to: string };
+
 export const adminFinanceService = {
     async getConfig(): Promise<FinanceConfig> {
         const { data } = await api.get('/admin/finance/config');
@@ -75,8 +100,8 @@ export const adminFinanceService = {
         return data.data;
     },
 
-    async getOverview(days: number): Promise<FinanceOverview> {
-        const { data } = await api.get('/admin/finance/overview', { params: { days } });
+    async getOverview(query: OverviewQuery): Promise<FinanceOverview> {
+        const { data } = await api.get('/admin/finance/pnl', { params: query });
         return data.data;
     },
 };

@@ -7,7 +7,7 @@ import { AdminCategories } from './AdminCategories';
 import { AdminTags } from './AdminTags';
 import { AdminBannedKeywords } from './AdminBannedKeywords';
 import { AdminSellers } from './AdminSellers';
-import { AdminFinanceSimulationPage } from './AdminFinanceSimulationPage';
+import { AdminFinanceSimulationPage, FinanceSection } from './AdminFinanceSimulationPage';
 import { AdminCommission } from './AdminCommission';
 import { AdminRevenue } from './AdminRevenue';
 import { Search, Edit, Lock, Unlock } from 'lucide-react';
@@ -15,8 +15,8 @@ import { authService } from '../../auth/services/authService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { AdminRefundRequests } from './AdminRefundRequests';
 import { AdminReturnsPage, PrinterReturnsPage } from '../../returns/ReturnPages';
-import { SegmentedControl } from '../components/AdminPrimitives';
-import { PAGE, cx } from '../components/adminUi';
+import { PageHeader, TabNav } from '../components/AdminPrimitives';
+import { PAGE } from '../components/adminUi';
 
 function AdminUsers() {
   const [users, setUsers] = useState<any[]>([]);
@@ -159,29 +159,36 @@ interface AdminPortalProps {
   onLogout: () => void;
 }
 
-/* ------------------------------------------------------------- Tài chính: 2 tab chung một mục menu */
-type FinanceTab = 'hoa-von' | 'hoa-hong';
+/* ------------------------------------------------------------- Tài chính: 4 tab chung một mục menu */
+type FinanceTab = FinanceSection | 'hoa-hong';
 
 const FINANCE_TABS: { value: FinanceTab; label: string }[] = [
-  { value: 'hoa-von', label: 'Lãi lỗ & hòa vốn' },
+  { value: 'tong-quan', label: 'Tổng quan' },
+  { value: 'mo-phong', label: 'Mô phỏng' },
+  { value: 'chi-phi', label: 'Chi phí vận hành' },
   { value: 'hoa-hong', label: 'Cấu hình lợi nhuận (%)' },
 ];
 
-// Tab nằm trên URL (?tab=hoa-hong) để tải lại trang hay mở link vẫn đúng tab.
+// Tab nằm trên URL (?tab=...) để tải lại trang hay mở link vẫn đúng tab. 3 tab đầu dùng chung một trang
+// nên chuyển qua lại không tải lại số liệu.
 function AdminFinance() {
   const [params, setParams] = useSearchParams();
-  const tab: FinanceTab = params.get('tab') === 'hoa-hong' ? 'hoa-hong' : 'hoa-von';
+  const tab = FINANCE_TABS.find(t => t.value === params.get('tab'))?.value ?? 'tong-quan';
   return (
     <>
-      <div className={cx(PAGE, 'mb-5')}>
-        <SegmentedControl<FinanceTab>
+      <div className={PAGE}>
+        <PageHeader
+          title="Tài chính"
+          description="Sàn thu được bao nhiêu, tốn bao nhiêu để vận hành và cần bán bao nhiêu để không lỗ. Chỉ tính đơn đã thanh toán — cùng cách đếm với trang Thống kê thu nhập."
+        />
+        <TabNav<FinanceTab>
           value={tab}
-          onChange={v => setParams(v === 'hoa-von' ? {} : { tab: v })}
+          onChange={v => setParams(v === 'tong-quan' ? {} : { tab: v })}
           options={FINANCE_TABS}
           label="Mục tài chính"
         />
       </div>
-      {tab === 'hoa-von' ? <AdminFinanceSimulationPage /> : <AdminCommission />}
+      {tab === 'hoa-hong' ? <AdminCommission /> : <AdminFinanceSimulationPage section={tab} />}
     </>
   );
 }
