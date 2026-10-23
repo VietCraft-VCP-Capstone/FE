@@ -34,11 +34,13 @@ function isNumber(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-export function RadarCompare({ axes, series, height = 320, unitHint }: {
+export function RadarCompare({ axes, series, height = 320, unitHint, thuGonBang = false }: {
   axes: string[];
   series: RadarSeries[];
   height?: number;
   unitHint?: string;
+  /** Thu bảng số vào "Xem bảng điểm" khi trang đã có phần đọc số thật riêng. */
+  thuGonBang?: boolean;
 }) {
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
   const shown = series.filter(s => !hidden.has(s.name));
@@ -117,6 +119,7 @@ export function RadarCompare({ axes, series, height = 320, unitHint }: {
         ))}
       </ul>
 
+      <BangGon thuGon={thuGonBang}>
       <DataTable
         caption="Bảng số của biểu đồ radar"
         head={
@@ -139,8 +142,19 @@ export function RadarCompare({ axes, series, height = 320, unitHint }: {
           </tr>
         ))}
       </DataTable>
+      </BangGon>
     </div>
   );
+}
+
+/** Bảng số vẫn luôn có trong trang (cho trình đọc màn hình), chỉ thu vào khi trang đã có phần đọc số thật riêng. */
+function BangGon({ thuGon, children }: { thuGon: boolean; children: React.ReactNode }) {
+  return thuGon ? (
+    <details className="rounded-md border border-stone-200 px-3 py-2">
+      <summary className="cursor-pointer text-xs font-semibold text-stone-600">Xem bảng điểm 0–100</summary>
+      <div className="mt-2">{children}</div>
+    </details>
+  ) : <>{children}</>;
 }
 
 export const RADAR_COLORS = [SERIES.blue, '#8b5cf6', '#0d9488', '#b45309', '#be185d'];

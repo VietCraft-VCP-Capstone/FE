@@ -281,7 +281,8 @@ export function DataTable({ head, children, caption }: {
   caption?: string;
 }) {
   return (
-    <div className="-mx-4 overflow-x-auto">
+    // relative: chữ sr-only (định vị tuyệt đối) trong ô phải nằm trong khung cuộn, không đẩy cả trang tràn ngang.
+    <div className="relative -mx-4 overflow-x-auto">
       <table className="w-full min-w-[560px] border-collapse text-left text-[13px]">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>

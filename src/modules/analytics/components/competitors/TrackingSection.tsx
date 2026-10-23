@@ -19,6 +19,7 @@ import { fullDate } from '../../format';
 import { invalidateInsights, type InsightState } from '../../hooks/useInsight';
 import { analyticsApi, analyticsErrorMessage } from '../../services/analyticsApi';
 import { categoryLabel, tagLabel } from '../../labels';
+import { GIAI_THICH, NhanTinCay } from './giaiThich';
 import type { CompetitorTracking, Competitors, Threat } from '../../types';
 
 export const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> = {
@@ -26,8 +27,6 @@ export const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> 
   medium: { label: 'Đe doạ vừa', tone: 'warn' },
   low: { label: 'Đe doạ thấp', tone: 'neutral' },
 };
-
-export const thuongDau = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /** Lý do AI chấm đe doạ, nói bằng lời. */
 export function lyDoDeDoa(t: Threat): string {
@@ -118,7 +117,9 @@ export function TrackingSection({ state, reload, rivals }: {
               {(data.surging?.length ?? 0) > 0 && (
                 <InsightCard
                   title="Đối thủ đang tăng tốc"
-                  description="Shop bạn theo dõi có tuần vừa rồi bán vượt hẳn các tuần trước (AI so với nhịp bán 7 tuần trước đó)."
+                  info={GIAI_THICH.tangToc}
+                  action={<NhanTinCay loai="kiem" />}
+                  description="Shop bạn theo dõi có tuần vừa rồi bán vượt hẳn mức thường lệ của họ."
                   bodyClassName="px-4 py-3"
                 >
                   <ul className="m-0 list-none space-y-2 p-0">
@@ -137,9 +138,11 @@ export function TrackingSection({ state, reload, rivals }: {
 
               <InsightCard
                 title="Hàng mới của đối thủ"
+                info={GIAI_THICH.hangMoi}
+                action={live ? <NhanTinCay loai="tham" /> : undefined}
                 description={
                   live
-                    ? `Sản phẩm các shop bạn theo dõi đăng trong 7 ngày gần nhất, cùng từ khoá hoặc danh mục với shop bạn. AI xếp mức đe doạ cao lên đầu.${data.alerts_computed_at ? ` Cập nhật ${timeAgo(data.alerts_computed_at)}.` : ''}`
+                    ? `Sản phẩm các shop bạn theo dõi đăng trong 7 ngày gần nhất, cùng từ khoá hoặc cùng loại hàng với bạn. Hàng đe doạ cao xếp lên đầu.${data.alerts_computed_at ? ` Cập nhật ${timeAgo(data.alerts_computed_at)}.` : ''}`
                     : 'Sản phẩm có từ khoá trùng với nhóm hàng bạn đang bán.'
                 }
                 bodyClassName="px-4 py-3"
@@ -178,7 +181,7 @@ export function TrackingSection({ state, reload, rivals }: {
                         </td>
                         {live && (
                           <td>
-                            {alert.threat && <Chip tone={MUC_DE_DOA[alert.threat.level].tone}>{MUC_DE_DOA[alert.threat.level].label} · {count(alert.threat.score)}</Chip>}
+                            {alert.threat && <Chip tone={MUC_DE_DOA[alert.threat.level].tone}>{MUC_DE_DOA[alert.threat.level].label}</Chip>}
                           </td>
                         )}
                         <td>

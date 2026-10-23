@@ -19,6 +19,7 @@ import { decimal } from '../../format';
 import type { InsightState } from '../../hooks/useInsight';
 import { categoryLabel } from '../../labels';
 import type { ShopComparison, StrategicGroups } from '../../types';
+import { GIAI_THICH, NhanTinCay } from './giaiThich';
 
 const so = (v: number) => decimal(v, Number.isInteger(v) ? 0 : 1);
 
@@ -126,6 +127,7 @@ export function BenchmarkSection({ state, reload }: { state: InsightState<ShopCo
           <div className="space-y-5">
             <InsightCard
               title="Bạn so với 5 shop dẫn đầu"
+              info={GIAI_THICH.soSanh}
               description={`Danh mục chính của bạn là ${catName} (${decimal(data.shops_in_segment, 0)} shop, kể cả shop bạn). ${chonTheo}`}
               action={weakest?.info && (
                 <Link to={weakest.info.action.to} className="text-[13px] font-semibold text-[#007700] no-underline hover:text-[#005B00]">
@@ -137,6 +139,7 @@ export function BenchmarkSection({ state, reload }: { state: InsightState<ShopCo
               <RadarCompare
                 axes={rows.map(r => r.name)}
                 unitHint="điểm 0–100 giữa 6 shop"
+                thuGonBang
                 series={[
                   { name: 'Shop của bạn', values: data.me, color: RADAR_ME_COLOR, primary: true, raw: rawCua(data.me_raw) },
                   ...data.competitors.map((c, i) => ({ name: c.shop_name, values: c.values, color: RADAR_COLORS[i % RADAR_COLORS.length], raw: rawCua(c.raw) })),
@@ -181,6 +184,8 @@ export function BenchmarkSection({ state, reload }: { state: InsightState<ShopCo
             {(data.strategic_groups || data.strategic_groups_reason) && (
               <InsightCard
                 title="Bản đồ nhóm chiến lược"
+                info={GIAI_THICH.nhom}
+                action={<NhanTinCay loai="tham" />}
                 description={`AI chia ${count(data.shops_in_segment)} shop cùng danh mục thành các nhóm có cách bán giống nhau (giá, đánh giá, thời gian trả lời, số mẫu, doanh thu).`}
                 bodyClassName="px-4 py-3"
               >
@@ -189,7 +194,7 @@ export function BenchmarkSection({ state, reload }: { state: InsightState<ShopCo
                     <p className="m-0 text-[13px] leading-relaxed text-stone-800">{nhomKetLuan(data.strategic_groups)}</p>
                     <StrategyMap data={data.strategic_groups} />
                     {!data.strategic_groups.clear && (
-                      <Note tone="warn">Các shop chưa tách nhóm rõ (độ tách {decimal(data.strategic_groups.silhouette, 2)}), nên đọc bản đồ để tham khảo.</Note>
+                      <Note tone="warn">Các shop trong danh mục này chưa chia thành nhóm rõ ràng, nên chỉ đọc bản đồ để tham khảo.</Note>
                     )}
                     <Note>Vị trí trên bản đồ chỉ cho thấy shop nào giống shop nào. Hai trục là hướng khác nhau nhiều nhất giữa các shop, không phải thang điểm.</Note>
                   </div>

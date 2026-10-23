@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Crosshair, Radar, UserPlus, Users } from 'lucide-react';
+import { ArrowUp, CalendarCheck, Crosshair, Radar, UserPlus, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { invalidateInsights, useInsight, type InsightState } from '../hooks/useInsight';
 import { analyticsApi, analyticsErrorMessage } from '../services/analyticsApi';
@@ -17,11 +17,12 @@ import type { CompetitorBrief, CompetitorTracking, Competitors, ShopComparison }
 import { InsightPage } from '../components/InsightPage';
 import { InsightBlock, InsightStatusView } from '../components/InsightBlock';
 import { SourceFooter } from '../components/SourceFooter';
-import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, SelectField, Takeaway } from '../components/ui';
+import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, SelectField } from '../components/ui';
 import { MiniStat } from '../components/charts/MiniViz';
 import { BenchmarkSection, giaTri, soVoiDanDau } from '../components/competitors/BenchmarkSection';
-import { MUC_DE_DOA, TrackingSection, lyDoDeDoa, thuongDau } from '../components/competitors/TrackingSection';
+import { MUC_DE_DOA, TrackingSection } from '../components/competitors/TrackingSection';
 import { TopTwentyCharts } from '../components/competitors/TopTwentyCharts';
+import { GIAI_THICH, NhanTinCay } from '../components/competitors/giaiThich';
 import { NA, decimal } from '../format';
 import { categoryLabel } from '../labels';
 import { count, money } from '../../../shared/utils/format';
@@ -34,8 +35,87 @@ const PHAN: { id: string; icon: LucideIcon; title: string; question: string }[] 
   { id: 'manh-yeu', icon: Crosshair, title: 'Điểm mạnh & điểm yếu', question: 'So với 5 shop dẫn đầu cùng danh mục, tôi hơn và kém ở đâu?' },
 ];
 
+/** Thanh điều hướng: đầu trang + 3 phần. */
+const MUC: { id: string; icon: LucideIcon; title: string }[] = [
+  { id: 'tong-quan', icon: CalendarCheck, title: 'Tổng quan' },
+  ...PHAN.map(({ id, icon, title }) => ({ id, icon, title })),
+];
+
 const PILL_CLASS =
-  'inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-stone-700 no-underline transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none';
+  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-stone-700 no-underline transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none';
+const PILL_DANG_XEM = '!border-[#007700] !bg-[#007700] !text-white';
+
+const rutGon = (s: string | null | undefined, n = 48) => {
+  const t = s ?? '';
+  return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t;
+};
+
+/** Cuộn đúng khung nội dung của khu người bán, không kéo cả cửa sổ (mất thanh tiêu đề). Chừa chỗ cho thanh dính. */
+function cuonToi(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const khung = el.closest('.seller-content');
+  if (!(khung instanceof HTMLElement)) {
+    el.scrollIntoView({ block: 'start' });
+    return;
+  }
+  const top = id === MUC[0].id ? 0 : el.getBoundingClientRect().top - khung.getBoundingClientRect().top + khung.scrollTop - 64;
+  const muot = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  khung.scrollTo({ top, behavior: muot ? 'smooth' : 'auto' });
+}
+
+/** Mọi link #phần trong trang đi qua cuonToi; vẫn giữ href để mở tab mới hoặc chép link được. */
+function bamNeo(e: React.MouseEvent) {
+  const a = (e.target as HTMLElement).closest('a[href^="#"]');
+  const id = a?.getAttribute('href')?.slice(1);
+  if (!id || !document.getElementById(id)) return;
+  e.preventDefault();
+  window.history.replaceState(window.history.state, '', `#${id}`);
+  cuonToi(id);
+}
+
+/** Thanh 4 nút dính trên đầu khi cuộn; nút của phần đang xem được tô xanh. */
+function ThanhDieuHuong({ dang }: { dang: string }) {
+  return (
+    // -top-6 bù 24px đệm trên của khung cuộn, để thanh nằm sát mép, không lộ nội dung phía trên.
+    <nav aria-label="Các phần trong trang" className="sticky -top-6 z-20 -mx-2 border-b border-stone-200 bg-[#f8fafb] px-2 py-2">
+      <div className="flex items-center gap-2">
+        <ul className="m-0 flex min-w-0 flex-1 list-none gap-2 overflow-x-auto p-0">
+          {MUC.map(m => (
+            <li key={m.id} className="shrink-0">
+              <a href={`#${m.id}`} aria-current={dang === m.id ? 'location' : undefined} className={`${PILL_CLASS} ${dang === m.id ? PILL_DANG_XEM : ''}`}>
+                <m.icon size={14} aria-hidden /> {m.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+        {dang !== 'tong-quan' && (
+          <a href="#tong-quan" className={`${PILL_CLASS} shrink-0`} title="Lên đầu trang" aria-label="Lên đầu trang">
+            <ArrowUp size={14} aria-hidden />
+          </a>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+/** Theo dõi phần nào đang nằm ở khoảng 15–30% chiều cao khung cuộn, để tô sáng nút tương ứng. */
+function usePhanDangXem() {
+  const [dang, setDang] = useState(MUC[0].id);
+  useEffect(() => {
+    const els = MUC.map(m => document.getElementById(m.id)).filter((e): e is HTMLElement => e !== null);
+    if (!els.length || typeof IntersectionObserver === 'undefined') return;
+    const thay = new Map<string, boolean>();
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => thay.set(e.target.id, e.isIntersecting));
+      const dau = MUC.find(m => thay.get(m.id));
+      if (dau) setDang(dau.id);
+    }, { root: els[0].closest('.seller-content'), rootMargin: '-15% 0px -70% 0px' });
+    els.forEach(e => io.observe(e));
+    return () => io.disconnect();
+  }, []);
+  return dang;
+}
 
 /** Phân vị giá đọc thành lời. Phân vị so với sản phẩm của shop khác; dưới 5 sản phẩm thì API trả null. */
 function priceWords(p: number | null | undefined): string | null {
@@ -129,7 +209,9 @@ function DirectRivalsCard({ listings, canTrack, trackedIds, pendingShop, onTrack
   return (
     <InsightCard
       title="Đối thủ trực tiếp của từng sản phẩm"
-      description="AI đọc tên, từ khoá và mô tả để tìm sản phẩm của shop khác giống sản phẩm của bạn nhất. Chỉ so trong cùng loại hàng. Từ 35% giống trở lên là gần như cùng sản phẩm."
+      info={GIAI_THICH.doiThuTrucTiep}
+      action={<NhanTinCay loai="kiem" />}
+      description="Sản phẩm của shop khác giống sản phẩm của bạn nhất, trong cùng loại hàng. Từ 35% giống trở lên là gần như cùng sản phẩm."
       footer={footer}
     >
       {!sp ? (
@@ -174,10 +256,7 @@ function DirectRivalsCard({ listings, canTrack, trackedIds, pendingShop, onTrack
               </li>
             ))}
           </ul>
-          <Note>
-            Ô màu là từ mà hai sản phẩm cùng có. Độ giống tính từ nội dung sản phẩm, không tính từ giá. Hai mốc 15% (đưa vào danh sách) và 35%
-            (gần như cùng sản phẩm) được đo trên 17.000 tin thật của Shopee: từ 35% trở lên, 73% đúng là cùng một sản phẩm.
-          </Note>
+          <Note>Ô màu là các từ hai sản phẩm cùng có, tức lý do AI chọn. Độ giống chỉ tính từ nội dung, không tính từ giá.</Note>
         </div>
       )}
     </InsightCard>
@@ -190,7 +269,8 @@ function WeeklyPlanCard({ state, reload }: { state: InsightState<CompetitorBrief
   return (
     <InsightCard
       title="Kế hoạch tuần này"
-      description="AI gom điều đáng chú ý nhất về đối thủ (trang này, So sánh giá, Gợi ý từ khoá) thành việc nên làm. Việc quan trọng nhất ở trên cùng."
+      info={GIAI_THICH.keHoach}
+      description="Những việc nên làm tuần này, việc gấp nhất ở trên cùng. Bấm Xem để tới đúng chỗ cần sửa."
       footer={state.kind === 'ready' && (
         <span className="text-xs text-stone-500">
           {state.data.source === 'llm'
@@ -230,7 +310,7 @@ function PageSection({ id, icon: Icon, title, question, action, children }: (typ
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={`${id}-tieu-de`} className="scroll-mt-4 space-y-4 border-t border-stone-200 pt-6">
+    <section id={id} aria-labelledby={`${id}-tieu-de`} className="scroll-mt-16 space-y-4 border-t border-stone-200 pt-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 id={`${id}-tieu-de`} className="m-0 flex items-center gap-2 text-base font-bold text-stone-900">
@@ -262,35 +342,66 @@ function TongQuan({ comp, trk, cmp, action }: {
   const nhom = cmp?.strategic_groups;
   const tenNhom = (id: number | null) => nhom?.groups.find(g => g.id === id)?.label;
 
+  // Mỗi phần một dòng ngắn để đọc lướt; chi tiết nằm ở phần tương ứng bên dưới.
+  const dong: { id: string; icon: LucideIcon; ten: string; cau: React.ReactNode }[] = [];
+  if (comp) {
+    dong.push({ ...PHAN[0], ten: PHAN[0].title, cau: rival ? (
+      <>Đối thủ trực tiếp nhất: <strong>{rival.shop_name}</strong>, có hàng giống {count(rival.overlap)} sản phẩm của bạn.</>
+    ) : top && top.est_sales_90d > 0 ? (
+      <>Bán chạy nhất {catName}: <strong title={top.title}>{rutGon(top.title)}</strong> của {top.shop_name}.</>
+    ) : (
+      <>Chưa tìm thấy đối thủ trực tiếp, và {catName} chưa có đơn đã giao để biết ai bán chạy.</>
+    ) });
+  }
+  if (trk) {
+    dong.push({ ...PHAN[1], ten: PHAN[1].title, cau: trk.data.tracked.length === 0 ? (
+      <>Bạn chưa theo dõi shop nào. Theo dõi để được báo khi họ ra hàng giống bạn.</>
+    ) : latest?.threat && latest.threat.level !== 'low' ? (
+      // Chỉ gọi tên khi đe doạ cao hoặc vừa; đe doạ thấp mà nêu tên là làm người bán lo thừa.
+      <>Hàng mới đáng chú ý: <strong title={latest.title ?? ''}>{rutGon(latest.title || latest.listing_id)}</strong> của {latest.shop_name || latest.shop_id} ({MUC_DE_DOA[latest.threat.level].label.toLowerCase()}).</>
+    ) : latest ? (
+      <>{count(trk.data.alerts_total)} hàng mới cùng nhóm hàng với bạn, chưa có gì đáng lo.</>
+    ) : (
+      <>{count(trk.data.tracked.length)} shop bạn theo dõi chưa ra hàng mới giống bạn.</>
+    ) });
+  }
+  if (ss) {
+    dong.push({ ...PHAN[2], ten: PHAN[2].title, cau: ss.weakest ? (
+      <>Nên cải thiện: <strong>{ss.weakest.name.toLowerCase()}</strong> (bạn {giaTri(ss.weakest.info, ss.weakest.mine)}, nhóm dẫn đầu {giaTri(ss.weakest.info, ss.weakest.group)}).
+        {ss.strongest && <> Mạnh nhất: {ss.strongest.name.toLowerCase()}.</>}</>
+    ) : ss.strongest ? (
+      <>Mạnh nhất: <strong>{ss.strongest.name.toLowerCase()}</strong> (bạn {giaTri(ss.strongest.info, ss.strongest.mine)}, nhóm dẫn đầu {giaTri(ss.strongest.info, ss.strongest.group)}). Không có tiêu chí nào kém hẳn.</>
+    ) : (
+      <>Chưa đủ số liệu để biết bạn hơn hay kém 5 shop dẫn đầu.</>
+    ) });
+  }
+  const itDon = comp && comp.competitors.every(c => c.est_sales_90d === 0) && comp.my_listings.every(l => l.est_sales_90d === 0);
+
   return (
     <>
-      <Takeaway action={action}>
-        {rival ? (
-          <>Đối thủ trực tiếp nhất là <strong>{rival.shop_name}</strong>, có hàng giống {count(rival.overlap)} sản phẩm của bạn. </>
-        ) : top && top.est_sales_90d > 0 ? (
-          <>Bán chạy nhất {catName} là <strong>{top.title}</strong> của {top.shop_name}. </>
-        ) : null}
-        {trk && (trk.data.tracked.length === 0 ? (
-          <>Bạn chưa theo dõi đối thủ nào. </>
-        ) : latest ? (
-          // Chỉ gọi tên khi đe doạ cao hoặc vừa; đe doạ thấp mà nêu tên là làm người bán lo thừa.
-          latest.threat && latest.threat.level !== 'low' ? (
-            <>Hàng mới đáng chú ý nhất: <strong>{latest.title || latest.listing_id}</strong> của {latest.shop_name || latest.shop_id} ({MUC_DE_DOA[latest.threat.level].label.toLowerCase()}: {thuongDau(lyDoDeDoa(latest.threat))}). </>
-          ) : latest.threat ? (
-            <>Đối thủ ra {count(trk.data.alerts_total)} sản phẩm mới cùng nhóm hàng, chưa có sản phẩm nào đe doạ đáng kể. </>
-          ) : (
-            <>Hàng mới nhất của đối thủ: <strong>{latest.title || latest.listing_id}</strong> của {latest.shop_name || latest.shop_id}. </>
-          )
-        ) : (
-          <>Các shop bạn theo dõi chưa ra hàng mới cùng nhóm hàng với bạn. </>
-        ))}
-        {ss?.strongest && (
-          <>Điểm mạnh nhất: <strong>{ss.strongest.name}</strong> (bạn {giaTri(ss.strongest.info, ss.strongest.mine)}, nhóm dẫn đầu {giaTri(ss.strongest.info, ss.strongest.group)}). </>
-        )}
-        {ss?.weakest && (
-          <>Cần cải thiện nhất: <strong>{ss.weakest.name}</strong> (bạn {giaTri(ss.weakest.info, ss.weakest.mine)}, nhóm dẫn đầu {giaTri(ss.weakest.info, ss.weakest.group)}).</>
-        )}
-      </Takeaway>
+      <section aria-label="Điểm chính" className="rounded-md border border-[#007700]/20 bg-[#EAF0E2] px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-[11.5px] font-bold uppercase tracking-wide text-[#005B00]">Điểm chính</span>
+          {action}
+        </div>
+        <ul className="m-0 mt-2 list-none space-y-2 p-0">
+          {dong.map(d => (
+            <li key={d.id} className="flex items-start gap-2.5 text-[14px] leading-relaxed text-stone-900">
+              <d.icon size={16} className="mt-1 shrink-0 text-[#007700]" aria-hidden />
+              <span className="min-w-0 flex-1">{d.cau}</span>
+              <a href={`#${d.id}`} className="shrink-0 text-[13px] font-semibold text-[#007700] no-underline hover:underline">
+                Xem<span className="sr-only"> phần {d.ten}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+      {itDon && (
+        <p role="note" className="m-0 rounded-md border border-sky-100 bg-sky-50 px-4 py-2.5 text-[13px] leading-relaxed text-sky-900">
+          Sàn mới có rất ít đơn đã giao, nên phần xếp hạng bán chạy và doanh số đang trống. Các phần so nội dung (đối thủ trực tiếp,
+          hàng mới của đối thủ) vẫn dùng được; số liệu tự cập nhật khi có đơn.
+        </p>
+      )}
 
       <InsightCard bodyClassName="px-4 py-3">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -341,6 +452,8 @@ export function CompetitorsPage() {
   const tracking = useInsight<CompetitorTracking>('/competitor-tracking');
   const comparison = useInsight<ShopComparison>('/shop-comparison');
   const brief = useInsight<CompetitorBrief>('/competitor-brief');
+  const dangXem = usePhanDangXem();
+  const [xemHet20, setXemHet20] = useState(false);
 
   // Tới từ đường dẫn có #phần: cuộn tới khi mọi phần đã tải xong, để nội dung phía trên không đẩy lệch.
   const { hash, key } = useLocation();
@@ -349,7 +462,7 @@ export function CompetitorsPage() {
   useEffect(() => {
     if (!hash || !daTai || daCuon.current === key) return;
     daCuon.current = key;
-    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+    cuonToi(hash.slice(1));
   }, [hash, key, daTai]);
 
   // Service tự chọn danh mục chính khi không truyền categoryId; nhớ lại để ô chọn không trống.
@@ -408,16 +521,10 @@ export function CompetitorsPage() {
 
   return (
     <InsightPage title="Phân tích đối thủ" question="Ai đang bán giống tôi, họ vừa ra hàng gì, và tôi hơn kém họ ở đâu?">
-      <nav aria-label="Các phần trong trang">
-        <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
-          {PHAN.map(p => (
-            <li key={p.id}>
-              <a href={`#${p.id}`} className={PILL_CLASS}><p.icon size={14} aria-hidden /> {p.title}</a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <div className="space-y-4" onClickCapture={bamNeo}>
+      <ThanhDieuHuong dang={dangXem} />
 
+      <div id="tong-quan" className="scroll-mt-16 space-y-4">
       <WeeklyPlanCard state={brief.state} reload={brief.reload} />
 
       <TongQuan
@@ -445,6 +552,7 @@ export function CompetitorsPage() {
           {notice.text}
         </p>
       )}
+      </div>
 
       <PageSection
         {...PHAN[0]}
@@ -513,6 +621,8 @@ export function CompetitorsPage() {
 
                 <InsightCard
                   title="20 sản phẩm bán chạy nhất của shop khác"
+                  info={GIAI_THICH.banChay}
+                  action={<NhanTinCay loai="kiem" />}
                   description="Xếp theo số đã bán trong 90 ngày, bằng nhau thì theo số đánh giá. Bấm Theo dõi để được báo khi shop đó ra hàng mới."
                   footer={<SourceFooter meta={meta} limitation={data.note} />}
                 >
@@ -536,7 +646,7 @@ export function CompetitorsPage() {
                           </>
                         }
                       >
-                        {data.competitors.map(row => (
+                        {(xemHet20 ? data.competitors : data.competitors.slice(0, 5)).map(row => (
                           <tr key={row.listing_id}>
                             <td className="text-right font-jakarta font-bold tabular-nums text-stone-900">{row.rank}</td>
                             <td>
@@ -583,6 +693,16 @@ export function CompetitorsPage() {
                           </tr>
                         ))}
                       </DataTable>
+                      {data.competitors.length > 5 && (
+                        <button
+                          type="button"
+                          onClick={() => setXemHet20(v => !v)}
+                          aria-expanded={xemHet20}
+                          className="mt-3 cursor-pointer rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
+                        >
+                          {xemHet20 ? 'Thu gọn còn 5 sản phẩm' : `Xem cả ${count(data.competitors.length)} sản phẩm`}
+                        </button>
+                      )}
                       <div className="mt-4 space-y-2">
                         {data.competitors.some(c => c.est_sales_90d === 0) && (
                           <Note tone="warn">
@@ -634,6 +754,7 @@ export function CompetitorsPage() {
       <PageSection {...PHAN[2]}>
         <BenchmarkSection state={comparison.state} reload={comparison.reload} />
       </PageSection>
+      </div>
     </InsightPage>
   );
 }
