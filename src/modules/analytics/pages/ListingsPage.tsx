@@ -1,6 +1,6 @@
 import { Tabs } from 'antd';
 import { useSearchParams } from 'react-router-dom';
-import { SellerAntd } from '../../seller/components/SellerAntd';
+import { HealthTheme } from '../components/health/HealthTheme';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { commonIssues } from '../components/health/commonIssues';
@@ -10,12 +10,12 @@ import { NextEventBanner } from '../components/intel/NextEventBanner';
 import { ShopOverview } from '../components/intel/ShopOverview';
 import { RankingView } from '../components/ranking/RankingView';
 import { SourceFooter } from '../components/SourceFooter';
-import { InsightCard, Note } from '../components/ui';
+import { Note } from '../components/ui';
 import { useInsight, type InsightState } from '../hooks/useInsight';
 import type { HealthRow, ListingHealthList } from '../healthTypes';
 
 function summary(state: InsightState<ListingHealthList>): string {
-  if (state.kind !== 'ready' || state.data.items.length === 0) return 'Chấm từng sản phẩm 0–100 theo 5 yếu tố: ảnh, mô tả, tag, đánh giá và giá. Từ 80 là Tốt, 50–79 là Cần cải thiện, dưới 50 là Kém.';
+  if (state.kind !== 'ready' || state.data.items.length === 0) return 'Chấm từng sản phẩm 0 đến 100 theo 6 yếu tố: ảnh, mô tả, tag, chất liệu, đánh giá của người mua và giá. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Kém.';
   const scored = state.data.items.filter(i => i.score !== null);
   if (scored.length === 0) return 'Chưa chấm được sản phẩm nào, thử tải lại sau.';
   const weak = scored.filter(i => healthTier(i.score).tone !== 'good').length;
@@ -30,8 +30,8 @@ const ABOUT = (
   <>
     <strong>Sức khoẻ sản phẩm cho biết sản phẩm nào đăng chưa tốt và nên sửa gì trước.</strong>
     <ul className="m-0 mt-1.5 list-disc space-y-1 pl-4">
-      <li>Mỗi sản phẩm có điểm 0–100 từ 5 yếu tố: ảnh, mô tả, tag, đánh giá của người mua và giá. Từ 80 là Tốt, 50–79 là Cần cải thiện, dưới 50 là Kém.</li>
-      <li>Yếu tố thiếu dữ liệu được 0 điểm, và các yếu tố còn lại không được chia lại trọng số.</li>
+      <li>Mỗi sản phẩm có điểm 0 đến 100 từ 6 yếu tố: ảnh, mô tả, tag, chất liệu, đánh giá của người mua và giá. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Kém.</li>
+      <li>Yếu tố chưa có dữ liệu được 0 điểm; điểm tối đa của các yếu tố khác giữ nguyên.</li>
       <li>Bấm tên sản phẩm để xem việc cần làm và phân tích chi tiết.</li>
       <li>Tab Bảng xếp hạng: sản phẩm nào bán chạy, được xem, được thích nhiều.</li>
     </ul>
@@ -46,6 +46,8 @@ function toRows(items: ListingHealthList['items']): HealthRow[] {
     thumbnail: i.thumbnail,
     score: i.score,
     top_todo: i.todos[0]?.message ?? i.warnings[0]?.message ?? null,
+    top_impact: i.todos[0]?.impact ?? null,
+    top_field: i.todos[0]?.field ?? i.warnings[0]?.field ?? null,
   }));
 }
 
@@ -64,7 +66,7 @@ export function ListingsPage() {
   };
 
   return (
-    <SellerAntd>
+    <HealthTheme>
       <InsightPage
         title="Sức khoẻ sản phẩm"
         info={ABOUT}
@@ -83,21 +85,24 @@ export function ListingsPage() {
             {(data, meta) => {
               const rows = toRows(data.items);
               return (
-                <div className="space-y-4">
-                  <ShopOverview items={rows} issues={commonIssues(data.items)} onFilter={t => setParam('muc', t)}>
-                    <NextEventBanner />
-                  </ShopOverview>
-                  <InsightCard footer={<SourceFooter meta={meta} />} bodyClassName="p-0">
-                    {data.items.length === 0
-                      ? <div className="p-4"><Note>Shop chưa có sản phẩm nào để chấm.</Note></div>
-                      : <HealthList items={rows} filter={filter} onFilter={t => setParam('muc', t)} />}
-                  </InsightCard>
+                <div className="space-y-8">
+                  {data.items.length === 0 ? (
+                    <Note>Shop chưa có sản phẩm nào để chấm.</Note>
+                  ) : (
+                    <>
+                      <ShopOverview items={rows} issues={commonIssues(data.items)} onFilter={t => setParam('muc', t)}>
+                        <NextEventBanner />
+                      </ShopOverview>
+                      <HealthList items={rows} filter={filter} onFilter={t => setParam('muc', t)} />
+                    </>
+                  )}
+                  <SourceFooter meta={meta} />
                 </div>
               );
             }}
           </InsightBlock>
         )}
       </InsightPage>
-    </SellerAntd>
+    </HealthTheme>
   );
 }

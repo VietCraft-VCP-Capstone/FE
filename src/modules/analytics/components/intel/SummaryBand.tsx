@@ -1,4 +1,4 @@
-import { decimal } from '../../format';
+import { decimal, scoreText } from '../../format';
 import type { ListingIntel } from '../../intelTypes';
 import { AXIS_KEYS, AXIS_SIMPLE, GROUP_LABEL, healthTier, TIER_COLOR } from './intelLabels';
 import { ScoreRing } from './ScoreRing';
@@ -20,7 +20,7 @@ function PartRow({ label, score }: { label: string; score: number | null }) {
         {score !== null && <span className="block h-full rounded-full bg-stone-300" style={{ width: `${Math.max(4, score)}%` }} />}
       </dd>
       <dd className="m-0 text-right text-[13px] font-semibold tabular-nums" style={{ color: TIER_COLOR[tier.tone] }}>
-        {score === null ? '-' : Math.round(score)}
+        {scoreText(score)}
       </dd>
     </div>
   );

@@ -13,10 +13,10 @@ export function HowScored({ data }: { data: ListingIntel }) {
       </summary>
       <div className="mt-2 grid gap-5 rounded-xl border border-stone-200 bg-white px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
         <ul className="m-0 list-disc space-y-1.5 pl-5 text-[13px] leading-relaxed text-stone-700">
-          <li>Điểm do mô hình AI ước tính: sản phẩm của bạn tốt hơn bao nhiêu phần trăm sản phẩm nhóm {group} trong dữ liệu tham chiếu.</li>
+          <li>Cách chấm này ước tính điểm: sản phẩm của bạn tốt hơn bao nhiêu phần trăm sản phẩm nhóm {group} trong dữ liệu tham chiếu.</li>
           <li>Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Kém.</li>
           {data.base !== null && data.demand_factor !== null && (
-            <li>Điểm gốc {decimal(data.base, 0)} nhân hệ số nhu cầu ×{decimal(data.demand_factor, 2)} của ngày đang xem, nên điểm đổi theo mùa.</li>
+            <li>Điểm chuẩn {decimal(data.base, 0)} nhân với mức độ quan tâm theo mùa ×{decimal(data.demand_factor, 2)} của ngày đang xem, nên điểm có thể thay đổi theo mùa vụ.</li>
           )}
           <li>Điểm từng phần là chỉ báo riêng, không cộng lại thành điểm tổng. Đánh giá của khách nằm trong việc cần làm, không cộng vào điểm.</li>
           <li>Điểm để bạn tự cải thiện, không ảnh hưởng thứ hạng tìm kiếm và không phải cam kết bán được.</li>

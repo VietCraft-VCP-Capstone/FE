@@ -1,11 +1,18 @@
 import { useRef } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Col, Row } from 'antd';
 import { Pencil } from 'lucide-react';
 import { editLink } from '../components/HealthParts';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
+import { AchievedList } from '../components/health/AchievedList';
 import { HealthScoreCard } from '../components/health/HealthScoreCard';
+import { HealthTheme } from '../components/health/HealthTheme';
+import { HealthSummary } from '../components/health/HealthSummary';
 import { HealthTodoList } from '../components/health/HealthTodoList';
+import { PriceAdvice } from '../components/health/PriceAdvice';
+import { Thumb } from '../components/health/Thumb';
+import { WhyScore } from '../components/health/WhyScore';
 import { PartTabs } from '../components/intel/PartTabs';
 import { SeasonPanel } from '../components/intel/SeasonPanel';
 import { ListingTraffic } from '../components/ListingTraffic';
@@ -45,7 +52,7 @@ function ListingDetail({ id }: { id: string }) {
 
   const datePicker = (
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="health-date" className="whitespace-nowrap text-xs font-semibold text-stone-600">Xem điểm tại ngày</label>
+        <label htmlFor="health-date" className="whitespace-nowrap text-xs text-stone-600">Xem từ ngày</label>
         <input
           id="health-date"
           type="date"
@@ -70,22 +77,19 @@ function ListingDetail({ id }: { id: string }) {
   );
 
   return (
+    <HealthTheme>
     <InsightPage
       title={title}
       question={QUESTION}
       actions={actions}
       breadcrumb={[{ label: 'Sức khoẻ sản phẩm', to: `${INSIGHTS_ROOT}/listings` }, { label: title }]}
       header={ready?.title ? (
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            {ready.thumbnail ? (
-              <img src={ready.thumbnail} alt="" className="h-14 w-14 shrink-0 rounded object-cover" />
-            ) : (
-              <span className="h-14 w-14 shrink-0 rounded bg-stone-100" aria-hidden />
-            )}
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 pb-5">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <Thumb src={ready.thumbnail} size={56} />
             <div className="min-w-0">
               <h1 className="m-0 line-clamp-2 font-jakarta text-lg font-extrabold leading-snug tracking-tight text-stone-900 md:text-xl">{ready.title}</h1>
-              <p className="m-0 mt-0.5 text-sm text-stone-600">{QUESTION}</p>
+              <p className="m-0 mt-0.5 text-xs text-stone-500">{QUESTION}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">{actions}</div>
@@ -94,25 +98,33 @@ function ListingDetail({ id }: { id: string }) {
     >
       <InsightBlock state={health.state} onRetry={health.reload}>
         {(data, meta) => (
-          <div className="space-y-3">
-            <HealthScoreCard data={data} />
-            <HealthTodoList data={data} productId={id} />
+          <div className="space-y-8 pt-2">
+            <HealthSummary data={data} />
+            <Row gutter={[48, 32]}>
+              <Col xs={24} lg={15} className="space-y-10">
+                <HealthTodoList data={data} productId={id} />
+                <HealthScoreCard data={data} />
+              </Col>
+              <Col xs={24} lg={9} className="space-y-10">
+                <PriceAdvice data={data} />
+                <AchievedList data={data} />
+              </Col>
+            </Row>
+            <WhyScore data={data} />
             <SourceFooter meta={meta} />
           </div>
         )}
       </InsightBlock>
-      <section className="space-y-3">
-        <h2 className="m-0 text-base font-bold text-stone-900">Phân tích chi tiết</h2>
-        <InsightBlock state={intel.state} onRetry={intel.reload}>
-          {data => (
-            <div className="space-y-4">
-              <SeasonPanel points={data.score_timeline}>{datePicker}</SeasonPanel>
-              <PartTabs data={data} productId={id} />
-            </div>
-          )}
-        </InsightBlock>
-      </section>
+      <InsightBlock state={intel.state} onRetry={intel.reload}>
+        {data => (
+          <div className="space-y-10 pt-6">
+            <SeasonPanel points={data.score_timeline}>{datePicker}</SeasonPanel>
+            <PartTabs data={data} productId={id} />
+          </div>
+        )}
+      </InsightBlock>
       {id && <ListingTraffic id={id} conversionDetail={null} />}
     </InsightPage>
+    </HealthTheme>
   );
 }

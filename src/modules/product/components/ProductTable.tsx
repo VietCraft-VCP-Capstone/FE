@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { BarChart2, Pencil, Trash2, PackageOpen, MapPin } from 'lucide-react';
 import { healthTier, TIER_COLOR } from '../../analytics/components/intel/intelLabels';
 import { INSIGHTS_ROOT } from '../../analytics/nav';
+import { NA, scoreText } from '../../analytics/format';
 
 interface ProductTableProps {
   products: ProductItem[];
@@ -265,14 +266,14 @@ export function ProductTable({
 
                   <td className="py-3 px-3">
                     {score === null ? (
-                      <span className="text-stone-400">-</span>
+                      <span className="text-stone-400">{NA}</span>
                     ) : (
                       <Link
                         to={`${INSIGHTS_ROOT}/listings/${product.id}`}
                         className="font-jakarta text-lg font-extrabold tabular-nums no-underline hover:underline"
                         style={{ color: TIER_COLOR[healthTier(score).tone] }}
                       >
-                        {Math.round(score)}
+                        {scoreText(score)}
                       </Link>
                     )}
                   </td>

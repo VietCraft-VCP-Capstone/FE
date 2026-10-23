@@ -1,4 +1,3 @@
-import { decimal } from '../../format';
 import type { IntelImage } from '../../intelTypes';
 import { Chip, InsightCard, Note } from '../ui';
 import { issueText } from './intelLabels';
@@ -19,7 +18,7 @@ function ImageTile({ img, index }: { img: IntelImage; index: number }) {
         {img.issues.map(i => <Chip key={i.code} tone="warn">{issueText(i)}</Chip>)}
         {img.issues.length === 0 && <Chip tone="good">Không lỗi</Chip>}
       </div>
-      {img.sim_title !== null && <p className="m-0 mt-1 text-[11px] text-stone-500">Khớp tiêu đề: {decimal(img.sim_title, 2)}</p>}
+      {img.sim_title !== null && <p className="m-0 mt-1 text-[11px] text-stone-500">Hợp với tên: {Math.round(img.sim_title * 100)}%</p>}
     </li>
   );
 }

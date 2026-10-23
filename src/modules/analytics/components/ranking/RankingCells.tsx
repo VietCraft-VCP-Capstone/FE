@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import type { Rank, RankInsight, RankingItem } from '../../rankingTypes';
 import { FOCUS } from '../health/healthStats';
 import { count } from '../../../../shared/utils/format';
+import { scoreText } from '../../format';
 import { nextLink, valueOf, type MetricDef } from './rankingMetrics';
 
 const MEDAL = ['#d4a017', '#9ca3af', '#b87333'];
@@ -107,6 +108,5 @@ export function InsightList({ item }: { item: RankingItem }) {
 
 export function ScoreTag({ score }: { score: number | null }) {
   if (score === null) return null;
-  const s = Math.round(score);
-  return <Tag variant="filled" color={s >= 80 ? 'success' : s >= 50 ? 'warning' : 'error'} className="!m-0 !text-[11px]">{s} điểm</Tag>;
+  return <Tag variant="filled" color={score >= 80 ? 'success' : score >= 50 ? 'warning' : 'error'} className="!m-0 !text-[11px]">{scoreText(score)} điểm</Tag>;
 }

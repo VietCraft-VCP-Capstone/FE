@@ -91,6 +91,8 @@ export interface HealthRow {
   thumbnail: string | null;
   score: number | null;
   top_todo: string | null;
+  top_impact: number | null;
+  top_field: string | null;
 }
 
 export interface HealthFactor {
@@ -105,7 +107,8 @@ export interface HealthFactor {
   missing: boolean;
   pending?: number;
   n_good?: number;
-  reference?: { price: number | null; source: 'category' | 'group' | 'tiki' | null; n: number };
+  reference?: { price: number | null; source: 'category' | 'group' | 'model' | 'tiki' | null; n: number };
+  suggestion?: { low: number; mid: number; high: number } | null;
 }
 
 export interface HealthItem {
@@ -125,7 +128,7 @@ export interface ListingHealth {
   date: string;
   score: number | null;
   status: HealthStatus | null;
-  model_version: 'health-2.0';
+  model_version: string;
   computed_at: string;
   axes: Record<HealthFactorKey, number>;
   axes_missing: string[];
@@ -137,6 +140,9 @@ export interface ListingHealth {
     trained_on: string;
     tiki_test_auc: number | null;
     equal_auc: number | null;
+    ranges: Partial<Record<HealthFactorKey, [number, number]>> | null;
+    sources: Partial<Record<HealthFactorKey, 'learned' | 'policy' | 'floor'>> | null;
+    markets: Partial<Record<'olist_test' | 'tiki_test' | 'shopee_test', { auc: number | null; lift: number | null } | null>> | null;
   };
 }
 

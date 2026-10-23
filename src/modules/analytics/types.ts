@@ -131,10 +131,9 @@ export interface ListingConversion {
 }
 
 /* ------------------------------------------------------------ F29 -------- */
-/** health-2.0: yếu tố thiếu dữ liệu được 0 điểm, ghi trong axes_missing. */
 export type HealthStatus = 'good' | 'needs_improvement' | 'poor';
 
-export type HealthAxis = 'image' | 'description' | 'tags' | 'review' | 'price';
+export type HealthAxis = 'image' | 'description' | 'tags' | 'material' | 'review' | 'price';
 
 /** Mục do engine F29 sinh: 'todo' tăng điểm, 'warning' chỉ nhắc, không trừ điểm. */
 export interface HealthTodo {

@@ -9,9 +9,9 @@ function priceSentence(pct: number | null) {
 }
 
 function priceHint(pct: number | null, neighbors: number) {
-  if (pct !== null && pct <= 10) return `Thuộc nhóm giá thấp nhất trong ${neighbors} listing gần giống, nên kiểm tra lại biên lợi nhuận`;
-  if (pct !== null && pct >= 90) return `Thuộc nhóm giá cao nhất trong ${neighbors} listing gần giống, nên nêu rõ điểm khác biệt`;
-  return `So với ${neighbors} listing gần giống nhất`;
+  if (pct !== null && pct <= 10) return `Thuộc nhóm giá thấp nhất trong ${neighbors} sản phẩm gần giống, nên kiểm tra lại biên lợi nhuận`;
+  if (pct !== null && pct >= 90) return `Thuộc nhóm giá cao nhất trong ${neighbors} sản phẩm gần giống, nên nêu rõ điểm khác biệt`;
+  return `So với ${neighbors} sản phẩm gần giống nhất`;
 }
 
 function Stat({ label, value, hint, className = '' }: { label: string; value: string; hint?: string; className?: string }) {
@@ -26,9 +26,9 @@ function Stat({ label, value, hint, className = '' }: { label: string; value: st
 
 export function MarketPanel({ market, bare = false }: { market: IntelMarket | null; bare?: boolean }) {
   return (
-    <InsightCard bare={bare} title="Thị hiếu và cạnh tranh" info="So với các listing gần giống nhất về ảnh và tiêu đề, trên sàn và trong VietCraft.">
+    <InsightCard bare={bare} title="Thị hiếu và cạnh tranh" info="So với các sản phẩm gần giống nhất về ảnh và tiêu đề, trên sàn và trong VietCraft.">
       {!market ? (
-        <Note>Chưa so sánh được với listing nào gần giống.</Note>
+        <Note>Chưa so sánh được với sản phẩm nào gần giống.</Note>
       ) : (
         <dl className="m-0 grid grid-cols-2 gap-4">
           <Stat
@@ -37,11 +37,11 @@ export function MarketPanel({ market, bare = false }: { market: IntelMarket | nu
             value={priceSentence(market.price_pct)}
             hint={priceHint(market.price_pct, market.neighbors)}
           />
-          <Stat label="Giá trung vị của sản phẩm tương tự" value={market.median_price === null ? '-' : money(market.median_price)} />
+          <Stat label="Mức giữa của sản phẩm gần giống (theo ảnh và tiêu đề)" value={market.median_price === null ? '-' : money(market.median_price)} />
           <Stat
-            label="Listing gần như trùng"
+            label="Sản phẩm gần như trùng"
             value={String(market.near_duplicates)}
-            hint={market.near_duplicates > 0 ? 'Ảnh và tiêu đề gần giống, nên tạo điểm khác biệt' : 'Chưa thấy listing nào trùng'}
+            hint={market.near_duplicates > 0 ? 'Ảnh và tiêu đề gần giống, nên tạo điểm khác biệt' : 'Chưa thấy sản phẩm nào trùng'}
           />
         </dl>
       )}

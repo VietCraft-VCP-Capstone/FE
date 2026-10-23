@@ -27,16 +27,16 @@ function MaterialLine({ material }: { material: IntelMaterial }) {
 
 export function KeywordPanel({ keywords, material, bare = false }: { keywords: IntelKeyword[]; material: IntelMaterial; bare?: boolean }) {
   return (
-    <InsightCard bare={bare} title="Từ khoá" info="Độ lift cho biết từ khoá đi cùng listing bán chạy của nhóm mạnh đến đâu. Số càng cao càng nên có trong tiêu đề. Từ khoá ít gặp ở nhóm bán chạy không giúp tăng điểm.">
+    <InsightCard bare={bare} title="Từ khoá" info="Từ khoá này xuất hiện nhiều hay ít ở nhóm sản phẩm bán chạy so với nhóm còn lại. Số càng cao càng nên có trong tiêu đề. Từ khoá ít gặp ở nhóm bán chạy không giúp tăng điểm.">
       <div className="space-y-3">
         <MaterialLine material={material} />
         {keywords.length === 0 ? (
           <Note>Chưa tìm thấy từ khoá nổi bật trong tiêu đề.</Note>
         ) : (
           <DataTable
-            caption="Từ khoá và độ lift"
+            caption="Từ khoá và mức gắn với bán chạy"
             minWidth="min-w-[400px]"
-            head={<><th scope="col">Từ khoá</th><th scope="col" className="text-right">Độ lift</th><th scope="col">Xu hướng</th></>}
+            head={<><th scope="col">Từ khoá</th><th scope="col" className="text-right">Gắn với bán chạy</th><th scope="col">Xu hướng</th></>}
           >
             {keywords.map(k => (
               <tr key={k.term}>

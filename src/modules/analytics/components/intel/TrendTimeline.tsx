@@ -40,8 +40,8 @@ export function TrendTimeline({ points, bare = false }: { points: IntelTimelineP
             </ol>
           )}
           <DataTable
-            caption="Điểm và hệ số nhu cầu theo tuần"
-            head={<><th scope="col">Tuần</th><th scope="col" className="text-right">Điểm</th><th scope="col" className="text-right">Hệ số nhu cầu</th><th scope="col">Sự kiện</th></>}
+            caption="Điểm và mức nhu cầu theo tuần"
+            head={<><th scope="col">Tuần</th><th scope="col" className="text-right">Điểm</th><th scope="col" className="text-right">Mức nhu cầu</th><th scope="col">Sự kiện</th></>}
           >
             {points.map(p => (
               <tr key={p.week_start}>
