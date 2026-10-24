@@ -13,6 +13,7 @@ import { ProductPagination } from '../components/ProductPagination';
 import { useProductFormDeepLink } from '../hooks/useProductFormDeepLink';
 import { useToast } from '../../../shared/components/Toast';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { analyticsApi } from '../../analytics/services/analyticsApi';
 import { Plus, Sparkles } from 'lucide-react';
 
 
@@ -34,6 +35,7 @@ export function ProductListingPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<ProductFilterState>(INITIAL_FILTER);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [health, setHealth] = useState<Map<string, number | null>>(new Map());
 
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -126,6 +128,13 @@ export function ProductListingPage() {
       }
     };
   }, [filter, fetchProducts]);
+
+  useEffect(() => {
+    analyticsApi
+      .listingsHealth()
+      .then(res => setHealth(new Map((res.data?.items ?? []).map(i => [i.product_id, i.score] as const))))
+      .catch(() => setHealth(new Map()));
+  }, []);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -296,6 +305,7 @@ export function ProductListingPage() {
         onEdit={handleOpenEdit}
         onDelete={handleOpenDelete}
         loading={loading}
+        health={health}
       />
 
       {/* Server-Side Pagination Footer */}

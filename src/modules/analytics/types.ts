@@ -131,10 +131,9 @@ export interface ListingConversion {
 }
 
 /* ------------------------------------------------------------ F29 -------- */
-/** health-1.0: trục thiếu dữ liệu bị loại khỏi phép tính, ghi trong axes_missing. */
 export type HealthStatus = 'good' | 'needs_improvement' | 'poor';
 
-export type HealthAxis = 'conversion' | 'rating' | 'content' | 'inventory' | 'freshness';
+export type HealthAxis = 'image' | 'description' | 'tags' | 'material' | 'review' | 'price';
 
 /** Mục do engine F29 sinh: 'todo' tăng điểm, 'warning' chỉ nhắc, không trừ điểm. */
 export interface HealthTodo {
