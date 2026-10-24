@@ -2,6 +2,8 @@ import type { HealthAxis, HealthStatus, HealthTodo, ListingHealthDetail } from '
 
 export type HealthAxes = Partial<Record<HealthAxis, number | null>>;
 
+export type HealthFactorKey = HealthAxis;
+
 export interface HealthHistoryPoint {
   date: string;
   score: number;
@@ -9,7 +11,7 @@ export interface HealthHistoryPoint {
   axes: HealthAxes;
 }
 
-export type PreviewLever = 'n_images' | 'description_length' | 'n_tags' | 'in_stock_ratio_pct';
+export type PreviewLever = 'n_images' | 'description_length' | 'n_tags' | 'price';
 
 export type PreviewInputs = Partial<Record<PreviewLever, number>>;
 
@@ -83,6 +85,67 @@ export interface ListingHealthList {
   total: number;
 }
 
+export interface HealthRow {
+  product_id: string;
+  title: string;
+  thumbnail: string | null;
+  score: number | null;
+  top_todo: string | null;
+  top_impact: number | null;
+  top_field: string | null;
+}
+
+export interface HealthFactor {
+  key: HealthFactorKey;
+  label: string;
+  weight: number;
+  sub_score: number;
+  points: number;
+  value: number | null;
+  target: number | null;
+  peer_median: number | null;
+  missing: boolean;
+  pending?: number;
+  n_good?: number;
+  reference?: { price: number | null; source: 'category' | 'group' | 'model' | 'tiki' | null; n: number };
+  suggestion?: { low: number; mid: number; high: number } | null;
+}
+
+export interface HealthItem {
+  type: 'todo' | 'warning' | 'info';
+  code?: string;
+  field: string | null;
+  message: string;
+  current_value: number | string | null;
+  target: number | string | null;
+  impact: number;
+}
+
+export interface ListingHealth {
+  product_id: string;
+  title: string;
+  thumbnail: string | null;
+  date: string;
+  score: number | null;
+  status: HealthStatus | null;
+  model_version: string;
+  computed_at: string;
+  axes: Record<HealthFactorKey, number>;
+  axes_missing: string[];
+  breakdown: HealthFactor[];
+  todos: HealthItem[];
+  warnings: HealthItem[];
+  basis: {
+    weights: Record<HealthFactorKey, number>;
+    trained_on: string;
+    tiki_test_auc: number | null;
+    equal_auc: number | null;
+    ranges: Partial<Record<HealthFactorKey, [number, number]>> | null;
+    sources: Partial<Record<HealthFactorKey, 'learned' | 'policy' | 'floor'>> | null;
+    markets: Partial<Record<'olist_test' | 'tiki_test' | 'shopee_test', { auc: number | null; lift: number | null } | null>> | null;
+  };
+}
+
 export interface HealthSummaryPoint {
   date: string;
   avg_score: number;
@@ -90,4 +153,30 @@ export interface HealthSummaryPoint {
   needs_improvement: number;
   poor: number;
   n: number;
+}
+
+export interface SellChanceAdvice {
+  feature: string;
+  current: number | null;
+  target: number | null;
+  gain: number;
+}
+
+export interface SellChance {
+  product_id: string;
+  score: number;
+  probability: number;
+  peer_group: { type: 'category' | 'platform'; name: string | null; size: number };
+  advice: SellChanceAdvice[];
+  compare: { feature: string; value: number | null; peer_median: number | null }[];
+  model: {
+    version: string;
+    trained_on: string;
+    horizon_days: number;
+    test_auc: number;
+    test_auc_ci95: [number, number];
+    baseline_auc: Record<string, number>;
+    delta_vs_best_baseline: { vs: string; auc: number; ci95: [number, number] };
+    group_lift: Record<string, number>;
+  };
 }

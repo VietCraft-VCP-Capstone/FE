@@ -30,6 +30,16 @@ export function decimal(value: number | null | undefined, digits = 2): string {
   return value.toLocaleString(VI, { maximumFractionDigits: digits, minimumFractionDigits: 0 });
 }
 
+export function vnd(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return NA;
+  return `${value.toLocaleString(VI)}đ`;
+}
+
+export function scoreText(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return NA;
+  return String(Math.floor(value));
+}
+
 /** "2026-08-01" -> "01/08". */
 export function shortDate(iso: string | null | undefined): string {
   if (!iso) return NA;
@@ -67,3 +77,10 @@ export const HEALTH_STATUS_LABEL: Record<string, string> = {
   needs_improvement: 'Nên sửa thêm',
   poor: 'Cần sửa gấp',
 };
+
+export function plainText(text: string): string {
+  return text
+    .replace(/([\dđ%])\s*[–—]\s*(\d)/g, '$1 đến $2')
+    .replace(/\s+[–—]\s+/g, ', ')
+    .replace(/\s+·\s+/g, '. ');
+}

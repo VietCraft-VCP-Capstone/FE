@@ -2,6 +2,7 @@ import api from '../../../infrastructure/api/interceptors';
 import type { HealthStatus, InsightContext, InsightEnvelope } from '../types';
 import type { ListingHealthList } from '../healthTypes';
 import type { HealthPreview, PreviewInputs } from '../healthTypes';
+import type { IntelPreviewBody, ListingIntel } from '../intelTypes';
 
 /**
  * Gọi 16 tính năng phân tích qua cổng BE /api/seller/analytics.
@@ -44,6 +45,11 @@ export const analyticsApi = {
   /** F29 · chấm thử điểm với giá trị giả định. Chỉ gửi lever người bán đã chỉnh. */
   async healthPreview(productId: string, body: PreviewInputs, signal?: AbortSignal): Promise<InsightEnvelope<HealthPreview>> {
     const res = await api.post(`${BASE}/listings/${productId}/health/preview`, body, { signal });
+    return res.data;
+  },
+
+  async intelPreview(body: IntelPreviewBody, signal?: AbortSignal): Promise<InsightEnvelope<ListingIntel>> {
+    const res = await api.post(`${BASE}/listings/intel/preview`, body, { signal });
     return res.data;
   },
 

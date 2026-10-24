@@ -139,6 +139,7 @@ export function CreateProductPage() {
     const [categories, setCategories] = useState<any[]>([]);
     const [availableTags, setAvailableTags] = useState<any[]>([]);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    const [materials, setMaterials] = useState<string[]>([]);
     const [blanks, setBlanks] = useState<any[]>([]);
     const [designs, setDesigns] = useState<any[]>([]);
     const [loadErr, setLoadErr] = useState('');
@@ -436,6 +437,7 @@ export function CreateProductPage() {
                 categoryId, 
                 tagIds,
                 newTagNames,
+                materials,
                 blankId: blank._id, 
                 printerId: blank.printer_id || connectedPrinter?.printer_id || 'vietcraft-direct',
                 printerName: blank.printer_name || connectedPrinter?.printer_name || 'Xưởng in đối tác',
@@ -543,6 +545,8 @@ export function CreateProductPage() {
                         availableTags={availableTags}
                         selectedTags={selectedTags}
                         setSelectedTags={setSelectedTags}
+                        materials={materials}
+                        setMaterials={setMaterials}
                         onCategoryProposed={reloadCategories}
                         blank={blank}
                         selectedVariants={selectedVariants}

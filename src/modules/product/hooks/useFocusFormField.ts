@@ -1,11 +1,14 @@
 import { RefObject, useEffect, useRef } from 'react';
 
-export type ProductFormFocusTarget = 'images' | 'title' | 'tags' | 'price' | 'stock' | 'description';
+export type ProductFormFocusTarget = 'images' | 'title' | 'tags' | 'price' | 'stock' | 'description' | 'materials';
 
 const FIELD_TO_TARGET: Record<string, ProductFormFocusTarget> = {
   images: 'images',
+  image: 'images',
   description: 'description',
   tags: 'tags',
+  material: 'materials',
+  materials: 'materials',
   stock_quantity: 'stock',
   stock: 'stock',
   'variants.retail_price': 'price',
