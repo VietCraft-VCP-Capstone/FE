@@ -1,33 +1,182 @@
 import { useState, useRef } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Modal, Tabs } from 'antd';
-import { ArrowLeft, Calendar, Sparkles, Layers, TrendingUp, Users, Package } from 'lucide-react';
+import { Modal, Tabs, Tooltip } from 'antd';
+import {
+  ArrowLeft,
+  Calendar,
+  Sparkles,
+  Layers,
+  TrendingUp,
+  Users,
+  Package,
+  CheckCircle2,
+  AlertCircle,
+  Pencil,
+  Info,
+  Eye,
+} from 'lucide-react';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { HealthTheme } from '../components/health/HealthTheme';
 import { HealthGauge } from '../components/health/HealthGauge';
 import { FactorGrid } from '../components/health/FactorGrid';
 import { FactorBreakdownCard } from '../components/health/FactorBreakdownCard';
-import { HealthRoadmap } from '../components/health/HealthRoadmap';
-import { ListingDiagnosticCard } from '../components/health/ListingDiagnosticCard';
+import { PriceAdvice } from '../components/health/PriceAdvice';
 import { WhyScore } from '../components/health/WhyScore';
 import { PartTabs } from '../components/intel/PartTabs';
 import { SeasonPanel } from '../components/intel/SeasonPanel';
 import { ListingTraffic } from '../components/ListingTraffic';
 import { SourceFooter } from '../components/SourceFooter';
 import { visibleTodos } from '../components/health/visibleTodos';
+import { editLink } from '../components/HealthParts';
 import { useInsight } from '../hooks/useInsight';
 import { INSIGHTS_ROOT } from '../nav';
+import { plainText } from '../format';
 import type { ListingHealth } from '../healthTypes';
 import type { ListingIntel } from '../intelTypes';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const QUESTION = 'Chấm điểm chất lượng tin đăng và đề xuất tối ưu chuyển đổi theo chuẩn thuật toán sàn.';
+const QUESTION = 'Chấm điểm chất lượng tin đăng và gợi ý những việc cần làm để tăng đơn hàng.';
 const MAX_DAYS = 730;
 const shiftDays = (days: number) =>
   new Date(Date.now() + days * 86_400_000).toLocaleDateString('sv-SE', {
     timeZone: 'Asia/Ho_Chi_Minh',
   });
+
+function PriorityActions({
+  data,
+  productId,
+}: {
+  data: ListingHealth;
+  productId: string;
+}) {
+  const todos = visibleTodos(data);
+  const urgent = data.warnings.filter(w => w.type === 'warning');
+  const actionable = todos.filter(t => t.field !== null && t.code !== 'review');
+  const reviewTodo = todos.find(t => t.code === 'review');
+  const totalImpact = Math.round(todos.reduce((sum, item) => sum + item.impact, 0));
+
+  return (
+    <div className="flex h-full flex-col justify-between">
+      <div>
+        <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
+              Việc nên làm theo thứ tự ưu tiên
+            </span>
+            <Tooltip title="Các gợi ý được sắp xếp theo mức điểm tăng nhiều nhất khi bạn sửa.">
+              <Info size={11} className="text-stone-300 hover:text-stone-600 cursor-help" />
+            </Tooltip>
+          </div>
+          {totalImpact > 0 && (
+            <Tooltip title="Tổng số điểm bạn có thể nhận thêm sau khi hoàn thành tất cả các mục này">
+              <span className="cursor-help rounded bg-[#EAF0E2] px-2 py-0.5 font-mono text-[11px] font-bold text-[#007700] border border-[#BECAB6]">
+                +{totalImpact} điểm tiềm năng
+              </span>
+            </Tooltip>
+          )}
+        </div>
+
+        {/* Urgent warnings */}
+        {urgent.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {urgent.map(item => (
+              <div
+                key={item.message}
+                className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-rose-200 bg-rose-50 text-xs text-[#BA1A1A]"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle size={14} className="shrink-0 text-[#BA1A1A]" />
+                  <span className="font-semibold truncate">{plainText(item.message)}</span>
+                </div>
+                {item.field && (
+                  <Link
+                    to={editLink(productId, item.field)}
+                    className="shrink-0 px-2 py-0.5 rounded bg-white text-[11px] font-bold text-[#BA1A1A] border border-rose-200 hover:bg-rose-50 no-underline"
+                  >
+                    Sửa ngay
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Action items */}
+        {actionable.length === 0 ? (
+          <div className="py-6 text-center">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#EAF0E2] text-[#007700] mb-2">
+              <CheckCircle2 size={20} />
+            </div>
+            <p className="text-xs font-bold text-stone-800 m-0">Tuyệt vời! Tin đăng đã đạt chuẩn tối ưu</p>
+            <p className="text-[11px] text-stone-500 m-0 mt-1 max-w-xs mx-auto">
+              Không còn việc nào cần sửa gấp. Hãy duy trì cập nhật giá và tồn kho định kỳ.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-2.5">
+            {actionable.slice(0, 3).map((item, idx) => {
+              const label = item.code === 'tags'
+                ? item.message.replace('tag', 'thẻ từ khoá (tag)')
+                : plainText(item.message);
+
+              return (
+                <div
+                  key={item.code ?? item.message}
+                  className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-stone-200 bg-white hover:border-[#BECAB6] transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-stone-100 font-mono text-[10px] font-bold text-stone-600">
+                      {idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold text-stone-800 truncate block">
+                        {label}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Tooltip title="Số điểm bạn sẽ nhận thêm ngay sau khi hoàn thành mục này">
+                      <span className="cursor-help font-mono text-[11px] font-bold text-[#007700] bg-[#EAF0E2] px-1.5 py-0.5 rounded border border-[#BECAB6]">
+                        +{Math.round(item.impact)}đ
+                      </span>
+                    </Tooltip>
+
+                    <Link
+                      to={editLink(productId, item.field)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-[#007700] text-white hover:bg-[#005B00] transition-colors no-underline shadow-2xs"
+                    >
+                      <Pencil size={11} />
+                      <span>Sửa ngay</span>
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Gentle Tip for Review / New Products */}
+        {reviewTodo && (
+          <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-stone-200/90 bg-[#FBFBFA] p-2.5 text-xs text-stone-600">
+            <Sparkles size={14} className="shrink-0 mt-0.5 text-[#007700]" />
+            <div className="min-w-0">
+              <span className="font-semibold text-stone-800">Mẹo cho sản phẩm mới:</span>{' '}
+              <span className="text-stone-600 leading-relaxed">
+                Khi có đơn hàng đầu tiên, hãy đính kèm thiệp cảm ơn viết tay để mời khách để lại đánh giá 5★ nhé (giúp cộng thêm tới +{Math.round(reviewTodo.impact)} điểm).
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-400">
+        <span>💡 Sau khi cập nhật thông tin và lưu sản phẩm, điểm số sẽ tự động cập nhật lại ngay.</span>
+      </div>
+    </div>
+  );
+}
 
 export function ListingDetailPage() {
   const { id = '' } = useParams();
@@ -39,9 +188,8 @@ function ListingDetail({ id }: { id: string }) {
   const date = ISO_DATE.test(params.get('date') ?? '') ? (params.get('date') as string) : '';
   const health = useInsight<ListingHealth>(id ? `/listings/${id}/health` : null);
   const intel = useInsight<ListingIntel>(id ? `/listings/${id}/intel` : null, { date });
-  const [selectedFactor, setSelectedFactor] = useState<string>('images');
+  const [selectedFactor, setSelectedFactor] = useState<string>('image');
   const [showWhyModal, setShowWhyModal] = useState<boolean>(false);
-  const [rangePill, setRangePill] = useState<'7' | '30' | '90'>('7');
   const [intelTab, setIntelTab] = useState<string>('parts');
 
   const last = useRef<{ title: string; thumbnail: string | null } | null>(null);
@@ -107,9 +255,7 @@ function ListingDetail({ id }: { id: string }) {
         header={
           <header className="mb-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-stone-200/80 pb-4">
-              {/* Product Identity Block: Prominent Thumbnail + Real Title + Meta */}
               <div className="flex items-center gap-3.5 min-w-0">
-                {/* Product Thumbnail with subtle border & fallback */}
                 <div className="relative h-14 w-14 shrink-0 rounded-xl border border-stone-200/80 bg-stone-100 overflow-hidden shadow-2xs">
                   {ready?.thumbnail ? (
                     <img
@@ -124,16 +270,18 @@ function ListingDetail({ id }: { id: string }) {
                   )}
                 </div>
 
-                {/* Title & Metadata */}
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="font-mono text-[11px] font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded">
-                      ID: {id ? id.slice(-8).toUpperCase() : 'N/A'}
+                    <span
+                      className="font-mono text-[11px] font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded cursor-help"
+                      title="Mã định danh tin đăng trên hệ thống VietCraft"
+                    >
+                      Mã tin: #{id ? id.slice(-8).toUpperCase() : 'N/A'}
                     </span>
                     <span className="text-stone-300">·</span>
-                    <span className="text-[11px] font-medium text-stone-500">Mộc Studio</span>
+                    <span className="text-[11px] font-medium text-stone-500">Tin đăng gian hàng</span>
                     <span className="text-stone-300">·</span>
-                    <span className="text-[11px] font-medium text-stone-400">Kiểm toán chất lượng tin đăng</span>
+                    <span className="text-[11px] font-medium text-stone-400">Đánh giá 6 tiêu chuẩn</span>
                   </div>
 
                   <h1 className="m-0 mt-1 truncate font-sans text-xl md:text-2xl font-bold tracking-tight text-[#111111]">
@@ -142,8 +290,7 @@ function ListingDetail({ id }: { id: string }) {
                 </div>
               </div>
 
-              {/* Action Controls: Back button & Date range */}
-              <div className="flex items-center gap-2.5 shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <Link
                   to={`${INSIGHTS_ROOT}/listings`}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50"
@@ -152,22 +299,16 @@ function ListingDetail({ id }: { id: string }) {
                   <span>Tất cả sản phẩm</span>
                 </Link>
 
-                <div className="flex items-center rounded-lg border border-stone-200 bg-white p-0.5">
-                  {(['7', '30', '90'] as const).map(days => (
-                    <button
-                      key={days}
-                      type="button"
-                      onClick={() => setRangePill(days)}
-                      className={`rounded px-3 py-1 text-xs font-semibold transition-all ${
-                        rangePill === days
-                          ? 'bg-[#111111] text-white'
-                          : 'text-stone-500 hover:text-[#111111]'
-                      }`}
-                    >
-                      {days} ngày
-                    </button>
-                  ))}
-                </div>
+                <a
+                  href={`/products/${id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-[#111111] no-underline"
+                  title="Mở trang sản phẩm hiển thị với người mua trong tab mới"
+                >
+                  <Eye size={13} className="text-stone-400" />
+                  <span>Xem trên sàn</span>
+                </a>
               </div>
             </div>
           </header>
@@ -176,16 +317,16 @@ function ListingDetail({ id }: { id: string }) {
         <InsightBlock state={health.state} onRetry={health.reload}>
           {(data, meta) => {
             const todos = visibleTodos(data);
-            const potential = todos.length
-              ? Math.min(100, (data.score ?? 0) + todos.reduce((s, t) => s + t.impact, 0))
-              : null;
+            const totalImpact = Math.round(todos.reduce((sum, item) => sum + item.impact, 0));
+            const currentScore = Math.floor(data.score ?? 0);
+            const potential = todos.length ? Math.min(100, currentScore + totalImpact) : null;
 
             return (
               <div className="space-y-6 pt-1">
-                {/* 1. Unified Panoramic Health Bento (Score + 6 Drivers + Factor Drilldown) */}
+                {/* 1. Top Bento: Health Score Gauge + Priority Action Items */}
                 <div className="rounded-xl border border-stone-200 bg-white overflow-hidden shadow-2xs">
                   <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-stone-100">
-                    {/* Left: Health Gauge Engine (5 cols) */}
+                    {/* Left: Overall Health Score Gauge (5 cols) */}
                     <div className="lg:col-span-5 p-5 md:p-6">
                       <HealthGauge
                         score={data.score}
@@ -195,18 +336,25 @@ function ListingDetail({ id }: { id: string }) {
                       />
                     </div>
 
-                    {/* Right: 6 Performance Pillars Grid (7 cols) */}
+                    {/* Right: Priority Action List (7 cols) */}
                     <div className="lg:col-span-7 p-5 md:p-6">
-                      <FactorGrid
-                        data={data}
-                        selectedFactor={selectedFactor}
-                        onSelectFactor={setSelectedFactor}
-                      />
+                      <PriorityActions data={data} productId={id} />
                     </div>
                   </div>
+                </div>
 
-                  {/* Bottom Integrated Drilldown Tray for Selected Factor */}
-                  <div className="border-t border-stone-100 bg-stone-50/40 p-5 md:p-6">
+                {/* 2. Core 6 Performance Standards Grid + Selected Factor Advice */}
+                <div className="rounded-xl border border-stone-200 bg-white overflow-hidden shadow-2xs">
+                  <div className="p-5 md:p-6">
+                    <FactorGrid
+                      data={data}
+                      selectedFactor={selectedFactor}
+                      onSelectFactor={setSelectedFactor}
+                    />
+                  </div>
+
+                  {/* Contextual guidance tray for selected factor */}
+                  <div className="border-t border-stone-100 bg-[#FBFBFA] p-5 md:p-6">
                     <FactorBreakdownCard
                       data={data}
                       selectedFactor={selectedFactor}
@@ -214,21 +362,21 @@ function ListingDetail({ id }: { id: string }) {
                   </div>
                 </div>
 
-                {/* 2. Horizontal Action Roadmap Pipeline */}
-                <HealthRoadmap data={data} />
-
-                {/* 3. Diagnostic Audit Table & Clean Inspection Drawer */}
-                <ListingDiagnosticCard data={data} productId={id} />
+                {/* 3. Market Price Guidance (if available) */}
+                <PriceAdvice data={data} />
 
                 {/* 4. Deep-dive Intelligence Tabs */}
-                <div className="rounded-xl border border-stone-200 bg-white p-5 md:p-6 shadow-2xs mt-6">
+                <div className="rounded-xl border border-stone-200 bg-white p-5 md:p-6 shadow-2xs">
                   <div className="border-b border-stone-100 pb-3 mb-5">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                      Dữ liệu chuyên sâu
+                      Phân tích kỹ thuật (AI)
                     </span>
                     <h3 className="m-0 mt-0.5 font-jakarta text-base font-bold text-[#111111]">
-                      Chẩn đoán chuyên sâu &amp; Thị trường
+                      Dữ liệu máy học &amp; Xu hướng thị trường
                     </h3>
+                    <p className="m-0 mt-1 text-xs text-stone-500">
+                      Phân tích chi tiết từng góc chụp ảnh, chất liệu và hiệu quả chuyển đổi giúp bạn tối ưu nâng cao.
+                    </p>
                   </div>
 
                   <Tabs
@@ -245,7 +393,7 @@ function ListingDetail({ id }: { id: string }) {
                         ),
                         children: (
                           <InsightBlock state={intel.state} onRetry={intel.reload}>
-                            {intelData => <PartTabs data={intelData} productId={id} />}
+                            {intelData => <PartTabs data={intelData} productId={id} bare />}
                           </InsightBlock>
                         ),
                       },
@@ -283,20 +431,20 @@ function ListingDetail({ id }: { id: string }) {
 
                 <SourceFooter meta={meta} />
 
-                {/* Algorithm Explanation Modal */}
+                {/* Plain-Language Scoring Modal */}
                 <Modal
                   open={showWhyModal}
                   onCancel={() => setShowWhyModal(false)}
                   footer={null}
                   title={
                     <div className="flex items-center gap-2">
-                      <Sparkles size={16} className="text-[#346538]" />
-                      <span className="font-jakarta font-bold text-[#111111]">
-                        Thuật toán tính điểm Listing Health
+                      <Sparkles size={16} className="text-[#007700]" />
+                      <span className="font-jakarta font-bold text-stone-900">
+                        Cách tính điểm sức khoẻ tin đăng
                       </span>
                     </div>
                   }
-                  width={760}
+                  width={720}
                 >
                   <WhyScore data={data} />
                 </Modal>

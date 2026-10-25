@@ -1,17 +1,74 @@
 import { Tooltip } from 'antd';
-import { ArrowUpRight, Info } from 'lucide-react';
-import type { ListingHealth } from '../../healthTypes';
+import {
+  Image as ImageIcon,
+  FileText,
+  Tag as TagIcon,
+  Layers,
+  Star,
+  DollarSign,
+  Info,
+  HelpCircle,
+} from 'lucide-react';
+import { decimal, vnd } from '../../format';
+import type { HealthFactor, HealthFactorKey, ListingHealth } from '../../healthTypes';
 
-export interface DriverCardItem {
-  id: string;
+interface FactorMeta {
   title: string;
-  value: string;
-  pct: number;
-  hasArrowUp?: boolean;
-  impact: 'Trọng số cao' | 'Trọng số vừa' | 'Trọng số nhẹ';
-  impactClass: string;
-  barColor: string;
-  desc: string;
+  icon: typeof ImageIcon;
+  tooltip: string;
+}
+
+const FACTOR_META: Record<HealthFactorKey, FactorMeta> = {
+  image: {
+    title: 'Ảnh sản phẩm',
+    icon: ImageIcon,
+    tooltip: 'Khách mua hàng thủ công cần xem ảnh rõ nét từ nhiều góc độ (khuyến nghị từ 5 ảnh trở lên).',
+  },
+  description: {
+    title: 'Mô tả chi tiết',
+    icon: FileText,
+    tooltip: 'Mô tả đầy đủ kích thước, công năng và câu chuyện chế tác giúp khách yên tâm chốt đơn.',
+  },
+  tags: {
+    title: 'Thẻ từ khoá (tags)',
+    icon: TagIcon,
+    tooltip: 'Gắn thẻ từ khoá giúp khách hàng dễ dàng tìm thấy sản phẩm khi gõ tìm kiếm trên sàn.',
+  },
+  material: {
+    title: 'Chất liệu chế tác',
+    icon: Layers,
+    tooltip: 'Hàng thủ công mỹ nghệ cần ghi rõ chất liệu (như gỗ tự nhiên, gốm Bát Tràng, lụa, sợi đay...).',
+  },
+  review: {
+    title: 'Đánh giá người mua',
+    icon: Star,
+    tooltip: 'Đánh giá 5 sao từ khách mua thật. Với sản phẩm mới, sàn sẽ tự động kích hoạt điểm khi có đánh giá đầu tiên.',
+  },
+  price: {
+    title: 'Giá so với thị trường',
+    icon: DollarSign,
+    tooltip: 'Mức giá bán hợp lý và cạnh tranh so với mặt bằng chung các sản phẩm tương tự trên sàn.',
+  },
+};
+
+function formatFactorValue(row: HealthFactor): string {
+  if (row.missing || row.value === null) return 'Chưa có';
+  switch (row.key) {
+    case 'image':
+      return `${decimal(row.value, 0)} / ${row.target ?? 5} ảnh`;
+    case 'description':
+      return `${decimal(row.value, 0)} từ`;
+    case 'tags':
+      return `${decimal(row.value, 0)} thẻ tag`;
+    case 'material':
+      return row.value > 0 ? 'Đã ghi nhận' : 'Chưa có';
+    case 'review':
+      return row.value > 0 ? `${row.value}★` : 'Chờ đơn đầu';
+    case 'price':
+      return vnd(row.value);
+    default:
+      return String(row.value);
+  }
 }
 
 export function FactorGrid({
@@ -23,157 +80,90 @@ export function FactorGrid({
   selectedFactor?: string;
   onSelectFactor?: (id: string) => void;
 }) {
-  const imgFactor = data.breakdown.find(f => f.key === 'image');
-  const descFactor = data.breakdown.find(f => f.key === 'description');
-  const priceFactor = data.breakdown.find(f => f.key === 'price');
-  const materialFactor = data.breakdown.find(f => f.key === 'material');
-  const reviewFactor = data.breakdown.find(f => f.key === 'review');
-
-  const contentScore = Math.min(99, Math.round(descFactor?.sub_score ?? 91));
-  const imageScore = Math.min(99, Math.round(imgFactor?.sub_score ?? 64));
-  const matScore = Math.min(99, Math.round(materialFactor?.sub_score ?? 97));
-
-  let priceDiff = '-4%';
-  let pricePct = 78;
-  if (priceFactor?.value && priceFactor.reference?.price) {
-    const diff = Math.round((priceFactor.value / priceFactor.reference.price - 1) * 100);
-    priceDiff = diff > 0 ? `+${diff}%` : `${diff}%`;
-    pricePct = Math.max(20, Math.min(100, 100 - Math.abs(diff)));
-  }
-
-  const revRating = reviewFactor?.value ? `${reviewFactor.value}★` : '2.4%';
-
-  const drivers: DriverCardItem[] = [
-    {
-      id: 'images',
-      title: 'Hình ảnh & Mockup',
-      value: `${imageScore}%`,
-      pct: imageScore,
-      impact: 'Trọng số cao',
-      impactClass: 'bg-[#FBF3DB] text-[#956400]',
-      barColor: 'bg-[#D9822B]',
-      desc: 'Yêu cầu từ 5 ảnh trở lên, tỷ lệ 1:1, độ phân giải tối thiểu 300 DPI.',
-    },
-    {
-      id: 'content',
-      title: 'Nội dung & SEO',
-      value: `${contentScore}%`,
-      pct: contentScore,
-      impact: 'Trọng số cao',
-      impactClass: 'bg-[#EDF3EC] text-[#346538]',
-      barColor: 'bg-[#346538]',
-      desc: 'Tiêu đề chứa từ khoá tìm kiếm, mô tả chuẩn bố cục và đủ 13 thẻ tag.',
-    },
-    {
-      id: 'conversion',
-      title: 'Tỉ lệ chuyển đổi',
-      value: '3.8%',
-      pct: 68,
-      hasArrowUp: true,
-      impact: 'Trọng số cao',
-      impactClass: 'bg-[#EDF3EC] text-[#346538]',
-      barColor: 'bg-[#346538]',
-      desc: 'Tỉ lệ khách đặt hàng trên tổng lượt truy cập xem sản phẩm 30 ngày.',
-    },
-    {
-      id: 'pricing',
-      title: 'Vị thế giá bán',
-      value: priceDiff,
-      pct: pricePct,
-      impact: 'Trọng số vừa',
-      impactClass: 'bg-[#EDF3EC] text-[#346538]',
-      barColor: 'bg-[#346538]',
-      desc: 'Độ chênh lệch giá niêm yết so với mức giá trung vị cùng phân khúc trên sàn.',
-    },
-    {
-      id: 'production',
-      title: 'Giao hàng đúng hẹn',
-      value: `${matScore}%`,
-      pct: matScore,
-      impact: 'Trọng số vừa',
-      impactClass: 'bg-[#EDF3EC] text-[#346538]',
-      barColor: 'bg-[#346538]',
-      desc: 'Tỉ lệ đơn sản xuất xuất kho và giao đúng cam kết SLA 24h.',
-    },
-    {
-      id: 'returns',
-      title: 'Đánh giá & Hoàn trả',
-      value: revRating,
-      pct: 82,
-      hasArrowUp: true,
-      impact: 'Trọng số nhẹ',
-      impactClass: 'bg-[#FDEBEC] text-[#9F2F2D]',
-      barColor: 'bg-[#E26D68]',
-      desc: 'Tỉ lệ khách hàng khiếu nại chất lượng in, nhầm size hoặc yêu cầu hoàn đơn.',
-    },
-  ];
+  const activeKey = selectedFactor === 'images' ? 'image' : selectedFactor === 'content' ? 'description' : selectedFactor === 'pricing' ? 'price' : (selectedFactor ?? 'image');
 
   return (
     <div className="flex h-full flex-col justify-between">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+      <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
-            6 Trụ cột quyết định điểm
+            6 Tiêu chuẩn chất lượng
           </span>
-          <Tooltip title="6 chỉ số cốt lõi ảnh hưởng trực tiếp tới thứ hạng hiển thị theo thuật toán sàn">
-            <Info size={12} className="text-stone-300 hover:text-stone-600 transition-colors cursor-help" />
+          <Tooltip title="6 tiêu chuẩn cơ bản được sàn sử dụng để đánh giá độ hoàn thiện và chất lượng tin đăng.">
+            <Info size={12} className="text-stone-300 hover:text-stone-600 cursor-help" />
           </Tooltip>
         </div>
-        <span className="text-[11px] text-stone-400">Chọn để xem phân tích</span>
+        <span className="text-[11px] text-stone-400">Bấm từng mục để xem gợi ý</span>
       </div>
 
-      {/* Clean Bento Grid without text clutter */}
-      <div className="mt-3.5 grid grid-cols-2 md:grid-cols-3 divide-x divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white overflow-hidden">
-        {drivers.map(card => {
-          const isSelected = selectedFactor === card.id || (!selectedFactor && card.id === 'images');
+      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2.5">
+        {data.breakdown.map(factor => {
+          const meta = FACTOR_META[factor.key] ?? {
+            title: factor.label,
+            icon: HelpCircle,
+            tooltip: 'Tiêu chuẩn chất lượng tin đăng.',
+          };
+          const Icon = meta.icon;
+          const isSelected = activeKey === factor.key;
+          const isPassed = factor.sub_score >= 100;
+          const isReviewWaiting = factor.key === 'review' && (factor.value === null || factor.value === 0 || factor.points <= 0);
+          const isFailed = !isReviewWaiting && (factor.missing || factor.points <= 0);
+
+          const statusBadge = isPassed
+            ? 'bg-[#EAF0E2] text-[#007700] border-[#BECAB6]'
+            : isReviewWaiting
+            ? 'bg-stone-100 text-stone-600 border-stone-200'
+            : isFailed
+            ? 'bg-rose-50 text-[#BA1A1A] border-rose-200'
+            : 'bg-amber-50 text-amber-800 border-amber-200';
+
+          const statusText = isPassed
+            ? 'Đạt chuẩn'
+            : isReviewWaiting
+            ? 'Sản phẩm mới'
+            : isFailed
+            ? 'Chưa đạt'
+            : 'Cần thêm';
 
           return (
             <button
-              key={card.id}
+              key={factor.key}
               type="button"
-              onClick={() => onSelectFactor?.(card.id)}
-              className={`group flex flex-col justify-between p-3.5 text-left transition-all ${
-                isSelected ? 'bg-stone-50/90 ring-1 ring-inset ring-stone-900/10' : 'bg-white hover:bg-stone-50/40'
+              onClick={() => onSelectFactor?.(factor.key)}
+              className={`group flex flex-col justify-between p-3 text-left rounded-lg border transition-all cursor-pointer ${
+                isSelected
+                  ? 'border-[#007700] ring-2 ring-[#007700]/20 bg-[#EAF0E2]/30 shadow-2xs'
+                  : 'border-stone-200 bg-white hover:border-[#BECAB6] hover:bg-[#EAF0E2]/10'
               }`}
             >
-              <div className="w-full">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1 min-w-0 pr-1">
-                    <span className={`text-xs truncate ${isSelected ? 'font-bold text-[#111111]' : 'font-medium text-stone-700'}`}>
-                      {card.title}
+              <div>
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-stone-500 group-hover:text-stone-800 transition-colors">
+                      <Icon size={13} />
                     </span>
-                    <Tooltip title={card.desc} placement="top">
-                      <span className="cursor-help text-stone-300 hover:text-stone-600">
-                        <Info size={11} />
-                      </span>
-                    </Tooltip>
+                    <span className="text-xs font-bold text-stone-800 truncate">{meta.title}</span>
                   </div>
-
-                  <ArrowUpRight
-                    size={12}
-                    className={`shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 ${
-                      isSelected ? 'text-[#111111]' : 'text-stone-300'
-                    }`}
-                  />
-                </div>
-
-                <div className="mt-2.5 flex items-baseline justify-between gap-1">
-                  <div className="font-jakarta text-xl font-black tracking-tight text-[#111111] tabular-nums">
-                    {card.value}
-                    {card.hasArrowUp && <span className="ml-0.5 text-xs font-bold text-stone-700">▲</span>}
-                  </div>
-                  <Tooltip title={`Trọng số đóng góp: ${card.impact}`} placement="top">
-                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide cursor-help ${card.impactClass}`}>
-                      {card.impact}
-                    </span>
+                  <Tooltip title={meta.tooltip} placement="top">
+                    <Info size={11} className="text-stone-300 hover:text-stone-600 shrink-0 cursor-help" />
                   </Tooltip>
                 </div>
 
-                {/* 3px indicator line */}
-                <div className="mt-2 h-1 w-full rounded-full bg-stone-100 overflow-hidden">
-                  <div className={`h-full rounded-full ${card.barColor}`} style={{ width: `${card.pct}%` }} />
+                <div className="mt-2 flex items-baseline justify-between gap-1">
+                  <span className="font-jakarta text-sm font-bold text-[#111111] truncate">
+                    {formatFactorValue(factor)}
+                  </span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${statusBadge}`}>
+                    {statusText}
+                  </span>
                 </div>
+              </div>
+
+              <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-400">
+                <span>Điểm đạt được:</span>
+                <span className="font-mono font-bold text-stone-700">
+                  {Math.round(factor.points)} / {factor.weight}đ
+                </span>
               </div>
             </button>
           );

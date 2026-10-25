@@ -7,7 +7,7 @@ const goal = (n: number | null, unit: string, suffix = '') => (n === null ? NA :
 export function formatAmount(key: HealthFactorKey, value: number): string {
   switch (key) {
     case 'image': return count(value, 'ảnh');
-    case 'description': return count(value, 'ký tự');
+    case 'description': return count(value, 'từ');
     case 'tags': return count(value, 'tag');
     case 'review': return count(value, 'đánh giá');
     case 'material': return value > 0 ? 'Đã nêu' : 'Chưa nêu';
@@ -25,13 +25,13 @@ export function factorValue(row: HealthFactor): string {
 export function factorTarget(row: HealthFactor): string {
   switch (row.key) {
     case 'image': return goal(row.target, 'ảnh', ' trở lên');
-    case 'description': return goal(row.target, 'ký tự', ' trở lên');
+    case 'description': return goal(row.target, 'từ', ' trở lên');
     case 'tags': return goal(row.target, 'tag', ' trở lên');
     case 'material': return 'Nêu chất liệu (ô Chất liệu, tên hoặc mô tả)';
     case 'review': return 'Đánh giá tốt từ người mua';
     case 'price': {
       const price = row.reference?.price;
-      return typeof price === 'number' ? `Không cao hơn ${vnd(price)}` : NA;
+      return typeof price === 'number' ? 'trong khoảng hợp lý quanh mức giữa' : NA;
     }
   }
 }

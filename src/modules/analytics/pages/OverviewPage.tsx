@@ -129,7 +129,7 @@ export function OverviewPage() {
                     icon={<Eye size={17} />}
                     iconBg="bg-amber-50 text-amber-600 ring-1 ring-amber-500/20"
                     trailing={<DeltaBadge value={data.kpi.views.pop_pct} fallbackLabel="Chưa so" />}
-                    hint="Sàn chưa bật theo dõi lượt xem"
+                    hint={data.kpi.views.value === null ? 'Sàn chưa bật theo dõi lượt xem' : (data.kpi.views.pop_pct === null ? 'Kỳ trước chưa có số để so' : `So với ${compare}`)}
                   />
                   <KpiTile
                     label="Đơn hàng"
@@ -159,10 +159,9 @@ export function OverviewPage() {
                   />
                 </div>
                 {data.anchored_to_latest_data && (
-                  <div className="mt-4">
+                  <div className="mt-3.5">
                     <Note>
-                      Cửa sổ thời gian tính từ ngày có dữ liệu mới nhất là {fullDate(data.to)}, không tính từ hôm
-                      nay. Vì vậy bạn sẽ chưa thấy số liệu của hôm nay ở đây.
+                      Số liệu báo cáo được tổng hợp định kỳ đến hết ngày {fullDate(data.to)}.
                     </Note>
                   </div>
                 )}
