@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
-import { Heart, Star, ArrowRight, CheckCircle2, Info, Ticket, Flame, UserPlus, Store } from 'lucide-react';
+import { Heart, ArrowRight, CheckCircle2, Info, Ticket, Flame, UserPlus, Store } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { shopService } from '../../product/services/shopService';
 import { promotionService } from '../../promotion/services/promotionService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { ForYouSection } from '../components/home/ForYouSection';
 import { buildDeals } from '../components/deals/buildDeals';
 import '../../../shared/components/layouts.css';
 
@@ -228,16 +229,6 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
   }, [couponList]);
 
   const flashDeals = useMemo(() => buildDeals(couponList, allProducts), [allProducts, couponList]);
-
-  const aiSuggestions = allProducts.slice(1, 5).map((p: any) => {
-    return {
-      id: p.id,
-      title: p.title,
-      price: p.price,
-      rating: 5,
-      image: p.images?.[0] || 'https://images.unsplash.com/photo-1603006905393-c910e859b89f?auto=format&fit=crop&w=300'
-    };
-  });
 
   const toShopCards = (shops: any[]) => {
     if (!shops || shops.length === 0) return [];
@@ -668,40 +659,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         )}
       </section>
 
-      {/* AI Recommendation Section */}
-      <section className="buyer-section" style={{ marginTop: 40 }}>
-        <div className="section-head" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>✨ Gợi ý từ AI dựa trên sở thích của bạn</h2>
-        </div>
-        <div className="buyer-grid-4">
-          {aiSuggestions.map((ai) => {
-            const isFav = favoritedProductIds.includes(ai.id);
-            return (
-              <div key={ai.id} className="buyer-card" onClick={() => navigate(`/product/${ai.id}`)}>
-                <div className="card-media">
-                  <img src={ai.image} alt={ai.title} />
-                  <button
-                    className="fav-overlay"
-                    onClick={(e) => toggleFavorite(ai.id, ai.title, e)}
-                    style={{ color: isFav ? '#e11d48' : '#888' }}
-                  >
-                    <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
-                  </button>
-                </div>
-                <div className="card-info">
-                  <h3>{ai.title}</h3>
-                  <div className="stars-row" style={{ display: 'flex', gap: 2, margin: '4px 0' }}>
-                    {[...Array(ai.rating)].map((_, s) => (
-                      <Star key={s} size={12} className="star-icon" style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                    ))}
-                  </div>
-                  <p className="price-tag">{ai.price.toLocaleString('vi-VN')}đ</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <ForYouSection deals={flashSaleProductMap} />
 
       {/* Followed Shop Updates Section */}
       <section className="buyer-section" style={{ marginTop: 40 }}>

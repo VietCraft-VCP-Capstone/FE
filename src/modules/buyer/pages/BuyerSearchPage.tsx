@@ -15,7 +15,7 @@ import { SearchActiveFilterTags } from '../components/search/SearchActiveFilterT
 import { SearchProductCard } from '../components/search/SearchProductCard';
 import { SearchPagination } from '../components/search/SearchPagination';
 import { SearchEmptyState } from '../components/search/SearchEmptyState';
-import { addRecentSearch } from '../components/search/recentSearchStorage';
+import { rememberSearch } from '../components/search/recentSearchStorage';
 import { SearchFilters, UpdateQuery } from '../components/search/searchFilters';
 import { FALLBACK_KEYWORDS } from '../components/SearchPopover';
 import '../../../shared/components/layouts.css';
@@ -96,7 +96,7 @@ export function BuyerSearchPage() {
   };
 
   useEffect(() => {
-    if (qParam) addRecentSearch(qParam);
+    if (qParam) rememberSearch(qParam);
   }, [qParam]);
 
   useEffect(() => {
