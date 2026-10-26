@@ -1,9 +1,11 @@
 import React from 'react';
 import { Heart, Store, Star } from 'lucide-react';
 import { ProductItem } from '../../../product/types/product';
+import { Deal } from '../deals/buildDeals';
 
 interface SearchProductCardProps {
   product: ProductItem;
+  deal?: Deal;
   isFavorited: boolean;
   onToggleFavorite: (productId: string, title: string, e: React.MouseEvent) => void;
   onClick: () => void;
@@ -11,11 +13,13 @@ interface SearchProductCardProps {
 
 export const SearchProductCard: React.FC<SearchProductCardProps> = ({
   product,
+  deal,
   isFavorited,
   onToggleFavorite,
   onClick
 }) => {
-  const isPod = product.productType === 'POD_TEMPLATE';
+  const price = deal ? deal.price : product.price || 0;
+  const oldPrice = deal ? deal.oldPrice : product.originalPrice;
   const shopName = product.shopInfo?.name || 'VietCraft Artisan';
 
   return (
@@ -31,22 +35,18 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
           loading="lazy"
         />
 
-        <div style={{
-          position: 'absolute',
-          top: 8,
-          left: 8,
-          backgroundColor: isPod ? 'rgba(109, 40, 217, 0.9)' : 'rgba(0, 119, 0, 0.9)',
-          color: '#ffffff',
-          fontSize: 10,
-          fontWeight: 800,
-          padding: '3px 7px',
-          borderRadius: 6,
-          letterSpacing: '0.02em',
-          textTransform: 'uppercase',
-          backdropFilter: 'blur(4px)'
-        }}>
-          {isPod ? 'In theo yêu cầu' : 'Thủ công'}
-        </div>
+        {deal && (
+          <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', zIndex: 3 }}>
+            {deal.badge === 'FLASH SALE'
+              ? <span className="flash-sale-badge">⚡ FLASH SALE</span>
+              : <span className="discount-tag" style={{ position: 'static' }}>{deal.badge}</span>}
+            {deal.discount && (
+              <span style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)', color: '#fef08a', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, backdropFilter: 'blur(4px)' }}>
+                {deal.discount}
+              </span>
+            )}
+          </div>
+        )}
 
         <button
           type="button"
@@ -107,11 +107,11 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
 
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 'auto', paddingTop: 4 }}>
           <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: '#007700' }}>
-            {(product.price || 0).toLocaleString('vi-VN')}đ
+            {price.toLocaleString('vi-VN')}đ
           </p>
-          {product.originalPrice && product.originalPrice > product.price && (
+          {oldPrice && oldPrice > price && (
             <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#a8a29e' }}>
-              {product.originalPrice.toLocaleString('vi-VN')}đ
+              {oldPrice.toLocaleString('vi-VN')}đ
             </span>
           )}
         </div>
