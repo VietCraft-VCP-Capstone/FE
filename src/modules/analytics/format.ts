@@ -68,6 +68,7 @@ export const RANGE_OPTIONS = [
   { value: '90d', label: '90 ngày' },
   { value: '180d', label: '6 tháng' },
   { value: '365d', label: '1 năm' },
+  { value: 'year', label: 'Theo năm' },
 ] as const;
 
 /** Nhãn BR-182: >= 80 · 50-79 · < 50. */
