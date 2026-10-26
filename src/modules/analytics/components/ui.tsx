@@ -279,7 +279,7 @@ export function Note({ children, tone = 'neutral' }: { children: React.ReactNode
 }
 
 /** Bảng dữ liệu gọn, cuộn ngang trên màn nhỏ thay vì vỡ bố cục. */
-export function DataTable({ head, children, caption, minWidth = 'min-w-[560px]' }: {
+export function DataTable({ head, children, caption, minWidth: _minWidth = 'min-w-[560px]' }: {
   head: React.ReactNode;
   children: React.ReactNode;
   caption?: string;
