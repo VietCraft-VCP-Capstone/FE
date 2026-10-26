@@ -93,6 +93,7 @@ export interface HealthRow {
   top_todo: string | null;
   top_impact: number | null;
   top_field: string | null;
+  issue_fields?: string[];
 }
 
 export interface HealthFactor {

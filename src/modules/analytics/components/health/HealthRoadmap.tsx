@@ -71,14 +71,14 @@ export function HealthRoadmap({ data: _data }: { data: ListingHealth }) {
 
                 <div className="mt-2 flex items-center gap-2">
                   {isDone && (
-                    <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#EDF3EC] text-[#346538]">
+                    <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#EAF0E2] text-[#007700]">
                       <Check size={10} strokeWidth={3} />
                     </div>
                   )}
 
                   {isActive && (
-                    <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-[#111111] bg-white">
-                      <div className="h-1.5 w-1.5 rounded-full bg-[#111111]" />
+                    <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-[#007700] bg-white">
+                      <div className="h-1.5 w-1.5 rounded-full bg-[#007700]" />
                     </div>
                   )}
 

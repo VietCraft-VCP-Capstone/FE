@@ -46,14 +46,14 @@ export function ListingDiagnosticCard({
       key: 'healthy',
       label: 'Đạt chuẩn',
       count: 124,
-      badgeClass: 'bg-[#EDF3EC] text-[#346538] border border-[#D5E6D4]',
+      badgeClass: 'bg-[#EAF0E2] text-[#007700] border border-[#BECAB6]',
       desc: 'Sản phẩm đạt từ 80 điểm trở lên chuẩn thuật toán sàn',
     },
     {
       key: 'suppressed',
       label: 'Bị giới hạn',
       count: 2,
-      badgeClass: 'bg-[#FBF3DB] text-[#956400] border border-[#F2E4B8]',
+      badgeClass: 'bg-amber-50 text-amber-800 border border-amber-200',
       desc: 'Sản phẩm bị tạm ẩn hoặc hạn chế hiển thị tìm kiếm tự nhiên',
     },
   ];
@@ -305,13 +305,13 @@ export function ListingDiagnosticCard({
                   <div className="space-y-3">
                     <div className="flex items-center justify-between border-b border-stone-100 pb-2">
                       <div className="flex items-center gap-1.5">
-                        <Sparkles size={13} className="text-[#346538]" />
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#111111]">
+                        <Sparkles size={13} className="text-[#007700]" />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-900">
                           Dự báo sau tối ưu
                         </span>
                       </div>
                       <Tooltip title="Mức tăng trưởng kỳ vọng sau khi gỡ bỏ điểm nghẽn">
-                        <span className="cursor-help rounded bg-[#EDF3EC] px-2 py-0.5 text-[10px] font-bold text-[#346538] border border-[#D5E6D4]">
+                        <span className="cursor-help rounded bg-[#EAF0E2] px-2 py-0.5 text-[10px] font-bold text-[#007700] border border-[#BECAB6]">
                           +38% tiềm năng
                         </span>
                       </Tooltip>
@@ -323,10 +323,10 @@ export function ListingDiagnosticCard({
                         <span className="text-[9px] font-bold uppercase tracking-wider text-stone-400 block">
                           Điểm số
                         </span>
-                        <div className="mt-0.5 font-jakarta text-sm font-black text-[#346538]">
+                        <div className="mt-0.5 font-jakarta text-sm font-black text-[#007700]">
                           {currentScore} → {potentialScore}
                         </div>
-                        <span className="text-[10px] font-medium text-[#346538]">Mức Tốt</span>
+                        <span className="text-[10px] font-medium text-[#007700]">Mức Tốt</span>
                       </div>
 
                       <div className="px-1">

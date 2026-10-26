@@ -35,7 +35,15 @@ function weakest(data: ListingIntel): IntelAxisKey {
   return scored.length ? scored.reduce((a, b) => ((data.axes[b].score as number) < (data.axes[a].score as number) ? b : a)) : 'image';
 }
 
-export function PartTabs({ data, productId }: { data: ListingIntel; productId?: string }) {
+export function PartTabs({
+  data,
+  productId,
+  bare = false,
+}: {
+  data: ListingIntel;
+  productId?: string;
+  bare?: boolean;
+}) {
   const [active, setActive] = useState<Part>(() => weakest(data));
   const parts: Part[] = productId ? [...AXIS_KEYS, 'sell'] : AXIS_KEYS;
 
@@ -56,6 +64,10 @@ export function PartTabs({ data, productId }: { data: ListingIntel; productId?: 
       ),
     };
   });
+
+  if (bare) {
+    return <Tabs activeKey={active} onChange={key => setActive(key as Part)} items={tabItems} className="mt-1" />;
+  }
 
   return (
     <section className="rounded-2xl border border-stone-200/80 bg-white p-5 md:p-6 shadow-xs transition-shadow hover:shadow-sm">
