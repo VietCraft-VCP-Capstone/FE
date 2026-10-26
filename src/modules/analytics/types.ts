@@ -218,21 +218,56 @@ export interface CategoryRevenue {
 
 /* ------------------------------------------------------------ F32 -------- */
 
+/** GET /competitor-brief: việc nên làm tuần này, gom từ F32–F36. Chỉ có cho gian hàng thật. */
+export interface CompetitorBrief {
+  /** rules = lập theo luật; llm = mô hình ngôn ngữ viết lại, số đã đối chiếu với số liệu gốc. */
+  source: 'rules' | 'llm';
+  provider: string | null;
+  /** API xếp sẵn từ gấp tới nên làm; `priority` thiếu khi AI còn chạy bản cũ. */
+  actions: { action: string; why: string; link: string | null; priority?: 'gap' | 'quan_trong' | 'nen_lam' }[];
+  facts_count: number;
+  generated_at: string;
+}
+
+/** Sản phẩm của shop khác giống sản phẩm của bạn nhất (AI so nội dung, chỉ trong cùng loại hàng). */
+export interface DirectRival {
+  product_id: string;
+  shop_id: string;
+  shop_name: string | null;
+  title: string | null;
+  price_vnd: number | null;
+  est_sales_90d: number;
+  /** 0–1, độ giống nội dung. */
+  similarity: number;
+  /** Giống từ 0,35: trên Shopee, 73% cặp ở mức này là cùng một sản phẩm. */
+  near_identical?: boolean;
+  /** Các từ hai sản phẩm cùng có, vd ["mèo", "cung hoàng đạo"]. */
+  reasons: string[];
+}
+
 export interface Competitors {
   category_id: string;
   available_categories: string[];
   /** Chỉ có ở shop thật: mã danh mục -> tên. Danh mục của sàn không có trong bảng nhãn cứng. */
   category_names?: Record<string, string | null>;
+  /** Dưới 5 sản phẩm của shop khác: vẫn hiện đủ số đang có, thứ hạng chỉ để tham khảo. */
+  low_sample?: boolean;
   my_listings: {
     listing_id: string;
     title: string;
     price_vnd: number;
     est_sales_90d: number;
     rating_shrunk: number | null;
-    /** Hạng theo số bán 90 ngày trong danh mục. */
+    n_reviews?: number;
+    favorite_count?: number;
+    /** Hạng theo số bán 90 ngày trong danh mục; hoà thì theo số đánh giá (BR-188). */
     rank_in_cat: number;
     n_in_cat: number;
+    /** Chỉ có ở shop thật. */
+    direct_rivals?: DirectRival[];
   }[];
+  /** Shop trùng nhiều sản phẩm với bạn nhất (chỉ có ở shop thật). */
+  direct_rival_shops?: { shop_id: string; shop_name: string | null; overlap: number; best_similarity: number }[];
   competitors: {
     rank: number;
     listing_id: string;
@@ -247,6 +282,7 @@ export interface Competitors {
     shop_id?: string;
   }[];
   my_position: {
+    /** Phân vị so với sản phẩm của shop khác; null khi dưới 5 sản phẩm để so. */
     price_percentile: number | null;
     rating_percentile: number | null;
     my_avg_price_vnd: number | null;
@@ -256,6 +292,23 @@ export interface Competitors {
 }
 
 /* ------------------------------------------------------------ F33 -------- */
+
+/** Nhóm chiến lược: AI phân cụm (KMeans) các shop cùng danh mục, PCA để vẽ 2 chiều. */
+export interface StrategicGroups {
+  k: number;
+  /** Độ tách nhóm, từ 0,25 là rõ. */
+  silhouette: number;
+  clear: boolean;
+  features: string[];
+  axes: { x: string; y: string | null };
+  groups: { id: number; label: string; size: number; avg_price_vnd: number; avg_revenue_90d_vnd: number }[];
+  points: { shop_id: string; shop_name: string | null; x: number; y: number; group: number; me: boolean }[];
+  my_group: number;
+  /** null khi sàn chưa có đơn để biết nhóm nào bán tốt hơn. */
+  best_group: number | null;
+  gaps: { feature: 'gia' | 'sao' | 'phan_hoi' | 'so_sp' | 'doanh_so'; name: string; mine: number; theirs: number }[];
+  method: string;
+}
 
 export interface ShopComparison {
   segment: string;
@@ -274,9 +327,15 @@ export interface ShopComparison {
     values: (number | null)[];
     /** Số thật từng trục, cùng đơn vị với `me_raw`. */
     raw?: Record<string, number | null>;
-    est_revenue_90d_vnd: number;
   }[];
+  /** Trục không có tốt/xấu (giá): 100 là đắt nhất, không phải tốt hơn. */
+  neutral_axes?: string[];
+  /** "reviews" khi sàn chưa có đơn nên 5 shop được chọn theo số đánh giá thay cho doanh thu. */
+  ranked_by?: 'revenue' | 'reviews';
   shops_in_segment: number;
+  /** Chỉ có ở shop thật. */
+  strategic_groups?: StrategicGroups | null;
+  strategic_groups_reason?: string | null;
   /** Trục của chính shop bạn đang thiếu dữ liệu. */
   axes_missing?: string[];
 }
@@ -294,6 +353,12 @@ export interface TagGap {
   tag_names?: Record<string, string>;
   /** Tag nhóm bán chạy hay dùng, kể cả tag shop mình đã có. */
   leader_tags?: { tag_id: string; used_by: number; mine: boolean }[];
+  /** Chỉ có ở shop thật: AI gợi ý riêng cho từng sản phẩm (lai: sản phẩm giống + độ phổ biến cùng loại). */
+  per_product?: {
+    product_id: string;
+    title: string | null;
+    suggestions: { tag_id: string; score: number; used_by: number; better_sellers: number; popular_in_type: number }[];
+  }[];
   missing_tags: {
     tag_id: string;
     name: string;
@@ -335,6 +400,22 @@ export interface MyProduct {
   handmade_hint: boolean;
 }
 
+/** Giá của đối thủ trực tiếp (AI kNN), pha với mặt bằng cùng loại theo độ tin cậy. */
+export interface AiPrice {
+  suggested_vnd: number;
+  low_vnd: number;
+  high_vnd: number;
+  confidence: 'high' | 'medium' | 'low';
+  /** Tỉ trọng giá đối thủ trực tiếp trong con số đề xuất (phần còn lại là mặt bằng cùng loại). */
+  rival_weight: number;
+  n_neighbors: number;
+  avg_similarity: number;
+  rival_price_min_vnd: number;
+  rival_price_max_vnd: number;
+  neighbors: { product_id: string; shop_name: string | null; title: string | null; price_vnd: number; est_sales_90d: number; similarity: number }[];
+  method: string;
+}
+
 export interface PricingAnalysis {
   product_type_id: string;
   available_product_types: string[];
@@ -357,12 +438,35 @@ export interface PricingAnalysis {
   /** true khi chưa chọn sản phẩm nào, nên chưa có phán xét về giá. */
   needs_product_pick?: boolean;
   limitation?: string | null;
+  ai_price?: AiPrice | null;
+  ai_price_reason?: string | null;
 }
 
 /* ------------------------------------------------------------ F36 -------- */
 
+/** AI chấm mức đe doạ của một sản phẩm mới của đối thủ. */
+export interface Threat {
+  score: number;
+  level: 'high' | 'medium' | 'low';
+  similarity: number;
+  matched_product_id: string | null;
+  matched_title: string | null;
+  /** > 0: đối thủ rẻ hơn sản phẩm khớp của bạn bao nhiêu %. */
+  price_gap_pct: number | null;
+  shop_strength: number;
+  near_identical?: boolean;
+}
+
 export interface CompetitorTracking {
-  tracked: { shop_id: string; shop_name: string | null; added_at: string | null; listings_total: number }[];
+  tracked: {
+    shop_id: string;
+    shop_name: string | null;
+    added_at: string | null;
+    listings_total: number;
+    /** Shop thật: danh mục shop đó bán nhiều nhất và ngày đăng sản phẩm gần nhất (SRS 3.9.5). */
+    category_name?: string | null;
+    last_new_listing_at?: string | null;
+  }[];
   slots_used: number;
   slots_limit: number;
   alerts: {
@@ -379,14 +483,27 @@ export interface CompetitorTracking {
     product_id?: string | null;
     matched_category?: string | null;
     category_name?: string | null;
+    /** Shop thật: danh mục lá trùng với ngách của bạn. */
+    matched_type?: string | null;
+    type_name?: string | null;
+    threat?: Threat | null;
   }[];
   alerts_total: number;
+  /** Chỉ có ở shop thật: shop đang theo dõi có tuần gần nhất bán vượt hẳn các tuần trước. */
+  surging?: { shop_id: string; shop_name: string | null; last_week: number; baseline: number; ratio: number | null; z: number }[];
   my_niche_tags: string[];
   /** Chỉ có ở shop thật: slug tag -> tên hiển thị. */
   tag_names?: Record<string, string>;
-  /** Chỉ có ở shop thật: lần quét gần nhất của job đêm. */
+  /** Chỉ có ở shop thật: giờ quét sàn gần nhất (quét mỗi ngày một lần). */
   alerts_computed_at?: string | null;
   limitation: string | null;
+}
+
+/** Kết quả ô "Tìm shop theo tên" của phần Theo dõi đối thủ. */
+export interface ShopSearchResult {
+  shop_id: string;
+  shop_name: string;
+  is_tracked: boolean;
 }
 
 /* ------------------------------------------------------------ F37 -------- */

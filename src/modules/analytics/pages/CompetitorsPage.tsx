@@ -1,34 +1,130 @@
 /**
- * F32 · Ai đang bán chạy — GET /seller/analytics/competitors?categoryId=
+ * Phân tích đối thủ — một trang gộp F32 (ai bán chạy), F36 (theo dõi đối thủ), F33 (điểm mạnh & điểm yếu).
  *
- * Trả lời: "Trong danh mục của tôi, ai đang bán chạy và tôi đứng ở đâu?" Viết cho người bán
- * mới: kết luận một câu trước, số liệu sau, và một việc làm ngay (theo dõi shop bán chạy nhất).
+ * Trang tải ba API một lần rồi chia cho từng phần, để kết luận đầu trang lấy được số của cả ba.
+ * Viết cho người bán mới: kế hoạch tuần này và một câu kết luận trước, chi tiết từng phần sau.
  * Gian hàng thật nhận `shop_id` từng dòng nên theo dõi được ngay trên bảng; shop mẫu thì không.
+ * Đường dẫn cũ /tracking và /benchmark chuyển về đây kèm #theo-doi, #manh-yeu.
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Radar, UserPlus } from 'lucide-react';
-import { invalidateInsights, useInsight } from '../hooks/useInsight';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Pagination } from 'antd';
+import { ArrowUp, CalendarCheck, Crosshair, Radar, UserPlus, Users } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { invalidateInsights, useInsight, type InsightState } from '../hooks/useInsight';
 import { analyticsApi, analyticsErrorMessage } from '../services/analyticsApi';
-import type { CompetitorTracking, Competitors } from '../types';
+import type { CompetitorBrief, CompetitorTracking, Competitors, ShopComparison } from '../types';
 import { InsightPage } from '../components/InsightPage';
 import { InsightBlock, InsightStatusView } from '../components/InsightBlock';
 import { SourceFooter } from '../components/SourceFooter';
-import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, SelectField, Takeaway } from '../components/ui';
+import { ACTION_CLASS, Chip, InsightCard, Note, SelectField, type Tone } from '../components/ui';
+import { SellerAntd } from '../../seller/components/SellerAntd';
 import { MiniStat } from '../components/charts/MiniViz';
+import { BenchmarkSection, giaTri, soVoiDanDau } from '../components/competitors/BenchmarkSection';
+import { MUC_DE_DOA, TrackingSection } from '../components/competitors/TrackingSection';
+import { TopTwentyCharts } from '../components/competitors/TopTwentyCharts';
+import { GIAI_THICH, NhanTinCay } from '../components/competitors/giaiThich';
 import { NA, decimal } from '../format';
 import { categoryLabel } from '../labels';
 import { count, money } from '../../../shared/utils/format';
 
 const INSIGHTS_ROOT = '/seller/insights';
 
-/** Phân vị giá đọc thành lời. Phân vị tính cả chính mình nên giá cao nhất là 100%. */
+const PHAN: { id: string; icon: LucideIcon; title: string; question: string }[] = [
+  { id: 'ban-chay', icon: Users, title: 'Ai đang bán chạy', question: 'Trong danh mục của tôi, ai bán chạy và tôi đứng ở đâu?' },
+  { id: 'theo-doi', icon: Radar, title: 'Theo dõi đối thủ', question: 'Đối thủ tôi theo dõi vừa ra hàng gì, có đáng lo không?' },
+  { id: 'manh-yeu', icon: Crosshair, title: 'Điểm mạnh & điểm yếu', question: 'So với 5 shop dẫn đầu cùng danh mục, tôi hơn và kém ở đâu?' },
+];
+
+/** Thanh điều hướng: đầu trang + 3 phần. */
+const MUC: { id: string; icon: LucideIcon; title: string }[] = [
+  { id: 'tong-quan', icon: CalendarCheck, title: 'Tổng quan' },
+  ...PHAN.map(({ id, icon, title }) => ({ id, icon, title })),
+];
+
+const PILL_CLASS =
+  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-stone-700 no-underline transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none';
+const PILL_DANG_XEM = '!border-[#007700] !bg-[#007700] !text-white';
+
+const rutGon = (s: string | null | undefined, n = 48) => {
+  const t = s ?? '';
+  return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t;
+};
+
+/** Cuộn đúng khung nội dung của khu người bán, không kéo cả cửa sổ (mất thanh tiêu đề). Chừa chỗ cho thanh dính. */
+function cuonToi(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const khung = el.closest('.seller-content');
+  if (!(khung instanceof HTMLElement)) {
+    el.scrollIntoView({ block: 'start' });
+    return;
+  }
+  const top = id === MUC[0].id ? 0 : el.getBoundingClientRect().top - khung.getBoundingClientRect().top + khung.scrollTop - 64;
+  const muot = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  khung.scrollTo({ top, behavior: muot ? 'smooth' : 'auto' });
+}
+
+/** Mọi link #phần trong trang đi qua cuonToi; vẫn giữ href để mở tab mới hoặc chép link được. */
+function bamNeo(e: React.MouseEvent) {
+  const a = (e.target as HTMLElement).closest('a[href^="#"]');
+  const id = a?.getAttribute('href')?.slice(1);
+  if (!id || !document.getElementById(id)) return;
+  e.preventDefault();
+  window.history.replaceState(window.history.state, '', `#${id}`);
+  cuonToi(id);
+}
+
+/** Thanh 4 nút dính trên đầu khi cuộn; nút của phần đang xem được tô xanh. */
+function ThanhDieuHuong({ dang }: { dang: string }) {
+  return (
+    // -top-6 bù 24px đệm trên của khung cuộn, để thanh nằm sát mép, không lộ nội dung phía trên.
+    <nav aria-label="Các phần trong trang" className="sticky -top-6 z-20 -mx-2 border-b border-stone-200 bg-[#f8fafb] px-2 py-2">
+      <div className="flex items-center gap-2">
+        <ul className="m-0 flex min-w-0 flex-1 list-none gap-2 overflow-x-auto p-0">
+          {MUC.map(m => (
+            <li key={m.id} className="shrink-0">
+              <a href={`#${m.id}`} aria-current={dang === m.id ? 'location' : undefined} className={`${PILL_CLASS} ${dang === m.id ? PILL_DANG_XEM : ''}`}>
+                <m.icon size={14} aria-hidden /> {m.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+        {dang !== 'tong-quan' && (
+          <a href="#tong-quan" className={`${PILL_CLASS} shrink-0`} title="Lên đầu trang" aria-label="Lên đầu trang">
+            <ArrowUp size={14} aria-hidden />
+          </a>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+/** Theo dõi phần nào đang nằm ở khoảng 15–30% chiều cao khung cuộn, để tô sáng nút tương ứng. */
+function usePhanDangXem() {
+  const [dang, setDang] = useState(MUC[0].id);
+  useEffect(() => {
+    const els = MUC.map(m => document.getElementById(m.id)).filter((e): e is HTMLElement => e !== null);
+    if (!els.length || typeof IntersectionObserver === 'undefined') return;
+    const thay = new Map<string, boolean>();
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => thay.set(e.target.id, e.isIntersecting));
+      const dau = MUC.find(m => thay.get(m.id));
+      if (dau) setDang(dau.id);
+    }, { root: els[0].closest('.seller-content'), rootMargin: '-15% 0px -70% 0px' });
+    els.forEach(e => io.observe(e));
+    return () => io.disconnect();
+  }, []);
+  return dang;
+}
+
+/** Phân vị giá đọc thành lời. Phân vị so với sản phẩm của shop khác; dưới 5 sản phẩm thì API trả null. */
 function priceWords(p: number | null | undefined): string | null {
   if (p === null || p === undefined || !Number.isFinite(p)) return null;
   if (p >= 90) return 'thuộc nhóm đắt nhất danh mục';
   if (p <= 10) return 'thuộc nhóm rẻ nhất danh mục';
-  return `đắt hơn ${p}% sản phẩm cùng danh mục`;
+  return `đắt hơn ${p}% sản phẩm của shop khác cùng danh mục`;
 }
 
 function ratingCell(rating: number | null, nReviews?: number) {
@@ -44,57 +140,375 @@ function ratingCell(rating: number | null, nReviews?: number) {
   );
 }
 
-/** Bảng sản phẩm của shop mình: mặc định 10 dòng, mở rộng khi người bán muốn xem hết. */
-function MyListingsTable({ rows }: { rows: Competitors['my_listings'] }) {
-  const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? rows : rows.slice(0, 10);
+const MOI_TRANG = 5;
+
+/** Kẹp trang đang xem vào khoảng có dữ liệu (danh sách có thể ngắn lại khi tải lại) và cắt ra các dòng của trang đó. */
+function catTrang<T>(rows: T[], trang: number) {
+  const t = Math.min(Math.max(1, trang), Math.max(1, Math.ceil(rows.length / MOI_TRANG)));
+  return { t, dau: (t - 1) * MOI_TRANG, rows: rows.slice((t - 1) * MOI_TRANG, t * MOI_TRANG) };
+}
+
+/** Phân trang chung của trang này: 5 dòng một trang, ẩn khi chỉ có một trang. */
+function PhanTrang({ trang, tong, onDoi, nhan }: { trang: number; tong: number; onDoi: (t: number) => void; nhan: string }) {
+  if (tong <= MOI_TRANG) return null;
+  return (
+    <nav aria-label={nhan} className="mt-3 flex justify-end">
+      <SellerAntd>
+        <Pagination size="small" current={trang} pageSize={MOI_TRANG} total={tong} onChange={onDoi} showSizeChanger={false} />
+      </SellerAntd>
+    </nav>
+  );
+}
+
+const LINK_TEN =
+  'min-w-0 truncate text-[13px] font-semibold text-stone-800 no-underline transition-colors duration-150 hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none';
+
+/** Sản phẩm của shop bạn trong danh mục, đặt cạnh top 20 của shop khác. */
+function SanPhamCuaBan({ rows }: { rows: Competitors['my_listings'] }) {
+  const [trang, setTrang] = useState(1);
+  const { t, rows: trangNay } = catTrang(rows, trang);
+  return (
+    <>
+      <ul className="m-0 list-none divide-y divide-stone-100 p-0" aria-label="Sản phẩm của bạn trong danh mục này">
+        {trangNay.map(row => (
+          <li key={row.listing_id} className="py-2.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <Link to={`${INSIGHTS_ROOT}/listings/${row.listing_id}`} title={row.title} className={LINK_TEN}>{row.title}</Link>
+              <span className="shrink-0 text-[13px] font-semibold tabular-nums text-stone-900">{money(row.price_vnd)}</span>
+            </div>
+            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-stone-500">
+              <span>Đã bán <strong className="tabular-nums text-stone-700">{count(row.est_sales_90d)}</strong></span>
+              <span>Đánh giá {ratingCell(row.rating_shrunk)}</span>
+              {/* 0 đơn thì hạng chỉ là thứ tự hoà, không nói lên gì. */}
+              <span>{row.est_sales_90d > 0 ? <>Hạng <strong className="tabular-nums text-stone-700">{count(row.rank_in_cat)}/{count(row.n_in_cat)}</strong></> : 'Chưa có đơn'}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <PhanTrang trang={t} tong={rows.length} onDoi={setTrang} nhan="Các trang sản phẩm của bạn" />
+    </>
+  );
+}
+
+/** Top 20 sản phẩm của shop khác, 5 sản phẩm một trang; theo dõi shop ngay trên từng dòng. */
+function Top20ShopKhac({ rows, canTrack, trackedIds, pendingShop, khoa, onTrack }: {
+  rows: Competitors['competitors'];
+  canTrack: boolean;
+  trackedIds: Set<string>;
+  pendingShop: string | null;
+  khoa: boolean;
+  onTrack: (shopId: string, shopName: string) => void;
+}) {
+  const [trang, setTrang] = useState(1);
+  const { t, rows: trangNay } = catTrang(rows, trang);
+  return (
+    <>
+      <ol className="m-0 list-none divide-y divide-stone-100 p-0" aria-label="Sản phẩm bán chạy nhất của shop khác">
+        {trangNay.map(row => (
+          <li key={row.listing_id} className="flex items-center gap-3 py-2.5">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs font-bold tabular-nums text-stone-700">
+              <span className="sr-only">Hạng </span>{row.rank}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 truncate text-[13px] font-semibold text-stone-800" title={row.title}>{row.title}</span>
+                <span className="shrink-0 text-[13px] font-semibold tabular-nums text-stone-900">{money(row.price_vnd)}</span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-stone-500">
+                {row.shop_id ? (
+                  <Link to={`/seller/competitors/${row.shop_id}`} title={`Xem hồ sơ ${row.shop_name}`} className="font-medium text-stone-700 no-underline hover:text-[#007700]">{row.shop_name}</Link>
+                ) : (
+                  <span className="font-medium text-stone-700">{row.shop_name}</span>
+                )}
+                <span>Đã bán <strong className="tabular-nums text-stone-700">{count(row.est_sales_90d)}</strong></span>
+                <span>{ratingCell(row.rating_shrunk, row.n_reviews)}</span>
+                <span><strong className="tabular-nums text-stone-700">{count(row.favorite_count)}</strong> yêu thích</span>
+              </div>
+            </div>
+            {canTrack && row.shop_id && (trackedIds.has(row.shop_id) ? (
+              <Chip tone="good">Đang theo dõi</Chip>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onTrack(row.shop_id!, row.shop_name)}
+                disabled={khoa}
+                aria-label={`Theo dõi ${row.shop_name}`}
+                className="inline-flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
+              >
+                <UserPlus size={13} aria-hidden />
+                {pendingShop === row.shop_id ? 'Đang thêm' : 'Theo dõi'}
+              </button>
+            ))}
+          </li>
+        ))}
+      </ol>
+      <PhanTrang trang={t} tong={rows.length} onDoi={setTrang} nhan="Các trang sản phẩm bán chạy của shop khác" />
+    </>
+  );
+}
+
+/** AI so nội dung (tên, từ khoá, mô tả) để tìm sản phẩm shop khác giống từng sản phẩm của bạn nhất. */
+function DirectRivalsCard({ listings, canTrack, trackedIds, pendingShop, onTrack, footer }: {
+  listings: Competitors['my_listings'];
+  canTrack: boolean;
+  trackedIds: Set<string>;
+  pendingShop: string | null;
+  onTrack: (shopId: string, shopName: string) => void;
+  footer?: React.ReactNode;
+}) {
+  const co = listings.filter(l => (l.direct_rivals?.length ?? 0) > 0);
+  const [chon, setChon] = useState('');
+  const sp = co.find(l => l.listing_id === chon) ?? co[0];
+  return (
+    <InsightCard
+      title="Đối thủ trực tiếp của từng sản phẩm"
+      info={GIAI_THICH.doiThuTrucTiep}
+      action={<NhanTinCay loai="kiem" />}
+      description="Sản phẩm của shop khác giống sản phẩm của bạn nhất, trong cùng loại hàng. Từ 35% giống trở lên là gần như cùng sản phẩm."
+      footer={footer}
+    >
+      {!sp ? (
+        <Note>AI chưa tìm thấy sản phẩm nào của shop khác đủ giống sản phẩm của bạn trong cùng loại hàng.</Note>
+      ) : (
+        <div className="space-y-4">
+          {co.length > 1 ? (
+            <SelectField label="Sản phẩm của bạn" value={sp.listing_id} onChange={setChon} options={co.map(l => ({ value: l.listing_id, label: l.title }))} />
+          ) : (
+            <p className="m-0 text-[13px] text-stone-600">Sản phẩm của bạn: <strong className="text-stone-900">{sp.title}</strong></p>
+          )}
+          <ul className="m-0 list-none space-y-3 p-0">
+            {sp.direct_rivals!.map(r => (
+              <li key={r.product_id} className="flex flex-wrap items-start gap-3 rounded-md border border-stone-200 bg-white px-4 py-3">
+                <span className="inline-flex h-11 w-14 shrink-0 flex-col items-center justify-center rounded-md bg-[#EAF0E2] text-[#005B00]">
+                  <strong className="text-base leading-none tabular-nums">{Math.round(r.similarity * 100)}%</strong>
+                  <span className="text-[10px]">giống</span>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="truncate text-[13px] font-semibold text-stone-900" title={r.title ?? ''}>{r.title}</span>
+                    {r.near_identical && <Chip tone="warn">Gần như cùng sản phẩm</Chip>}
+                  </span>
+                  <span className="block text-xs text-stone-500">
+                    <Link to={`/seller/competitors/${r.shop_id}`} className="font-medium text-stone-700 no-underline hover:text-[#007700]">{r.shop_name}</Link>
+                    {' · '}{r.price_vnd === null ? NA : money(r.price_vnd)}{' · '}đã bán {count(r.est_sales_90d)}
+                  </span>
+                  {r.reasons.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {r.reasons.map(x => <Chip key={x} tone="info">{x}</Chip>)}
+                    </div>
+                  )}
+                </div>
+                {canTrack && (trackedIds.has(r.shop_id) ? (
+                  <Chip tone="good">Đang theo dõi</Chip>
+                ) : (
+                  <button type="button" onClick={() => onTrack(r.shop_id, r.shop_name ?? '')} disabled={pendingShop !== null} className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none">
+                    <UserPlus size={13} aria-hidden />
+                    {pendingShop === r.shop_id ? 'Đang thêm' : 'Theo dõi'}
+                  </button>
+                ))}
+              </li>
+            ))}
+          </ul>
+          <Note>Ô màu là các từ hai sản phẩm cùng có, tức lý do AI chọn. Độ giống chỉ tính từ nội dung, không tính từ giá.</Note>
+        </div>
+      )}
+    </InsightCard>
+  );
+}
+
+const MUC_UU_TIEN: Record<NonNullable<CompetitorBrief['actions'][number]['priority']>, { label: string; tone: Tone }> = {
+  gap: { label: 'Gấp', tone: 'bad' },
+  quan_trong: { label: 'Quan trọng', tone: 'warn' },
+  nen_lam: { label: 'Nên làm', tone: 'neutral' },
+};
+
+/** Kế hoạch tuần này: điều đáng làm nhất về đối thủ, API đã xếp từ gấp tới nên làm. Shop mẫu không có nên ẩn hẳn. */
+function WeeklyPlanCard({ state, reload }: { state: InsightState<CompetitorBrief>; reload: () => void }) {
+  const [trang, setTrang] = useState(1);
+  if (state.kind === 'insufficient') return null;
+  const viec = state.kind === 'ready' ? state.data.actions : [];
+  const { t, dau, rows } = catTrang(viec, trang);
+  return (
+    <InsightCard
+      title="Kế hoạch tuần này"
+      info={GIAI_THICH.keHoach}
+      description={`${viec.length ? `${count(viec.length)} việc nên làm tuần này, xếp từ gấp tới nên làm. ` : ''}Bấm Xem để tới đúng chỗ cần sửa.`}
+      footer={state.kind === 'ready' && (
+        <span className="text-xs text-stone-500">
+          {state.data.source === 'llm'
+            ? `Câu chữ do mô hình ngôn ngữ (${state.data.provider}) viết. Mọi con số đã được đối chiếu với số liệu gốc.`
+            : 'Lập tự động từ số liệu phân tích. Mỗi việc đều kèm con số làm căn cứ.'}
+        </span>
+      )}
+    >
+      {state.kind !== 'ready' ? (
+        <InsightStatusView state={state} onRetry={reload} compact />
+      ) : viec.length === 0 ? (
+        <Note>Tuần này chưa có việc gì gấp: giá, từ khoá và đối thủ của bạn đều chưa có gì đáng lo.</Note>
+      ) : (
+        <>
+          <ol className="m-0 list-none space-y-2 p-0" start={dau + 1}>
+            {rows.map((a, i) => (
+              <li key={dau + i} className="flex items-start gap-3 rounded-md border border-stone-200 bg-white px-4 py-3">
+                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#EAF0E2] text-xs font-bold text-[#005B00]" aria-hidden>
+                  {dau + i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start gap-2">
+                    {a.priority && <Chip tone={MUC_UU_TIEN[a.priority].tone}>{MUC_UU_TIEN[a.priority].label}</Chip>}
+                    <p className="m-0 min-w-0 flex-1 text-sm font-semibold text-stone-900">{a.action}</p>
+                  </div>
+                  {a.why && <p className="m-0 mt-0.5 text-[13px] text-stone-600">{a.why}</p>}
+                </div>
+                {a.link && (
+                  <Link to={a.link} className="shrink-0 text-[13px] font-medium text-[#007700] no-underline hover:underline">Xem</Link>
+                )}
+              </li>
+            ))}
+          </ol>
+          <PhanTrang trang={t} tong={viec.length} onDoi={setTrang} nhan="Các trang của kế hoạch tuần này" />
+        </>
+      )}
+    </InsightCard>
+  );
+}
+
+function PageSection({ id, icon: Icon, title, question, action, children }: (typeof PHAN)[number] & {
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} aria-labelledby={`${id}-tieu-de`} className="scroll-mt-16 space-y-4 border-t border-stone-200 pt-6">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id={`${id}-tieu-de`} className="m-0 flex items-center gap-2 text-base font-bold text-stone-900">
+            <Icon size={18} className="text-[#007700]" aria-hidden /> {title}
+          </h2>
+          <p className="mb-0 mt-1 text-[13px] text-stone-600">{question}</p>
+        </div>
+        {action}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/** Kết luận chung: mỗi phần góp một câu và một con số; phần nào chưa tải xong thì bỏ qua. */
+function TongQuan({ comp, trk, cmp, action }: {
+  comp: Competitors | null;
+  trk: { data: CompetitorTracking; live: boolean } | null;
+  cmp: ShopComparison | null;
+  action?: React.ReactNode;
+}) {
+  if (!comp && !trk && !cmp) return null;
+  const catName = comp ? categoryLabel(comp.category_id, comp.category_names?.[comp.category_id]) : '';
+  const best = comp?.my_listings[0];
+  const rival = comp?.direct_rival_shops?.[0];
+  const top = comp?.competitors[0];
+  const latest = trk?.data.alerts[0];
+  const ss = cmp ? soVoiDanDau(cmp) : null;
+  const nhom = cmp?.strategic_groups;
+  const tenNhom = (id: number | null) => nhom?.groups.find(g => g.id === id)?.label;
+
+  // Mỗi phần một dòng ngắn để đọc lướt; chi tiết nằm ở phần tương ứng bên dưới.
+  const dong: { id: string; icon: LucideIcon; ten: string; cau: React.ReactNode }[] = [];
+  if (comp) {
+    dong.push({ ...PHAN[0], ten: PHAN[0].title, cau: rival ? (
+      <>Đối thủ trực tiếp nhất: <strong>{rival.shop_name}</strong>, có hàng giống {count(rival.overlap)} sản phẩm của bạn.</>
+    ) : top && top.est_sales_90d > 0 ? (
+      <>Bán chạy nhất {catName}: <strong title={top.title}>{rutGon(top.title)}</strong> của {top.shop_name}.</>
+    ) : (
+      <>Chưa tìm thấy đối thủ trực tiếp, và {catName} chưa có đơn đã giao để biết ai bán chạy.</>
+    ) });
+  }
+  if (trk) {
+    dong.push({ ...PHAN[1], ten: PHAN[1].title, cau: trk.data.tracked.length === 0 ? (
+      <>Bạn chưa theo dõi shop nào. Theo dõi để được báo khi họ ra hàng giống bạn.</>
+    ) : latest?.threat && latest.threat.level !== 'low' ? (
+      // Chỉ gọi tên khi đe doạ cao hoặc vừa; đe doạ thấp mà nêu tên là làm người bán lo thừa.
+      <>Hàng mới đáng chú ý: <strong title={latest.title ?? ''}>{rutGon(latest.title || latest.listing_id)}</strong> của {latest.shop_name || latest.shop_id} ({MUC_DE_DOA[latest.threat.level].label.toLowerCase()}).</>
+    ) : latest ? (
+      <>{count(trk.data.alerts_total)} hàng mới cùng nhóm hàng với bạn, chưa có gì đáng lo.</>
+    ) : (
+      <>{count(trk.data.tracked.length)} shop bạn theo dõi chưa ra hàng mới giống bạn.</>
+    ) });
+  }
+  if (ss) {
+    dong.push({ ...PHAN[2], ten: PHAN[2].title, cau: ss.weakest ? (
+      <>Nên cải thiện: <strong>{ss.weakest.name.toLowerCase()}</strong> (bạn {giaTri(ss.weakest.info, ss.weakest.mine)}, nhóm dẫn đầu {giaTri(ss.weakest.info, ss.weakest.group)}).
+        {ss.strongest && <> Mạnh nhất: {ss.strongest.name.toLowerCase()}.</>}</>
+    ) : ss.strongest ? (
+      <>Mạnh nhất: <strong>{ss.strongest.name.toLowerCase()}</strong> (bạn {giaTri(ss.strongest.info, ss.strongest.mine)}, nhóm dẫn đầu {giaTri(ss.strongest.info, ss.strongest.group)}). Không có tiêu chí nào kém hẳn.</>
+    ) : (
+      <>Chưa đủ số liệu để biết bạn hơn hay kém 5 shop dẫn đầu.</>
+    ) });
+  }
+  const itDon = comp && comp.competitors.every(c => c.est_sales_90d === 0) && comp.my_listings.every(l => l.est_sales_90d === 0);
 
   return (
     <>
-      <DataTable
-        caption="Sản phẩm của shop bạn trong danh mục này"
-        head={
-          <>
-            <th scope="col">Sản phẩm</th>
-            <th scope="col" className="text-right">Giá</th>
-            <th scope="col" className="text-right">Đã bán (90 ngày)</th>
-            <th scope="col">Đánh giá</th>
-            <th scope="col" className="text-right">Hạng trong danh mục</th>
-          </>
-        }
-      >
-        {shown.map(row => (
-          <tr key={row.listing_id}>
-            <td>
-              <Link
-                to={`${INSIGHTS_ROOT}/listings/${row.listing_id}`}
-                title={row.title}
-                className="block max-w-[34ch] truncate font-medium text-stone-800 no-underline transition-colors duration-150 hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
-              >
-                {row.title}
-              </Link>
-            </td>
-            <td className="text-right tabular-nums">{money(row.price_vnd)}</td>
-            <td className="text-right tabular-nums">{count(row.est_sales_90d)}</td>
-            <td>{ratingCell(row.rating_shrunk)}</td>
-            <td className="whitespace-nowrap text-right tabular-nums text-stone-700">
-              {count(row.rank_in_cat)} / {count(row.n_in_cat)}
-            </td>
-          </tr>
-        ))}
-      </DataTable>
-
-      {rows.length > 10 && (
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => setExpanded(v => !v)}
-            className="cursor-pointer rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
-          >
-            {expanded ? 'Thu gọn danh sách' : `Xem tất cả ${count(rows.length)} sản phẩm`}
-          </button>
+      <section aria-label="Điểm chính" className="rounded-md border border-[#007700]/20 bg-[#EAF0E2] px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-[11.5px] font-bold uppercase tracking-wide text-[#005B00]">Điểm chính</span>
+          {action}
         </div>
+        <ul className="m-0 mt-2 list-none space-y-2 p-0">
+          {dong.map(d => (
+            <li key={d.id} className="flex items-start gap-2.5 text-[14px] leading-relaxed text-stone-900">
+              <d.icon size={16} className="mt-1 shrink-0 text-[#007700]" aria-hidden />
+              <span className="min-w-0 flex-1">{d.cau}</span>
+              <a href={`#${d.id}`} className="shrink-0 text-[13px] font-semibold text-[#007700] no-underline hover:underline">
+                Xem<span className="sr-only"> phần {d.ten}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+      {itDon && (
+        <p role="note" className="m-0 rounded-md border border-sky-100 bg-sky-50 px-4 py-2.5 text-[13px] leading-relaxed text-sky-900">
+          Sàn mới có rất ít đơn đã giao, nên phần xếp hạng bán chạy và doanh số đang trống. Các phần so nội dung (đối thủ trực tiếp,
+          hàng mới của đối thủ) vẫn dùng được; số liệu tự cập nhật khi có đơn.
+        </p>
       )}
+
+      <InsightCard bodyClassName="px-4 py-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {comp && (
+            <MiniStat
+              label="Hạng bán chạy"
+              value={best && best.est_sales_90d > 0 ? `${count(best.rank_in_cat)} / ${count(best.n_in_cat)}` : 'Chưa có'}
+              hint={!best
+                ? `Bạn chưa có sản phẩm trong ${catName}.`
+                : best.est_sales_90d > 0
+                  ? `Sản phẩm tốt nhất của bạn trong ${catName}.`
+                  : `Chưa có đơn đã giao trong 90 ngày nên chưa xếp hạng được.`}
+            />
+          )}
+          {trk && (
+            <MiniStat
+              label="Đang theo dõi"
+              value={`${count(trk.data.slots_used)} / ${count(trk.data.slots_limit)} shop`}
+              hint={trk.data.slots_used >= trk.data.slots_limit ? 'Đã đủ chỗ.' : undefined}
+            />
+          )}
+          {trk && (
+            <MiniStat
+              label="Hàng mới của đối thủ"
+              value={`${count(trk.data.alerts_total)} sản phẩm`}
+              hint={trk.live ? '7 ngày qua, cùng nhóm hàng với bạn.' : 'Cùng nhóm hàng với bạn.'}
+            />
+          )}
+          {nhom ? (
+            <MiniStat
+              label="Nhóm chiến lược của bạn"
+              value={tenNhom(nhom.my_group)}
+              hint={nhom.best_group === null ? undefined : nhom.best_group === nhom.my_group ? 'Đang là nhóm bán tốt nhất.' : `Nhóm bán tốt nhất: ${tenNhom(nhom.best_group)}.`}
+            />
+          ) : ss && (
+            <MiniStat label="Danh mục chính" value={ss.catName} hint={`${decimal(cmp!.shops_in_segment, 0)} shop cùng danh mục.`} />
+          )}
+        </div>
+      </InsightCard>
     </>
   );
 }
@@ -103,9 +517,22 @@ export function CompetitorsPage() {
   const [params, setParams] = useSearchParams();
   const urlCategory = params.get('categoryId') || '';
   const { state, reload } = useInsight<Competitors>('/competitors', { categoryId: urlCategory || undefined });
+  const tracking = useInsight<CompetitorTracking>('/competitor-tracking');
+  const comparison = useInsight<ShopComparison>('/shop-comparison');
+  const brief = useInsight<CompetitorBrief>('/competitor-brief');
+  const dangXem = usePhanDangXem();
 
-  // Không truyền categoryId thì service tự chọn danh mục chính và trả về trong category_id.
-  // Nhớ lại giá trị đó để ô chọn không bị trống và không phải gọi lại API lần hai.
+  // Tới từ đường dẫn có #phần: cuộn tới khi mọi phần đã tải xong, để nội dung phía trên không đẩy lệch.
+  const { hash, key } = useLocation();
+  const daTai = [state, tracking.state, comparison.state, brief.state].every(s => s.kind !== 'loading');
+  const daCuon = useRef('');
+  useEffect(() => {
+    if (!hash || !daTai || daCuon.current === key) return;
+    daCuon.current = key;
+    cuonToi(hash.slice(1));
+  }, [hash, key, daTai]);
+
+  // Service tự chọn danh mục chính khi không truyền categoryId; nhớ lại để ô chọn không trống.
   const [resolved, setResolved] = useState<{ id: string; list: string[]; names: Record<string, string | null> } | null>(null);
   useEffect(() => {
     if (state.kind === 'ready') {
@@ -123,7 +550,6 @@ export function CompetitorsPage() {
   const selected = urlCategory || resolved?.id || '';
 
   const canTrack = state.kind === 'ready' && state.data.competitors.some(c => c.shop_id);
-  const tracking = useInsight<CompetitorTracking>(canTrack ? '/competitor-tracking' : null);
   const trackedIds = useMemo(
     () => new Set(tracking.state.kind === 'ready' ? tracking.state.data.tracked.map(t => t.shop_id) : []),
     [tracking.state],
@@ -138,7 +564,7 @@ export function CompetitorsPage() {
       await analyticsApi.trackCompetitor(shopId);
       invalidateInsights('/competitor-tracking');
       tracking.reload();
-      setNotice({ tone: 'good', text: `Đã theo dõi ${shopName}. Hàng mới của shop này sẽ hiện ở mục Đối thủ đang theo dõi.` });
+      setNotice({ tone: 'good', text: `Đã theo dõi ${shopName}. Hàng mới của shop này sẽ hiện ở phần Theo dõi đối thủ bên dưới.` });
     } catch (err) {
       setNotice({ tone: 'bad', text: analyticsErrorMessage(err, 'Không theo dõi được shop này.') });
     } finally {
@@ -153,16 +579,52 @@ export function CompetitorsPage() {
     setParams(next);
   }
 
+  // Việc làm ngay: theo dõi đối thủ trực tiếp nhất (AI) chưa theo dõi, không có thì shop bán chạy nhất, rồi tới điểm yếu nhất.
+  const nextRival = state.kind === 'ready' && canTrack && tracking.state.kind === 'ready'
+    ? state.data.direct_rival_shops?.find(s => !trackedIds.has(s.shop_id))
+      ?? state.data.competitors.find(c => c.shop_id && !trackedIds.has(c.shop_id))
+    : undefined;
+  const yeuNhat = comparison.state.kind === 'ready' ? soVoiDanDau(comparison.state.data).weakest : undefined;
+
   return (
-    <InsightPage
-      title="Ai đang bán chạy"
-      question="Trong danh mục của tôi, ai đang bán chạy và tôi đứng ở đâu?"
-      actions={
-        options.length > 0 && (
-          <SelectField label="Danh mục" value={selected} onChange={pickCategory} options={options} />
-        )
-      }
-    >
+    <InsightPage title="Phân tích đối thủ" question="Ai đang bán giống tôi, họ vừa ra hàng gì, và tôi hơn kém họ ở đâu?">
+      <div className="space-y-4" onClickCapture={bamNeo}>
+      <ThanhDieuHuong dang={dangXem} />
+
+      <div id="tong-quan" className="scroll-mt-16 space-y-4">
+      <WeeklyPlanCard state={brief.state} reload={brief.reload} />
+
+      <TongQuan
+        comp={state.kind === 'ready' ? state.data : null}
+        trk={tracking.state.kind === 'ready' ? { data: tracking.state.data, live: tracking.state.meta.source.mode === 'live' } : null}
+        cmp={comparison.state.kind === 'ready' ? comparison.state.data : null}
+        action={
+          nextRival ? (
+            <button
+              type="button"
+              onClick={() => track(nextRival.shop_id!, nextRival.shop_name ?? '')}
+              disabled={pendingShop !== null}
+              className={ACTION_CLASS}
+            >
+              <UserPlus size={15} aria-hidden />
+              {pendingShop === nextRival.shop_id ? 'Đang theo dõi...' : `Theo dõi ${nextRival.shop_name}`}
+            </button>
+          ) : yeuNhat?.info?.action ? (
+            <Link to={yeuNhat.info.action.to} className={ACTION_CLASS}>{yeuNhat.info.action.label}</Link>
+          ) : undefined
+        }
+      />
+      {notice && (
+        <p aria-live="polite" className={`m-0 text-[13px] font-medium ${notice.tone === 'good' ? 'text-[#005B00]' : 'text-red-700'}`}>
+          {notice.text}
+        </p>
+      )}
+      </div>
+
+      <PageSection
+        {...PHAN[0]}
+        action={options.length > 0 && <SelectField label="Danh mục" value={selected} onChange={pickCategory} options={options} />}
+      >
       {state.kind !== 'ready' ? (
         <InsightCard>
           <InsightStatusView state={state} onRetry={reload} />
@@ -172,47 +634,10 @@ export function CompetitorsPage() {
           {(data, meta) => {
             const catName = categoryLabel(data.category_id, data.category_names?.[data.category_id]);
             const best = data.my_listings[0];
-            const top = data.competitors[0];
             const price = priceWords(data.my_position.price_percentile);
-            // Việc nên làm: theo dõi shop bán chạy nhất mà mình chưa theo dõi.
-            const nextRival = canTrack && tracking.state.kind === 'ready'
-              ? data.competitors.find(c => c.shop_id && !trackedIds.has(c.shop_id))
-              : undefined;
 
             return (
               <div className="space-y-5">
-                <Takeaway
-                  action={
-                    nextRival ? (
-                      <button
-                        type="button"
-                        onClick={() => track(nextRival.shop_id!, nextRival.shop_name)}
-                        disabled={pendingShop !== null}
-                        className={ACTION_CLASS}
-                      >
-                        <UserPlus size={15} aria-hidden />
-                        {pendingShop === nextRival.shop_id ? 'Đang theo dõi...' : `Theo dõi ${nextRival.shop_name}`}
-                      </button>
-                    ) : canTrack ? (
-                      <Link to={`${INSIGHTS_ROOT}/tracking`} className={ACTION_CLASS}>Xem đối thủ đang theo dõi</Link>
-                    ) : undefined
-                  }
-                >
-                  {best
-                    ? <>Trong <strong>{catName}</strong>, sản phẩm bán chạy nhất của bạn đứng hạng <strong>{count(best.rank_in_cat)}/{count(best.n_in_cat)}</strong>. </>
-                    : <>Bạn chưa có sản phẩm nào trong <strong>{catName}</strong>. </>}
-                  {price && data.my_position.my_avg_price_vnd !== null && (
-                    <>Giá trung bình của bạn {money(data.my_position.my_avg_price_vnd)}, {price}. </>
-                  )}
-                  {top && (
-                    <>Bán chạy nhất là <strong>{top.title}</strong> của {top.shop_name} ({count(top.est_sales_90d)} cái trong 90 ngày).</>
-                  )}
-                </Takeaway>
-                {notice && (
-                  <p aria-live="polite" className={`m-0 text-[13px] font-medium ${notice.tone === 'good' ? 'text-[#005B00]' : 'text-red-700'}`}>
-                    {notice.text}
-                  </p>
-                )}
 
                 <InsightCard
                   title="Bạn đứng ở đâu trong danh mục"
@@ -229,9 +654,11 @@ export function CompetitorsPage() {
                       label="Điểm đánh giá của bạn"
                       value={data.my_position.my_avg_rating === null ? 'Chưa có' : `${decimal(data.my_position.my_avg_rating, 1)} / 5`}
                       hint={
-                        data.my_position.rating_percentile === null
-                          ? 'Chưa có khách đánh giá sản phẩm trong danh mục này.'
-                          : `Cao hơn ${data.my_position.rating_percentile}% sản phẩm cùng danh mục.`
+                        data.my_position.my_avg_rating === null
+                          ? 'Chưa có khách đánh giá sản phẩm của bạn trong danh mục này.'
+                          : data.my_position.rating_percentile === null
+                            ? 'Chưa đủ 5 sản phẩm của shop khác có đánh giá để so.'
+                            : `Cao hơn ${data.my_position.rating_percentile}% sản phẩm của shop khác cùng danh mục.`
                       }
                     />
                     <MiniStat
@@ -248,113 +675,105 @@ export function CompetitorsPage() {
                   </div>
                 </InsightCard>
 
-                <InsightCard
-                  title="20 sản phẩm bán chạy nhất của shop khác"
-                  description="Xếp theo số đã bán trong 90 ngày. Bấm Theo dõi để được báo khi shop đó ra hàng mới."
-                  footer={<SourceFooter meta={meta} limitation={data.note} />}
-                >
-                  {data.competitors.length === 0 ? (
-                    <Note>Danh mục này chưa có sản phẩm nào của người bán khác để so sánh.</Note>
-                  ) : (
-                    <>
-                      <DataTable
-                        caption="Hai mươi sản phẩm bán chạy nhất của shop khác trong danh mục"
-                        head={
-                          <>
-                            <th scope="col" className="text-right">Hạng</th>
-                            <th scope="col">Shop</th>
-                            <th scope="col">Sản phẩm</th>
-                            <th scope="col" className="text-right">Giá</th>
-                            <th scope="col" className="text-right">Đã bán (90 ngày)</th>
-                            <th scope="col">Đánh giá</th>
-                            <th scope="col" className="text-right">Được yêu thích</th>
-                            {canTrack && <th scope="col" className="text-right"><span className="sr-only">Theo dõi</span></th>}
-                          </>
-                        }
-                      >
-                        {data.competitors.map(row => (
-                          <tr key={row.listing_id}>
-                            <td className="text-right font-jakarta font-bold tabular-nums text-stone-900">{row.rank}</td>
-                            <td>
-                              {row.shop_id ? (
-                                <Link
-                                  to={`/seller/competitors/${row.shop_id}`}
-                                  title={`Xem hồ sơ ${row.shop_name}`}
-                                  className="block max-w-[24ch] truncate font-medium text-stone-800 no-underline transition-colors duration-150 hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
-                                >
-                                  {row.shop_name}
-                                </Link>
-                              ) : (
-                                <span className="block max-w-[24ch] truncate font-medium text-stone-800" title={row.shop_name}>
-                                  {row.shop_name}
-                                </span>
-                              )}
-                            </td>
-                            <td>
-                              <span className="block max-w-[30ch] truncate text-stone-600" title={row.title}>
-                                {row.title}
-                              </span>
-                            </td>
-                            <td className="text-right tabular-nums">{money(row.price_vnd)}</td>
-                            <td className="text-right tabular-nums">{count(row.est_sales_90d)}</td>
-                            <td>{ratingCell(row.rating_shrunk, row.n_reviews)}</td>
-                            <td className="text-right tabular-nums">{count(row.favorite_count)}</td>
-                            {canTrack && (
-                              <td className="text-right">
-                                {row.shop_id && (trackedIds.has(row.shop_id) ? (
-                                  <Chip tone="good">Đang theo dõi</Chip>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => track(row.shop_id!, row.shop_name)}
-                                    disabled={pendingShop !== null || tracking.state.kind !== 'ready'}
-                                    className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
-                                  >
-                                    <UserPlus size={13} aria-hidden />
-                                    {pendingShop === row.shop_id ? 'Đang thêm' : 'Theo dõi'}
-                                  </button>
-                                ))}
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                      </DataTable>
-                      <div className="mt-4">
+                {data.direct_rival_shops !== undefined && (
+                  <DirectRivalsCard
+                    listings={data.my_listings}
+                    canTrack={canTrack}
+                    trackedIds={trackedIds}
+                    pendingShop={pendingShop}
+                    onTrack={track}
+                    footer={<SourceFooter meta={meta} />}
+                  />
+                )}
+
+                {/* Đối thủ một bên, của bạn một bên: màn rộng đặt cạnh nhau, màn hẹp xếp chồng. */}
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                  <InsightCard
+                    title="Sản phẩm của bạn trong danh mục này"
+                    description="Hạng tính theo số đã bán trong 90 ngày, so với mọi sản phẩm cùng danh mục. Bấm tên sản phẩm để xem chi tiết."
+                    footer={<SourceFooter meta={meta} limitation={data.note} />}
+                  >
+                    {data.my_listings.length === 0 ? (
+                      <Note>
+                        Bạn chưa có sản phẩm nào trong danh mục {catName}. Chọn danh mục khác để xem vị trí của mình.
+                      </Note>
+                    ) : (
+                      <SanPhamCuaBan key={data.category_id} rows={data.my_listings} />
+                    )}
+                  </InsightCard>
+
+                  <InsightCard
+                    title={`${count(data.competitors.length)} sản phẩm bán chạy nhất của shop khác`}
+                    info={GIAI_THICH.banChay}
+                    action={<NhanTinCay loai="kiem" />}
+                    description="Xếp theo số đã bán trong 90 ngày, bằng nhau thì theo số đánh giá. Bấm Theo dõi để được báo khi shop đó ra hàng mới."
+                    footer={<SourceFooter meta={meta} limitation={data.note} />}
+                  >
+                    {data.competitors.length === 0 ? (
+                      <Note>Danh mục này chưa có sản phẩm nào của người bán khác để so sánh.</Note>
+                    ) : (
+                      <div className="space-y-3">
+                        {data.low_sample && (
+                          <Note tone="warn">
+                            Danh mục này mới có {count(data.competitors.length)} sản phẩm của shop khác, nên thứ hạng chỉ để tham khảo.
+                          </Note>
+                        )}
+                        <Top20ShopKhac
+                          key={data.category_id}
+                          rows={data.competitors}
+                          canTrack={canTrack}
+                          trackedIds={trackedIds}
+                          pendingShop={pendingShop}
+                          khoa={pendingShop !== null || tracking.state.kind !== 'ready'}
+                          onTrack={track}
+                        />
+                        {data.competitors.some(c => c.est_sales_90d === 0) && (
+                          <Note tone="warn">
+                            {count(data.competitors.filter(c => c.est_sales_90d === 0).length)} sản phẩm trong danh sách chưa có đơn đã giao trong 90 ngày,
+                            nên được xếp theo số đánh giá. Thứ hạng của chúng chưa nói lên ai bán chạy hơn.
+                          </Note>
+                        )}
                         <Note>
                           {canTrack
-                            ? 'Theo dõi tối đa 10 shop. Hàng mới của họ hiện ở mục '
-                            : 'Bảng này chưa kèm mã shop nên không theo dõi trực tiếp từ đây được. Thêm shop ở mục '}
-                          <Link
-                            to={`${INSIGHTS_ROOT}/tracking`}
+                            ? 'Theo dõi tối đa 10 shop. Hàng mới của họ hiện ở phần '
+                            : 'Danh sách này chưa kèm mã shop nên không theo dõi trực tiếp từ đây được. Thêm shop ở phần '}
+                          <a
+                            href="#theo-doi"
                             className="inline-flex items-center gap-1 font-semibold text-[#007700] no-underline transition-colors duration-150 hover:text-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
                           >
-                            <Radar size={14} aria-hidden /> Đối thủ đang theo dõi
-                          </Link>
-                          .
+                            <Radar size={14} aria-hidden /> Theo dõi đối thủ
+                          </a>
+                          {' '}bên dưới.
                         </Note>
                       </div>
-                    </>
-                  )}
-                </InsightCard>
+                    )}
+                  </InsightCard>
+                </div>
 
-                <InsightCard
-                  title="Sản phẩm của bạn trong danh mục này"
-                  description="Hạng tính theo số đã bán trong 90 ngày, so với mọi sản phẩm cùng danh mục. Bấm tên sản phẩm để xem chi tiết."
-                  footer={<SourceFooter meta={meta} limitation={data.note} />}
-                >
-                  {data.my_listings.length === 0 ? (
-                    <Note>
-                      Bạn chưa có sản phẩm nào trong danh mục {catName}. Chọn danh mục khác để xem vị trí của mình.
-                    </Note>
-                  ) : (
-                    <MyListingsTable rows={data.my_listings} />
-                  )}
-                </InsightCard>
+                {data.competitors.length > 0 && (
+                  <InsightCard
+                    title={`Bạn so với ${count(data.competitors.length)} sản phẩm bán chạy`}
+                    description="Mỗi cột là một sản phẩm trong danh sách bán chạy, đường nét đứt là trung bình các sản phẩm của bạn. Bên dưới là điểm mạnh và điểm cần cải thiện."
+                    footer={<SourceFooter meta={meta} />}
+                  >
+                    <TopTwentyCharts data={data} />
+                  </InsightCard>
+                )}
               </div>
             );
           }}
         </InsightBlock>
       )}
+      </PageSection>
+
+      <PageSection {...PHAN[1]}>
+        <TrackingSection state={tracking.state} reload={tracking.reload} rivals={state.kind === 'ready' ? state.data : null} />
+      </PageSection>
+
+      <PageSection {...PHAN[2]}>
+        <BenchmarkSection state={comparison.state} reload={comparison.reload} />
+      </PageSection>
+      </div>
     </InsightPage>
   );
 }

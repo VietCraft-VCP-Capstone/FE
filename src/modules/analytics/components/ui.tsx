@@ -233,12 +233,12 @@ export function SelectField({ label, value, onChange, options, className }: {
 /* ------------------------------------------------------- kết luận nhanh --- */
 
 export const ACTION_CLASS =
-  'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border-none bg-[#007700] px-4 py-2 text-[13px] font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:bg-stone-300 motion-reduce:transition-none';
+  'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border-none bg-[#007700] px-4 py-2 text-[13px] font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:bg-stone-300 motion-reduce:transition-none';
 
 /** Đầu mỗi trang: câu trả lời trước, số liệu sau, kèm đúng một việc nên làm (người bán mới đọc 5 giây là đủ). */
 export function Takeaway({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <section aria-label="Kết luận nhanh" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#007700]/20 bg-[#EAF0E2] px-5 py-4">
+    <section aria-label="Kết luận nhanh" className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-[#007700]/20 bg-[#EAF0E2] px-4 py-3">
       <div className="min-w-0 flex-1">
         <span className="block text-[11.5px] font-bold uppercase tracking-wide text-[#005B00]">Kết luận nhanh</span>
         <p className="mb-0 mt-1 text-[15px] leading-relaxed text-stone-900">{children}</p>
@@ -286,8 +286,9 @@ export function DataTable({ head, children, caption, minWidth = 'min-w-[560px]' 
   minWidth?: string;
 }) {
   return (
-    <div className="scroll-shadow-x -mx-4 overflow-x-auto">
-      <table className={`w-full ${minWidth} border-collapse text-left text-[13px]`}>
+    // relative: chữ sr-only (định vị tuyệt đối) trong ô phải nằm trong khung cuộn, không đẩy cả trang tràn ngang.
+    <div className="relative -mx-4 overflow-x-auto">
+      <table className="w-full min-w-[560px] border-collapse text-left text-[13px]">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr className="border-b border-stone-100 text-xs font-semibold text-stone-500 [&>th]:px-4 [&>th]:py-2.5 [&>th]:font-semibold">

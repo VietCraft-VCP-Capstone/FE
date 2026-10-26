@@ -1,5 +1,5 @@
 /**
- * F34 — Từ khoá nên thêm. Đọc GET /seller/analytics/tag-gap (tham số categoryId).
+ * F34 — Gợi ý từ khoá. Đọc GET /seller/analytics/tag-gap (tham số categoryId).
  *
  * Người bán mới cần biết "nên thêm từ khoá nào", không cần "lift" hay "tag đủ mạnh". Khi
  * chưa có tín hiệu thì nói bình tĩnh là chưa cần thêm, thay vì đặt khung cảnh báo lên đầu
@@ -7,6 +7,7 @@
  */
 
 import { Check, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { count } from '../../../shared/utils/format';
 import { InsightBlock } from '../components/InsightBlock';
@@ -17,6 +18,42 @@ import { decimal, pct } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import { categoryLabel, tagLabel } from '../labels';
 import type { TagGap } from '../types';
+
+/** AI gợi ý từ khoá riêng cho một sản phẩm: lấy từ sản phẩm giống nó, bù bằng độ phổ biến trong cùng loại hàng. */
+function PerProductTags({ rows, name }: { rows: NonNullable<TagGap['per_product']>; name: (id: string) => string }) {
+  const [chon, setChon] = useState('');
+  const sp = rows.find(r => r.product_id === chon) ?? rows[0];
+  return (
+    <InsightCard
+      title="Gợi ý cho từng sản phẩm"
+      description="AI xem các sản phẩm của shop khác giống sản phẩm này nhất đang gắn từ khoá gì mà nó chưa có."
+      bodyClassName="px-4 py-3"
+    >
+      {!sp ? (
+        <Note>Sản phẩm của bạn đã có đủ từ khoá mà các sản phẩm giống đang dùng.</Note>
+      ) : (
+        <div className="space-y-3">
+          {rows.length > 1 && (
+            <SelectField label="Sản phẩm" value={sp.product_id} onChange={setChon} options={rows.map(r => ({ value: r.product_id, label: r.title ?? r.product_id }))} />
+          )}
+          <ul className="m-0 list-none space-y-2 p-0">
+            {sp.suggestions.map(g => (
+              <li key={g.tag_id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                <Chip tone="brand" icon={<Plus size={12} aria-hidden />}>{name(g.tag_id)}</Chip>
+                <span className="text-stone-600">
+                  {g.used_by > 0
+                    ? `${count(g.used_by)} sản phẩm giống đang dùng${g.better_sellers > 0 ? `, ${count(g.better_sellers)} trong đó bán chạy hơn bạn` : ''}`
+                    : `phổ biến trong cùng loại hàng (${count(g.popular_in_type)} sản phẩm dùng)`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Note>Gợi ý là tương quan: sản phẩm giống bạn hay dùng từ khoá này, không bảo đảm thêm vào là bán được nhiều hơn.</Note>
+        </div>
+      )}
+    </InsightCard>
+  );
+}
 
 export function TagGapPage() {
   const [params, setParams] = useSearchParams();
@@ -30,7 +67,7 @@ export function TagGapPage() {
   };
 
   return (
-    <InsightPage title="Từ khoá nên thêm" question="Shop bán chạy cùng danh mục hay gắn từ khoá (tag) nào mà tôi chưa có?">
+    <InsightPage title="Gợi ý từ khoá" question="Shop bán chạy cùng danh mục hay gắn từ khoá (tag) nào mà tôi chưa có?">
       <InsightBlock state={state} onRetry={reload}>
         {(data, meta) => {
           const trusted = data.signal.has_signal;
@@ -45,7 +82,7 @@ export function TagGapPage() {
                 action={
                   trusted && goi
                     ? <Link to="/seller/products" className={ACTION_CLASS}>Thêm từ khoá cho sản phẩm</Link>
-                    : <Link to="/seller/insights/benchmark" className={ACTION_CLASS}>Xem tôi mạnh, yếu ở đâu</Link>
+                    : <Link to="/seller/insights/competitors#manh-yeu" className={ACTION_CLASS}>Xem điểm mạnh & điểm yếu</Link>
                 }
               >
                 {trusted && goi ? (
@@ -67,7 +104,7 @@ export function TagGapPage() {
               <InsightCard
                 title="Từ khoá shop bán chạy hay dùng"
                 description={`Lấy từ ${count(data.competitors_scanned)} sản phẩm bán chạy nhất của shop khác. Dấu ✓ là bạn đã có, dấu + là bạn chưa có.`}
-                bodyClassName="px-5 py-4"
+                bodyClassName="px-4 py-3"
                 action={
                   <SelectField
                     label="Danh mục"
@@ -98,11 +135,13 @@ export function TagGapPage() {
                 )}
               </InsightCard>
 
+              {data.per_product && data.per_product.length > 0 && <PerProductTags rows={data.per_product} name={id => name(id)} />}
+
               {rows.length > 0 && (
                 <InsightCard
                   title={trusted ? 'Từ khoá nên cân nhắc thêm' : 'Từ khoá tham khảo (chưa đủ chắc chắn)'}
                   description="Từ khoá nhóm bán chạy dùng nhiều hơn hẳn phần còn lại của danh mục, mà shop bạn chưa có."
-                  bodyClassName="px-5 py-4"
+                  bodyClassName="px-4 py-3"
                 >
                   <DataTable
                     caption={`Từ khoá của nhóm bán chạy trong ${catName} mà shop chưa dùng`}
