@@ -90,6 +90,7 @@ export const analyticsApi = {
     category_name?: string;
     product_type?: string;
     keywords?: string;
+    material?: string;
     blank_cost?: number;
   }, signal?: AbortSignal) {
     const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
