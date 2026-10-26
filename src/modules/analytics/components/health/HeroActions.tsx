@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Tooltip } from 'antd';
 import {
   RefreshCw,
-  AlertCircle,
   Sparkles,
   CheckCircle2,
   ArrowRight,
@@ -21,15 +20,15 @@ interface HeroActionsProps {
 }
 
 const FIELD_NAMES: Record<string, string> = {
-  title: 'Tiêu đề',
-  description: 'Mô tả',
+  title: 'Tên sản phẩm',
+  description: 'Mô tả chi tiết',
   images: 'Hình ảnh',
-  category_id: 'Danh mục',
-  categories: 'Danh mục',
+  category_id: 'Ngành hàng',
+  categories: 'Ngành hàng',
   price: 'Giá bán',
-  tags: 'Từ khoá',
-  materials: 'Chất liệu',
-  variants: 'Phân loại',
+  tags: 'Từ khoá tìm kiếm',
+  materials: 'Chất liệu & thuộc tính',
+  variants: 'Phân loại hàng',
 };
 
 interface MinimalGuide {
@@ -40,94 +39,96 @@ interface MinimalGuide {
 
 const MINIMAL_GUIDES: Record<string, MinimalGuide> = {
   IMAGES_INSUFFICIENT: {
-    title: 'Cần bổ sung thêm ảnh',
-    summary: 'Tin đăng có từ 2–5 ảnh giúp người mua dễ hình dung và tăng tỷ lệ đặt hàng.',
+    title: 'Thêm ảnh sản phẩm',
+    summary: 'Đăng từ 2–5 ảnh vuông rõ nét giúp khách xem đủ các góc và an tâm bấm mua.',
     tips: [
-      'Ảnh cận cảnh bề mặt chất liệu vải, đường may hoặc nhãn mác',
-      'Ảnh người mẫu mặc thực tế hoặc chụp góc nghiêng 45°',
-      'Ảnh bảng quy đổi kích cỡ (size chart) để khách tự chọn size',
+      'Chụp ảnh cận cảnh đường may, chất vải hoặc tem mác sản phẩm',
+      'Ảnh chụp người mẫu mặc thực tế hoặc góc chụp nghiêng 45 độ',
+      'Đăng kèm 1 ảnh bảng kích thước (size chart) để khách tự chọn size',
     ],
   },
   TITLE_TOO_SHORT: {
-    title: 'Tiêu đề quá ngắn',
-    summary: 'Nên đặt từ 40–80 ký tự để khách dễ tìm thấy sản phẩm trên sàn.',
+    title: 'Đặt tên sản phẩm dài hơn (Chuẩn tìm kiếm)',
+    summary: 'Tên sản phẩm nên từ 40–80 ký tự để khách gõ tìm kiếm là thấy ngay.',
     tips: [
-      'Công thức chuẩn: [Tên sản phẩm] + [Chất liệu] + [Kiểu dáng / Dịp sử dụng]',
-      'Ví dụ: Áo Thun Trơn Cotton 100% Cổ Tròn Form Regular Unisex',
+      'Công thức chuẩn sàn: [Tên sản phẩm] + [Chất liệu/Đặc tính] + [Kiểu dáng / Dịp mặc]',
+      'Ví dụ: Áo Thun Trơn Cotton 100% Cổ Tròn Form Rộng Unisex',
     ],
   },
   TITLE_EMPTY: {
-    title: 'Chưa có tiêu đề',
-    summary: 'Tiêu đề là thông tin bắt buộc để sản phẩm xuất hiện trong tìm kiếm.',
-    tips: ['Nhập tên sản phẩm kèm chất liệu và đặc tính nổi bật.'],
+    title: 'Chưa có tên sản phẩm',
+    summary: 'Tên sản phẩm là thông tin bắt buộc để hiển thị khi khách tìm kiếm.',
+    tips: ['Nhập tên sản phẩm kèm chất liệu và đặc tính nổi bật nhất.'],
   },
   DESCRIPTION_TOO_SHORT: {
-    title: 'Mô tả quá ngắn',
-    summary: 'Nên viết từ 100 từ trở lên để giải đáp thắc mắc cho người mua.',
+    title: 'Viết thêm mô tả chi tiết',
+    summary: 'Mô tả từ 100 từ trở lên giúp khách tự giải đáp thắc mắc mà không cần nhắn hỏi shop.',
     tips: [
       'Nêu rõ bảng số đo kích cỡ (dài áo, ngực, cân nặng phù hợp)',
-      'Thành phần chất liệu vải và cảm giác khi mặc',
-      'Hướng dẫn giặt ủi và chính sách đổi trả của shop',
+      'Thành phần chất liệu vải và cảm giác khi mặc/sử dụng',
+      'Chính sách đổi trả trong 7 ngày và cam kết hàng đúng mô tả',
     ],
   },
   DESCRIPTION_EMPTY: {
-    title: 'Chưa có mô tả',
-    summary: 'Bổ sung thông số kích thước và chất liệu để khách an tâm đặt hàng.',
-    tips: ['Giới thiệu kích cỡ, chất liệu và cách bảo quản sản phẩm.'],
+    title: 'Chưa có mô tả sản phẩm',
+    summary: 'Khách mua online rất ngại hỏi, hãy ghi rõ kích thước và chất liệu để khách mua luôn.',
+    tips: ['Ghi rõ bảng size, chất liệu và hướng dẫn sử dụng/bảo quản.'],
   },
   MISSING_MATERIAL_INFO: {
-    title: 'Chưa nêu chất liệu',
-    summary: 'Khách hàng luôn quan tâm thành phần vải trước khi bấm mua.',
+    title: 'Chưa điền thông tin chất liệu',
+    summary: 'Khách mua online luôn muốn biết chất liệu gì trước khi bấm đặt hàng.',
     tips: [
-      'Ghi rõ loại vải: Cotton 100%, nỉ chân cua, linen thô,...',
-      'Đặc tính: Thấm hút mồ hôi, co giãn 2 chiều hay 4 chiều',
+      'Điền rõ loại vải/chất liệu: Cotton 100%, nỉ chân cua, lụa, kaki...',
+      'Đặc tính nổi bật: Co giãn 4 chiều, thấm hút mồ hôi, không nhăn xù',
     ],
   },
   MISSING_SIZING_INFO: {
-    title: 'Thiếu hướng dẫn chọn size',
-    summary: 'Bảng size rõ ràng giúp giảm 50% yêu cầu đổi trả vì mặc không vừa.',
+    title: 'Chưa có hướng dẫn chọn size',
+    summary: 'Bảng size rõ ràng giúp giảm 50% yêu cầu đổi trả vì khách mặc không vừa.',
     tips: [
       'Ghi bảng size S, M, L, XL kèm chiều cao và cân nặng tương ứng',
-      'Hoặc tải 1 ảnh bảng size vào bộ sưu tập ảnh',
+      'Hoặc tải 1 ảnh bảng quy đổi kích cỡ vào bộ sưu tập ảnh',
     ],
   },
   MISSING_CARE_INFO: {
-    title: 'Thiếu hướng dẫn bảo quản',
-    summary: 'Giúp khách giặt đúng cách để giữ hình in bền và đánh giá 5 sao.',
-    tips: ['Giặt mặt trái, nước thường, không ủi trực tiếp lên hình in'],
+    title: 'Chưa có hướng dẫn bảo quản',
+    summary: 'Giúp khách dùng bền đẹp và hài lòng để lại đánh giá 5 sao cho shop.',
+    tips: ['Ghi rõ cách giặt ủi: giặt máy hay giặt tay, nhiệt độ nước, cách phơi'],
   },
   LOW_IMAGE_RESOLUTION: {
-    title: 'Ảnh mờ hoặc độ phân giải thấp',
-    summary: 'Ảnh tối thiểu 500x500 px (tốt nhất 1000x1000 px) để xem rõ nét.',
-    tips: ['Tải trực tiếp ảnh gốc từ máy ảnh/điện thoại, tránh ảnh chụp màn hình'],
+    title: 'Ảnh sản phẩm bị mờ',
+    summary: 'Nên dùng ảnh từ 500x500 px trở lên (tốt nhất là 1000x1000 px) để xem sắc nét.',
+    tips: ['Tải trực tiếp ảnh gốc từ điện thoại/máy ảnh, tránh ảnh chụp lại màn hình'],
   },
   BLURRY_IMAGE: {
-    title: 'Ảnh bị rung hoặc lệch nét',
-    summary: 'Ảnh sắc nét giúp khách hàng cảm nhận được chất lượng vải thật.',
+    title: 'Ảnh bị rung hoặc nhoè nét',
+    summary: 'Ảnh sắc nét tạo độ uy tín cao và giúp khách cảm nhận được chất lượng vải thật.',
     tips: ['Chụp đủ sáng ban ngày, cố định tay hoặc dùng chân máy'],
   },
   EXTREME_ASPECT_RATIO: {
-    title: 'Tỉ lệ ảnh chưa chuẩn',
-    summary: 'Nên dùng ảnh vuông 1:1 để không bị cắt méo trên điện thoại.',
-    tips: ['Cắt cúp ảnh về khung vuông 1:1, sản phẩm nằm ở chính giữa'],
+    title: 'Tỉ lệ ảnh chưa chuẩn khung vuông',
+    summary: 'Nên dùng ảnh vuông 1:1 để sản phẩm không bị méo hoặc cắt lệch trên điện thoại.',
+    tips: ['Cắt ảnh về khung vuông 1:1 trước khi tải lên, đặt sản phẩm ở chính giữa'],
   },
   MATERIAL_CONTRADICTION: {
-    title: 'Chất liệu không đồng nhất',
-    summary: 'Tiêu đề và mô tả đang nhắc đến các loại chất liệu khác nhau.',
+    title: 'Thông tin chất liệu chưa đồng nhất',
+    summary: 'Tên sản phẩm và mô tả đang ghi 2 chất liệu khác nhau, dễ làm khách hoang mang.',
     tips: ['Thống nhất duy nhất một loại chất liệu chính xác ở cả 2 mục'],
   },
 };
 
+type FilterType = 'all' | 'urgent' | 'seo';
+
 export function HeroActions({ data, productId }: HeroActionsProps) {
-  const [activeTab, setActiveTab] = useState<'priority' | 'audit'>('priority');
+  const [filter, setFilter] = useState<FilterType>('all');
   const [auditData, setAuditData] = useState<QualityAuditData | null>(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [rechecking, setRechecking] = useState(false);
   const [expandedIssues, setExpandedIssues] = useState<Record<string, boolean>>({});
 
   const todos = visibleTodos(data);
-  const urgent = data.warnings.filter(w => w.type === 'warning');
-  const actionable = todos.filter(t => t.field !== null && t.code !== 'review');
+  const urgentWarnings = data.warnings.filter(w => w.type === 'warning');
+  const actionableTodos = todos.filter(t => t.field !== null && t.code !== 'review');
   const reviewTodo = todos.find(t => t.code === 'review');
   const totalImpact = Math.round(todos.reduce((sum, item) => sum + item.impact, 0));
 
@@ -169,179 +170,131 @@ export function HeroActions({ data, productId }: HeroActionsProps) {
     setExpandedIssues(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const openIssues = (auditData?.issues || []).filter(i => i.status === 'open');
+  const openAuditIssues = (auditData?.issues || []).filter(i => i.status === 'open');
+
+  const urgentCount = urgentWarnings.length + openAuditIssues.length;
+  const seoCount = actionableTodos.length;
+  const totalCount = urgentCount + seoCount;
 
   return (
     <div className="flex h-full flex-col justify-between">
       <div>
-        {/* Minimalist Top Tabs */}
-        <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
-          <div className="flex items-center gap-5">
+        {/* Top Header: Simple Friendly Filters & Recheck CTA */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               type="button"
-              onClick={() => setActiveTab('priority')}
-              className={`text-xs font-bold uppercase tracking-wider transition-colors pb-1 border-b-2 cursor-pointer ${
-                activeTab === 'priority'
-                  ? 'text-stone-900 border-stone-900'
-                  : 'text-stone-400 border-transparent hover:text-stone-600'
+              onClick={() => setFilter('all')}
+              className={`text-xs font-semibold px-2.5 py-1 rounded transition-all duration-150 active:scale-95 cursor-pointer ${
+                filter === 'all'
+                  ? 'bg-stone-900 text-white shadow-xs'
+                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
               }`}
             >
-              Việc nên làm ({actionable.length})
+              Tất cả ({totalCount})
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('audit')}
-              className={`text-xs font-bold uppercase tracking-wider transition-colors pb-1 border-b-2 cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'audit'
-                  ? 'text-stone-900 border-stone-900'
-                  : 'text-stone-400 border-transparent hover:text-stone-600'
-              }`}
-            >
-              <span>Kiểm toán tin đăng</span>
-              {openIssues.length > 0 ? (
-                <span className="font-mono text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded">
-                  {openIssues.length}
-                </span>
-              ) : (
-                <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                  ✓
-                </span>
-              )}
-            </button>
-          </div>
 
-          <div>
-            {activeTab === 'priority' ? (
-              totalImpact > 0 ? (
-                <Tooltip title="Tổng số điểm có thể tăng thêm sau khi hoàn thành các mục">
-                  <span className="cursor-help font-mono text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                    +{totalImpact} điểm tiềm năng
-                  </span>
-                </Tooltip>
-              ) : null
-            ) : (
+            {urgentCount > 0 && (
               <button
                 type="button"
-                disabled={rechecking}
-                onClick={handleRecheck}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-500 hover:text-stone-900 cursor-pointer disabled:opacity-50 transition-colors"
-                title="Kiểm tra lại sau khi bạn cập nhật sản phẩm"
+                onClick={() => setFilter('urgent')}
+                className={`text-xs font-semibold px-2.5 py-1 rounded transition-all duration-150 active:scale-95 cursor-pointer flex items-center gap-1 ${
+                  filter === 'urgent'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                }`}
               >
-                <RefreshCw size={11} className={rechecking ? 'animate-spin' : ''} />
-                <span>{rechecking ? 'Đang duyệt...' : 'Duyệt lại ⟳'}</span>
+                <span>Cần sửa gấp</span>
+                <span className="font-mono text-[10px] font-bold">({urgentCount})</span>
+              </button>
+            )}
+
+            {seoCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilter('seo')}
+                className={`text-xs font-semibold px-2.5 py-1 rounded transition-all duration-150 active:scale-95 cursor-pointer flex items-center gap-1 ${
+                  filter === 'seo'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                }`}
+              >
+                <span>Gợi ý tăng đơn</span>
+                <span className="font-mono text-[10px] font-bold">({seoCount})</span>
               </button>
             )}
           </div>
+
+          <div className="flex items-center gap-2">
+            {totalImpact > 0 && (
+              <Tooltip title="Tổng số điểm shop có thể nhận thêm sau khi hoàn thành các mục">
+                <span className="cursor-help font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded transition-transform hover:scale-105">
+                  +{totalImpact} điểm
+                </span>
+              </Tooltip>
+            )}
+
+            <button
+              type="button"
+              disabled={rechecking}
+              onClick={handleRecheck}
+              className="inline-flex items-center gap-1 text-xs font-medium text-stone-600 hover:text-stone-900 cursor-pointer disabled:opacity-50 transition-all duration-150 active:scale-95 bg-stone-100 hover:bg-stone-200 px-2.5 py-1 rounded"
+              title="Bấm để kiểm tra lại sau khi shop vừa chỉnh sửa sản phẩm"
+            >
+              <RefreshCw size={11} className={`transition-transform duration-500 ${rechecking ? 'animate-spin text-stone-700' : 'text-stone-500 group-hover:rotate-180'}`} />
+              <span>{rechecking ? 'Đang duyệt...' : 'Kiểm tra lại'}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Tab 1: Priority Actions */}
-        {activeTab === 'priority' && (
-          <div className="mt-2">
-            {urgent.length > 0 && (
-              <div className="space-y-2 mb-2">
-                {urgent.map(item => (
+        {/* Action Items List */}
+        <div className="mt-2">
+          {auditLoading ? (
+            <div className="space-y-2 py-3 animate-pulse">
+              <div className="h-4 w-3/4 rounded bg-stone-100" />
+              <div className="h-4 w-1/2 rounded bg-stone-100" />
+            </div>
+          ) : totalCount === 0 ? (
+            <div className="py-8 text-center text-xs text-stone-500 animate-slide-up">
+              <CheckCircle2 size={20} className="text-emerald-600 mx-auto mb-1.5" />
+              <span className="font-bold text-stone-800 block">Tin đăng đã đạt chuẩn tối ưu!</span>
+              <span className="text-[11px] text-stone-400 mt-0.5 block">
+                Không còn mục nào cần sửa. Hãy duy trì cập nhật giá và tồn kho định kỳ.
+              </span>
+            </div>
+          ) : (
+            <div key={filter} className="divide-y divide-stone-100 animate-slide-down">
+              {/* 1. Urgent Warnings */}
+              {(filter === 'all' || filter === 'urgent') &&
+                urgentWarnings.map((item) => (
                   <div
                     key={item.message}
-                    className="flex items-center justify-between gap-3 py-2 px-3 border-l-2 border-rose-500 bg-rose-50/50 text-xs text-rose-900"
+                    className="group -mx-2 px-2 py-2.5 first:pt-1 last:pb-1 flex items-center justify-between gap-3 rounded hover:bg-stone-50/70 transition-all duration-150"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <AlertCircle size={13} className="shrink-0 text-rose-600" />
-                      <span className="font-medium truncate">{plainText(item.message)}</span>
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 shrink-0">
+                        Cần sửa
+                      </span>
+                      <span className="text-xs font-medium text-stone-800 truncate">
+                        {plainText(item.message)}
+                      </span>
                     </div>
+
                     {item.field && (
                       <Link
                         to={editLink(productId, item.field)}
-                        className="shrink-0 font-semibold text-rose-700 hover:text-rose-900 text-xs no-underline inline-flex items-center gap-0.5"
+                        className="text-xs font-semibold text-rose-700 hover:text-rose-900 transition-colors no-underline inline-flex items-center gap-0.5 shrink-0"
                       >
                         <span>Sửa ngay</span>
-                        <ArrowRight size={11} />
+                        <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform duration-150" />
                       </Link>
                     )}
                   </div>
                 ))}
-              </div>
-            )}
 
-            {actionable.length === 0 ? (
-              <div className="py-8 text-center text-xs text-stone-500">
-                <CheckCircle2 size={18} className="text-[#007700] mx-auto mb-1.5" />
-                <span className="font-semibold text-stone-800 block">Tuyệt vời! Tin đăng đã đạt chuẩn tối ưu</span>
-                <span className="text-[11px] text-stone-400 mt-0.5 block">
-                  Không còn việc nào cần sửa gấp. Hãy duy trì cập nhật giá và tồn kho định kỳ.
-                </span>
-              </div>
-            ) : (
-              <div className="divide-y divide-stone-100">
-                {actionable.slice(0, 3).map((item, idx) => {
-                  const label = item.code === 'tags'
-                    ? item.message.replace('tag', 'thẻ từ khoá (tag)')
-                    : plainText(item.message);
-
-                  return (
-                    <div
-                      key={item.code ?? item.message}
-                      className="flex items-center justify-between py-2.5 first:pt-1 last:pb-1"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-3">
-                        <span className="font-mono text-[11px] font-semibold text-stone-400 shrink-0">
-                          0{idx + 1}
-                        </span>
-                        <span className="text-xs font-medium text-stone-800 truncate">
-                          {label}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3 shrink-0">
-                        <Tooltip title="Điểm cộng dự kiến sau khi sửa xong">
-                          <span className="cursor-help font-mono text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                            +{Math.round(item.impact)}đ
-                          </span>
-                        </Tooltip>
-
-                        <Link
-                          to={editLink(productId, item.field)}
-                          className="text-xs font-semibold text-stone-800 hover:text-emerald-700 transition-colors no-underline inline-flex items-center gap-0.5"
-                        >
-                          <span>Sửa</span>
-                          <ArrowRight size={11} />
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {reviewTodo && (
-              <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-start gap-2 text-[11px] text-stone-500">
-                <Sparkles size={13} className="shrink-0 text-amber-600 mt-0.5" />
-                <span>
-                  <strong className="text-stone-700">Mẹo sản phẩm mới:</strong> Kèm thiệp cảm ơn khi giao hàng để mời khách đánh giá 5★ (+{Math.round(reviewTodo.impact)} điểm).
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab 2: Quality Audit */}
-        {activeTab === 'audit' && (
-          <div className="mt-2">
-            {auditLoading ? (
-              <div className="space-y-2 py-3">
-                <div className="h-4 w-3/4 animate-pulse rounded bg-stone-100" />
-                <div className="h-4 w-1/2 animate-pulse rounded bg-stone-100" />
-              </div>
-            ) : openIssues.length === 0 ? (
-              <div className="py-8 text-center text-xs text-stone-500">
-                <CheckCircle2 size={18} className="text-[#007700] mx-auto mb-1.5" />
-                <span className="font-semibold text-stone-800 block">Tin đăng đạt chuẩn kiểm toán</span>
-                <span className="text-[11px] text-stone-400 mt-0.5 block">
-                  Hình ảnh, tiêu đề, mô tả và chất liệu đều đạt chuẩn hiển thị trên sàn.
-                </span>
-              </div>
-            ) : (
-              <div className="divide-y divide-stone-100">
-                {openIssues.map((issue) => {
+              {/* 2. Quality Audit Issues (Missing photos, short title, etc.) */}
+              {(filter === 'all' || filter === 'urgent') &&
+                openAuditIssues.map((issue) => {
                   const isExpanded = Boolean(expandedIssues[issue.id]);
                   const guide = MINIMAL_GUIDES[issue.code] || {
                     title: issue.message,
@@ -354,16 +307,22 @@ export function HeroActions({ data, productId }: HeroActionsProps) {
                   const minCount = issue.evidence?.expected_min_count ?? 2;
 
                   return (
-                    <div key={issue.id} className="py-2.5 first:pt-1 last:pb-1">
+                    <div
+                      key={issue.id}
+                      className="group -mx-2 px-2 py-2.5 first:pt-1 last:pb-1 rounded hover:bg-stone-50/70 transition-all duration-150"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1 space-y-0.5">
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 shrink-0">
+                              Cần sửa
+                            </span>
                             <span className="font-semibold text-stone-900">
                               {guide.title}
                             </span>
                             {isImages && (
                               <span className="rounded bg-stone-100 px-1.5 py-0.2 font-mono text-[10px] text-stone-600">
-                                {count}/{minCount} ảnh
+                                Hiện có {count}/{minCount} ảnh
                               </span>
                             )}
                             <span className="text-[11px] text-stone-400">
@@ -380,23 +339,23 @@ export function HeroActions({ data, productId }: HeroActionsProps) {
                           <button
                             type="button"
                             onClick={() => toggleExpand(issue.id)}
-                            className="text-[11px] text-stone-400 hover:text-stone-700 cursor-pointer"
+                            className="text-[11px] text-stone-400 hover:text-stone-700 active:scale-95 transition-all duration-150 cursor-pointer"
                           >
-                            {isExpanded ? 'Đóng' : 'Gợi ý'}
+                            {isExpanded ? 'Thu gọn' : 'Xem mẹo'}
                           </button>
 
                           <Link
                             to={editLink(productId, issue.field)}
-                            className="text-xs font-semibold text-stone-800 hover:text-emerald-700 transition-colors no-underline inline-flex items-center gap-0.5"
+                            className="text-xs font-semibold text-stone-900 hover:text-emerald-700 transition-colors no-underline inline-flex items-center gap-0.5"
                           >
-                            <span>Sửa</span>
-                            <ArrowRight size={11} />
+                            <span>Sửa ngay</span>
+                            <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform duration-150" />
                           </Link>
                         </div>
                       </div>
 
                       {isExpanded && (
-                        <div className="mt-2 pl-3 border-l-2 border-stone-200 text-xs text-stone-600 space-y-1">
+                        <div className="mt-2 pl-3 border-l-2 border-stone-200 text-xs text-stone-600 space-y-1 animate-expand">
                           {guide.tips.map((tip, idx) => (
                             <p key={idx} className="m-0 leading-relaxed text-stone-600">
                               • {tip}
@@ -407,14 +366,57 @@ export function HeroActions({ data, productId }: HeroActionsProps) {
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </div>
-        )}
+
+              {/* 3. SEO & Conversion Optimization Todos */}
+              {(filter === 'all' || filter === 'seo') &&
+                actionableTodos.slice(0, 4).map((item) => {
+                  const label = item.code === 'tags'
+                    ? item.message.replace('tag', 'thẻ từ khoá tìm kiếm')
+                    : plainText(item.message);
+
+                  return (
+                    <div
+                      key={item.code ?? item.message}
+                      className="group -mx-2 px-2 flex items-center justify-between py-2.5 first:pt-1 last:pb-1 rounded hover:bg-stone-50/70 transition-all duration-150"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-3">
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 font-mono shrink-0 transition-transform group-hover:scale-105">
+                          +{Math.round(item.impact)}đ
+                        </span>
+                        <span className="text-xs font-medium text-stone-800 truncate">
+                          {label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Link
+                          to={editLink(productId, item.field)}
+                          className="text-xs font-semibold text-stone-800 hover:text-emerald-700 transition-colors no-underline inline-flex items-center gap-0.5"
+                        >
+                          <span>Sửa</span>
+                          <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform duration-150" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+
+          {/* Practical E-commerce Tip for New Products */}
+          {reviewTodo && (
+            <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-start gap-2 text-[11px] text-stone-500">
+              <Sparkles size={13} className="shrink-0 text-amber-600 mt-0.5" />
+              <span>
+                <strong className="text-stone-700">Mẹo ra đơn đầu tiên:</strong> Đính kèm một card nhỏ hướng dẫn đổi trả kèm mã giảm giá cho đơn sau để khách hài lòng và để lại đánh giá 5★ (+{Math.round(reviewTodo.impact)} điểm).
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-400">
-        <span>💡 Sau khi lưu thay đổi trên sản phẩm, điểm số và kết quả duyệt sẽ cập nhật lại.</span>
+        <span>💡 Sau khi chỉnh sửa sản phẩm và bấm Lưu, bấm nút "Kiểm tra lại" ở góc trên để hệ thống chấm lại điểm ngay.</span>
       </div>
     </div>
   );

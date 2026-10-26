@@ -20,34 +20,34 @@ interface FactorMeta {
 
 const FACTOR_META: Record<HealthFactorKey, FactorMeta> = {
   image: {
-    title: 'Ảnh sản phẩm',
+    title: 'Hình ảnh sản phẩm',
     icon: ImageIcon,
-    tooltip: 'Khách mua hàng thủ công cần xem ảnh rõ nét từ nhiều góc độ (khuyến nghị từ 5 ảnh trở lên).',
+    tooltip: 'Khách mua online xem ảnh đầu tiên (khuyến nghị từ 3–5 ảnh vuông 1:1 rõ nét).',
   },
   description: {
     title: 'Mô tả chi tiết',
     icon: FileText,
-    tooltip: 'Mô tả đầy đủ kích thước, công năng và câu chuyện chế tác giúp khách yên tâm chốt đơn.',
+    tooltip: 'Mô tả rõ ràng kích cỡ, chất liệu và chính sách đổi trả giúp khách yên tâm chốt đơn.',
   },
   tags: {
-    title: 'Thẻ từ khoá (tags)',
+    title: 'Từ khoá tìm kiếm (Tags)',
     icon: TagIcon,
-    tooltip: 'Gắn thẻ từ khoá giúp khách hàng dễ dàng tìm thấy sản phẩm khi gõ tìm kiếm trên sàn.',
+    tooltip: 'Gắn từ khoá tìm kiếm giúp khách dễ dàng tìm thấy sản phẩm khi gõ tìm trên sàn.',
   },
   material: {
-    title: 'Chất liệu chế tác',
+    title: 'Thuộc tính & Chất liệu',
     icon: Layers,
-    tooltip: 'Hàng thủ công mỹ nghệ cần ghi rõ chất liệu (như gỗ tự nhiên, gốm Bát Tràng, lụa, sợi đay...).',
+    tooltip: 'Điền rõ chất liệu giúp sản phẩm xuất hiện khi khách dùng bộ lọc tìm kiếm trên sàn.',
   },
   review: {
     title: 'Đánh giá người mua',
     icon: Star,
-    tooltip: 'Đánh giá 5 sao từ khách mua thật. Với sản phẩm mới, sàn sẽ tự động kích hoạt điểm khi có đánh giá đầu tiên.',
+    tooltip: 'Đánh giá 5 sao từ khách mua thật. Với sản phẩm mới đăng, điểm sẽ tự kích hoạt tối đa khi có đơn đầu tiên.',
   },
   price: {
     title: 'Giá so với thị trường',
     icon: DollarSign,
-    tooltip: 'Mức giá bán hợp lý và cạnh tranh so với mặt bằng chung các sản phẩm tương tự trên sàn.',
+    tooltip: 'Mức giá bán cạnh tranh so với mặt bằng chung các sản phẩm tương tự trên sàn.',
   },
 };
 
@@ -59,9 +59,9 @@ function formatFactorValue(row: HealthFactor): string {
     case 'description':
       return `${decimal(row.value, 0)} từ`;
     case 'tags':
-      return `${decimal(row.value, 0)} thẻ tag`;
+      return `${decimal(row.value, 0)} từ khoá`;
     case 'material':
-      return row.value > 0 ? 'Đã ghi nhận' : 'Chưa có';
+      return row.value > 0 ? 'Đã điền' : 'Chưa điền';
     case 'review':
       return row.value > 0 ? `${row.value}★` : 'Chờ đơn đầu';
     case 'price':
@@ -130,30 +130,30 @@ export function FactorGrid({
               key={factor.key}
               type="button"
               onClick={() => onSelectFactor?.(factor.key)}
-              className={`group flex flex-col justify-between p-3.5 text-left transition-colors cursor-pointer ${
+              className={`group flex flex-col justify-between p-3.5 text-left transition-all duration-200 cursor-pointer active:scale-[0.98] ${
                 isSelected
-                  ? 'bg-stone-50 border-l-2 border-l-[#007700]'
-                  : 'bg-white hover:bg-stone-50/50'
+                  ? 'bg-stone-50 border-l-2 border-l-[#007700] shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)]'
+                  : 'bg-white hover:bg-stone-50/70'
               }`}
             >
               <div>
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-stone-400 group-hover:text-stone-700 transition-colors">
+                    <span className="text-stone-400 group-hover:text-stone-800 group-hover:scale-110 transition-all duration-200">
                       <Icon size={13} />
                     </span>
                     <span className="text-xs font-semibold text-stone-800 truncate">{meta.title}</span>
                   </div>
                   <Tooltip title={meta.tooltip} placement="top">
-                    <Info size={11} className="text-stone-300 hover:text-stone-600 shrink-0 cursor-help" />
+                    <Info size={11} className="text-stone-300 hover:text-stone-600 shrink-0 cursor-help transition-colors" />
                   </Tooltip>
                 </div>
 
                 <div className="mt-2.5 flex items-baseline justify-between gap-1">
-                  <span className="font-jakarta text-sm font-bold text-[#111111] truncate">
+                  <span className="font-jakarta text-sm font-bold text-[#111111] truncate group-hover:translate-x-0.5 transition-transform duration-150">
                     {formatFactorValue(factor)}
                   </span>
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${statusBadge}`}>
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 transition-transform duration-150 group-hover:scale-105 ${statusBadge}`}>
                     {statusText}
                   </span>
                 </div>
@@ -161,7 +161,7 @@ export function FactorGrid({
 
               <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-400">
                 <span>Điểm đạt được:</span>
-                <span className="font-mono font-bold text-stone-700">
+                <span className="font-mono font-bold text-stone-700 transition-colors group-hover:text-stone-900">
                   {Math.round(factor.points)} / {factor.weight}đ
                 </span>
               </div>

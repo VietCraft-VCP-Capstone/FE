@@ -96,13 +96,22 @@ export function HealthGauge({
               strokeLinecap="round"
               strokeDasharray={arcLength}
               strokeDashoffset={strokeOffset}
-              className="transition-all duration-700 ease-out"
+              className="transition-all duration-1000 ease-out"
             />
 
             {/* Indicator Bead */}
             {clamped > 0 && (
-              <g transform={`translate(${pointerX}, ${pointerY})`}>
-                <circle r="6" fill="#FFFFFF" stroke="#111111" strokeWidth="2.5" />
+              <g
+                transform={`translate(${pointerX}, ${pointerY})`}
+                className="transition-all duration-1000 ease-out"
+              >
+                <circle
+                  r="6"
+                  fill="#FFFFFF"
+                  stroke="#111111"
+                  strokeWidth="2.5"
+                  className="transition-transform duration-300 hover:scale-125 cursor-pointer filter drop-shadow-sm"
+                />
               </g>
             )}
 
@@ -122,8 +131,8 @@ export function HealthGauge({
           </svg>
 
           {/* Center Score Readout */}
-          <div className="absolute inset-x-0 bottom-1 flex flex-col items-center">
-            <div className="flex items-baseline justify-center">
+          <div className="absolute inset-x-0 bottom-1 flex flex-col items-center animate-slide-up">
+            <div className="flex items-baseline justify-center transition-transform hover:scale-105 duration-200">
               <span className="font-jakarta text-5xl font-black tracking-tight text-[#111111] tabular-nums">
                 {scoreText(score)}
               </span>
@@ -132,14 +141,14 @@ export function HealthGauge({
 
             <div className="mt-2 flex items-center justify-center gap-2">
               <Tooltip title={statusTooltip}>
-                <span className={`rounded px-2 py-0.5 text-[11px] font-bold cursor-help ${statusBadge}`}>
+                <span className={`rounded px-2 py-0.5 text-[11px] font-bold cursor-help transition-all duration-200 hover:scale-105 active:scale-95 ${statusBadge}`}>
                   {statusLabel}
                 </span>
               </Tooltip>
 
               {gain > 0 && (
                 <Tooltip title={`Hoàn thành các gợi ý bên cạnh có thể nâng điểm lên khoảng ${Math.min(100, Math.round(potential ?? 100))}/100, giúp bài đăng hoàn thiện và uy tín hơn.`}>
-                  <span className="cursor-help rounded bg-[#EAF0E2] px-2 py-0.5 text-[11px] font-semibold text-[#007700] border border-[#BECAB6]">
+                  <span className="cursor-help rounded bg-[#EAF0E2] px-2 py-0.5 text-[11px] font-semibold text-[#007700] border border-[#BECAB6] transition-all duration-200 hover:scale-105 active:scale-95 animate-pulse-subtle">
                     Có thể đạt {Math.min(100, Math.round(potential ?? 100))}/100
                   </span>
                 </Tooltip>
@@ -154,10 +163,10 @@ export function HealthGauge({
         <button
           type="button"
           onClick={onExplainClick}
-          className="inline-flex items-center gap-1 text-[11px] font-medium text-stone-400 transition-colors hover:text-[#007700] cursor-pointer"
+          className="group inline-flex items-center gap-1.5 text-[11px] font-medium text-stone-400 transition-all duration-200 hover:text-[#007700] cursor-pointer"
         >
           <span>Cách tính điểm &amp; 6 tiêu chuẩn</span>
-          <ArrowRight size={11} className="text-stone-400" />
+          <ArrowRight size={11} className="text-stone-400 group-hover:text-[#007700] transition-transform duration-200 group-hover:translate-x-1" />
         </button>
       </div>
     </div>

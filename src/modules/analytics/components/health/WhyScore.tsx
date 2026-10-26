@@ -91,8 +91,8 @@ export function WhyScore({ data }: { data: ListingHealth }) {
       </div>
 
       <div className="rounded-lg border border-[#D5E6D4] bg-[#EDF3EC]/60 p-3.5 text-xs leading-relaxed text-[#254C28]">
-        <span className="font-bold">Lưu ý về định giá đồ thủ công:</span>{' '}
-        Tiêu chuẩn Giá (tối đa 40đ) chỉ đo lường xem mức giá có nằm trong khung chấp nhận được của phân khúc khách hàng hay không. Sàn không ép bạn phải bán rẻ để lấy điểm cao. Với sản phẩm thủ công tinh xảo độc bản, giá cao hoàn toàn xứng đáng nếu bạn làm nổi bật công sức chế tác và chất liệu quý trong phần mô tả.
+        <span className="font-bold">Lưu ý về định giá sản phẩm:</span>{' '}
+        Tiêu chuẩn Giá đo lường mức độ cạnh tranh của sản phẩm so với mặt bằng chung cùng ngành trên sàn. Sàn không ép bạn phải bán rẻ để lấy điểm cao. Nếu sản phẩm của bạn có chất lượng vượt trội hoặc có quà tặng kèm, hãy nêu rõ trong phần mô tả hoặc tạo thêm mã giảm giá (voucher) để thu hút khách hàng.
       </div>
     </div>
   );

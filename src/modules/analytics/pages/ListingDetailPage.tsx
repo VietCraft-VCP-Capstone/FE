@@ -154,7 +154,7 @@ function ListingDetail({ id }: { id: string }) {
               <div className="flex items-center gap-2 shrink-0">
                 <Link
                   to={`${INSIGHTS_ROOT}/listings`}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-all duration-150 hover:bg-stone-50 hover:border-stone-300 active:scale-95"
                 >
                   <ArrowLeft size={13} />
                   <span>Tất cả sản phẩm</span>
@@ -164,7 +164,7 @@ function ListingDetail({ id }: { id: string }) {
                   href={`/products/${id}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50 hover:text-[#111111] no-underline"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-all duration-150 hover:bg-stone-50 hover:border-stone-300 hover:text-[#111111] active:scale-95 no-underline"
                   title="Mở trang sản phẩm hiển thị với người mua trong tab mới"
                 >
                   <Eye size={13} className="text-stone-400" />
@@ -183,7 +183,7 @@ function ListingDetail({ id }: { id: string }) {
             const potential = todos.length ? Math.min(100, currentScore + totalImpact) : null;
 
             return (
-              <div className="space-y-5 pt-1">
+              <div className="space-y-5 pt-1 animate-slide-up">
                 <div className="border border-stone-200 bg-white rounded-lg overflow-hidden">
                   <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-stone-100">
                     {/* Left: Overall Health Score Gauge (5 cols) */}
@@ -229,13 +229,13 @@ function ListingDetail({ id }: { id: string }) {
                 <div className="border border-stone-200 bg-white rounded-lg p-5 md:p-6">
                   <div className="border-b border-stone-100 pb-3 mb-5">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                      Phân tích kỹ thuật (AI)
+                      Hiệu quả &amp; Xu hướng bán hàng
                     </span>
                     <h3 className="m-0 mt-0.5 font-jakarta text-base font-bold text-[#111111]">
-                      Dữ liệu máy học &amp; Xu hướng thị trường
+                      Lưu lượng truy cập &amp; Cơ hội tăng đơn
                     </h3>
                     <p className="m-0 mt-1 text-xs text-stone-500">
-                      Phân tích chi tiết từng góc chụp ảnh, chất liệu và hiệu quả chuyển đổi giúp bạn tối ưu nâng cao.
+                      Theo dõi lượt xem, tỷ lệ khách bấm mua và xu hướng theo mùa vụ để lên kế hoạch bán hàng tốt nhất.
                     </p>
                   </div>
 

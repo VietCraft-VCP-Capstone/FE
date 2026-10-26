@@ -1,12 +1,12 @@
 import type { HealthFactorKey } from '../../healthTypes';
 
 export const PART: Record<HealthFactorKey, { label: string; why: string }> = {
-  price: { label: 'Giá', why: 'Khách thường so giá trước khi mua. Giá cao hơn nhiều so với sản phẩm tương tự mà không giải thích lý do thì khách dễ bỏ qua.' },
-  image: { label: 'Ảnh', why: 'Khách không cầm được sản phẩm, nên ảnh là thứ họ xem đầu tiên và tin nhất.' },
-  description: { label: 'Mô tả', why: 'Mô tả trả lời những câu khách hay hỏi: kích thước, chất liệu, cách dùng, cách bảo quản.' },
-  tags: { label: 'Tag', why: 'Tag giúp sản phẩm hiện ra khi khách tìm kiếm hoặc lọc theo chủ đề.' },
-  material: { label: 'Chất liệu', why: 'Với đồ thủ công, khách luôn muốn biết sản phẩm làm từ gì.' },
-  review: { label: 'Đánh giá', why: 'Đánh giá giúp khách mới tin hơn, nhưng dữ liệu chưa cho thấy nó làm sản phẩm bán chạy hơn rõ rệt, nên chỉ giữ ít điểm.' },
+  price: { label: 'Giá bán', why: 'Khách hay so sánh giá với các shop khác. Giá hợp lý và cạnh tranh giúp tăng nhanh tỷ lệ chốt đơn.' },
+  image: { label: 'Hình ảnh', why: 'Khách mua online xem ảnh đầu tiên. Ảnh rõ đẹp từ nhiều góc chụp giúp khách tin tưởng bấm mua.' },
+  description: { label: 'Mô tả', why: 'Mô tả giải đáp thắc mắc về kích cỡ (size), chất liệu, công năng và chính sách đổi trả hàng.' },
+  tags: { label: 'Từ khoá', why: 'Từ khoá giúp sản phẩm xuất hiện khi khách gõ tìm kiếm trên sàn.' },
+  material: { label: 'Chất liệu', why: 'Điền rõ chất liệu giúp sản phẩm xuất hiện khi khách dùng bộ lọc tìm kiếm và an tâm về chất lượng.' },
+  review: { label: 'Đánh giá', why: 'Đánh giá từ khách đã mua giúp tạo dựng uy tín cho shop và thuyết phục khách mới chốt đơn.' },
 };
 
 export const SOURCE: Record<'learned' | 'policy' | 'floor', string> = {

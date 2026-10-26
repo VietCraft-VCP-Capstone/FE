@@ -13,13 +13,13 @@ const FACTOR_DETAILS: Record<
   }
 > = {
   image: {
-    title: 'Ảnh sản phẩm',
+    title: 'Hình ảnh sản phẩm',
     field: 'images',
     actionLabel: 'Thêm ảnh ngay',
     guide: [
-      'Chụp ít nhất 5 ảnh với ánh sáng tự nhiên, phông nền đơn giản làm nổi bật sản phẩm.',
-      'Chụp đầy đủ các góc: góc nhìn toàn cảnh, góc nghiêng 45 độ, và góc đặt trong không gian sống.',
-      'Chụp cận cảnh đường kim mũi chỉ, hoa văn gốm sứ hoặc thớ gỗ để khách cảm nhận sự tỉ mỉ.',
+      'Đăng từ 3–5 ảnh vuông (tỷ lệ 1:1) chụp rõ nét với ánh sáng đủ, phông nền đơn giản làm nổi bật sản phẩm.',
+      'Chụp đầy đủ các góc: mặt trước, mặt sau, góc nghiêng và ảnh chụp cận cảnh chất liệu vải/tem mác.',
+      'Nên có ít nhất 1 ảnh bảng quy đổi kích cỡ (size chart) để người mua tự chọn size mà không cần nhắn hỏi shop.',
     ],
   },
   description: {
@@ -27,29 +27,29 @@ const FACTOR_DETAILS: Record<
     field: 'description',
     actionLabel: 'Sửa mô tả ngay',
     guide: [
-      'Nêu rõ kích thước thực tế (dài, rộng, cao, cân nặng) để khách dễ hình dung kích cỡ.',
-      'Kể ngắn gọn câu chuyện làng nghề, cảm hứng tạo tác hoặc ý nghĩa văn hoá của sản phẩm.',
-      'Ghi rõ hướng dẫn bảo quản (ví dụ: tránh ẩm ướt, lau bằng khăn mềm, cách giặt đồ thêu tay).',
+      'Ghi bảng thông số kích cỡ rõ ràng: chiều dài, vòng ngực, cân nặng phù hợp để khách chọn size nhanh.',
+      'Ghi rõ chất liệu vải/nguyên liệu (ví dụ: Cotton 100% co giãn 4 chiều, thoáng mát, bền màu).',
+      'Nêu rõ cam kết bán hàng và chính sách đổi trả trong 7 ngày để khách lạ an tâm bấm mua.',
     ],
   },
   tags: {
-    title: 'Thẻ từ khoá (tags)',
+    title: 'Từ khoá tìm kiếm (Tags)',
     field: 'tags',
-    actionLabel: 'Thêm thẻ từ khoá',
+    actionLabel: 'Thêm từ khoá',
     guide: [
-      'Thẻ từ khoá (tag) là những từ khách hay gõ tìm kiếm trên sàn (nên gắn từ 3–5 thẻ liên quan).',
-      'Gợi ý gắn thẻ chất liệu & công dụng: #thủ_công, #len_cừu, #áo_ấm, #đồ_mùa_đông, #quà_tặng.',
-      'Dùng từ ngắn gọn, chính xác (1-3 từ mỗi thẻ). Tránh gõ lại nguyên cả tên sản phẩm vào ô tag.',
+      'Từ khoá (tag) là những từ khách hay gõ tìm kiếm trên sàn (nên gắn từ 3–5 từ khoá liên quan nhất).',
+      'Gợi ý từ khoá: tên loại sản phẩm, kiểu dáng, phong cách (ví dụ: #ao_thun, #ao_phong_nam, #form_rong).',
+      'Dùng từ ngắn gọn, chính xác (1–3 từ mỗi thẻ). Tránh gõ lại nguyên cả tên sản phẩm dài vào ô từ khoá.',
     ],
   },
   material: {
-    title: 'Chất liệu chế tác',
+    title: 'Thông tin chất liệu & thuộc tính',
     field: 'materials',
-    actionLabel: 'Cập nhật chất liệu',
+    actionLabel: 'Điền chất liệu',
     guide: [
-      'Điền chính xác tên chất liệu vào ô Chất liệu trong trang sửa sản phẩm.',
-      'Nếu sản phẩm kết hợp nhiều chất liệu, hãy liệt kê đầy đủ (ví dụ: khung gỗ sồi kết hợp mây đan mắt cáo).',
-      'Nhắc lại chất liệu trong tiêu đề hoặc đoạn đầu mô tả để khách tìm kiếm bằng chất liệu dễ thấy.',
+      'Điền đúng tên chất liệu chính vào ô Chất liệu để sản phẩm xuất hiện khi người mua lọc theo chất liệu.',
+      'Nếu sản phẩm có pha chất liệu, hãy ghi rõ (ví dụ: 95% Cotton, 5% Spandex co giãn).',
+      'Nhắc lại chất liệu ở Tiêu đề và Mô tả để khách tìm kiếm theo chất liệu dễ thấy shop bạn.',
     ],
   },
   review: {
@@ -57,9 +57,9 @@ const FACTOR_DETAILS: Record<
     field: 'reviews',
     actionLabel: 'Xem đơn hàng',
     guide: [
-      'Sản phẩm mới chưa có đánh giá sẽ tự động được kích hoạt điểm ngay khi nhận được đánh giá 5★ đầu tiên.',
-      'Mẹo nhỏ: Đính kèm một bức thiệp cảm ơn viết tay mộc mạc trong kiện hàng để tạo thiện cảm và mời khách đánh giá.',
-      'Đánh giá thực tế từ khách đã mua là yếu tố thuyết phục nhất để những người xem sau bấm chốt đơn.',
+      'Sản phẩm mới đăng chưa có đánh giá sẽ tự động được tính điểm tối đa ngay khi nhận được đánh giá 5★ đầu tiên.',
+      'Mẹo nhỏ: Đính kèm một card nhỏ hướng dẫn đổi trả kèm lời cảm ơn để khách hài lòng và đánh giá 5★.',
+      'Sản phẩm có từ 3 đánh giá kèm hình ảnh thực tế sẽ tăng gấp đôi tỷ lệ khách lạ bấm đặt hàng.',
     ],
   },
   price: {
@@ -67,9 +67,9 @@ const FACTOR_DETAILS: Record<
     field: 'price',
     actionLabel: 'Điều chỉnh giá',
     guide: [
-      'Mức giá hợp lý so với các sản phẩm cùng nhóm hàng thủ công trên sàn.',
-      'Nếu sản phẩm thủ công có giá cao hơn mặt bằng, hãy làm nổi bật giá trị độc bản và công sức nghệ nhân.',
-      'Khách hàng sẵn sàng chi trả mức giá xứng đáng nếu họ cảm nhận được sự tâm huyết và chất lượng.',
+      'Mức giá bán cạnh tranh so với mặt bằng chung các sản phẩm tương tự đang bán trên sàn.',
+      'Nếu giá của shop cao hơn mặt bằng, hãy tạo Voucher giảm giá hoặc quà tặng kèm để kích thích khách chốt đơn.',
+      'Nếu giá của bạn đã rất tốt, hãy tập trung làm đẹp ảnh bìa và tiêu đề để thu hút lượt click vào xem.',
     ],
   },
 };
@@ -101,10 +101,10 @@ export function FactorBreakdownCard({
   if (!factor) return null;
 
   return (
-    <div className="space-y-3">
+    <div key={factorKey} className="space-y-3 animate-slide-up">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200/80 pb-2">
         <div className="flex items-center gap-2">
-          <Lightbulb size={14} className="text-[#956400]" />
+          <Lightbulb size={14} className="text-[#956400] transition-transform duration-300 hover:rotate-12 cursor-pointer" />
           <span className="text-xs font-bold text-[#111111]">
             Gợi ý tối ưu: {details.title}
           </span>
@@ -116,14 +116,14 @@ export function FactorBreakdownCard({
         {factorKey === 'review' ? (
           <Link
             to="/seller/orders"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors no-underline"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-stone-100 text-stone-700 hover:bg-stone-200 active:scale-95 transition-all duration-150 no-underline"
           >
             <span>Xem đơn hàng</span>
           </Link>
         ) : (
           <Link
             to={editLink(data.product_id, details.field)}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-[#111111] text-white hover:bg-stone-800 transition-colors no-underline"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-[#111111] text-white hover:bg-stone-800 active:scale-95 shadow-xs transition-all duration-150 no-underline"
           >
             <Pencil size={11} />
             <span>{details.actionLabel}</span>
@@ -135,9 +135,9 @@ export function FactorBreakdownCard({
         {details.guide.map((tip, idx) => (
           <div
             key={idx}
-            className="flex items-start gap-2.5 text-xs leading-relaxed text-stone-600"
+            className="group flex items-start gap-2.5 text-xs leading-relaxed text-stone-600 p-2.5 -m-2 rounded-md hover:bg-white/80 hover:shadow-xs transition-all duration-200"
           >
-            <span className="font-mono text-[10px] font-bold text-stone-400 mt-0.5">
+            <span className="font-mono text-[10px] font-bold text-stone-400 mt-0.5 group-hover:text-stone-900 group-hover:scale-110 transition-all duration-150">
               0{idx + 1}
             </span>
             <span>{tip}</span>

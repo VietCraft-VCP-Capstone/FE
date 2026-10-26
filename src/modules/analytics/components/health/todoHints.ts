@@ -1,8 +1,8 @@
 export const TODO_HINT: Record<string, string> = {
-  image: 'Khách không cầm được sản phẩm, ảnh là thứ họ xem đầu tiên. Nên có ảnh chính, ảnh nhiều góc, ảnh chi tiết và ảnh khi dùng.',
-  description: 'Mô tả trả lời câu hỏi của khách: kích thước, chất liệu, cách dùng, cách bảo quản. Mô tả đủ ý giúp khách yên tâm đặt mua.',
-  tags: 'Tag giúp sản phẩm hiện ra khi khách tìm kiếm hoặc lọc theo chủ đề.',
-  material: 'Khách hàng thời trang và đồ thủ công luôn hỏi "làm bằng gì". Ghi rõ chất liệu để khách khỏi phải nhắn hỏi.',
-  review: 'Đánh giá tốt từ người đã mua giúp khách mới tin tưởng hơn.',
-  price: 'Khách hay so giá với sản phẩm tương tự. Giá cao hơn nhiều mà không giải thích lý do thì khách dễ bỏ qua.',
+  image: 'Khách mua online xem ảnh đầu tiên. Nên có ảnh bìa vuông 1:1, ảnh các góc và ảnh bảng size/kích thước.',
+  description: 'Mô tả trả lời các thắc mắc thường gặp: kích cỡ chi tiết, chất liệu vải và chính sách đổi trả hàng.',
+  tags: 'Từ khoá giúp sản phẩm xuất hiện khi khách hàng gõ tìm kiếm trên sàn.',
+  material: 'Khách mua online luôn quan tâm "chất liệu gì". Ghi rõ chất liệu giúp sản phẩm dễ lên bộ lọc tìm kiếm.',
+  review: 'Đánh giá 5★ từ khách đã mua giúp tạo dựng uy tín và thuyết phục khách mới bấm chốt đơn.',
+  price: 'Khách hay so giá với các shop khác. Giữ giá cạnh tranh hoặc tạo mã giảm giá để chốt đơn nhanh hơn.',
 };
