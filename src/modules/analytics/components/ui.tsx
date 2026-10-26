@@ -20,7 +20,7 @@ export const BRAND = '#007700';
 /** Biểu tượng ⓘ: rê chuột hoặc focus bàn phím để xem chú giải, giữ màn hình ít chữ. */
 export function InfoTip({ text, label = 'Xem giải thích', wide = false }: { text: React.ReactNode; label?: string; wide?: boolean }) {
   return (
-    <Tooltip styles={wide ? { root: { maxWidth: 420 } } : undefined} title={<div className={`${wide ? 'max-w-sm' : 'max-w-xs'} text-xs leading-relaxed`}>{text}</div>}>
+    <Tooltip trigger={['hover', 'focus']} styles={wide ? { root: { maxWidth: 420 } } : undefined} title={<div className={`${wide ? 'max-w-sm' : 'max-w-xs'} text-xs leading-relaxed`}>{text}</div>}>
       <button
         type="button"
         aria-label={label}
@@ -40,8 +40,10 @@ export function InsightCard({
   footer,
   className,
   bodyClassName,
+  bare = false,
   children,
 }: {
+  bare?: boolean;
   title?: string;
   info?: React.ReactNode;
   description?: string;
@@ -51,6 +53,7 @@ export function InsightCard({
   bodyClassName?: string;
   children: React.ReactNode;
 }) {
+  if (bare) return <div className="min-w-0">{children}</div>;
   return (
     <section className={`flex min-w-0 flex-col rounded-md border border-stone-200 bg-white ${className || ''}`}>
       {(title || action) && (
@@ -86,14 +89,15 @@ const TONE_CLASS: Record<Tone, string> = {
   brand: 'bg-[#007700] text-white',
 };
 
-export function Chip({ tone = 'neutral', icon, children, className }: {
+export function Chip({ tone = 'neutral', icon, children, className, wrap = false }: {
   tone?: Tone;
   icon?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  wrap?: boolean;
 }) {
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-0.5 text-[11.5px] font-semibold ${TONE_CLASS[tone]} ${className || ''}`}>
+    <span className={`inline-flex items-center gap-1 ${wrap ? 'max-w-full whitespace-normal text-left' : 'whitespace-nowrap'} rounded px-2 py-0.5 text-[11.5px] font-semibold ${TONE_CLASS[tone]} ${className || ''}`}>
       {icon}
       {children}
     </span>
@@ -229,12 +233,12 @@ export function SelectField({ label, value, onChange, options, className }: {
 /* ------------------------------------------------------- kết luận nhanh --- */
 
 export const ACTION_CLASS =
-  'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border-none bg-[#007700] px-4 py-2 text-[13px] font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:bg-stone-300 motion-reduce:transition-none';
+  'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border-none bg-[#007700] px-4 py-2 text-[13px] font-semibold text-white no-underline transition-colors duration-150 hover:bg-[#005B00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:bg-stone-300 motion-reduce:transition-none';
 
 /** Đầu mỗi trang: câu trả lời trước, số liệu sau, kèm đúng một việc nên làm (người bán mới đọc 5 giây là đủ). */
 export function Takeaway({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <section aria-label="Kết luận nhanh" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#007700]/20 bg-[#EAF0E2] px-5 py-4">
+    <section aria-label="Kết luận nhanh" className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-[#007700]/20 bg-[#EAF0E2] px-4 py-3">
       <div className="min-w-0 flex-1">
         <span className="block text-[11.5px] font-bold uppercase tracking-wide text-[#005B00]">Kết luận nhanh</span>
         <p className="mb-0 mt-1 text-[15px] leading-relaxed text-stone-900">{children}</p>
@@ -275,13 +279,15 @@ export function Note({ children, tone = 'neutral' }: { children: React.ReactNode
 }
 
 /** Bảng dữ liệu gọn, cuộn ngang trên màn nhỏ thay vì vỡ bố cục. */
-export function DataTable({ head, children, caption }: {
+export function DataTable({ head, children, caption, minWidth = 'min-w-[560px]' }: {
   head: React.ReactNode;
   children: React.ReactNode;
   caption?: string;
+  minWidth?: string;
 }) {
   return (
-    <div className="-mx-4 overflow-x-auto">
+    // relative: chữ sr-only (định vị tuyệt đối) trong ô phải nằm trong khung cuộn, không đẩy cả trang tràn ngang.
+    <div className="relative -mx-4 overflow-x-auto">
       <table className="w-full min-w-[560px] border-collapse text-left text-[13px]">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>

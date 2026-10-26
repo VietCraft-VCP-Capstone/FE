@@ -8,6 +8,7 @@ const EMPTY_FORM: ProductFormData = {
   category: '',
   categoryId: '',
   tagIds: [],
+  materials: [],
   price: 0,
   stock: 10,
   sku: '',
@@ -18,7 +19,8 @@ const EMPTY_FORM: ProductFormData = {
   thumbnail: '',
   images: [],
   colors: [{ name: 'Gỗ sồi tự nhiên', hex: '#5C4033' }],
-  sizes: []
+  sizes: [],
+  material: ''
 };
 
 function formFromProduct(product: ProductItem): ProductFormData {
@@ -36,6 +38,7 @@ function formFromProduct(product: ProductItem): ProductFormData {
     category: product.category || '',
     categoryId: '',
     tagIds: [],
+    materials: product.materials ? [...product.materials] : [],
     price: product.price || 0,
     stock: product.stock !== undefined ? product.stock : 10,
     sku: product.sku || '',
@@ -48,7 +51,8 @@ function formFromProduct(product: ProductItem): ProductFormData {
     colors: product.colors && product.colors.length > 0 ? product.colors : [],
     sizes: product.sizes && product.sizes.length > 0
       ? product.sizes
-      : Array.from(new Set((product.variants || []).map(v => v.size).filter(Boolean))) as string[]
+      : Array.from(new Set((product.variants || []).map(v => v.size).filter(Boolean))) as string[],
+    material: product.variants?.[0]?.material || (product as any).material || ''
   };
 }
 
@@ -58,6 +62,7 @@ function newProductForm(): ProductFormData {
     category: '',
     categoryId: '',
     tagIds: [],
+    materials: [],
     price: 0,
     stock: 50,
     sku: '',
@@ -71,7 +76,8 @@ function newProductForm(): ProductFormData {
       { name: 'Đen', hex: '#1C1C1C' },
       { name: 'Trắng', hex: '#FFFFFF' }
     ],
-    sizes: []
+    sizes: [],
+    material: ''
   };
 }
 

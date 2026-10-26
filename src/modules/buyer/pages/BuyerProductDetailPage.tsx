@@ -11,6 +11,7 @@ import { cartService } from '../../order/services/cartService';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 import { getSessionId, recordProductViewEvent } from '../services/eventService';
+import { getRecentSearches } from '../components/search/recentSearchStorage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Variant { id: string; name: string; color?: string; size?: string; material?: string; price: number; stock: number; mockupImage?: string; }
@@ -268,11 +269,9 @@ export function BuyerProductDetailPage() {
         setRelated(relSlice);
         const relIds = new Set(relSlice.map((r: any) => r.id));
 
-        return productsService.getAll({ limit: 8 } as any)
-          .catch(() => [])
-          .then((all: any) => {
-            const allList = Array.isArray(all) ? all : (all?.items || []);
-            const pool = allList.filter((p: any) => p.id !== id && !relIds.has(p.id));
+        return productsService.getForYou(12, getRecentSearches())
+          .then((all: any[]) => {
+            const pool = all.filter((p: any) => p.id !== id && !relIds.has(p.id));
             const sugg = pool.slice(0, 4);
             suggestionsDetailCache.set(id, sugg);
             setSuggestions(sugg);
