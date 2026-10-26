@@ -48,6 +48,13 @@ function toDisplayDate(str: string): string {
     return str;
 }
 
+function formatConfidenceScore(score: number | undefined | null): string {
+    if (score === undefined || score === null) return '0%';
+    // Nếu điểm trả về tỷ lệ thập phân 0–1 (ví dụ 0.83) thì nhân 100 thành 83%, nếu đã là 0-100 thì giữ nguyên
+    const pct = score <= 1 && score > 0 ? Math.round(score * 100) : Math.round(score);
+    return `${pct}%`;
+}
+
 function toIsoDate(str: string): string {
     if (!str) return '';
     if (str.includes('-') && str.length === 10) return str;
@@ -1589,11 +1596,11 @@ export function SellerRegisterPage() {
                                                         }`}>
                                                         {frontVerification.is_likely_authentic ? (
                                                             <>
-                                                                <CheckCircle2 size={12} /> Hợp lệ ({frontVerification.confidence_score}%)
+                                                                <CheckCircle2 size={12} /> Chất lượng ảnh đạt ({formatConfidenceScore(frontVerification.confidence_score)})
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <AlertTriangle size={12} /> Cảnh báo ({frontVerification.confidence_score}%)
+                                                                <AlertTriangle size={12} /> Cần kiểm tra lại ({formatConfidenceScore(frontVerification.confidence_score)})
                                                             </>
                                                         )}
                                                     </div>
@@ -1651,11 +1658,11 @@ export function SellerRegisterPage() {
                                                         }`}>
                                                         {backVerification.is_likely_authentic ? (
                                                             <>
-                                                                <CheckCircle2 size={12} /> Hợp lệ ({backVerification.confidence_score}%)
+                                                                <CheckCircle2 size={12} /> Chất lượng ảnh đạt ({formatConfidenceScore(backVerification.confidence_score)})
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <AlertTriangle size={12} /> Cảnh báo ({backVerification.confidence_score}%)
+                                                                <AlertTriangle size={12} /> Cần kiểm tra lại ({formatConfidenceScore(backVerification.confidence_score)})
                                                             </>
                                                         )}
                                                     </div>
@@ -1742,7 +1749,7 @@ export function SellerRegisterPage() {
                                     <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
-                                                <ShieldCheck size={15} className="text-[#007700]" /> Báo cáo kiểm định ảnh thật/giả
+                                                <ShieldCheck size={15} className="text-[#007700]" /> Đánh giá chất lượng ảnh & bố cục (Hỗ trợ nhập liệu)
                                             </span>
                                         </div>
 
@@ -1794,6 +1801,10 @@ export function SellerRegisterPage() {
                                                     </ul>
                                                 </div>
                                             )}
+
+                                        <p className="text-[11px] text-slate-500 italic bg-slate-100/70 p-2 rounded-lg border border-slate-200/80">
+                                            * Lưu ý: Kết quả phân tích chất lượng ảnh và trích xuất OCR chỉ hỗ trợ nhận diện và điền tự động biểu mẫu, không thay thế việc đối chiếu với cơ sở dữ liệu định danh quốc gia. Hồ sơ đăng ký sẽ được Quản trị viên thẩm định độc lập trước khi phê duyệt.
+                                        </p>
                                     </div>
                                 )}
                             </div>

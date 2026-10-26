@@ -12,6 +12,7 @@ export interface SmartProductAiModalProps {
   categories?: any[];
   initialCategory?: string;
   initialTitle?: string;
+  initialMaterial?: string;
   blankCost?: number;
   isPod?: boolean;
   onApplyTitle?: (title: string) => void;
@@ -19,6 +20,7 @@ export interface SmartProductAiModalProps {
   onApplyMarkup?: (markup: number) => void;
   onApplyDescription?: (desc: string) => void;
   onApplyTags?: (tagNames: string[]) => void;
+  onApplyMaterial?: (material: string) => void;
   onApplyAll?: (data: {
     title: string;
     price: number;
@@ -26,6 +28,7 @@ export interface SmartProductAiModalProps {
     description: string;
     tags: string[];
     categoryId?: string;
+    material?: string;
   }) => void;
 }
 
@@ -36,6 +39,7 @@ export function SmartProductAiModal({
   categories = [],
   initialCategory = '',
   initialTitle = '',
+  initialMaterial = '',
   blankCost = 0,
   isPod = false,
   onApplyTitle,
@@ -43,10 +47,12 @@ export function SmartProductAiModal({
   onApplyMarkup,
   onApplyDescription,
   onApplyTags,
+  onApplyMaterial,
   onApplyAll,
 }: SmartProductAiModalProps) {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [keywordIdea, setKeywordIdea] = useState(initialTitle);
+  const [material, setMaterial] = useState(initialMaterial);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<SmartProductSuggestionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,18 +64,23 @@ export function SmartProductAiModal({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const fetchSuggestion = useCallback(async () => {
+  const fetchSuggestion = useCallback(async (overrides?: { catId?: string; kw?: string; mat?: string }) => {
     setLoading(true);
     setError(null);
     try {
+      const catToUse = overrides?.catId !== undefined ? overrides.catId : selectedCategory;
+      const kwToUse = overrides?.kw !== undefined ? overrides.kw : keywordIdea;
+      const matToUse = overrides?.mat !== undefined ? overrides.mat : material;
+
       // Find category name if categoryId was given
-      const matchedCat = categories.find(c => c._id === selectedCategory || c.name === selectedCategory);
-      const catName = matchedCat?.name || selectedCategory;
+      const matchedCat = categories.find(c => c._id === catToUse || c.name === catToUse);
+      const catName = matchedCat?.name || catToUse;
 
       const result = await analyticsApi.getSmartProductSuggestion({
-        category_id: selectedCategory,
+        category_id: catToUse,
         category_name: catName,
-        keywords: keywordIdea.trim(),
+        keywords: kwToUse.trim(),
+        material: matToUse.trim(),
         blank_cost: blankCost,
       });
 
@@ -88,11 +99,11 @@ export function SmartProductAiModal({
       }
     } catch (err: any) {
       console.error('Failed to fetch AI product suggestion:', err);
-      setError('Chưa thể lấy dữ liệu phân tích từ AI lúc này. Vui lòng thử lại sau.');
+      setError('Chưa thể lấy dữ liệu phân tích lúc này. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, keywordIdea, blankCost, categories]);
+  }, [selectedCategory, keywordIdea, material, blankCost, categories]);
 
   // Lược bỏ các phần hậu tố (- ...) nếu mở lại từ một tiêu đề đã gợi ý trước đó
   const extractCoreTopic = (rawTitle: string): string => {
@@ -106,9 +117,11 @@ export function SmartProductAiModal({
 
   useEffect(() => {
     if (isOpen) {
+      const coreTopic = extractCoreTopic(initialTitle);
       setSelectedCategory(initialCategory);
-      setKeywordIdea(extractCoreTopic(initialTitle));
-      fetchSuggestion();
+      setKeywordIdea(coreTopic);
+      setMaterial(initialMaterial);
+      fetchSuggestion({ catId: initialCategory, kw: coreTopic, mat: initialMaterial });
     }
   }, [isOpen]);
 
@@ -129,6 +142,7 @@ export function SmartProductAiModal({
     const finalTitle = chosenTitle || (data?.suggested_titles?.[0] ?? '');
     const finalDesc = data?.seo_description || '';
     const finalTags = selectedTags.length > 0 ? selectedTags : (data?.suggested_tags ?? []);
+    const finalMaterial = material.trim();
 
     if (onApplyAll) {
       onApplyAll({
@@ -138,6 +152,7 @@ export function SmartProductAiModal({
         description: finalDesc,
         tags: finalTags,
         categoryId: selectedCategory || undefined,
+        material: finalMaterial || undefined,
       });
     } else {
       if (onApplyTitle && finalTitle) onApplyTitle(finalTitle);
@@ -145,6 +160,7 @@ export function SmartProductAiModal({
       if (onApplyMarkup && finalMarkup > 0) onApplyMarkup(finalMarkup);
       if (onApplyDescription && finalDesc) onApplyDescription(finalDesc);
       if (onApplyTags && finalTags.length > 0) onApplyTags(finalTags);
+      if (onApplyMaterial && finalMaterial) onApplyMaterial(finalMaterial);
     }
     onClose();
   };
@@ -170,11 +186,11 @@ export function SmartProductAiModal({
                   VietCraft AI Studio
                 </h3>
                 <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-stone-950 px-2 py-0.5 rounded-full shadow-xs">
-                  Market Intelligence
+                  Trợ Lý Niêm Yết
                 </span>
               </div>
               <p className="text-[11px] text-emerald-100 font-medium mt-0.5">
-                Gợi ý Tên chuẩn SEO, Giá bán tối ưu & Từ khóa Hot từ 5.000+ đối thủ TMĐT
+                Gợi ý Tên chuẩn SEO, Định giá thị trường & Thẻ tag phổ biến trên sàn
               </p>
             </div>
           </div>
@@ -190,17 +206,17 @@ export function SmartProductAiModal({
 
           {/* Quick Search & Filter Toolbar */}
           <div className="mt-4 pt-3.5 border-t border-white/15 grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-            <div className="sm:col-span-5">
+            <div className="sm:col-span-4">
               <input
                 type="text"
-                placeholder="Ý tưởng hoặc chủ đề (VD: anime, hoa sen, vintage...)"
+                placeholder="Ý tưởng / chủ đề (VD: hoa sen, vintage...)"
                 value={keywordIdea}
                 onChange={e => setKeywordIdea(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && fetchSuggestion()}
                 className="w-full px-3 py-2 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl text-xs text-white placeholder:text-emerald-200/70 focus:outline-none focus:bg-white focus:text-stone-900 focus:placeholder:text-stone-400 transition"
               />
             </div>
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-3">
               <select
                 value={selectedCategory}
                 onChange={e => setSelectedCategory(e.target.value)}
@@ -215,14 +231,24 @@ export function SmartProductAiModal({
               </select>
             </div>
             <div className="sm:col-span-3">
+              <input
+                type="text"
+                placeholder="Chất liệu (VD: Men rạn, Tơ tằm, Da thật...)"
+                value={material}
+                onChange={e => setMaterial(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && fetchSuggestion()}
+                className="w-full px-3 py-2 bg-white/10 hover:bg-white/15 border border-white/20 rounded-xl text-xs text-white placeholder:text-emerald-200/70 focus:outline-none focus:bg-white focus:text-stone-900 focus:placeholder:text-stone-400 transition"
+              />
+            </div>
+            <div className="sm:col-span-2">
               <button
                 type="button"
-                onClick={fetchSuggestion}
+                onClick={() => fetchSuggestion()}
                 disabled={loading}
-                className="w-full py-2 px-3 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-60 cursor-pointer"
+                className="w-full py-2 px-2 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1 shadow-sm active:scale-95 disabled:opacity-60 cursor-pointer"
               >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                {loading ? 'Đang phân tích...' : 'Phân tích lại'}
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                <span>{loading ? 'Đang phân tích...' : 'Phân tích lại'}</span>
               </button>
             </div>
           </div>
@@ -235,9 +261,9 @@ export function SmartProductAiModal({
           {loading ? (
             <div className="py-16 text-center space-y-3">
               <div className="w-12 h-12 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
-              <h4 className="text-sm font-bold text-stone-800">AI đang quét dữ liệu thị trường & đối thủ...</h4>
+              <h4 className="text-sm font-bold text-stone-800">Đang tổng hợp dữ liệu ngành hàng...</h4>
               <p className="text-xs text-stone-500 max-w-md mx-auto">
-                Đang phân tích chỉ số nhu cầu Google Trends, phân vị giá bán chạy và từ khóa hot có tỷ lệ chuyển đổi cao.
+                Đang phân tích phân vị giá thị trường, thẻ tag phổ biến và đề xuất tiêu đề SEO chuẩn mực.
               </p>
             </div>
           ) : error ? (
@@ -245,7 +271,7 @@ export function SmartProductAiModal({
               <p className="text-xs font-bold text-rose-700">{error}</p>
               <button
                 type="button"
-                onClick={fetchSuggestion}
+                onClick={() => fetchSuggestion()}
                 className="text-xs font-bold text-rose-600 underline hover:text-rose-800"
               >
                 Bấm để thử lại
@@ -253,12 +279,12 @@ export function SmartProductAiModal({
             </div>
           ) : data ? (
             <>
-              {/* SECTION 1: Từ Khóa & Xu Hướng Hot */}
+              {/* SECTION 1: Thẻ Tags Phổ Biến */}
               <div className="bg-white p-4.5 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
                     <Flame className="text-orange-500 fill-orange-500" size={16} />
-                    Từ Khóa Hot Đang Có Nhu Cầu Cao (Google Trends & TMĐT)
+                    Thẻ Tag Phổ Biến Trong Ngành Hàng
                   </h4>
                   <span className="text-[11px] text-stone-400 font-medium">Bấm vào tag để bổ sung</span>
                 </div>
@@ -363,10 +389,12 @@ export function SmartProductAiModal({
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
                       <Coins className="text-amber-500" size={16} />
-                      Định Giá Bán Tối Ưu Lợi Nhuận
+                      Định Giá Bán & Phân Vị Thị Trường
                     </h4>
-                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      Tỷ lệ chuyển đổi cao nhất
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      {data.pricing_insight.market_sample_count > 0 
+                        ? `Dữ liệu từ ${data.pricing_insight.market_sample_count} sản phẩm cùng ngành`
+                        : 'Tính theo biên lợi nhuận giá vốn'}
                     </span>
                   </div>
 
@@ -374,26 +402,26 @@ export function SmartProductAiModal({
                     {/* Thẻ Giá Đề Xuất */}
                     <div className="p-3.5 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl space-y-1">
                       <span className="text-[10px] uppercase font-black text-emerald-800 tracking-wider">
-                        Giá Bán Đề Xuất
+                        Giá Bán Đề Xuất (P50)
                       </span>
                       <div className="text-xl font-black text-emerald-700">
                         {data.pricing_insight.recommended_price.toLocaleString('vi-VN')}đ
                       </div>
                       <p className="text-[10px] text-emerald-800/80 font-medium">
-                        Điểm cân bằng giữa số lượng bán & lợi nhuận
+                        Mức giá trung vị cân bằng thị trường
                       </p>
                     </div>
 
                     {/* Thẻ Khoảng Giá Thị Trường (P25 - P75) */}
                     <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
                       <span className="text-[10px] uppercase font-black text-stone-500 tracking-wider">
-                        Biên Giá Cạnh Tranh (P25 - P75)
+                        Biên Giá Cạnh Tranh (P25 — P75)
                       </span>
                       <div className="text-sm font-black text-stone-800">
                         {data.pricing_insight.price_range.low.toLocaleString('vi-VN')}đ — {data.pricing_insight.price_range.high.toLocaleString('vi-VN')}đ
                       </div>
                       <p className="text-[10px] text-stone-500">
-                        Vùng giá chiếm 50% doanh số các shop bán chạy
+                        Khoảng giá liên phân vị 50% thị trường
                       </p>
                     </div>
 
@@ -410,7 +438,7 @@ export function SmartProductAiModal({
                       <p className="text-[10px] text-amber-800/80 font-medium">
                         {isPod && blankCost > 0 
                           ? `(Giá phôi ${blankCost.toLocaleString('vi-VN')}đ + Lời ${data.pricing_insight.recommended_markup.toLocaleString('vi-VN')}đ)`
-                          : 'Dành cho mẫu thiết kế độc quyền'}
+                          : 'Ước lượng phân khúc cao cấp'}
                       </p>
                     </div>
                   </div>
@@ -445,9 +473,9 @@ export function SmartProductAiModal({
                 <div className="relative">
                   <textarea
                     readOnly
-                    rows={4}
+                    rows={7}
                     value={data.seo_description}
-                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-700 font-mono leading-relaxed resize-none focus:outline-none"
+                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-700 font-sans leading-relaxed resize-y max-h-64 focus:outline-none"
                   />
                 </div>
               </div>

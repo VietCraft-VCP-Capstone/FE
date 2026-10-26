@@ -10,6 +10,22 @@ import {
 import { invalidateInsights } from '../../analytics/hooks/useInsight';
 import { getSessionId } from '../../buyer/services/eventService';
 
+export interface VideoAdQuota {
+  enabled: boolean;
+  durationSec: number;
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface VideoAdJobResult {
+  jobId: string;
+  status: 'pending' | 'done' | 'failed';
+  videoUrl?: string;
+  error?: string;
+  quota?: VideoAdQuota;
+}
+
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
 const absImg = (u: any) => (typeof u === 'string' && u.startsWith('/') ? ORIGIN + u : u);
 const resolveImages = (p: any) =>
@@ -227,6 +243,22 @@ export const productsService = {
         }))
       : [];
     return { images, byColor };
+  },
+
+  getVideoAdQuota: async (): Promise<VideoAdQuota> => {
+    const res = await api.get('/products/video-ad/quota');
+    return res.data;
+  },
+
+  /** TỐN TIỀN mỗi lần gọi thật — chỉ gọi khi người dùng bấm nút. */
+  createVideoAd: async (imageUrl: string, title?: string): Promise<VideoAdJobResult> => {
+    const res = await api.post('/products/video-ad', { imageUrl, title });
+    return { ...res.data, videoUrl: absImg(res.data?.videoUrl) };
+  },
+
+  getVideoAdStatus: async (jobId: string): Promise<VideoAdJobResult> => {
+    const res = await api.get(`/products/video-ad/${jobId}`);
+    return { ...res.data, videoUrl: absImg(res.data?.videoUrl) };
   },
 
   resetDefaults: (): ProductItem[] => {

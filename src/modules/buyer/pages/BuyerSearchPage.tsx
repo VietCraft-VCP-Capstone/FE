@@ -1,8 +1,10 @@
-import { useState, useEffect, type MouseEvent } from 'react';
+import { useState, useEffect, useMemo, type MouseEvent } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
+import { promotionService } from '../../promotion/services/promotionService';
+import { buildDeals } from '../components/deals/buildDeals';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import { ProductItem } from '../../product/types/product';
 import { SeoMeta } from '../../../shared/components/SeoMeta';
@@ -62,9 +64,12 @@ export function BuyerSearchPage() {
   const [categories, setCategories] = useState(PRIMARY_CATEGORIES);
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [popularKeywords, setPopularKeywords] = useState(FALLBACK_KEYWORDS.slice(0, 6));
+  const [coupons, setCoupons] = useState<any[]>([]);
   const { showToast } = useToast();
+  const dealMap = useMemo(() => new Map(buildDeals(coupons, products, Infinity).map(d => [d.id, d])), [coupons, products]);
 
   useEffect(() => {
+    promotionService.getAll().then((list: any) => setCoupons(Array.isArray(list) ? list : [])).catch(() => { });
     productsService.getTrendingKeywords(6).then((kws) => { if (kws.length) setPopularKeywords(kws); });
     if (isLoggedIn()) favoritesService.getFavoriteIds().then(setFavoritedProductIds);
     productsService.getCategories().then((data: any) => {
@@ -236,6 +241,7 @@ export function BuyerSearchPage() {
                   <SearchProductCard
                     key={p.id}
                     product={p}
+                    deal={dealMap.get(p.id)}
                     isFavorited={favoritedProductIds.includes(p.id)}
                     onToggleFavorite={handleToggleFavorite}
                     onClick={() => {

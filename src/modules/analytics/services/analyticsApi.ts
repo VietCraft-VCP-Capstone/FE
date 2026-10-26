@@ -1,7 +1,9 @@
 import api from '../../../infrastructure/api/interceptors';
-import type { HealthStatus, InsightContext, InsightEnvelope } from '../types';
+import type { HealthStatus, InsightContext, InsightEnvelope, ShopSearchResult } from '../types';
 import type { ListingHealthList } from '../healthTypes';
 import type { HealthPreview, PreviewInputs } from '../healthTypes';
+import type { IntelPreviewBody, ListingIntel } from '../intelTypes';
+import type { QualityAuditData } from '../qualityTypes';
 
 /**
  * Gọi 16 tính năng phân tích qua cổng BE /api/seller/analytics.
@@ -47,14 +49,40 @@ export const analyticsApi = {
     return res.data;
   },
 
+  async intelPreview(body: IntelPreviewBody, signal?: AbortSignal): Promise<InsightEnvelope<ListingIntel>> {
+    const res = await api.post(`${BASE}/listings/intel/preview`, body, { signal });
+    return res.data;
+  },
+
+  async listingQuality(productId: string, signal?: AbortSignal): Promise<InsightEnvelope<QualityAuditData>> {
+    const res = await api.get(`${BASE}/listings/${productId}/quality`, { signal });
+    return res.data;
+  },
+
+  async listingQualityAudit(productId: string, force = false, signal?: AbortSignal): Promise<InsightEnvelope<QualityAuditData>> {
+    const res = await api.post(`${BASE}/listings/${productId}/quality/audit`, { force }, { signal });
+    return res.data;
+  },
+
+  async listingQualityRecheck(productId: string, signal?: AbortSignal): Promise<InsightEnvelope<QualityAuditData>> {
+    const res = await api.post(`${BASE}/listings/${productId}/quality/recheck`, {}, { signal });
+    return res.data;
+  },
+
   async trackCompetitor(shopId: string) {
     const res = await api.post(`${BASE}/competitor-tracking`, { shop_id: shopId });
     return res.data;
   },
 
   async untrackCompetitor(shopId: string) {
-    const res = await api.delete(`${BASE}/competitor-tracking`, { data: { shop_id: shopId } });
+    const res = await api.delete(`${BASE}/competitor-tracking/${encodeURIComponent(shopId)}`);
     return res.data;
+  },
+
+  /** F36 · tìm shop trên sàn theo tên để theo dõi (shop mẫu luôn nhận danh sách rỗng). */
+  async searchShops(q: string, signal?: AbortSignal): Promise<ShopSearchResult[]> {
+    const res = await api.get(`${BASE}/competitor-tracking/search`, { params: { q }, signal });
+    return res.data.data;
   },
 
   async getSmartProductSuggestion(params: {
@@ -62,6 +90,7 @@ export const analyticsApi = {
     category_name?: string;
     product_type?: string;
     keywords?: string;
+    material?: string;
     blank_cost?: number;
   }, signal?: AbortSignal) {
     const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
