@@ -3,6 +3,7 @@ import type { HealthStatus, InsightContext, InsightEnvelope } from '../types';
 import type { ListingHealthList } from '../healthTypes';
 import type { HealthPreview, PreviewInputs } from '../healthTypes';
 import type { IntelPreviewBody, ListingIntel } from '../intelTypes';
+import type { QualityAuditData } from '../qualityTypes';
 
 /**
  * Gọi 16 tính năng phân tích qua cổng BE /api/seller/analytics.
@@ -50,6 +51,21 @@ export const analyticsApi = {
 
   async intelPreview(body: IntelPreviewBody, signal?: AbortSignal): Promise<InsightEnvelope<ListingIntel>> {
     const res = await api.post(`${BASE}/listings/intel/preview`, body, { signal });
+    return res.data;
+  },
+
+  async listingQuality(productId: string, signal?: AbortSignal): Promise<InsightEnvelope<QualityAuditData>> {
+    const res = await api.get(`${BASE}/listings/${productId}/quality`, { signal });
+    return res.data;
+  },
+
+  async listingQualityAudit(productId: string, force = false, signal?: AbortSignal): Promise<InsightEnvelope<QualityAuditData>> {
+    const res = await api.post(`${BASE}/listings/${productId}/quality/audit`, { force }, { signal });
+    return res.data;
+  },
+
+  async listingQualityRecheck(productId: string, signal?: AbortSignal): Promise<InsightEnvelope<QualityAuditData>> {
+    const res = await api.post(`${BASE}/listings/${productId}/quality/recheck`, {}, { signal });
     return res.data;
   },
 

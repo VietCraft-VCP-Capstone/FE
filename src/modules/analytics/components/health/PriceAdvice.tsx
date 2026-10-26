@@ -22,11 +22,11 @@ export function PriceAdvice({ data }: { data: ListingHealth }) {
   const isHigh = over > 0;
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-5 md:p-6 shadow-2xs">
+    <div className="border border-stone-200 bg-white rounded-lg p-5 md:p-6">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-stone-100 pb-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-100 text-stone-700">
+          <div className="flex h-7 w-7 items-center justify-center rounded bg-stone-100 text-stone-700">
             <DollarSign size={14} />
           </div>
           <div>
@@ -43,10 +43,10 @@ export function PriceAdvice({ data }: { data: ListingHealth }) {
         </Tooltip>
       </div>
 
-      {/* 3 Metric Comparison Cards without slider line */}
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* 3 Metric Comparison in flat divided grid */}
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-stone-100 border border-stone-200/90 rounded-md overflow-hidden">
         {/* Card 1: Your Price */}
-        <div className="p-3.5 rounded-lg border border-stone-200 bg-[#FBFBFA]">
+        <div className="p-3.5 bg-stone-50/40">
           <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
             Giá niêm yết của bạn
           </span>
@@ -55,12 +55,12 @@ export function PriceAdvice({ data }: { data: ListingHealth }) {
           </div>
           <div className="mt-2">
             {isHigh ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">
                 <AlertCircle size={11} />
                 <span>Cao hơn mức phổ biến {over}%</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-[#EAF0E2] text-[#007700] border border-[#BECAB6]">
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded bg-[#EAF0E2] text-[#007700]">
                 <CheckCircle2 size={11} />
                 <span>Giá cạnh tranh tốt</span>
               </span>
@@ -69,7 +69,7 @@ export function PriceAdvice({ data }: { data: ListingHealth }) {
         </div>
 
         {/* Card 2: Market Median */}
-        <div className="p-3.5 rounded-lg border border-stone-200 bg-white">
+        <div className="p-3.5 bg-white">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
               Mức giá phổ biến
@@ -88,7 +88,7 @@ export function PriceAdvice({ data }: { data: ListingHealth }) {
 
         {/* Card 3: Suggested Range */}
         {suggestion ? (
-          <div className="p-3.5 rounded-lg border border-stone-200 bg-white">
+          <div className="p-3.5 bg-white">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
                 Khoảng giá gợi ý
@@ -105,17 +105,17 @@ export function PriceAdvice({ data }: { data: ListingHealth }) {
             </p>
           </div>
         ) : (
-          <div className="p-3.5 rounded-lg border border-stone-200 bg-white flex flex-col justify-center text-center">
+          <div className="p-3.5 bg-white flex flex-col justify-center text-center">
             <span className="text-xs text-stone-400">Đang cập nhật khoảng giá thị trường</span>
           </div>
         )}
       </div>
 
       {/* Craft Seller Guidance Callout */}
-      <div className={`mt-3.5 p-3 rounded-lg border text-xs leading-relaxed flex items-start gap-2.5 ${
+      <div className={`mt-3.5 py-2.5 px-3 border-l-2 text-xs leading-relaxed flex items-start gap-2.5 ${
         isHigh
-          ? 'border-amber-200 bg-amber-50/60 text-amber-900'
-          : 'border-[#BECAB6] bg-[#EAF0E2]/40 text-[#171D15]'
+          ? 'border-amber-500 bg-amber-50/50 text-amber-900'
+          : 'border-[#007700] bg-[#EAF0E2]/40 text-[#171D15]'
       }`}>
         <Lightbulb size={14} className={`shrink-0 mt-0.5 ${isHigh ? 'text-amber-700' : 'text-[#007700]'}`} />
         <p className="m-0">

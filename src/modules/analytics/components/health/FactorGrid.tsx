@@ -96,7 +96,7 @@ export function FactorGrid({
         <span className="text-[11px] text-stone-400">Bấm từng mục để xem gợi ý</span>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2.5">
+      <div className="mt-3 border border-stone-200/90 rounded-md overflow-hidden grid grid-cols-2 md:grid-cols-3 divide-x divide-y divide-stone-100">
         {data.breakdown.map(factor => {
           const meta = FACTOR_META[factor.key] ?? {
             title: factor.label,
@@ -110,12 +110,12 @@ export function FactorGrid({
           const isFailed = !isReviewWaiting && (factor.missing || factor.points <= 0);
 
           const statusBadge = isPassed
-            ? 'bg-[#EAF0E2] text-[#007700] border-[#BECAB6]'
+            ? 'bg-[#EAF0E2] text-[#007700]'
             : isReviewWaiting
-            ? 'bg-stone-100 text-stone-600 border-stone-200'
+            ? 'bg-stone-100 text-stone-600'
             : isFailed
-            ? 'bg-rose-50 text-[#BA1A1A] border-rose-200'
-            : 'bg-amber-50 text-amber-800 border-amber-200';
+            ? 'bg-rose-50 text-[#BA1A1A]'
+            : 'bg-amber-50 text-amber-800';
 
           const statusText = isPassed
             ? 'Đạt chuẩn'
@@ -130,30 +130,30 @@ export function FactorGrid({
               key={factor.key}
               type="button"
               onClick={() => onSelectFactor?.(factor.key)}
-              className={`group flex flex-col justify-between p-3 text-left rounded-lg border transition-all cursor-pointer ${
+              className={`group flex flex-col justify-between p-3.5 text-left transition-colors cursor-pointer ${
                 isSelected
-                  ? 'border-[#007700] ring-2 ring-[#007700]/20 bg-[#EAF0E2]/30 shadow-2xs'
-                  : 'border-stone-200 bg-white hover:border-[#BECAB6] hover:bg-[#EAF0E2]/10'
+                  ? 'bg-stone-50 border-l-2 border-l-[#007700]'
+                  : 'bg-white hover:bg-stone-50/50'
               }`}
             >
               <div>
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-stone-500 group-hover:text-stone-800 transition-colors">
+                    <span className="text-stone-400 group-hover:text-stone-700 transition-colors">
                       <Icon size={13} />
                     </span>
-                    <span className="text-xs font-bold text-stone-800 truncate">{meta.title}</span>
+                    <span className="text-xs font-semibold text-stone-800 truncate">{meta.title}</span>
                   </div>
                   <Tooltip title={meta.tooltip} placement="top">
                     <Info size={11} className="text-stone-300 hover:text-stone-600 shrink-0 cursor-help" />
                   </Tooltip>
                 </div>
 
-                <div className="mt-2 flex items-baseline justify-between gap-1">
+                <div className="mt-2.5 flex items-baseline justify-between gap-1">
                   <span className="font-jakarta text-sm font-bold text-[#111111] truncate">
                     {formatFactorValue(factor)}
                   </span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${statusBadge}`}>
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${statusBadge}`}>
                     {statusText}
                   </span>
                 </div>

@@ -131,14 +131,14 @@ export function FactorBreakdownCard({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
         {details.guide.map((tip, idx) => (
           <div
             key={idx}
-            className="flex items-start gap-2.5 p-3 rounded-lg border border-stone-200 bg-white text-xs leading-relaxed text-stone-700"
+            className="flex items-start gap-2.5 text-xs leading-relaxed text-stone-600"
           >
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-stone-100 font-mono text-[10px] font-bold text-stone-600">
-              {idx + 1}
+            <span className="font-mono text-[10px] font-bold text-stone-400 mt-0.5">
+              0{idx + 1}
             </span>
             <span>{tip}</span>
           </div>
