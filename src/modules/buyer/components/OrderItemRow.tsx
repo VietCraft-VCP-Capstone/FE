@@ -1,6 +1,6 @@
 import type { OrderItemResponse } from '../../order/services/ordersService';
 import type { ReturnEligibilityItem } from '../../returns/services/returnService';
-import { OrderItemActions, OrderItemEligibilityNote } from './OrderItemActions';
+import { OrderItemActions, OrderItemEligibilityNote, type NormalRefund } from './OrderItemActions';
 
 interface Props {
   orderId: string;
@@ -10,9 +10,10 @@ interface Props {
   eligibility?: ReturnEligibilityItem;
   onReview: (productId: string) => void;
   onReorder: (item: OrderItemResponse) => void;
+  refund: NormalRefund;
 }
 
-export function OrderItemRow({ orderId, item, completed, returnable, eligibility, onReview, onReorder }: Props) {
+export function OrderItemRow({ orderId, item, completed, returnable, eligibility, onReview, onReorder, refund }: Props) {
   return (
     <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 lg:flex-row lg:items-start lg:justify-between">
       <div className="flex min-w-0 flex-1 items-start gap-4">
@@ -33,7 +34,7 @@ export function OrderItemRow({ orderId, item, completed, returnable, eligibility
       </div>
       <div className="flex flex-col items-end gap-3 lg:max-w-[60%]">
         <span className="text-sm font-extrabold text-gray-900">{((item.price || 0) * (item.quantity || 0)).toLocaleString('vi-VN')}đ</span>
-        {returnable && <OrderItemActions orderId={orderId} item={item} reviewable={completed} eligibility={eligibility} onReview={onReview} onReorder={onReorder} />}
+        {returnable && <OrderItemActions orderId={orderId} item={item} reviewable={completed} eligibility={eligibility} onReview={onReview} onReorder={onReorder} refund={refund} />}
       </div>
     </div>
   );

@@ -94,6 +94,7 @@ export interface SellerNotificationSettings {
   analytics: {
     weeklyReport: NotificationChannelSetting;
     promotions: NotificationChannelSetting;
+    performanceAlert: NotificationChannelSetting;
   };
 }
 

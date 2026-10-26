@@ -8,7 +8,7 @@ import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
 import { OrderItemsList } from '../components/OrderItemsList';
-import { OrderSupportSection } from '../components/OrderSupportSection';
+import { RefundRequestPanel } from '../components/RefundRequestPanel';
 import { returnService, type ReturnEligibilityItem } from '../../returns/services/returnService';
 import { refundService } from '../../order/services/refundService';
 import type { OrderItemResponse, OrderResponse } from '../../order/services/ordersService';
@@ -27,6 +27,7 @@ export function BuyerOrderDetailPage() {
     const [targetReviewProductId, setTargetReviewProductId] = useState<string | undefined>(undefined);
     const [eligibilityItems, setEligibilityItems] = useState<ReturnEligibilityItem[]>([]);
     const [hasLegacyRefund, setHasLegacyRefund] = useState(false);
+    const [refundFormOpen, setRefundFormOpen] = useState(false);
     const [reorderItems, setReorderItems] = useState<OrderItemResponse[] | null>(null);
 
     const handleOpenReview = (productId?: string) => {
@@ -533,6 +534,10 @@ export function BuyerOrderDetailPage() {
                     returnable={['completed', 'shipping'].includes(order.status)}
                     onReview={handleOpenReview}
                     onReorder={handleReorder}
+                    refund={{
+                        blocked: hasLegacyRefund ? 'Đơn đã có yêu cầu hoàn tiền, xem bên dưới' : order.status !== 'completed' ? 'Gửi yêu cầu sau khi đơn hoàn thành' : null,
+                        open: () => setRefundFormOpen(true),
+                    }}
                 />
 
                 {order.status === 'shipping' && <div className="flex justify-end border-t border-gray-50 p-4">
@@ -549,10 +554,12 @@ export function BuyerOrderDetailPage() {
                 </div>}
             </div>
 
-            {!awaitingPayment && (hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID')) && <OrderSupportSection
+            {!awaitingPayment && <RefundRequestPanel
                 orderId={order.id}
                 refundOrderId={order._id}
-                orderStatus={order.status}
+                formOpen={refundFormOpen}
+                onFormClose={() => setRefundFormOpen(false)}
+                onCreated={() => { setRefundFormOpen(false); setHasLegacyRefund(true); }}
             />}
 
             {/* Bottom Payment details */}

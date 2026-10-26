@@ -59,7 +59,8 @@ const SIDEBAR_COLLAPSED_KEY = 'vietcraft:seller-sidebar-collapsed';
 export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  // Mặc định thu gọn ở màn hình hẹp; sau khi người bán bấm thì giữ lựa chọn đó giữa các trang lẫn lần mở sau.
+  useSocket(); // mở socket để chuông nhận thông báo realtime ở mọi trang seller
+  // Sidebar chỉ đóng/mở khi người bán bấm, và giữ lựa chọn đó giữa các trang lẫn lần mở sau.
   const [collapsed, setCollapsed] = useState(() => {
     let saved: string | null = null;
     try { saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY); } catch { saved = null; }
@@ -88,7 +89,7 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
 
     notificationService.getUnreadCount()
       .then(c => setUnreadNotifCount(c))
-      .catch(() => {});
+      .catch(err => console.warn('MSG134', err));
 
     const onUnreadUpdate = (e: any) => {
       if (typeof e.detail?.unreadCount === 'number') {

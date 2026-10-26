@@ -1,6 +1,7 @@
 import type { OrderItemResponse } from '../../order/services/ordersService';
 import type { ReturnEligibilityItem } from '../../returns/services/returnService';
 import { OrderItemRow } from './OrderItemRow';
+import type { NormalRefund } from './OrderItemActions';
 
 interface Props {
   orderId: string;
@@ -10,9 +11,10 @@ interface Props {
   returnable: boolean;
   onReview: (productId: string) => void;
   onReorder: (item: OrderItemResponse) => void;
+  refund: NormalRefund;
 }
 
-export function OrderItemsList({ orderId, items, eligibilityItems, completed, returnable, onReview, onReorder }: Props) {
+export function OrderItemsList({ orderId, items, eligibilityItems, completed, returnable, onReview, onReorder, refund }: Props) {
   return (
     <div className="divide-y divide-gray-50 p-4">
       {items.map((item, index) => {
@@ -28,6 +30,7 @@ export function OrderItemsList({ orderId, items, eligibilityItems, completed, re
           eligibility={eligibility}
           onReview={onReview}
           onReorder={onReorder}
+          refund={refund}
         />;
       })}
     </div>

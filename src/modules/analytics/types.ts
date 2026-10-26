@@ -172,15 +172,32 @@ export interface ListingHealthDetail {
 
 /* ------------------------------------------------------------ F30 -------- */
 
+export type AlertMetric = 'views' | 'revenue';
+
+export interface AlertListing {
+  listing_id: string;
+  title: string;
+  expected: number;
+  actual: number;
+  change_pct: number;
+}
+
 export interface AnomalyAlert {
+  id: string;
   date: string;
+  metric: AlertMetric;
   direction: 'spike' | 'drop';
+  /** daily: một ngày lệch · zero_run: nhiều ngày liền bằng 0 (date là ngày cuối). */
+  rule: 'daily' | 'zero_run';
   z: number;
-  expected_vnd: number;
-  actual_vnd: number;
+  /** VND nếu metric là revenue, lượt xem nếu views. */
+  expected: number;
+  actual: number;
+  change_pct: number;
   severity: 'low' | 'medium' | 'high' | string;
   calendar_sensitive: boolean;
-  confidence: 'ok' | 'calendar_sensitive' | 'limited_few_cycles' | 'unreliable_high_rate' | string;
+  confidence: 'ok' | 'low_history' | string;
+  top_listings: AlertListing[];
 }
 
 export interface AnomalyAlerts {
@@ -189,8 +206,15 @@ export interface AnomalyAlerts {
   alerts: AnomalyAlert[];
   total: number;
   shop_was_analysed: boolean;
-  threshold: { z: number; why: string };
+  skip_reason: 'chua_chay' | 'qua_ngan' | 'khong_co_san_pham' | 'loi' | null;
   limitation: string | null;
+  threshold: {
+    z: number;
+    min_change_pct: number;
+    min_change_vnd: number;
+    min_expected: { views: number; revenue: number };
+    weekly_cap: number;
+  };
 }
 
 /* ------------------------------------------------------------ F31 -------- */

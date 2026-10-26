@@ -33,16 +33,16 @@ export function NotificationSettingsTab({
     key: string,
     channel: 'email' | 'app'
   ) => {
-    setFormData(prev => ({
-      ...prev,
-      [group]: {
-        ...prev[group],
-        [key]: {
-          ...(prev[group] as any)[key],
-          [channel]: !(prev[group] as any)[key][channel]
+    setFormData(prev => {
+      const cur = (prev[group] as any)[key] ?? { email: false, app: true };
+      return {
+        ...prev,
+        [group]: {
+          ...prev[group],
+          [key]: { ...cur, [channel]: !cur[channel] }
         }
-      }
-    }));
+      };
+    });
   };
 
   return (
@@ -231,6 +231,32 @@ export function NotificationSettingsTab({
             </h3>
 
             <div className="space-y-3.5">
+              {/* Performance Alert */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-stone-800">Cảnh báo hiệu suất</h4>
+                  <p className="text-[11px] text-stone-500">Báo ngay khi doanh thu hoặc lượt xem lệch bất thường so với mức thường ngày</p>
+                </div>
+                <div className="flex items-center gap-12 sm:gap-16 pr-4">
+                  <div className="w-16 flex justify-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.analytics.performanceAlert?.email ?? false}
+                      onChange={() => handleToggle('analytics', 'performanceAlert', 'email')}
+                      className="w-4 h-4 rounded text-[#007700] accent-[#007700] border-stone-300 focus:ring-[#007700] cursor-pointer"
+                    />
+                  </div>
+                  <div className="w-16 flex justify-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.analytics.performanceAlert?.app ?? true}
+                      onChange={() => handleToggle('analytics', 'performanceAlert', 'app')}
+                      className="w-4 h-4 rounded text-[#007700] accent-[#007700] border-stone-300 focus:ring-[#007700] cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Weekly Performance Report */}
               <div className="flex items-center justify-between">
                 <div>
