@@ -1,5 +1,5 @@
 import api from '../../../infrastructure/api/interceptors';
-import type { HealthStatus, InsightContext, InsightEnvelope } from '../types';
+import type { HealthStatus, InsightContext, InsightEnvelope, ShopSearchResult } from '../types';
 import type { ListingHealthList } from '../healthTypes';
 import type { HealthPreview, PreviewInputs } from '../healthTypes';
 
@@ -53,8 +53,14 @@ export const analyticsApi = {
   },
 
   async untrackCompetitor(shopId: string) {
-    const res = await api.delete(`${BASE}/competitor-tracking`, { data: { shop_id: shopId } });
+    const res = await api.delete(`${BASE}/competitor-tracking/${encodeURIComponent(shopId)}`);
     return res.data;
+  },
+
+  /** F36 · tìm shop trên sàn theo tên để theo dõi (shop mẫu luôn nhận danh sách rỗng). */
+  async searchShops(q: string, signal?: AbortSignal): Promise<ShopSearchResult[]> {
+    const res = await api.get(`${BASE}/competitor-tracking/search`, { params: { q }, signal });
+    return res.data.data;
   },
 
   async getSmartProductSuggestion(params: {

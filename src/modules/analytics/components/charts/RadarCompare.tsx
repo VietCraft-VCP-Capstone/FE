@@ -34,15 +34,17 @@ function isNumber(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-export function RadarCompare({ axes, series, height = 320, unitHint, thuGonBang = false }: {
+export function RadarCompare({ axes, series, height = 320, unitHint, bangSoThat = false, anBanDau = [] }: {
   axes: string[];
   series: RadarSeries[];
   height?: number;
   unitHint?: string;
-  /** Thu bảng số vào "Xem bảng điểm" khi trang đã có phần đọc số thật riêng. */
-  thuGonBang?: boolean;
+  /** Bảng dưới radar ghi số thật (`raw`) thay cho điểm 0–100, thu vào "Xem số thật của từng shop". */
+  bangSoThat?: boolean;
+  /** Tên các đường ẩn lúc đầu; người dùng bấm chú thích để vẽ thêm. */
+  anBanDau?: string[];
 }) {
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set(anBanDau));
   const shown = series.filter(s => !hidden.has(s.name));
   const toggle = (name: string) => setHidden(prev => {
     const next = new Set(prev);
@@ -119,9 +121,9 @@ export function RadarCompare({ axes, series, height = 320, unitHint, thuGonBang 
         ))}
       </ul>
 
-      <BangGon thuGon={thuGonBang}>
+      <BangGon thuGon={bangSoThat}>
       <DataTable
-        caption="Bảng số của biểu đồ radar"
+        caption={bangSoThat ? 'Số thật của từng shop theo các tiêu chí của biểu đồ radar' : 'Bảng số của biểu đồ radar'}
         head={
           <>
             <th scope="col">Tiêu chí{unitHint ? ` (${unitHint})` : ''}</th>
@@ -131,12 +133,12 @@ export function RadarCompare({ axes, series, height = 320, unitHint, thuGonBang 
           </>
         }
       >
-        {rows.map(row => (
+        {rows.map((row, i) => (
           <tr key={String(row.axis)}>
             <td className="font-medium text-stone-700">{row.axis}</td>
             {series.map(s => (
               <td key={s.name} className={`text-right tabular-nums ${s.primary ? 'font-bold text-stone-900' : 'text-stone-600'}`}>
-                {decimal(row[s.name] as number | null)}
+                {bangSoThat && s.raw ? s.raw[i] ?? 'Chưa có' : decimal(row[s.name] as number | null)}
               </td>
             ))}
           </tr>
@@ -151,7 +153,7 @@ export function RadarCompare({ axes, series, height = 320, unitHint, thuGonBang 
 function BangGon({ thuGon, children }: { thuGon: boolean; children: React.ReactNode }) {
   return thuGon ? (
     <details className="rounded-md border border-stone-200 px-3 py-2">
-      <summary className="cursor-pointer text-xs font-semibold text-stone-600">Xem bảng điểm 0–100</summary>
+      <summary className="cursor-pointer text-xs font-semibold text-stone-600">Xem số thật của từng shop</summary>
       <div className="mt-2">{children}</div>
     </details>
   ) : <>{children}</>;

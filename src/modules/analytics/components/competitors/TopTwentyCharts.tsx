@@ -1,13 +1,15 @@
 /**
  * BR-189: ba biểu đồ cột (giá, số đánh giá, lượt yêu thích) của 20 sản phẩm bán chạy nhất của shop khác,
  * shop của bạn vẽ chồng bằng một đường mức (trung bình các sản phẩm của bạn trong danh mục).
- * 20 cột nên không ghi số lên từng cột; số chi tiết nằm ở bảng ngay bên dưới.
+ * 20 cột nên không ghi số lên từng cột; số chi tiết nằm ở danh sách top 20 phía trên.
  */
 
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CHART_INK, CHART_MARKS, SERIES } from '../../../../shared/components/charts/chartTheme';
 import { count, money } from '../../../../shared/utils/format';
+import { decimal } from '../../format';
 import type { Competitors } from '../../types';
+import { BangManhYeu, type TieuChi } from './BangManhYeu';
 
 type Dong = Competitors['competitors'][number];
 
@@ -72,6 +74,31 @@ function MotBieuDo({ rows, chiSo }: { rows: Dong[]; chiSo: ChiSo }) {
 }
 
 const tb = (xs: number[]) => (xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : null);
+const soTb = (v: number) => decimal(v, v < 10 && !Number.isInteger(v) ? 1 : 0);
+const nghin = (v: number) => money(Math.round(v / 1000) * 1000);
+
+/** Trung bình mỗi sản phẩm của bạn so với trung bình top 20; không so số đã bán vì top 20 vốn chọn theo số bán. */
+function tieuChiTop20(data: Competitors): TieuChi[] {
+  const top = data.competitors;
+  const tot = (k: 'n_reviews' | 'favorite_count' | 'rating_shrunk') => top
+    .filter(r => typeof r[k] === 'number')
+    .reduce<{ v: number; shop: string | null } | null>((a, r) => (a && a.v >= (r[k] as number) ? a : { v: r[k] as number, shop: r.shop_name }), null);
+  const dem = (k: 'n_reviews' | 'favorite_count', ten: string, donVi: string): TieuChi => {
+    const group = tb(top.map(r => r[k] ?? 0));
+    return {
+      key: k, ten, mine: tb(data.my_listings.map(r => r[k] ?? 0)), group, best: tot(k), better: 'more',
+      tol: Math.max(1, (group ?? 0) * 0.1), fmt: v => `${soTb(v)} ${donVi}`, fmtDiff: d => `${soTb(d)} ${donVi}`,
+    };
+  };
+  const sao = top.map(r => r.rating_shrunk).filter((v): v is number => typeof v === 'number');
+  const gia = tb(top.map(r => r.price_vnd));
+  return [
+    { key: 'rating', ten: 'Điểm đánh giá', mine: data.my_position.my_avg_rating, group: tb(sao), best: tot('rating_shrunk'), better: 'more', tol: 0.1, fmt: v => `${decimal(v, 1)} / 5`, fmtDiff: d => `${decimal(d, 1)} sao` },
+    dem('n_reviews', 'Số đánh giá mỗi sản phẩm', 'đánh giá'),
+    dem('favorite_count', 'Lượt yêu thích mỗi sản phẩm', 'lượt'),
+    { key: 'price', ten: 'Giá trung bình', mine: data.my_position.my_avg_price_vnd, group: gia, best: null, better: null, tol: (gia ?? 0) * 0.1, fmt: nghin, fmtDiff: nghin },
+  ];
+}
 
 export function TopTwentyCharts({ data }: { data: Competitors }) {
   const mine = data.my_listings;
@@ -98,6 +125,14 @@ export function TopTwentyCharts({ data }: { data: Competitors }) {
           </li>
         )}
       </ul>
+      {mine.length > 0 && (
+        <div className="space-y-3 pt-3">
+          <p className="m-0 text-xs leading-relaxed text-stone-500">
+            Trung bình mỗi sản phẩm của bạn so với trung bình các sản phẩm bán chạy. Không so số đã bán, vì các sản phẩm này vốn được chọn vì bán nhiều nhất.
+          </p>
+          <BangManhYeu ds={tieuChiTop20(data)} tenNhom="Trung bình top 20" />
+        </div>
+      )}
     </div>
   );
 }

@@ -224,7 +224,8 @@ export interface CompetitorBrief {
   /** rules = lập theo luật; llm = mô hình ngôn ngữ viết lại, số đã đối chiếu với số liệu gốc. */
   source: 'rules' | 'llm';
   provider: string | null;
-  actions: { action: string; why: string; link: string | null }[];
+  /** API xếp sẵn từ gấp tới nên làm; `priority` thiếu khi AI còn chạy bản cũ. */
+  actions: { action: string; why: string; link: string | null; priority?: 'gap' | 'quan_trong' | 'nen_lam' }[];
   facts_count: number;
   generated_at: string;
 }
@@ -250,6 +251,8 @@ export interface Competitors {
   available_categories: string[];
   /** Chỉ có ở shop thật: mã danh mục -> tên. Danh mục của sàn không có trong bảng nhãn cứng. */
   category_names?: Record<string, string | null>;
+  /** Dưới 5 sản phẩm của shop khác: vẫn hiện đủ số đang có, thứ hạng chỉ để tham khảo. */
+  low_sample?: boolean;
   my_listings: {
     listing_id: string;
     title: string;
@@ -456,7 +459,15 @@ export interface Threat {
 }
 
 export interface CompetitorTracking {
-  tracked: { shop_id: string; shop_name: string | null; added_at: string | null; listings_total: number }[];
+  tracked: {
+    shop_id: string;
+    shop_name: string | null;
+    added_at: string | null;
+    listings_total: number;
+    /** Shop thật: danh mục shop đó bán nhiều nhất và ngày đăng sản phẩm gần nhất (SRS 3.9.5). */
+    category_name?: string | null;
+    last_new_listing_at?: string | null;
+  }[];
   slots_used: number;
   slots_limit: number;
   alerts: {
@@ -484,9 +495,16 @@ export interface CompetitorTracking {
   my_niche_tags: string[];
   /** Chỉ có ở shop thật: slug tag -> tên hiển thị. */
   tag_names?: Record<string, string>;
-  /** Chỉ có ở shop thật: lần quét gần nhất của job đêm. */
+  /** Chỉ có ở shop thật: giờ quét sàn gần nhất (quét mỗi ngày một lần). */
   alerts_computed_at?: string | null;
   limitation: string | null;
+}
+
+/** Kết quả ô "Tìm shop theo tên" của phần Theo dõi đối thủ. */
+export interface ShopSearchResult {
+  shop_id: string;
+  shop_name: string;
+  is_tracked: boolean;
 }
 
 /* ------------------------------------------------------------ F37 -------- */

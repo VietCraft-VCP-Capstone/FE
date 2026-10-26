@@ -7,7 +7,7 @@
  *   seed_demo  shop mẫu. Nhập mã `shp_*`; cột thời gian là lúc hệ thống soát, không phải lúc đăng.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConfirmModal } from '../../../../shared/components/ConfirmModal';
@@ -20,7 +20,7 @@ import { invalidateInsights, type InsightState } from '../../hooks/useInsight';
 import { analyticsApi, analyticsErrorMessage } from '../../services/analyticsApi';
 import { categoryLabel, tagLabel } from '../../labels';
 import { GIAI_THICH, NhanTinCay } from './giaiThich';
-import type { CompetitorTracking, Competitors, Threat } from '../../types';
+import type { CompetitorTracking, Competitors, ShopSearchResult, Threat } from '../../types';
 
 export const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> = {
   high: { label: 'Đe doạ cao', tone: 'bad' },
@@ -42,6 +42,7 @@ const FIELD_CLASS =
   'h-9 rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none transition-colors duration-150 hover:border-stone-300 focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20 disabled:bg-stone-50 disabled:text-stone-400 motion-reduce:transition-none';
 
 const LINK_CLASS = 'font-semibold text-[#007700] no-underline hover:text-[#005B00]';
+const TIM_TOI_THIEU = 2;
 
 export function TrackingSection({ state, reload, rivals }: {
   state: InsightState<CompetitorTracking>;
@@ -54,6 +55,33 @@ export function TrackingSection({ state, reload, rivals }: {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
   const [removing, setRemoving] = useState<{ id: string; name: string | null } | null>(null);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<ShopSearchResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  // SRS 3.9.5: thêm shop bằng cách tìm theo tên; chờ người dùng ngừng gõ rồi mới gọi BE.
+  useEffect(() => {
+    const q = query.trim();
+    if (!live || q.length < TIM_TOI_THIEU) {
+      setResults(null);
+      return;
+    }
+    const ctl = new AbortController();
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        setResults(await analyticsApi.searchShops(q, ctl.signal));
+      } catch {
+        if (!ctl.signal.aborted) setResults([]);
+      } finally {
+        if (!ctl.signal.aborted) setSearching(false);
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      ctl.abort();
+    };
+  }, [query, live]);
 
   const rivalOptions = useMemo(() => {
     if (!live || !rivals || state.kind !== 'ready') return [];
@@ -70,16 +98,13 @@ export function TrackingSection({ state, reload, rivals }: {
     reload();
   };
 
-  const add = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const target = shopId.trim();
-    if (!target) return;
+  const trackShop = async (target: string, name: string) => {
     setBusy(true);
     setMessage(null);
     try {
       await analyticsApi.trackCompetitor(target);
-      const name = rivalOptions.find(o => o.value === target)?.label ?? target;
       setShopId('');
+      setResults(rs => rs?.map(r => (r.shop_id === target ? { ...r, is_tracked: true } : r)) ?? null);
       setMessage({ tone: 'good', text: `Đã theo dõi ${name}.` });
       refresh();
     } catch (err) {
@@ -87,6 +112,12 @@ export function TrackingSection({ state, reload, rivals }: {
     } finally {
       setBusy(false);
     }
+  };
+
+  const add = (event: React.FormEvent) => {
+    event.preventDefault();
+    const target = shopId.trim();
+    if (target) void trackShop(target, rivalOptions.find(o => o.value === target)?.label ?? target);
   };
 
   const remove = async () => {
@@ -241,10 +272,57 @@ export function TrackingSection({ state, reload, rivals }: {
                 description={live ? 'Bấm tên shop để xem hồ sơ, sản phẩm và khuyến mãi của họ.' : 'Nhập mã shop để thêm vào danh sách. Mã có dạng shp_00042.'}
                 bodyClassName="px-4 py-3"
               >
+                {live && (
+                  <div className="mb-4">
+                    <label htmlFor="tim-shop" className="text-xs font-semibold text-stone-600">Tìm shop theo tên</label>
+                    <input
+                      id="tim-shop"
+                      type="search"
+                      value={query}
+                      onChange={e => setQuery(e.target.value)}
+                      placeholder={`Gõ ít nhất ${TIM_TOI_THIEU} chữ trong tên shop`}
+                      maxLength={60}
+                      autoComplete="off"
+                      disabled={full}
+                      className={`${FIELD_CLASS} mt-1 block w-full max-w-sm`}
+                    />
+                    <div aria-live="polite" className="mt-2 max-w-sm">
+                      {searching ? (
+                        <p className="m-0 text-xs text-stone-500">Đang tìm...</p>
+                      ) : results?.length === 0 ? (
+                        <p className="m-0 text-xs text-stone-500">Không có shop nào tên như vậy.</p>
+                      ) : results ? (
+                        <ul className="m-0 list-none divide-y divide-stone-100 rounded-lg border border-stone-200 p-0">
+                          {results.map(r => (
+                            <li key={r.shop_id} className="flex items-center justify-between gap-3 px-3 py-2 text-[13px]">
+                              <Link to={`/seller/competitors/${r.shop_id}`} className="min-w-0 truncate font-semibold text-stone-800 no-underline hover:text-[#007700]">
+                                {r.shop_name}
+                              </Link>
+                              {r.is_tracked ? (
+                                <Chip tone="good">Đang theo dõi</Chip>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => void trackShop(r.shop_id, r.shop_name)}
+                                  disabled={full || busy}
+                                  aria-label={`Theo dõi ${r.shop_name}`}
+                                  className={`${ACTION_CLASS} h-8 px-3`}
+                                >
+                                  <Plus size={14} aria-hidden />
+                                  Theo dõi
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
                 <form onSubmit={add} className="mb-4 flex flex-wrap items-end gap-2">
                   <div className="flex flex-col gap-1">
                     <label htmlFor="ma-shop" className="text-xs font-semibold text-stone-600">
-                      {live ? 'Thêm shop bán chạy cùng danh mục' : 'Mã shop cần theo dõi'}
+                      {live ? 'Hoặc chọn shop bán chạy cùng danh mục' : 'Mã shop cần theo dõi'}
                     </label>
                     {live ? (
                       <select
@@ -293,7 +371,7 @@ export function TrackingSection({ state, reload, rivals }: {
                       <UserPlus size={18} />
                     </span>
                     <p className="m-0 text-xs leading-relaxed text-stone-500">
-                      Chưa theo dõi shop nào. Chọn một shop ở ô bên trên, hoặc bấm "Theo dõi" trên trang gian hàng của họ.
+                      Chưa theo dõi shop nào. Tìm theo tên hoặc chọn một shop ở ô bên trên, hoặc bấm "Theo dõi" trên trang gian hàng của họ.
                     </p>
                   </div>
                 ) : (
@@ -304,8 +382,10 @@ export function TrackingSection({ state, reload, rivals }: {
                         <th scope="col">Shop</th>
                         {!live && <th scope="col">Mã</th>}
                         {!live && <th scope="col">Thêm lúc</th>}
+                        {live && <th scope="col">Danh mục chính</th>}
+                        {live && <th scope="col">Ra hàng mới gần nhất</th>}
                         <th scope="col" className="text-right">Sản phẩm đang bán</th>
-                        <th scope="col" className="text-right">Hàng mới cùng nhóm</th>
+                        <th scope="col" className="text-right">Hàng mới trùng ngách (7 ngày)</th>
                         <th scope="col" className="text-right"><span className="sr-only">Bỏ theo dõi</span></th>
                       </>
                     }
@@ -323,6 +403,8 @@ export function TrackingSection({ state, reload, rivals }: {
                         </td>
                         {!live && <td className="font-mono text-xs text-stone-500">{shop.shop_id}</td>}
                         {!live && <td className="text-stone-600">{timeAgo(shop.added_at)}</td>}
+                        {live && <td className="text-stone-600">{shop.category_name || 'Chưa rõ'}</td>}
+                        {live && <td className="whitespace-nowrap text-stone-600">{fullDate(shop.last_new_listing_at)}</td>}
                         <td className="text-right tabular-nums text-stone-700">{count(shop.listings_total)}</td>
                         <td className="text-right tabular-nums text-stone-700">
                           {moiTheoShop[shop.shop_id] ? <Chip tone="info">{count(moiTheoShop[shop.shop_id])} mới</Chip> : <span className="text-stone-400">0</span>}
@@ -353,7 +435,7 @@ export function TrackingSection({ state, reload, rivals }: {
         title="Bỏ theo dõi shop này?"
         message={
           live
-            ? `Bạn sẽ không còn thấy hàng mới của ${removing?.name || 'shop này'} ở đây nữa, và shop này cũng rời khỏi mục Đối thủ đang theo dõi ở khu Vận hành. Có thể theo dõi lại bất cứ lúc nào.`
+            ? `Bạn sẽ không nhận cảnh báo mới về ${removing?.name || 'shop này'} nữa; cảnh báo đã gửi vẫn còn trong mục Thông báo. Shop này cũng rời khỏi mục Đối thủ đang theo dõi ở khu Vận hành. Có thể theo dõi lại bất cứ lúc nào.`
             : `Cảnh báo tương lai về ${removing?.name || removing?.id || 'shop này'} sẽ dừng. Cảnh báo cũ vẫn được giữ lại.`
         }
         confirmLabel="Bỏ theo dõi"
