@@ -1,7 +1,7 @@
 import { ProductFormData, CatalogOption } from '../types/product';
 import { commissionAmount, withCommission } from '../../../shared/utils/commission';
 import { money } from '../../../shared/utils/format';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { ProductFormTagField } from './ProductFormTagField';
 
 interface ProductFormBasicFieldsProps {
@@ -17,6 +17,7 @@ interface ProductFormBasicFieldsProps {
   onAddTag: (name: string) => void;
   onRemoveNewTag: (name: string) => void;
   onProposeCategory: () => void;
+  onOpenAiModal?: () => void;
 }
 
 const LABEL_CLASS = 'block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta';
@@ -34,9 +35,25 @@ export function ProductFormBasicFields({
   onAddTag,
   onRemoveNewTag,
   onProposeCategory,
+  onOpenAiModal,
 }: ProductFormBasicFieldsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Header bar with AI Suggestion Button */}
+      {onOpenAiModal && (
+        <div className="md:col-span-2 flex items-center justify-between pb-1 border-b border-stone-100">
+          <span className="text-xs font-bold text-stone-500 uppercase tracking-wider font-jakarta">Thông tin chung</span>
+          <button
+            type="button"
+            onClick={onOpenAiModal}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-black shadow-sm transition active:scale-95 cursor-pointer"
+          >
+            <Sparkles size={14} className="text-amber-300 animate-pulse" />
+            <span>✨ AI Gợi ý tên, giá & từ khóa hot</span>
+          </button>
+        </div>
+      )}
+
       {/* Title */}
       <div className="md:col-span-2 space-y-1.5" data-focus-target="title">
         <label className={LABEL_CLASS}>
@@ -154,6 +171,20 @@ export function ProductFormBasicFields({
         {errors.stock && <p className="text-xs text-rose-500">{errors.stock}</p>}
       </div>
 
+      {/* Material */}
+      <div className="space-y-1.5">
+        <label className={LABEL_CLASS}>
+          Chất liệu sản phẩm
+        </label>
+        <input
+          type="text"
+          placeholder="VD: Gốm Bát Tràng men rạn, Lụa tơ tằm, Gỗ hương..."
+          value={formData.material || ''}
+          onChange={(e) => onPatch({ material: e.target.value })}
+          className="w-full px-3.5 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700]"
+        />
+      </div>
+
       {/* Location */}
       <div className="space-y-1.5">
         <label className={LABEL_CLASS}>
@@ -161,7 +192,7 @@ export function ProductFormBasicFields({
         </label>
         <input
           type="text"
-          placeholder="VD: Xưởng may TP.HCM, Xưởng in Hà Nội..."
+          placeholder="VD: Xưởng may TP.HCM, Làng gốm Bát Tràng..."
           value={formData.location}
           onChange={(e) => onPatch({ location: e.target.value })}
           className="w-full px-3.5 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700]"

@@ -93,6 +93,7 @@ export interface ProductFormData {
   images: string[];
   colors: ProductColorVariant[];
   sizes?: string[];
+  material?: string;
 }
 
 export type ProductSortOption = 

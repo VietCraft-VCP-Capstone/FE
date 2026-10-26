@@ -12,6 +12,7 @@ import { chatService } from '../../chat/services/chatService';
 import { notificationService } from '../../notification/services/notificationService';
 import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
 import { WorkspaceSwitcher, rememberSellerPath } from '../../analytics/components/WorkspaceSwitcher';
+import { useSocket } from '../../../infrastructure/websocket/useSocket';
 
 export interface SellerNavItem {
   to: string;
@@ -75,6 +76,9 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
+
+  // Khởi tạo kết nối WebSocket cho toàn bộ Seller portal
+  useSocket();
 
   useEffect(() => {
     chatService.getUnreadCount()
