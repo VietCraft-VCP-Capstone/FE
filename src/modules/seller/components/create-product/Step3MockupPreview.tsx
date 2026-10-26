@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Loader2, Check, Star, Palette, Image as ImageIcon, Eye, Layers } from 'lucide-react';
 import { productsService, MockupColorPreview } from '../../../product/services/productsService';
 import { abs } from './useHTMLImage';
+import { VideoAdCard } from './VideoAdCard';
 
 interface ColorGroup {
     color: string;
@@ -613,6 +614,11 @@ export function Step3MockupPreview({
                     </div>
                 </div>
             </div>
+
+            {/* 3. VIDEO QUẢNG CÁO AI (bấm nút mới tốn phí) */}
+            {!loading && !err && (coverImage || heroImage) && (
+                <VideoAdCard imageUrl={coverImage || heroImage} title={blank.title} />
+            )}
         </div>
     );
 }
