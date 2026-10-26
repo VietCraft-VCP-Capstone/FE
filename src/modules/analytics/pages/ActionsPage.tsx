@@ -70,7 +70,7 @@ function EvidenceLink({ to, label }: { to: string; label: string }) {
   return (
     <Link
       to={to}
-      className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 no-underline transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
+      className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 no-underline transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none"
     >
       {label}
       <ArrowRight size={14} aria-hidden />
@@ -80,7 +80,7 @@ function EvidenceLink({ to, label }: { to: string; label: string }) {
 
 function WarnBlock({ children }: { children: ReactNode }) {
   return (
-    <div role="note" className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">
+    <div role="note" className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">
       <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden />
       <div className="min-w-0">{children}</div>
     </div>
@@ -94,7 +94,7 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
   const kind = TARGET_KIND[rec.target.type] ?? 'Đối tượng';
 
   return (
-    <article className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
+    <article className="rounded-md border border-stone-200 bg-white p-4 sm:p-5">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EAF0E2] font-jakarta text-base font-extrabold text-[#005B00]">
           {rec.priority}
@@ -159,9 +159,9 @@ export function ActionsPage() {
         onRetry={reload}
         skeleton={
           <div className="space-y-4">
-            <Skeleton className="h-24 w-full rounded-2xl" />
-            <Skeleton className="h-56 w-full rounded-2xl" />
-            <Skeleton className="h-56 w-full rounded-2xl" />
+            <Skeleton className="h-24 w-full rounded-md" />
+            <Skeleton className="h-56 w-full rounded-md" />
+            <Skeleton className="h-56 w-full rounded-md" />
           </div>
         }
       >

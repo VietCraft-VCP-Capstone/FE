@@ -305,7 +305,7 @@ export function AdminFinanceSimulationPage() {
                   -{money(vcPerOrder)}
                 </div>
                 <p className="mt-1 mb-0 text-[11.5px] text-stone-500 leading-normal">
-                  Sàn thanh toán cổng VNPAY (1.5%) + phí gửi thông báo/SMS/Email.
+                  Sàn thanh toán cổng trực tuyến (1.5%) + phí gửi thông báo/SMS/Email.
                 </p>
               </div>
               <div className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 h-6 w-6 items-center justify-center rounded-full bg-white border border-admin-line shadow-sm text-admin-muted">
@@ -508,7 +508,7 @@ export function AdminFinanceSimulationPage() {
                 <div className="text-[11px] text-admin-muted mt-0.5">Tỷ lệ phí dịch vụ {((revPerOrder / aov) * 100).toFixed(0)}%</div>
               </div>
               <div className="rounded-lg bg-admin-canvas p-3 border border-admin-line-soft">
-                <div className="text-[11.5px] font-bold text-admin-muted">2. Phí cổng VNPay & thông báo</div>
+                <div className="text-[11.5px] font-bold text-admin-muted">2. Phí cổng thanh toán & thông báo</div>
                 <div className="mt-1 text-[17px] font-extrabold text-rose-700 tabular-nums">
                   -{money(vcPerOrder)}
                 </div>
@@ -526,7 +526,7 @@ export function AdminFinanceSimulationPage() {
                 <div className="mt-1 text-[17px] font-extrabold text-blue-700 tabular-nums">
                   {((cmPerOrder / (revPerOrder || 1)) * 100).toFixed(1)}%
                 </div>
-                <div className="text-[11px] text-admin-muted mt-0.5">Tỷ lệ giữ lại sau khi trả VNPay</div>
+                <div className="text-[11px] text-admin-muted mt-0.5">Tỷ lệ giữ lại sau chi phí cổng</div>
               </div>
             </div>
           </div>
@@ -733,7 +733,7 @@ export function AdminFinanceSimulationPage() {
                   {money(simulation.projected_total_cost)}
                 </div>
                 <div className="text-[11.5px] text-slate-600 font-medium">
-                  Máy chủ + Phí cổng VNPay
+                  Máy chủ + Phí cổng thanh toán
                 </div>
               </div>
 
@@ -945,7 +945,7 @@ export function AdminFinanceSimulationPage() {
                 Cấu Hình Đơn Giá Chi Phí Vận Hành & Chính Sách Thu Phí
               </h2>
               <p className="mt-0.5 text-[12.5px] text-admin-muted">
-                💡 <strong className="text-stone-700">Hướng dẫn:</strong> Chỉ chỉnh sửa các thông số này khi nhà cung cấp máy chủ, Cloudinary, hoặc cổng thanh toán VNPay tăng giá.
+                💡 <strong className="text-stone-700">Hướng dẫn:</strong> Chỉ chỉnh sửa các thông số này khi nhà cung cấp máy chủ, Cloudinary, hoặc cổng thanh toán tăng giá.
                 {config?.updated_at && (
                   <span className="ml-1 text-admin-muted font-normal">
                     (Lần lưu gần nhất: {new Date(config.updated_at).toLocaleString('vi-VN')})
@@ -1069,7 +1069,7 @@ export function AdminFinanceSimulationPage() {
 
               <div>
                 <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Phí cổng thanh toán VNPAY (%):
+                  Phí cổng thanh toán trực tuyến (%):
                 </label>
                 <div className="relative flex items-center">
                   <input

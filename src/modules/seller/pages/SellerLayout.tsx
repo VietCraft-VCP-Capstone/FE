@@ -4,7 +4,7 @@ import '../../../shared/components/layouts.css';
 import { POD_CREATE_ENABLED, POD_CREATE_PATH } from '../featureFlags';
 import {
   LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Palette, Ticket,
-  Wallet, Banknote, Rocket,
+  Banknote, Rocket, Users,
   Settings, Bell, Mail, PanelLeft, LogOut, ChevronDown, MessageSquare
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -12,6 +12,7 @@ import { chatService } from '../../chat/services/chatService';
 import { notificationService } from '../../notification/services/notificationService';
 import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
 import { WorkspaceSwitcher, rememberSellerPath } from '../../analytics/components/WorkspaceSwitcher';
+import { useSocket } from '../../../infrastructure/websocket/useSocket';
 
 export interface SellerNavItem {
   to: string;
@@ -44,7 +45,7 @@ const OPS_NAV: SellerNavItem[] = [
   { to: '/seller/products/new', icon: PlusCircle, label: 'Tạo sản phẩm POD' },
   { to: '/seller/designs', icon: Palette, label: 'Kho thiết kế' },
   { to: '/seller/promotions', icon: Ticket, label: 'Khuyến mãi' },
-  { to: '/seller/revenue', icon: Wallet, label: 'Doanh thu cửa hàng' },
+  { to: '/seller/competitors', icon: Users, label: 'Đối thủ đang theo dõi' },
   { to: '/seller/payouts', icon: Banknote, label: 'Đối soát & rút tiền' },
   { to: '/seller/onboarding', icon: Rocket, label: 'Thiết lập gian hàng' },
 ];
@@ -58,9 +59,12 @@ const SIDEBAR_COLLAPSED_KEY = 'vietcraft:seller-sidebar-collapsed';
 export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  useSocket(); // mở socket để chuông nhận thông báo realtime ở mọi trang seller
   // Sidebar chỉ đóng/mở khi người bán bấm, và giữ lựa chọn đó giữa các trang lẫn lần mở sau.
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY); } catch { saved = null; }
+    return saved !== null ? saved === '1' : window.matchMedia('(max-width: 767px)').matches;
   });
   const toggleCollapsed = () => {
     setCollapsed(prev => {
@@ -75,6 +79,9 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
 
+  // Khởi tạo kết nối WebSocket cho toàn bộ Seller portal
+  useSocket();
+
   useEffect(() => {
     chatService.getUnreadCount()
       .then(c => setUnreadChatCount(c))
@@ -82,7 +89,7 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
 
     notificationService.getUnreadCount()
       .then(c => setUnreadNotifCount(c))
-      .catch(() => {});
+      .catch(err => console.warn('MSG134', err));
 
     const onUnreadUpdate = (e: any) => {
       if (typeof e.detail?.unreadCount === 'number') {
@@ -105,7 +112,14 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
     window.addEventListener('vietcraft-notification-unread-updated', onNotifUpdate);
     window.addEventListener('vietcraft-notification-received', onNotifUpdate);
 
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
     return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
       window.removeEventListener('vietcraft-chat-unread-updated', onUnreadUpdate);
       window.removeEventListener('vietcraft-message-received', onUnreadUpdate);
       window.removeEventListener('vietcraft-notification-unread-updated', onNotifUpdate);
@@ -126,7 +140,16 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
 
   const currentPath = location.pathname === '/seller/product-listing' ? '/seller/products' : location.pathname;
   const navGroups = groups ?? OPS_GROUPS;
-  const isActive = (to: string) => currentPath === to || currentPath.startsWith(`${to}/`);
+  const allNavItems = navGroups.flatMap(g => g.items);
+  const activeNavTo = allNavItems
+    .map(i => i.to)
+    .filter(to => {
+      if (currentPath === to) return true;
+      if (to === '/seller/products' && currentPath.startsWith('/seller/products/new')) return false;
+      return currentPath.startsWith(`${to}/`);
+    })
+    .sort((a, b) => b.length - a.length)[0];
+  const isActive = (to: string) => to === activeNavTo;
 
   return (
     <div className="seller-layout">

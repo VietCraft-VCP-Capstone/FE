@@ -81,8 +81,8 @@ export function ForecastPage() {
         onRetry={reload}
         skeleton={
           <div className="space-y-4">
-            <Skeleton className="h-80 w-full rounded-2xl" />
-            <Skeleton className="h-40 w-full rounded-2xl" />
+            <Skeleton className="h-80 w-full rounded-md" />
+            <Skeleton className="h-40 w-full rounded-md" />
           </div>
         }
       >
@@ -126,7 +126,7 @@ export function ForecastPage() {
                       Bình quân {perDay == null ? NA : money(perDay)} mỗi ngày
                     </span>
                   </div>
-                  <div className="min-w-0 rounded-xl bg-stone-50 px-4 py-3">
+                  <div className="min-w-0 rounded-md bg-stone-50 px-4 py-3">
                     <span className="block text-[11.5px] font-semibold text-stone-500">Cộng dồn dải từng ngày</span>
                     <span className="mt-0.5 block font-jakarta text-base font-bold text-stone-900">
                       {band ? `${compactMoney(band.lo)} đến ${compactMoney(band.hi)}` : NA}

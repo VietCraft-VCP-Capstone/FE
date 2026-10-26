@@ -1,17 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
-import { Heart, Star, ArrowRight, CheckCircle2, Info, Ticket, Flame } from 'lucide-react';
+import { Heart, ArrowRight, CheckCircle2, Info, Ticket, Flame, UserPlus, Store } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { shopService } from '../../product/services/shopService';
 import { promotionService } from '../../promotion/services/promotionService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { ForYouSection } from '../components/home/ForYouSection';
+import { buildDeals } from '../components/deals/buildDeals';
 import '../../../shared/components/layouts.css';
 
 // Bộ nhớ đệm cấp module: giữ lại sản phẩm và voucher khi người dùng chuyển trang
 let homeDataCache: {
   products: any[];
   shops: any[];
+  suggestedShops: any[];
   coupons: any[];
   timestamp: number;
 } | null = null;
@@ -24,6 +27,8 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
   const [allProducts, setAllProducts] = useState<any[]>(() => homeDataCache?.products || []);
   const [shopList, setShopList] = useState<any[]>(() => homeDataCache?.shops || []);
+  const [suggestedShopList, setSuggestedShopList] = useState<any[]>(() => homeDataCache?.suggestedShops || []);
+  const [followingShopId, setFollowingShopId] = useState<string | null>(null);
   const [couponList, setCouponList] = useState<any[]>(() => homeDataCache?.coupons || []);
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
@@ -76,20 +81,28 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
     Promise.all([
       productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
+      // Chỉ lấy đúng các shop người dùng đang theo dõi, không fallback sang toàn bộ shop
       isLoggedIn()
-        ? shopService.getFollowedShops()
-            .then(followed => (Array.isArray(followed) && followed.length > 0 ? followed : productsService.getFeaturedShops()))
-            .catch(() => productsService.getFeaturedShops().catch(() => []))
-        : productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
+        ? shopService.getFollowedShops().catch((err) => { console.error('Failed to fetch followed shops', err); return []; })
+        : Promise.resolve([]),
+      productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
       promotionService.getAll().catch((err) => { console.error('Failed to fetch coupons', err); return []; }),
-    ]).then(([products, shops, coupons]) => {
+    ]).then(([products, followed, featured, coupons]) => {
       const productList = Array.isArray(products) ? products : (products as any)?.items || [];
+      const followedShops = Array.isArray(followed) ? followed : [];
+      const followedIds = new Set(followedShops.map((s: any) => (s._id || s.id)?.toString()));
+      // Gợi ý: các shop nổi bật mà người dùng chưa theo dõi
+      const suggestedShops = (Array.isArray(featured) ? featured : [])
+        .filter((s: any) => !followedIds.has((s._id || s.id)?.toString()))
+        .slice(0, 6);
       setAllProducts(productList);
-      setShopList(shops || []);
+      setShopList(followedShops);
+      setSuggestedShopList(suggestedShops);
       setCouponList(coupons || []);
       homeDataCache = {
         products: productList,
-        shops: shops || [],
+        shops: followedShops,
+        suggestedShops,
         coupons: coupons || [],
         timestamp: Date.now()
       };
@@ -123,6 +136,33 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
     } catch (err) {
       console.error('toggleFavorite failed', err);
       triggerToast('Không thể cập nhật yêu thích, vui lòng thử lại.', 'info');
+    }
+  };
+
+  const handleFollowShop = async (shopId: string, shopName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isLoggedIn()) {
+      navigate('/login');
+      return;
+    }
+    if (!shopId || followingShopId) return;
+    setFollowingShopId(shopId);
+    try {
+      await shopService.follow(shopId);
+      const followedShop = suggestedShopList.find((s: any) => (s._id || s.id)?.toString() === shopId);
+      const nextFollowed = followedShop ? [...shopList, followedShop] : shopList;
+      const nextSuggested = suggestedShopList.filter((s: any) => (s._id || s.id)?.toString() !== shopId);
+      setShopList(nextFollowed);
+      setSuggestedShopList(nextSuggested);
+      if (homeDataCache) {
+        homeDataCache = { ...homeDataCache, shops: nextFollowed, suggestedShops: nextSuggested };
+      }
+      triggerToast(`Đã theo dõi gian hàng "${shopName}"`, 'success');
+    } catch (err) {
+      console.error('followShop failed', err);
+      triggerToast('Không thể theo dõi gian hàng, vui lòng thử lại.', 'info');
+    } finally {
+      setFollowingShopId(null);
     }
   };
 
@@ -188,182 +228,11 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
     });
   }, [couponList]);
 
-  // Lấy sản phẩm có ưu đãi thật / Flash Sale thật từ database và voucher đang chạy
-  const flashDeals = useMemo(() => {
-    const now = new Date();
-    const activePromotions = couponList.filter((c: any) => {
-      if (!c.is_active) return false;
-      const start = new Date(c.start_date);
-      const end = new Date(c.end_date);
-      return start <= now && end >= now;
-    });
+  const flashDeals = useMemo(() => buildDeals(couponList, allProducts), [allProducts, couponList]);
 
-    const flashSaleCoupons = activePromotions.filter((c: any) => c.discount_type === 'FLASH_SALE');
-    const otherCoupons = activePromotions.filter((c: any) => c.discount_type !== 'FLASH_SALE');
-
-    const deals: Array<{
-      id: string;
-      title: string;
-      price: number;
-      oldPrice: number;
-      discount: string;
-      image: string;
-      badge?: string;
-      couponCode?: string;
-      couponTitle?: string;
-    }> = [];
-
-    // Helper chuẩn hoá Shop ID
-    const getShopId = (obj: any): string | null => {
-      if (!obj) return null;
-      if (typeof obj === 'string') return obj;
-      if (typeof obj === 'object') {
-        return obj._id?.toString() || obj.id?.toString() || null;
-      }
-      return null;
-    };
-
-    const getProductShopId = (p: any): string | null => {
-      if (!p) return null;
-      return getShopId(p.shop_id) || getShopId(p.shopInfo?.id || p.shopInfo?._id) || getShopId(p.sellerId) || null;
-    };
-
-    const addedProductIds = new Set<string>();
-
-    // 1. Sản phẩm thuộc chương trình FLASH SALE thật
-    for (const coupon of flashSaleCoupons) {
-      const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
-        ? parseFloat(coupon.discount_value.$numberDecimal)
-        : parseFloat(coupon.discount_value || 0);
-      const minVal = typeof coupon.min_order_value === 'object' && coupon.min_order_value?.$numberDecimal
-        ? parseFloat(coupon.min_order_value.$numberDecimal)
-        : parseFloat(coupon.min_order_value || 0);
-
-      if (coupon.applicable_scope === 'SPECIFIC_PRODUCTS' && Array.isArray(coupon.applicable_product_ids)) {
-        for (const prodId of coupon.applicable_product_ids) {
-          const idStr = (prodId?._id || prodId)?.toString();
-          if (!idStr || addedProductIds.has(idStr)) continue;
-          const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
-          if (p && p.price > 0) {
-            const basePrice = p.price;
-            if (minVal > 0 && basePrice < minVal) continue;
-            let dealPrice = basePrice;
-            let discountText = '';
-            if (discountVal <= 100) {
-              dealPrice = Math.round(basePrice * (1 - discountVal / 100));
-              discountText = `-${discountVal}%`;
-            } else {
-              dealPrice = Math.max(0, basePrice - discountVal);
-              discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
-            }
-            deals.push({
-              id: p.id || p._id,
-              title: p.title || p.name,
-              price: dealPrice,
-              oldPrice: basePrice,
-              discount: discountText,
-              image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
-              badge: 'FLASH SALE',
-              couponCode: coupon.code,
-              couponTitle: coupon.title
-            });
-            addedProductIds.add(idStr);
-          }
-        }
-      } else if (coupon.applicable_scope === 'ALL') {
-        const couponShopId = getShopId(coupon.shop_id);
-        const matchingProds = couponShopId
-          ? allProducts.filter((p: any) => getProductShopId(p) === couponShopId)
-          : allProducts;
-        for (const p of matchingProds.slice(0, 8)) {
-          const idStr = (p.id || p._id)?.toString();
-          if (!idStr || addedProductIds.has(idStr)) continue;
-          const basePrice = p.price;
-          if (minVal > 0 && basePrice < minVal) continue;
-          let dealPrice = basePrice;
-          let discountText = '';
-          if (discountVal <= 100) {
-            dealPrice = Math.round(basePrice * (1 - discountVal / 100));
-            discountText = `-${discountVal}%`;
-          } else {
-            dealPrice = Math.max(0, basePrice - discountVal);
-            discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
-          }
-          deals.push({
-            id: p.id || p._id,
-            title: p.title || p.name,
-            price: dealPrice,
-            oldPrice: basePrice,
-            discount: discountText,
-            image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
-            badge: 'FLASH SALE',
-            couponCode: coupon.code,
-            couponTitle: coupon.title
-          });
-          addedProductIds.add(idStr);
-        }
-      }
-    }
-
-    // 2. Sản phẩm thuộc các voucher chỉ định sản phẩm cụ thể (SPECIFIC_PRODUCTS) thỏa mãn điều kiện đơn tối thiểu
-    for (const coupon of otherCoupons) {
-      if (coupon.applicable_scope !== 'SPECIFIC_PRODUCTS' || !Array.isArray(coupon.applicable_product_ids)) continue;
-
-      const discountVal = typeof coupon.discount_value === 'object' && coupon.discount_value?.$numberDecimal
-        ? parseFloat(coupon.discount_value.$numberDecimal)
-        : parseFloat(coupon.discount_value || 0);
-      const minVal = typeof coupon.min_order_value === 'object' && coupon.min_order_value?.$numberDecimal
-        ? parseFloat(coupon.min_order_value.$numberDecimal)
-        : parseFloat(coupon.min_order_value || 0);
-
-      for (const prodId of coupon.applicable_product_ids) {
-        const idStr = (prodId?._id || prodId)?.toString();
-        if (!idStr || addedProductIds.has(idStr)) continue;
-        const p = allProducts.find((item: any) => (item.id === idStr || item._id?.toString() === idStr));
-        if (p && p.price > 0) {
-          const basePrice = p.price;
-          if (minVal > 0 && basePrice < minVal) continue;
-          let dealPrice = basePrice;
-          let discountText = '';
-          if (coupon.discount_type === 'PERCENTAGE') {
-            dealPrice = Math.round(basePrice * (1 - discountVal / 100));
-            discountText = `-${discountVal}%`;
-          } else {
-            dealPrice = Math.max(0, basePrice - discountVal);
-            discountText = discountVal >= 1000 ? `-${Math.round(discountVal / 1000)}K` : `-${discountVal}đ`;
-          }
-          deals.push({
-            id: p.id || p._id,
-            title: p.title || p.name,
-            price: dealPrice,
-            oldPrice: basePrice,
-            discount: discountText,
-            image: p.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300',
-            badge: 'ƯU ĐÃI',
-            couponCode: coupon.code,
-            couponTitle: coupon.title
-          });
-          addedProductIds.add(idStr);
-        }
-      }
-    }
-
-    return deals;
-  }, [allProducts, couponList]);
-
-  const aiSuggestions = allProducts.slice(1, 5).map((p: any) => {
-    return {
-      id: p.id,
-      title: p.title,
-      price: p.price,
-      rating: 5,
-      image: p.images?.[0] || 'https://images.unsplash.com/photo-1603006905393-c910e859b89f?auto=format&fit=crop&w=300'
-    };
-  });
-
-  const subbedShops = useMemo(() => {
-    if (!shopList || shopList.length === 0) return [];
-    return shopList.map((shop: any) => {
+  const toShopCards = (shops: any[]) => {
+    if (!shops || shops.length === 0) return [];
+    return shops.map((shop: any) => {
       const sId = (shop._id || shop.id)?.toString();
       const sSlug = shop.slug;
       const targetShop = sId || sSlug;
@@ -381,6 +250,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
       return {
         id: targetShop,
+        shopId: sId,
         slug: sSlug,
         name: shop.shop_name || shop.name || shop.shopName || 'Gian hàng',
         caption: `Đã thêm ${shop.listing_count || shop.listingCount || (shopProds.length > 0 ? shopProds.length : 1)} sản phẩm mới`,
@@ -388,14 +258,12 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         thumbnails
       };
     });
-  }, [shopList, allProducts]);
+  };
 
-  const searchedProducts = allProducts.filter((p: any) =>
-    (p.title || p.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.category || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const subbedShops = useMemo(() => toShopCards(shopList), [shopList, allProducts]);
+  const suggestedShops = useMemo(() => toShopCards(suggestedShopList), [suggestedShopList, allProducts]);
 
-  const displayProducts = searchedProducts;
+  const displayProducts = allProducts;
   const itemsPerPage = 8;
   const totalPages = Math.ceil(displayProducts.length / itemsPerPage);
   const paginatedProducts = displayProducts.slice(
@@ -791,46 +659,76 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         )}
       </section>
 
-      {/* AI Recommendation Section */}
-      <section className="buyer-section" style={{ marginTop: 40 }}>
-        <div className="section-head" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>✨ Gợi ý từ AI dựa trên sở thích của bạn</h2>
-        </div>
-        <div className="buyer-grid-4">
-          {aiSuggestions.map((ai) => {
-            const isFav = favoritedProductIds.includes(ai.id);
-            return (
-              <div key={ai.id} className="buyer-card" onClick={() => navigate(`/product/${ai.id}`)}>
-                <div className="card-media">
-                  <img src={ai.image} alt={ai.title} />
-                  <button
-                    className="fav-overlay"
-                    onClick={(e) => toggleFavorite(ai.id, ai.title, e)}
-                    style={{ color: isFav ? '#e11d48' : '#888' }}
-                  >
-                    <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
-                  </button>
-                </div>
-                <div className="card-info">
-                  <h3>{ai.title}</h3>
-                  <div className="stars-row" style={{ display: 'flex', gap: 2, margin: '4px 0' }}>
-                    {[...Array(ai.rating)].map((_, s) => (
-                      <Star key={s} size={12} className="star-icon" style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                    ))}
-                  </div>
-                  <p className="price-tag">{ai.price.toLocaleString('vi-VN')}đ</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <ForYouSection deals={flashSaleProductMap} />
 
       {/* Followed Shop Updates Section */}
       <section className="buyer-section" style={{ marginTop: 40 }}>
         <div className="section-head" style={{ marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Cập nhật từ gian hàng bạn theo dõi</h2>
         </div>
+        {subbedShops.length === 0 ? (
+          <>
+            <div style={{ padding: '20px 16px', textAlign: 'center', background: '#fafaf9', border: '1px dashed #d6d3d1', borderRadius: 12, color: '#57534e' }}>
+              <Store size={28} style={{ color: '#a8a29e', margin: '0 auto 8px' }} />
+              <p style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#292524' }}>Bạn chưa theo dõi gian hàng nào</p>
+              <p style={{ fontSize: 12, margin: '4px 0 0' }}>Theo dõi gian hàng yêu thích để nhận cập nhật sản phẩm mới tại đây.</p>
+            </div>
+
+            {suggestedShops.length > 0 && (
+              <>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#330033', margin: '20px 0 12px' }}>Gợi ý gian hàng nên theo dõi</h3>
+                <div className="buyer-grid-3">
+                  {suggestedShops.map((shop, i) => {
+                    const targetShop = shop.id || shop.slug;
+                    const isFollowing = followingShopId === shop.shopId;
+                    return (
+                      <div
+                        key={shop.id || i}
+                        className="shop-update-card cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => {
+                          if (targetShop) navigate(`/shop/${targetShop}`);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title={`Xem gian hàng ${shop.name}`}
+                      >
+                        <div className="shop-head" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <img src={shop.image} alt={shop.name} className="shop-avatar" style={{ border: '1px solid #ebd0eb' }} />
+                          <div>
+                            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{shop.name}</h3>
+                            <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{shop.caption}</p>
+                          </div>
+                        </div>
+                        <div className="shop-thumbnails">
+                          {shop.thumbnails.map((t: string, idx: number) => (
+                            <img key={idx} src={t} alt="thumbnail" />
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="shop-view-btn"
+                          disabled={isFollowing}
+                          onClick={(e) => handleFollowShop(shop.shopId, shop.name, e)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            cursor: isFollowing ? 'wait' : 'pointer',
+                            opacity: isFollowing ? 0.7 : 1
+                          }}
+                          title={`Theo dõi gian hàng ${shop.name}`}
+                        >
+                          <UserPlus size={12} />
+                          <span>{isFollowing ? 'Đang theo dõi...' : 'Theo dõi'}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </>
+        ) : (
         <div className="buyer-grid-3">
           {subbedShops.map((shop, i) => {
             const targetShop = shop.id || shop.slug;
@@ -889,6 +787,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
             );
           })}
         </div>
+        )}
       </section>
 
       {/* Styles Discovery Section */}

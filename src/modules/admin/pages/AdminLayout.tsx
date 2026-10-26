@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import '../../../shared/components/layouts.css';
 import {
-  LayoutDashboard, Users, ClipboardCheck, Tag, Scale, Megaphone, Bell, Search, LogOut, Store, Calculator, Percent, Wallet
+  LayoutDashboard, Users, ClipboardCheck, Tag, Scale, Megaphone, Bell, Search, LogOut, Store, Calculator, Percent, Wallet, ShieldAlert
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -19,8 +19,9 @@ const NAV_ITEMS = [
   { to: '/admin/sellers', icon: Store, label: 'Duyệt Người bán' },
   { to: '/admin/categories', icon: Tag, label: 'Danh mục' },
   { to: '/admin/tags', icon: Tag, label: 'Thẻ' },
+  { to: '/admin/banned-keywords', icon: ShieldAlert, label: 'Từ khóa cấm' },
   { to: '/admin/disputes', icon: Scale, label: 'Tranh chấp' },
-  { to: '/admin/returns', icon: Scale, label: 'Return v3' },
+  { to: '/admin/returns', icon: Scale, label: 'Đổi trả & POD' },
   { to: '/admin/marketing', icon: Megaphone, label: 'Marketing' },
   { to: '/admin/revenue', icon: Wallet, label: 'Thống kê thu nhập' },
   { to: '/admin/commission', icon: Percent, label: 'Cấu hình lợi nhuận' },
@@ -41,8 +42,17 @@ export function AdminLayout({ children, user, onLogout }: AdminLayoutProps) {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [menuOpen]);
 
+  useEffect(() => {
+    document.documentElement.classList.add('overflow-hidden');
+    document.body.classList.add('overflow-hidden');
+    return () => {
+      document.documentElement.classList.remove('overflow-hidden');
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, []);
+
   return (
-    <div className="flex h-screen overflow-hidden bg-admin-canvas font-[system-ui,-apple-system,sans-serif]">
+    <div className="flex h-screen max-h-screen overflow-hidden bg-admin-canvas font-[system-ui,-apple-system,sans-serif]">
       {/* Sidebar Navigation */}
       <aside className="flex w-[200px] flex-shrink-0 flex-col border-r border-admin-line bg-admin-surface py-6">
         <div className="px-5 pb-6">

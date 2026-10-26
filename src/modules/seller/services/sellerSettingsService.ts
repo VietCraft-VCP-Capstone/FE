@@ -49,8 +49,14 @@ export const INITIAL_SELLER_SETTINGS: SellerSettingsState = {
         estimatedTime: '2 - 3 ngày'
       }
     ],
-    useFlatRate: false,
-    flatRateFee: 0
+    pricingType: 'FLAT_RATE',
+    useFlatRate: true,
+    flatRateFee: 0,
+    zoneRates: {
+      intraProvince: 22000,
+      intraRegion: 30000,
+      interRegion: 38000
+    }
   },
   payment: {
     bankAccounts: [],
@@ -70,7 +76,8 @@ export const INITIAL_SELLER_SETTINGS: SellerSettingsState = {
     },
     analytics: {
       weeklyReport: { email: true, app: false },
-      promotions: { email: false, app: true }
+      promotions: { email: false, app: true },
+      performanceAlert: { email: false, app: true }
     }
   },
   updatedAt: new Date().toISOString()
@@ -124,13 +131,30 @@ function filterOutViettel(settings: SellerSettingsState): SellerSettingsState {
   return settings;
 }
 
+function sanitizeForLocalStorage(settings: SellerSettingsState): SellerSettingsState {
+  try {
+    const copy = JSON.parse(JSON.stringify(settings));
+    if (copy.payment?.bankAccounts) {
+      copy.payment.bankAccounts = copy.payment.bankAccounts.map((b: any) => ({
+        ...b,
+        accountNumber: b.accountNumber
+          ? (b.accountNumber.startsWith('*') ? b.accountNumber : `**** **** ${String(b.accountNumber).slice(-4)}`)
+          : ''
+      }));
+    }
+    return copy;
+  } catch {
+    return settings;
+  }
+}
+
 export const sellerSettingsService = {
   getSettings: async (): Promise<SellerSettingsState> => {
     try {
       const res = await api.get('/seller/settings');
       if (res.data && res.data.brand) {
         const clean = filterOutViettel(res.data);
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(clean));
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitizeForLocalStorage(clean)));
         return clean;
       }
     } catch (e) {
@@ -163,7 +187,7 @@ export const sellerSettingsService = {
       const res = await api.put('/seller/settings', payload);
       if (res.data && res.data.brand) {
         const clean = filterOutViettel(res.data);
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(clean));
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitizeForLocalStorage(clean)));
         return clean;
       }
     } catch (e) {
@@ -173,7 +197,7 @@ export const sellerSettingsService = {
 
     const current = sellerSettingsService.getCachedSettings();
     const merged = filterOutViettel({ ...current, ...payload, updatedAt: new Date().toISOString() });
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitizeForLocalStorage(merged)));
     return merged;
   },
 
@@ -257,6 +281,16 @@ export const sellerSettingsService = {
     const initial: OnboardingState = { currentStep: 1, isCompleted: false };
     localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(initial));
     return initial;
+  },
+
+  getReputation: async (): Promise<{ profile: any; logs: any[] }> => {
+    try {
+      const res = await api.get('/seller/settings/reputation');
+      return res.data || { profile: null, logs: [] };
+    } catch (e) {
+      console.warn('Could not load seller reputation:', e);
+      return { profile: null, logs: [] };
+    }
   },
 
   saveOnboardingState: (state: OnboardingState): OnboardingState => {

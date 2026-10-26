@@ -3,12 +3,12 @@ import { createPortal } from 'react-dom';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { cartService } from '../../order/services/cartService';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Truck, Check, CreditCard, MessageSquare, Store, Copy, AlertCircle, CheckCircle, RotateCcw, ArrowRight, PackageCheck, X, Loader2, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Truck, Check, CreditCard, MessageSquare, Store, Copy, AlertCircle, CheckCircle, RotateCcw, ArrowRight, PackageCheck, X, Loader2, XCircle, RefreshCw, AlertTriangle, Ticket } from 'lucide-react';
 import { ordersService } from '../../order/services/ordersService';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
 import { OrderItemsList } from '../components/OrderItemsList';
-import { OrderSupportSection } from '../components/OrderSupportSection';
+import { RefundRequestPanel } from '../components/RefundRequestPanel';
 import { returnService, type ReturnEligibilityItem } from '../../returns/services/returnService';
 import { refundService } from '../../order/services/refundService';
 import type { OrderItemResponse, OrderResponse } from '../../order/services/ordersService';
@@ -27,6 +27,7 @@ export function BuyerOrderDetailPage() {
     const [targetReviewProductId, setTargetReviewProductId] = useState<string | undefined>(undefined);
     const [eligibilityItems, setEligibilityItems] = useState<ReturnEligibilityItem[]>([]);
     const [hasLegacyRefund, setHasLegacyRefund] = useState(false);
+    const [refundFormOpen, setRefundFormOpen] = useState(false);
     const [reorderItems, setReorderItems] = useState<OrderItemResponse[] | null>(null);
 
     const handleOpenReview = (productId?: string) => {
@@ -95,7 +96,7 @@ export function BuyerOrderDetailPage() {
         setHasLegacyRefund(false);
         void Promise.all([
             refundService.getForOrder(order.id).catch(() => null),
-            order.status === 'completed' && order._id ? returnService.eligibility(order._id).catch(() => []) : Promise.resolve([]),
+            ['completed', 'shipping'].includes(order.status) && order._id ? returnService.eligibility(order._id).catch(() => []) : Promise.resolve([]),
         ]).then(([legacyRefund, eligibility]) => {
             if (cancelled) return;
             setHasLegacyRefund(legacyRefund !== null);
@@ -323,6 +324,10 @@ export function BuyerOrderDetailPage() {
     const subtotal = orderItems.reduce((acc, item) => acc + ((item.price || 0) * (item.quantity || 0)), 0);
     const shippingFee = Number(order.shippingFee ?? 0);
     const totalAmount = Number(order.totalAmount ?? 0);
+    const rawDiscount = (order as any).discount ?? (order as any).couponDiscount ?? (order as any).financial_breakdown?.coupon_discount;
+    const computedDiscount = (rawDiscount !== undefined && rawDiscount !== null && Number(rawDiscount) > 0)
+        ? Number(rawDiscount)
+        : Math.max(0, subtotal + shippingFee - totalAmount);
     const canCancelOrder = order && 
         order.status !== 'cancelled' &&
         order.status !== 'shipping' &&
@@ -412,7 +417,7 @@ export function BuyerOrderDetailPage() {
                                     Đơn hàng đang có yêu cầu đổi trả / hoàn tiền
                                 </h3>
                                 <span className="bg-indigo-200/70 text-indigo-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                    Return v3
+                                    Đổi trả POD
                                 </span>
                             </div>
                             <p className="text-xs text-indigo-700 mt-0.5">
@@ -526,8 +531,13 @@ export function BuyerOrderDetailPage() {
                     items={orderItems}
                     eligibilityItems={eligibilityItems}
                     completed={order.status === 'completed'}
+                    returnable={['completed', 'shipping'].includes(order.status)}
                     onReview={handleOpenReview}
                     onReorder={handleReorder}
+                    refund={{
+                        blocked: hasLegacyRefund ? 'Đơn đã có yêu cầu hoàn tiền, xem bên dưới' : order.status !== 'completed' ? 'Gửi yêu cầu sau khi đơn hoàn thành' : null,
+                        open: () => setRefundFormOpen(true),
+                    }}
                 />
 
                 {order.status === 'shipping' && <div className="flex justify-end border-t border-gray-50 p-4">
@@ -544,10 +554,12 @@ export function BuyerOrderDetailPage() {
                 </div>}
             </div>
 
-            {!awaitingPayment && (hasLegacyRefund || order.isPod !== true || orderItems.some(item => !item.order_item_id) || eligibilityItems.some(item => item.reasonIfNot?.code === 'NORMAL_UNSUPPORTED' || item.reasonIfNot?.code === 'MISSING_ORDER_ITEM_ID')) && <OrderSupportSection
+            {!awaitingPayment && <RefundRequestPanel
                 orderId={order.id}
                 refundOrderId={order._id}
-                orderStatus={order.status}
+                formOpen={refundFormOpen}
+                onFormClose={() => setRefundFormOpen(false)}
+                onCreated={() => { setRefundFormOpen(false); setHasLegacyRefund(true); }}
             />}
 
             {/* Bottom Payment details */}
@@ -564,6 +576,22 @@ export function BuyerOrderDetailPage() {
                             <span>Phí vận chuyển</span>
                             <span className="text-gray-950 font-semibold">{shippingFee.toLocaleString('vi-VN')}đ</span>
                         </div>
+                        {computedDiscount > 0 && (
+                            <div className="flex justify-between items-center text-emerald-600 font-bold bg-emerald-50/70 border border-emerald-100 px-2.5 py-1.5 rounded-xl">
+                                <span className="flex items-center gap-1.5">
+                                    <Ticket size={13} className="text-emerald-600" />
+                                    <span>Giảm giá voucher</span>
+                                    {order.couponCode && (
+                                        <span className="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black uppercase">
+                                            {order.couponCode}
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="text-emerald-700 font-black">
+                                    -{computedDiscount.toLocaleString('vi-VN')}đ
+                                </span>
+                            </div>
+                        )}
                         <div className="flex justify-between border-t border-gray-50 pt-2 font-black text-sm text-gray-900">
                             <span>Thành tiền</span>
                             <span className="text-emerald-700 text-base">{totalAmount.toLocaleString('vi-VN')}đ</span>

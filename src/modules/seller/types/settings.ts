@@ -22,6 +22,14 @@ export interface ShippingCarrierItem {
   estimatedTime?: string;
 }
 
+export type ShippingPricingType = 'FLAT_RATE' | 'ZONE_BASED';
+
+export interface ZoneShippingRates {
+  intraProvince: number; // Nội tỉnh
+  intraRegion: number;   // Nội vùng
+  interRegion: number;   // Liên vùng
+}
+
 export interface SellerShippingSettings {
   senderName: string;
   senderPhone: string;
@@ -30,8 +38,10 @@ export interface SellerShippingSettings {
   ward: string;
   specificAddress: string;
   carriers: ShippingCarrierItem[];
+  pricingType?: ShippingPricingType;
   useFlatRate: boolean;
   flatRateFee: number;
+  zoneRates?: ZoneShippingRates;
 }
 
 export interface BankAccountItem {
@@ -84,6 +94,7 @@ export interface SellerNotificationSettings {
   analytics: {
     weeklyReport: NotificationChannelSetting;
     promotions: NotificationChannelSetting;
+    performanceAlert: NotificationChannelSetting;
   };
 }
 

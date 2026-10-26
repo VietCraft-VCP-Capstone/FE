@@ -3,7 +3,6 @@ import {
   BellRing,
   CalendarClock,
   Compass,
-  Crosshair,
   Eye,
   LayoutGrid,
   LineChart,
@@ -61,14 +60,13 @@ export const INSIGHTS_NAV: InsightNavGroup[] = [
     ],
   },
   {
-    label: 'Nhìn sang ngang',
-    hint: 'So với người bán cùng ngách',
+    // Xem tổng thể đối thủ trước (F32, F36, F33 gộp một trang), rồi mới sửa giá, từ khoá.
+    label: 'Đối thủ cạnh tranh',
+    hint: 'So sánh với shop cùng ngành',
     items: [
-      { to: `${INSIGHTS_ROOT}/competitors`, label: 'Đối thủ cùng danh mục', icon: Users, feature: 'F32' },
-      { to: `${INSIGHTS_ROOT}/benchmark`, label: 'So sánh 5 trục', icon: Crosshair, feature: 'F33' },
-      { to: `${INSIGHTS_ROOT}/tag-gap`, label: 'Tag còn thiếu', icon: Tags, feature: 'F34' },
-      { to: `${INSIGHTS_ROOT}/pricing`, label: 'Mặt bằng giá', icon: Target, feature: 'F35' },
-      { to: `${INSIGHTS_ROOT}/tracking`, label: 'Theo dõi đối thủ', icon: Radar, feature: 'F36' },
+      { to: `${INSIGHTS_ROOT}/competitors`, label: 'Phân tích đối thủ', icon: Users, feature: 'F32 · F33 · F36' },
+      { to: `${INSIGHTS_ROOT}/pricing`, label: 'So sánh giá', icon: Target, feature: 'F35' },
+      { to: `${INSIGHTS_ROOT}/tag-gap`, label: 'Gợi ý từ khoá', icon: Tags, feature: 'F34' },
     ],
   },
   {

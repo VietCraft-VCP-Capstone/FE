@@ -19,7 +19,28 @@ export interface ShopDetail {
   listingCount: number;
   followersCount: number;
   isFollowing: boolean;
+  reputation_score?: number;
+  reputation_tier?: string;
   createdAt?: string | Date;
+  shippingSettings?: {
+    pricingType?: 'FLAT_RATE' | 'ZONE_BASED';
+    useFlatRate?: boolean;
+    flatRateFee?: number;
+    province?: string;
+    district?: string;
+    ward?: string;
+    carriers?: Array<{
+      id: string;
+      name: string;
+      enabled: boolean;
+      estimatedTime?: string;
+    }>;
+    zoneRates?: {
+      intraProvince: number;
+      intraRegion: number;
+      interRegion: number;
+    };
+  } | null;
 }
 
 export const shopService = {

@@ -1,26 +1,59 @@
 /**
- * F34 — Tag còn thiếu. Trả lời: "Nhóm bán chạy đang gắn tag nào mà tôi chưa có?"
+ * F34 — Gợi ý từ khoá. Đọc GET /seller/analytics/tag-gap (tham số categoryId).
  *
- * Đọc GET /seller/analytics/tag-gap (tham số categoryId).
- *
- * Trang này khác các trang còn lại ở một điểm: khi `signal.has_signal` là false thì thứ
- * quan trọng nhất trên màn hình KHÔNG phải danh sách tag, mà là lời cảnh báo rằng danh
- * sách đó chưa đáng tin. Dữ liệu mồi gán tag ngẫu nhiên nên độ vượt trội đo được là
- * nhiễu. Đặt bảng lên trước cảnh báo là mời người bán ra quyết định trên số ngẫu nhiên.
+ * Người bán mới cần biết "nên thêm từ khoá nào", không cần "lift" hay "tag đủ mạnh". Khi
+ * chưa có tín hiệu thì nói bình tĩnh là chưa cần thêm, thay vì đặt khung cảnh báo lên đầu
+ * trang. Bảng tag thiếu chỉ hiện khi có, và mờ đi khi chưa đủ chắc chắn.
  */
 
-import { AlertTriangle } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { Check, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { count } from '../../../shared/utils/format';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { SourceFooter } from '../components/SourceFooter';
-import { MiniStat } from '../components/charts/MiniViz';
-import { Chip, DataTable, InsightCard, Note, SelectField } from '../components/ui';
+import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, SelectField, Takeaway } from '../components/ui';
 import { decimal, pct } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import { categoryLabel, tagLabel } from '../labels';
 import type { TagGap } from '../types';
+
+/** AI gợi ý từ khoá riêng cho một sản phẩm: lấy từ sản phẩm giống nó, bù bằng độ phổ biến trong cùng loại hàng. */
+function PerProductTags({ rows, name }: { rows: NonNullable<TagGap['per_product']>; name: (id: string) => string }) {
+  const [chon, setChon] = useState('');
+  const sp = rows.find(r => r.product_id === chon) ?? rows[0];
+  return (
+    <InsightCard
+      title="Gợi ý cho từng sản phẩm"
+      description="AI xem các sản phẩm của shop khác giống sản phẩm này nhất đang gắn từ khoá gì mà nó chưa có."
+      bodyClassName="px-4 py-3"
+    >
+      {!sp ? (
+        <Note>Sản phẩm của bạn đã có đủ từ khoá mà các sản phẩm giống đang dùng.</Note>
+      ) : (
+        <div className="space-y-3">
+          {rows.length > 1 && (
+            <SelectField label="Sản phẩm" value={sp.product_id} onChange={setChon} options={rows.map(r => ({ value: r.product_id, label: r.title ?? r.product_id }))} />
+          )}
+          <ul className="m-0 list-none space-y-2 p-0">
+            {sp.suggestions.map(g => (
+              <li key={g.tag_id} className="flex flex-wrap items-center gap-2 text-[13px]">
+                <Chip tone="brand" icon={<Plus size={12} aria-hidden />}>{name(g.tag_id)}</Chip>
+                <span className="text-stone-600">
+                  {g.used_by > 0
+                    ? `${count(g.used_by)} sản phẩm giống đang dùng${g.better_sellers > 0 ? `, ${count(g.better_sellers)} trong đó bán chạy hơn bạn` : ''}`
+                    : `phổ biến trong cùng loại hàng (${count(g.popular_in_type)} sản phẩm dùng)`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Note>Gợi ý là tương quan: sản phẩm giống bạn hay dùng từ khoá này, không bảo đảm thêm vào là bán được nhiều hơn.</Note>
+        </div>
+      )}
+    </InsightCard>
+  );
+}
 
 export function TagGapPage() {
   const [params, setParams] = useSearchParams();
@@ -34,115 +67,122 @@ export function TagGapPage() {
   };
 
   return (
-    <InsightPage title="Tag còn thiếu" question="Nhóm bán chạy đang gắn tag nào mà tôi chưa có?">
+    <InsightPage title="Gợi ý từ khoá" question="Shop bán chạy cùng danh mục hay gắn từ khoá (tag) nào mà tôi chưa có?">
       <InsightBlock state={state} onRetry={reload}>
         {(data, meta) => {
           const trusted = data.signal.has_signal;
           const rows = [...data.missing_tags].sort((a, b) => b.lift - a.lift);
+          const name = (id: string, fallback?: string) => tagLabel(data.tag_names?.[id] ?? fallback ?? null, id);
+          const catName = categoryLabel(data.category_id, data.category_names?.[data.category_id]);
+          const goi = rows[0];
 
           return (
             <div className="space-y-5">
-              {!trusted && (
-                <section className="rounded-2xl border border-amber-300 bg-amber-50 p-5" role="note">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-700" aria-hidden />
-                    <div>
-                      <h2 className="m-0 text-sm font-bold text-amber-900">Chưa có tín hiệu đủ mạnh, đừng hành động theo bảng dưới</h2>
-                      <p className="mb-0 mt-1.5 text-[13px] leading-relaxed text-amber-900/90">{data.signal.note}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-4 border-t border-amber-200 pt-4 md:grid-cols-4">
-                    <MiniStat label="Tag đã thử" value={count(data.signal.tags_tested)} />
-                    <MiniStat label="Tag đủ mạnh" value={count(data.signal.strong_count)} hint="Cần ít nhất 1 để tin được" />
-                    <MiniStat label="Tag yếu" value={count(data.signal.weak_count)} hint="Nằm trong mức ngẫu nhiên" />
-                    <MiniStat label="Vượt trội cao nhất" value={data.signal.max_lift === null ? 'Chưa có' : `${decimal(data.signal.max_lift)} lần`} />
-                  </div>
-                </section>
-              )}
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <InsightCard bodyClassName="px-5 py-4">
-                  <MiniStat label="Đối thủ đã quét" value={count(data.competitors_scanned)} hint="Nhóm bán chạy nhất trong danh mục" />
-                </InsightCard>
-                <InsightCard bodyClassName="px-5 py-4">
-                  <MiniStat label="Tag shop bạn đang dùng" value={count(data.my_tags.length)} />
-                </InsightCard>
-                <InsightCard bodyClassName="px-5 py-4">
-                  <MiniStat label="Tag họ có mà bạn chưa" value={count(rows.length)} />
-                </InsightCard>
-              </div>
+              <Takeaway
+                action={
+                  trusted && goi
+                    ? <Link to="/seller/products" className={ACTION_CLASS}>Thêm từ khoá cho sản phẩm</Link>
+                    : <Link to="/seller/insights/competitors#manh-yeu" className={ACTION_CLASS}>Xem điểm mạnh & điểm yếu</Link>
+                }
+              >
+                {trusted && goi ? (
+                  <>
+                    Nên cân nhắc thêm từ khoá <strong>{name(goi.tag_id, goi.name)}</strong>: {count(goi.used_by_competitors)} trên{' '}
+                    {count(data.competitors_scanned)} sản phẩm bán chạy nhất trong {catName} đang dùng, nhiều gấp{' '}
+                    {decimal(goi.lift)} lần cả danh mục.
+                  </>
+                ) : rows.length === 0 ? (
+                  <>Từ khoá của bạn đã giống nhóm bán chạy trong <strong>{catName}</strong>. Chưa cần thêm từ khoá mới.</>
+                ) : (
+                  <>
+                    Chưa đủ chắc chắn để khuyên thêm từ khoá nào trong <strong>{catName}</strong>. Các từ khoá bên dưới chỉ để
+                    tham khảo.
+                  </>
+                )}
+              </Takeaway>
 
               <InsightCard
-                title="Tag nhóm bán chạy dùng nhiều hơn mặt bằng"
-                description="Độ vượt trội là tỉ lệ dùng tag trong nhóm bán chạy chia cho tỉ lệ dùng của toàn danh mục. Vượt trội 2 lần nghĩa là nhóm dẫn đầu dùng tag đó gấp đôi mặt bằng."
-                bodyClassName="px-5 py-4"
+                title="Từ khoá shop bán chạy hay dùng"
+                description={`Lấy từ ${count(data.competitors_scanned)} sản phẩm bán chạy nhất của shop khác. Dấu ✓ là bạn đã có, dấu + là bạn chưa có.`}
+                bodyClassName="px-4 py-3"
                 action={
                   <SelectField
                     label="Danh mục"
                     value={data.category_id}
                     onChange={setCategory}
-                    options={data.available_categories.map(id => ({ value: id, label: categoryLabel(id) }))}
+                    options={data.available_categories.map(id => ({ value: id, label: categoryLabel(id, data.category_names?.[id]) }))}
                   />
                 }
-                footer={<SourceFooter meta={meta} limitation={data.note} />}
+                footer={<SourceFooter meta={meta} method={data.signal.note} limitation={data.note} />}
               >
-                {rows.length === 0 ? (
-                  <Note>
-                    Không có tag nào của nhóm bán chạy mà shop bạn chưa dùng trong danh mục này. Bộ tag của bạn đã bao phủ
-                    đủ, nên chỗ cần cải thiện nằm ở nơi khác.
-                  </Note>
+                {(data.leader_tags ?? []).length === 0 ? (
+                  <Note>Các sản phẩm bán chạy trong danh mục này chưa gắn từ khoá nào.</Note>
                 ) : (
+                  <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+                    {(data.leader_tags ?? []).map(t => (
+                      <li key={t.tag_id}>
+                        <Chip
+                          tone={t.mine ? 'good' : 'neutral'}
+                          icon={t.mine ? <Check size={12} aria-hidden /> : <Plus size={12} aria-hidden />}
+                        >
+                          <span>{name(t.tag_id)}</span>
+                          <span className="font-normal opacity-75">· {count(t.used_by)}/{count(data.competitors_scanned)}</span>
+                          <span className="sr-only">{t.mine ? ', bạn đã có' : ', bạn chưa có'}</span>
+                        </Chip>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </InsightCard>
+
+              {data.per_product && data.per_product.length > 0 && <PerProductTags rows={data.per_product} name={id => name(id)} />}
+
+              {rows.length > 0 && (
+                <InsightCard
+                  title={trusted ? 'Từ khoá nên cân nhắc thêm' : 'Từ khoá tham khảo (chưa đủ chắc chắn)'}
+                  description="Từ khoá nhóm bán chạy dùng nhiều hơn hẳn phần còn lại của danh mục, mà shop bạn chưa có."
+                  bodyClassName="px-4 py-3"
+                >
                   <DataTable
-                    caption={`Tag của nhóm bán chạy trong danh mục ${categoryLabel(data.category_id)} mà shop chưa dùng`}
+                    caption={`Từ khoá của nhóm bán chạy trong ${catName} mà shop chưa dùng`}
                     head={
                       <>
-                        <th scope="col">Tag</th>
-                        <th scope="col" className="text-right">Đối thủ dùng</th>
+                        <th scope="col">Từ khoá</th>
+                        <th scope="col" className="text-right">Số sản phẩm bán chạy dùng</th>
                         <th scope="col" className="text-right">Nhóm bán chạy</th>
-                        <th scope="col" className="text-right">Toàn danh mục</th>
-                        <th scope="col" className="text-right">Vượt trội</th>
-                        <th scope="col" className="text-right">Traffic có thể tăng</th>
+                        <th scope="col" className="text-right">Cả danh mục</th>
+                        <th scope="col" className="text-right">Nhiều gấp</th>
+                        <th scope="col" className="text-right">Lượt xem có thể tăng</th>
                       </>
                     }
                   >
                     {rows.map(tag => {
-                      // Dữ liệu từng trả khoảng ngược (thấp 53%, cao 25%). Vẫn sắp lại ở đây
-                      // để giao diện không bao giờ in ra một khoảng vô nghĩa.
+                      // Dữ liệu từng trả khoảng ngược (thấp > cao): sắp lại cho khỏi in khoảng vô nghĩa.
                       const low = Math.min(tag.estimated_traffic_gain.low_pct, tag.estimated_traffic_gain.high_pct);
                       const high = Math.max(tag.estimated_traffic_gain.low_pct, tag.estimated_traffic_gain.high_pct);
                       return (
-                        <tr key={tag.tag_id}>
-                          <td className="font-semibold text-stone-800">{tagLabel(tag.name, tag.tag_id)}</td>
-                          <td className="text-right tabular-nums text-stone-700">{count(tag.used_by_competitors)}</td>
-                          <td className="text-right tabular-nums text-stone-700">{pct(tag.competitor_share_pct, 0)}</td>
-                          <td className="text-right tabular-nums text-stone-600">{pct(tag.category_share_pct, 0)}</td>
-                          <td className="text-right tabular-nums font-semibold text-stone-900">{decimal(tag.lift)} lần</td>
-                          <td className="whitespace-nowrap text-right">
-                            <span className={trusted ? 'tabular-nums text-stone-800' : 'tabular-nums text-stone-400'}>
-                              {pct(low, 0)} đến {pct(high, 0)}
-                            </span>
-                            <span className="ml-1.5 text-[11px] text-stone-400">ước lượng</span>
-                          </td>
+                        <tr key={tag.tag_id} className={trusted ? undefined : 'text-stone-400'}>
+                          <td className="font-semibold">{name(tag.tag_id, tag.name)}</td>
+                          <td className="text-right tabular-nums">{count(tag.used_by_competitors)}</td>
+                          <td className="text-right tabular-nums">{pct(tag.competitor_share_pct, 0)}</td>
+                          <td className="text-right tabular-nums">{pct(tag.category_share_pct, 0)}</td>
+                          <td className="text-right tabular-nums font-semibold">{decimal(tag.lift)} lần</td>
+                          <td className="whitespace-nowrap text-right tabular-nums">{pct(low, 0)} đến {pct(high, 0)}</td>
                         </tr>
                       );
                     })}
                   </DataTable>
-                )}
-
-                <div className="mt-4 flex items-start gap-2 rounded-xl bg-stone-50 px-3.5 py-3">
-                  <AlertTriangle size={15} className="mt-0.5 shrink-0 text-stone-500" aria-hidden />
-                  <p className="m-0 text-xs leading-relaxed text-stone-600">
-                    {data.note} Con số "traffic có thể tăng" là một khoảng ước lượng, không phải mức chắc chắn đạt được, và
-                    không phải cam kết.
-                  </p>
-                </div>
-              </InsightCard>
+                  <div className="mt-4">
+                    <Note>Đây chỉ là gợi ý: thêm từ khoá không đảm bảo bán thêm. "Lượt xem có thể tăng" là khoảng ước tính.</Note>
+                  </div>
+                </InsightCard>
+              )}
 
               {data.my_tags.length > 0 && (
-                <InsightCard title="Tag shop bạn đang dùng" description="Để đối chiếu với bảng trên.">
+                <InsightCard title="Từ khoá shop bạn đang dùng" description="Trong danh mục đang xem.">
                   <div className="flex flex-wrap gap-1.5">
                     {data.my_tags.map(tag => (
-                      <Chip key={tag} tone="neutral">{tagLabel(tag, tag)}</Chip>
+                      <Chip key={tag} tone="neutral">{name(tag)}</Chip>
                     ))}
                   </div>
                 </InsightCard>

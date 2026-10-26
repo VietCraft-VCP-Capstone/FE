@@ -396,6 +396,8 @@ export function SkeletonRows({ rows = 6, columns }: { rows?: number; columns: st
 
 function useDialogBehaviour(open: boolean, onClose: () => void) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -412,7 +414,7 @@ function useDialogBehaviour(open: boolean, onClose: () => void) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !panelRef.current) return;
@@ -439,7 +441,7 @@ function useDialogBehaviour(open: boolean, onClose: () => void) {
       document.body.style.overflow = prevOverflow;
       restoreTo?.focus?.({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return panelRef;
 }

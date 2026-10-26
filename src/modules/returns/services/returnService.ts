@@ -73,6 +73,33 @@ export interface ReturnEligibilityItem {
   remainingQuantity: number;
   activeRequestId?: string;
 }
+export interface ShopAuditRisk {
+  shop_id: string;
+  shop_name: string;
+  reputation_score: number;
+  reputation_tier: 'TRUSTED' | 'NORMAL' | 'WARNING' | 'RESTRICTED';
+  clean_streak_orders: number;
+  dispute_count_30d: number;
+  penalty_points_30d: number;
+  average_rating: number;
+  rating_count: number;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  recommendation: string;
+}
+
+export interface BuyerAuditRisk {
+  buyer_id: string;
+  total_delivered_orders: number;
+  total_return_requests: number;
+  dispute_rate_pct: number;
+  is_flagged_for_abuse: boolean;
+}
+
+export interface DisputeAuditProfile {
+  shop: ShopAuditRisk | null;
+  buyer: BuyerAuditRisk;
+}
+
 export interface PrinterDecision { action: ReturnAction; reason: string; proposedFault?: FaultParty; proposedClassification?: string }
 export interface AdminDecision { resolution: ReturnResolution | null; faultParty: FaultParty | null; reason: string; amountMinor?: number; currency?: string }
 export interface ReturnRequestPage { items: ReturnRequest[]; total: number; page: number; pageSize: number }
@@ -80,22 +107,23 @@ export interface ReturnRequestPage { items: ReturnRequest[]; total: number; page
 const idOf = (request: ReturnRequest) => request.id || request._id || '';
 
 export const returnService = {
-  create: async (payload: ReturnRequestInput): Promise<ReturnRequest> => unwrap(await api.post('/returns/v3/requests', payload)),
+  create: async (payload: ReturnRequestInput): Promise<ReturnRequest> => unwrap(await api.post('/returns/requests', payload)),
   eligibility: async (orderId: string): Promise<ReturnEligibilityItem[]> => {
-    const result = unwrap<{ items: ReturnEligibilityItem[] }>(await api.get<{ items: ReturnEligibilityItem[] }>('/returns/v3/eligibility', { params: { orderId } }));
+    const result = unwrap<{ items: ReturnEligibilityItem[] }>(await api.get<{ items: ReturnEligibilityItem[] }>('/returns/eligibility', { params: { orderId } }));
     return result.items || [];
   },
-  listPage: async (status?: string, page = 1, pageSize = 20): Promise<ReturnRequestPage> => unwrap(await api.get('/returns/v3/requests', { params: { status: status || undefined, page, pageSize } })),
+  listPage: async (status?: string, page = 1, pageSize = 20): Promise<ReturnRequestPage> => unwrap(await api.get('/returns/requests', { params: { status: status || undefined, page, pageSize } })),
   list: async (status?: string): Promise<ReturnRequest[]> => collectRequestPages(page => returnService.listPage(status, page, 100)),
-  detail: async (id: string): Promise<ReturnDetail> => unwrap(await api.get<ReturnDetail>(`/returns/v3/requests/${encodeURIComponent(id)}`)),
-  dispute: async (id: string, reason: string): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/dispute`, { reason })),
-  addEvidence: async (id: string, evidence: ReturnEvidence[]): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/evidence`, { evidence })),
-  printerDecision: async (id: string, payload: PrinterDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/printer-decision`, payload)),
-  requestEvidence: async (id: string, reason: string): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/printer-evidence-request`, { reason })),
-  adminDecision: async (id: string, payload: AdminDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/admin/decision`, payload)),
-  adminConfirmRefund: async (id: string, payload: { amountMinor: number; currency: string; faultParty: FaultParty }): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/v3/requests/${encodeURIComponent(id)}/admin/confirm-refund`, payload)),
-  clock: async (): Promise<{ now: string }> => (await api.get('/returns/v3/clock')).data,
-  devPrinterAction: async (requestId: string, payload: PrinterDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>('/returns/v3/requests/dev/printer-action', { requestId, ...payload })),
+  detail: async (id: string): Promise<ReturnDetail> => unwrap(await api.get<ReturnDetail>(`/returns/requests/${encodeURIComponent(id)}`)),
+  auditProfile: async (id: string): Promise<DisputeAuditProfile> => unwrap(await api.get<DisputeAuditProfile>(`/returns/requests/${encodeURIComponent(id)}/audit-profile`)),
+  dispute: async (id: string, reason: string): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/dispute`, { reason })),
+  addEvidence: async (id: string, evidence: ReturnEvidence[]): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/evidence`, { evidence })),
+  printerDecision: async (id: string, payload: PrinterDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/printer-decision`, payload)),
+  requestEvidence: async (id: string, reason: string): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/printer-evidence-request`, { reason })),
+  adminDecision: async (id: string, payload: AdminDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/admin/decision`, payload)),
+  adminConfirmRefund: async (id: string, payload: { amountMinor: number; currency: string; faultParty: FaultParty }): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/admin/confirm-refund`, payload)),
+  clock: async (): Promise<{ now: string }> => (await api.get('/returns/clock')).data,
+  devPrinterAction: async (requestId: string, payload: PrinterDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>('/returns/requests/dev/printer-action', { requestId, ...payload })),
   upload: async (file: File): Promise<ReturnEvidence> => {
     const uri = await refundService.uploadEvidence(file);
     return { id: crypto.randomUUID(), uri, kind: file.type.startsWith('video/') ? 'VIDEO' : 'IMAGE' };

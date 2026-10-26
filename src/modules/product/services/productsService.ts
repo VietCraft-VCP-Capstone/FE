@@ -1,5 +1,30 @@
-import api from '../../../infrastructure/api/interceptors';
-import { ProductItem, ProductFormData, ProductFilterState, PaginatedProductsResult } from '../types/product';
+import api, { isLoggedIn } from '../../../infrastructure/api/interceptors';
+import {
+  ProductItem,
+  ProductFormData,
+  ProductFilterState,
+  PaginatedProductsResult,
+  SearchFilterState,
+  SuggestResult
+} from '../types/product';
+import { invalidateInsights } from '../../analytics/hooks/useInsight';
+import { getSessionId } from '../../buyer/services/eventService';
+
+export interface VideoAdQuota {
+  enabled: boolean;
+  durationSec: number;
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface VideoAdJobResult {
+  jobId: string;
+  status: 'pending' | 'done' | 'failed';
+  videoUrl?: string;
+  error?: string;
+  quota?: VideoAdQuota;
+}
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
 const absImg = (u: any) => (typeof u === 'string' && u.startsWith('/') ? ORIGIN + u : u);
@@ -46,6 +71,52 @@ export const productsService = {
     }
   },
 
+  search: async (params?: Partial<SearchFilterState>): Promise<PaginatedProductsResult> => {
+    try {
+      const res = await api.get('/products/search', { params });
+      return toPaginated(res.data);
+    } catch (err) {
+      console.error('Error searching products from API:', err);
+      return { items: [], total: 0, page: 1, limit: 12, totalPages: 1 };
+    }
+  },
+
+  trackSearchClick: (logId: string, productId: string, position: number): void => {
+    api.post('/products/search/click', { logId, productId, position }).catch(() => {});
+  },
+
+  suggest: async (q: string, signal?: AbortSignal): Promise<SuggestResult> => {
+    const empty = { keywords: [], shops: [], categories: [] };
+    if (!q.trim()) return empty;
+    try {
+      const res = await api.get('/products/suggest', { params: { q: q.trim() }, signal });
+      return res.data || empty;
+    } catch {
+      return empty;
+    }
+  },
+
+  getTrendingKeywords: async (limit = 8): Promise<string[]> => {
+    try {
+      const res = await api.get('/products/meta/trending-keywords', { params: { limit } });
+      return Array.isArray(res.data) ? res.data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  getForYou: async (limit: number, recentSearches: string[] = []): Promise<any[]> => {
+    try {
+      const res = await api.get('/products/meta/for-you', {
+        params: { limit, sessionId: getSessionId(), q: isLoggedIn() ? [] : recentSearches.filter(Boolean).slice(0, 3) },
+        paramsSerializer: { indexes: null },
+      });
+      return Array.isArray(res.data) ? res.data.map(resolveImages) : [];
+    } catch {
+      return [];
+    }
+  },
+
   getMine: async (filter?: Partial<ProductFilterState>): Promise<PaginatedProductsResult> => {
     const res = await api.get('/products/mine', { params: filter });
     return toPaginated(res.data);
@@ -83,24 +154,29 @@ export const productsService = {
 
   create: async (productData: ProductFormData | any): Promise<ProductItem | any> => {
     const res = await api.post('/products', productData);
+    invalidateInsights('');
     return resolveImages(res.data);
   },
 
   update: async (id: string, productData: Partial<ProductFormData> | any): Promise<ProductItem | any> => {
     const res = await api.put(`/products/${id}`, productData);
+    invalidateInsights('');
     return resolveImages(res.data);
   },
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/products/${id}`);
+    invalidateInsights('');
   },
 
   batchDelete: async (ids: string[]): Promise<void> => {
     await api.post('/products/batch-delete', { ids });
+    invalidateInsights('');
   },
 
   updateStatus: async (ids: string[], status: ProductItem['status']): Promise<void> => {
     await api.patch('/products/batch-status', { ids, status });
+    invalidateInsights('');
   },
 
   getCategories: async () => {
@@ -167,6 +243,22 @@ export const productsService = {
         }))
       : [];
     return { images, byColor };
+  },
+
+  getVideoAdQuota: async (): Promise<VideoAdQuota> => {
+    const res = await api.get('/products/video-ad/quota');
+    return res.data;
+  },
+
+  /** TỐN TIỀN mỗi lần gọi thật — chỉ gọi khi người dùng bấm nút. */
+  createVideoAd: async (imageUrl: string, title?: string): Promise<VideoAdJobResult> => {
+    const res = await api.post('/products/video-ad', { imageUrl, title });
+    return { ...res.data, videoUrl: absImg(res.data?.videoUrl) };
+  },
+
+  getVideoAdStatus: async (jobId: string): Promise<VideoAdJobResult> => {
+    const res = await api.get(`/products/video-ad/${jobId}`);
+    return { ...res.data, videoUrl: absImg(res.data?.videoUrl) };
   },
 
   resetDefaults: (): ProductItem[] => {

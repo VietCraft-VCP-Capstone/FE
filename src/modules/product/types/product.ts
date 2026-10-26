@@ -27,6 +27,7 @@ export interface ProductItem {
   category: string;
   /** Tên các thẻ đang gắn — BE trả về từ product.tags. */
   tags?: string[];
+  materials?: string[];
   price: number;
   originalPrice?: number;
   stock: number;
@@ -38,6 +39,17 @@ export interface ProductItem {
   thumbnail: string;
   images: string[];
   colors: ProductColorVariant[];
+  sizes?: string[];
+  variants?: {
+    id: string;
+    name: string;
+    color?: string;
+    size?: string;
+    material?: string;
+    price: number;
+    stock: number;
+    mockupImage?: string;
+  }[];
   engagementTrend: number[]; // 5-7 data points for sparkline
   inventoryTrends: InventoryTrendPoint[]; // Timeline points for detail line chart
   /** BE luôn trả kèm (xem BE product.dto.ts: ProductItemResponseDTO.shopInfo). */
@@ -48,6 +60,10 @@ export interface ProductItem {
     rating: number;
   };
   sellerId?: string;
+  rating?: number;
+  ratingCount?: number;
+  productType?: string;
+  soldCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,6 +82,8 @@ export interface ProductFormData {
   category: string;
   categoryId: string;
   tagIds: string[];
+  newTagNames?: string[];
+  materials?: string[];
   price: number;
   stock: number;
   sku: string;
@@ -76,6 +94,8 @@ export interface ProductFormData {
   thumbnail: string;
   images: string[];
   colors: ProductColorVariant[];
+  sizes?: string[];
+  material?: string;
 }
 
 export type ProductSortOption = 
@@ -103,4 +123,36 @@ export interface PaginatedProductsResult {
   page: number;
   limit: number;
   totalPages: number;
+  searchLogId?: string;
 }
+
+export interface SearchFilterState {
+  q?: string;
+  category?: string;
+  productType?: string;
+  rating?: number | string;
+  minPrice?: number | string;
+  maxPrice?: number | string;
+  sort?: string;
+  page?: number;
+  limit?: number;
+  inStockOnly?: boolean;
+}
+
+export interface SuggestResult {
+  keywords: string[];
+  shops: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string;
+    reputationScore: number;
+    reputationTier: string;
+  }>;
+  categories: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
+}
+

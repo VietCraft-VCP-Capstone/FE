@@ -10,6 +10,8 @@ import { reviewService } from '../../product/services/reviewService';
 import { cartService } from '../../order/services/cartService';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { getSessionId, recordProductViewEvent } from '../services/eventService';
+import { getRecentSearches } from '../components/search/recentSearchStorage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Variant { id: string; name: string; color?: string; size?: string; material?: string; price: number; stock: number; mockupImage?: string; }
@@ -267,11 +269,9 @@ export function BuyerProductDetailPage() {
         setRelated(relSlice);
         const relIds = new Set(relSlice.map((r: any) => r.id));
 
-        return productsService.getAll({ limit: 8 } as any)
-          .catch(() => [])
-          .then((all: any) => {
-            const allList = Array.isArray(all) ? all : (all?.items || []);
-            const pool = allList.filter((p: any) => p.id !== id && !relIds.has(p.id));
+        return productsService.getForYou(12, getRecentSearches())
+          .then((all: any[]) => {
+            const pool = all.filter((p: any) => p.id !== id && !relIds.has(p.id));
             const sugg = pool.slice(0, 4);
             suggestionsDetailCache.set(id, sugg);
             setSuggestions(sugg);
@@ -294,6 +294,17 @@ export function BuyerProductDetailPage() {
         });
     }
   }, [id]);
+
+  // Record product view event
+  useEffect(() => {
+    if (!id || !product) return;
+
+    const sessionId = getSessionId();
+    recordProductViewEvent(id, sessionId)
+      .catch((err) => {
+        console.warn('Failed to record product view event:', err);
+      });
+  }, [id, product]);
 
   // Derive unique option sets from variants
   const colors = [...new Set((product?.variants || []).map(v => v.color).filter(Boolean))] as string[];
@@ -532,6 +543,7 @@ export function BuyerProductDetailPage() {
 
     const checkoutItem = {
       productId: product.id || (product as any)._id,
+      shopId: product.shopInfo?.id || (product as any)?.shop_id?._id || (product as any)?.shop_id,
       variantId: targetVariantId ? String(targetVariantId) : '',
       title: product.title || 'Sản phẩm VietCraft',
       shopName: product.shopInfo?.name || (product as any)?.shop_id?.shop_name || 'VietCraft Shop',
@@ -692,7 +704,13 @@ export function BuyerProductDetailPage() {
           <div>
             <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }}>
               <img src={images[selectedImage]} alt={product.title} style={S.mainImg} />
-              <button onClick={toggleFav} style={{ position: 'absolute', top: 12, right: 12, background: '#fff', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+              <button
+                onClick={toggleFav}
+                title="Yêu thích sản phẩm"
+                aria-label="Yêu thích sản phẩm"
+                aria-pressed={isFav}
+                data-testid="favorite-btn"
+                style={{ position: 'absolute', top: 12, right: 12, background: '#fff', border: 'none', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
                 <Heart size={18} fill={isFav ? '#e11d48' : 'none'} color={isFav ? '#e11d48' : '#555'} />
               </button>
             </div>
@@ -786,6 +804,11 @@ export function BuyerProductDetailPage() {
                         <div>
                           <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 900, color: '#1c1917' }}>{v.code}</span>
                           <div style={{ fontSize: 10, fontWeight: 700, color: '#008000' }}>{v.title || `Giảm ${v.discount_value}`}</div>
+                          <div style={{ fontSize: 9, fontWeight: 600, color: '#78716c', display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
+                            {v.is_platform || !v.shop_id
+                              ? 'Toàn sàn VietCraft'
+                              : <><Store size={9} /> {v.shop_name || 'Voucher của shop'}</>}
+                          </div>
                         </div>
                         <button
                           onClick={(e) => handleSaveVoucher(v.code, e)}

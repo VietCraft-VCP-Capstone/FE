@@ -22,6 +22,8 @@ export type InsightState<T> =
   | { kind: 'error'; message: string };
 
 const TTL_MS = 5 * 60 * 1000;
+const RATE_LIMITED = 'Bạn thử quá nhiều lần, vui lòng đợi một phút rồi thử lại.';
+const BAD_DATE = 'Ngày xem điểm không hợp lệ. Chọn ngày cách hôm nay tối đa 730 ngày.';
 const cache = new Map<string, { at: number; value: InsightState<unknown> }>();
 
 function keyOf(path: string, params?: QueryParams): string {
@@ -38,7 +40,7 @@ export function invalidateInsights(pathPrefix: string) {
   }
 }
 
-function toState<T>(err: any): InsightState<T> {
+export function toState<T>(err: any): InsightState<T> {
   const status: number | undefined = err?.response?.status;
   const body = err?.response?.data || {};
   if (status === 503 && body.error === 'mart_not_ready') return { kind: 'not_ready', collection: body.collection || '' };
@@ -47,6 +49,8 @@ function toState<T>(err: any): InsightState<T> {
   if (status === 502 || status === 503 || status === 504 || !status) {
     return { kind: 'unavailable', code: body.error || 'network' };
   }
+  if (status === 429) return { kind: 'error', message: typeof body.message === 'string' ? body.message : RATE_LIMITED };
+  if (status === 400 && (body.field ?? body.detail?.field) === 'date') return { kind: 'error', message: BAD_DATE };
   return { kind: 'error', message: typeof body.error === 'string' ? body.error : 'Không đọc được số liệu.' };
 }
 
@@ -88,7 +92,11 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
           res.meta?.status === 'insufficient_data' || res.data === null
             ? { kind: 'insufficient', reason: res.meta?.reason || 'Chưa đủ dữ liệu để tính.', meta: res.meta, viewer: res.viewer }
             : { kind: 'ready', data: res.data as T, meta: res.meta, viewer: res.viewer };
-        cache.set(key, { at: Date.now(), value });
+        // Chỉ lưu cache khi có dữ liệu (ready). Trạng thái 'insufficient' không lưu cache dài
+        // để khi người bán có đơn mới thì dữ liệu được cập nhật ngay lập tức.
+        if (value.kind === 'ready') {
+          cache.set(key, { at: Date.now(), value });
+        }
         setState(value);
       })
       .catch(err => {
@@ -100,9 +108,10 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
 
   const reload = useCallback(() => {
     if (key) cache.delete(key);
+    if (path) invalidateInsights(path);
     forceRef.current = true;
     setNonce(n => n + 1);
-  }, [key]);
+  }, [key, path]);
 
   return { state, reload };
 }

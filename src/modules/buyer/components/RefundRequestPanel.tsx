@@ -22,18 +22,18 @@ const labels: Record<string, string> = {
 interface RefundRequestPanelProps {
   orderId: string;
   refundOrderId: string;
-  orderStatus: string;
+  formOpen: boolean;
+  onFormClose: () => void;
+  onCreated: () => void;
 }
 
-export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: RefundRequestPanelProps) {
+export function RefundRequestPanel({ orderId, refundOrderId, formOpen, onFormClose, onCreated }: RefundRequestPanelProps) {
   const [searchParams] = useSearchParams();
-  const [open, setOpen] = useState(false);
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [request, setRequest] = useState<RefundRequest | null>(null);
 
-  const canRequest = orderStatus === 'completed' && !request;
   const canDispute = !!request && (
     (request.product_type === 'POD' && request.status === 'PRINTER_REJECTED') ||
     (request.product_type === 'NORMAL' && ['SELLER_REJECTED', 'PRINTER_APPROVED', 'PRINTER_REJECTED'].includes(request.status)) ||
@@ -84,24 +84,18 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
 
   return (
     <>
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+      {request && <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
-            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${request ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700'}`}>
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700`}>
               <span aria-hidden="true" className="text-lg font-bold">↺</span>
             </span>
             <div className="min-w-0">
               <h3 className="text-sm font-extrabold text-slate-900">Hoàn tiền theo đơn hàng</h3>
-              {request ? (
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Mã yêu cầu <span className="font-mono font-semibold text-slate-700">{request._id.slice(-8)}</span>
-                  {requestOrderCode ? ` · Đơn ${requestOrderCode}` : ''}
-                </p>
-              ) : (
-                <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">
-                  Biểu mẫu này tạo yêu cầu hoàn tiền theo đơn hàng.
-                </p>
-              )}
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Mã yêu cầu <span className="font-mono font-semibold text-slate-700">{request._id.slice(-8)}</span>
+                {requestOrderCode ? ` · Đơn ${requestOrderCode}` : ''}
+              </p>
             </div>
           </div>
 
@@ -120,15 +114,6 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
               </span>
             )}
 
-            {canRequest && (
-              <button
-                type="button"
-                onClick={() => setOpen(true)}
-                className="min-h-10 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
-              >
-                Tạo yêu cầu hoàn tiền
-              </button>
-            )}
 
             {canDispute && (
               <button
@@ -208,18 +193,17 @@ export function RefundRequestPanel({ orderId, refundOrderId, orderStatus }: Refu
             {error}
           </p>
         )}
-      </section>
+      </section>}
 
-      {/* Modal Dialog for Refund Form */}
-      {open && (
+      {formOpen && (
         <RefundFormModal
-          isOpen={open}
+          isOpen={formOpen}
           orderId={refundOrderId}
           orderCode={requestOrderCode}
-          onClose={() => setOpen(false)}
+          onClose={onFormClose}
           onSuccess={newRequest => {
             setRequest(newRequest);
-            setOpen(false);
+            onCreated();
           }}
         />
       )}

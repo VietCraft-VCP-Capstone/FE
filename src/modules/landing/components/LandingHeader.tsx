@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Search, Heart, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cartService } from '../../order/services/cartService';
+import { SearchPopover } from '../../buyer/components/SearchPopover';
+import { useSearchSuggest } from '../../buyer/hooks/useSearchSuggest';
 
 interface LandingHeaderProps {
   user: any;
@@ -25,6 +27,7 @@ export function LandingHeader({
   onDashboard,
 }: LandingHeaderProps) {
   const [cartCount, setCartCount] = useState<number>(0);
+  const searchBox = useSearchSuggest(searchQuery, setSearchQuery);
 
   useEffect(() => {
     cartService.getCart()
@@ -71,16 +74,18 @@ export function LandingHeader({
           </Link>
         </nav>
 
-        {/* Search Bar */}
-        <div className="flex-1 max-w-lg relative group">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#007700] transition-colors" />
+        <div className="flex-1 max-w-lg min-w-[160px] relative group" ref={searchBox.containerRef}>
+          <Search
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#007700] transition-colors cursor-pointer"
+            onClick={() => searchBox.onExecuteSearch()}
+          />
           <input
             type="text"
             placeholder="Tìm kiếm thiết kế, nghệ thuật, quà tặng..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            {...searchBox.inputProps}
             className="w-full bg-stone-50 border border-stone-200 focus:border-[#007700] focus:bg-white rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none transition-all shadow-inner"
           />
+          <SearchPopover {...searchBox.popoverProps} />
         </div>
 
         {/* Right Actions */}
