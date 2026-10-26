@@ -58,7 +58,7 @@ export interface InsightEnvelope<T> {
   viewer?: InsightViewer;
 }
 
-export type TimeRange = '7d' | '30d' | '90d' | '180d' | '365d';
+export type TimeRange = '7d' | '30d' | '90d' | '180d' | '365d' | 'year';
 export type AlertPeriod = TimeRange | 'all';
 export type ForecastWindow = '30' | '60' | '90';
 
@@ -131,10 +131,9 @@ export interface ListingConversion {
 }
 
 /* ------------------------------------------------------------ F29 -------- */
-/** health-1.0: trục thiếu dữ liệu bị loại khỏi phép tính, ghi trong axes_missing. */
 export type HealthStatus = 'good' | 'needs_improvement' | 'poor';
 
-export type HealthAxis = 'conversion' | 'rating' | 'content' | 'inventory' | 'freshness';
+export type HealthAxis = 'image' | 'description' | 'tags' | 'material' | 'review' | 'price';
 
 /** Mục do engine F29 sinh: 'todo' tăng điểm, 'warning' chỉ nhắc, không trừ điểm. */
 export interface HealthTodo {

@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { SellerLayout } from '../../seller/pages/SellerLayout';
 import { DemoBanner } from '../components/DemoBanner';
 import { INSIGHTS_NAV } from '../nav';
@@ -23,6 +23,11 @@ import { TagGapPage } from './TagGapPage';
  * thanh bên sang nhóm phân tích. Nhờ vậy hai khu trông là một sản phẩm, và bộ chuyển
  * khu ở giữa thanh tiêu đề đưa người bán qua lại mà không mất ngữ cảnh.
  */
+function OldIntelRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/seller/insights/listings${id ? `/${id}` : ''}`} replace />;
+}
+
 export function InsightsPortal({ user, onLogout }: { user: any; onLogout: () => void }) {
   return (
     <SellerLayout user={user} onLogout={onLogout} groups={INSIGHTS_NAV}>
@@ -36,6 +41,8 @@ export function InsightsPortal({ user, onLogout }: { user: any; onLogout: () => 
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="listings" element={<ListingsPage />} />
         <Route path="listings/:id" element={<ListingDetailPage />} />
+        <Route path="listing-intel" element={<OldIntelRedirect />} />
+        <Route path="listing-intel/:id" element={<OldIntelRedirect />} />
 
         <Route path="competitors" element={<CompetitorsPage />} />
         {/* Hai tab cũ đã gộp vào Phân tích đối thủ; giữ đường dẫn để link cũ vẫn tới đúng phần. */}

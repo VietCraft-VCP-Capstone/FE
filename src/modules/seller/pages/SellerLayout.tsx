@@ -58,9 +58,11 @@ const SIDEBAR_COLLAPSED_KEY = 'vietcraft:seller-sidebar-collapsed';
 export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  // Sidebar chỉ đóng/mở khi người bán bấm, và giữ lựa chọn đó giữa các trang lẫn lần mở sau.
+  // Mặc định thu gọn ở màn hình hẹp; sau khi người bán bấm thì giữ lựa chọn đó giữa các trang lẫn lần mở sau.
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY); } catch { saved = null; }
+    return saved !== null ? saved === '1' : window.matchMedia('(max-width: 767px)').matches;
   });
   const toggleCollapsed = () => {
     setCollapsed(prev => {

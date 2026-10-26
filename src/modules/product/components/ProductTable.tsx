@@ -1,6 +1,10 @@
 import { ProductItem } from '../types/product';
 import { ProductImage } from './ProductImage';
+import { Link } from 'react-router-dom';
 import { BarChart2, Pencil, Trash2, PackageOpen, MapPin } from 'lucide-react';
+import { healthTier, TIER_COLOR } from '../../analytics/components/intel/intelLabels';
+import { INSIGHTS_ROOT } from '../../analytics/nav';
+import { NA, scoreText } from '../../analytics/format';
 
 interface ProductTableProps {
   products: ProductItem[];
@@ -11,6 +15,7 @@ interface ProductTableProps {
   onEdit: (product: ProductItem) => void;
   onDelete: (product: ProductItem) => void;
   loading?: boolean;
+  health?: Map<string, number | null>;
 }
 
 export function ProductTable({
@@ -22,6 +27,7 @@ export function ProductTable({
   onEdit,
   onDelete,
   loading = false,
+  health,
 }: ProductTableProps) {
   const isAllSelected = products.length > 0 && selectedIds.length === products.length;
   const isSomeSelected = selectedIds.length > 0 && selectedIds.length < products.length;
@@ -147,7 +153,7 @@ export function ProductTable({
         </div>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse table-fixed min-w-[960px]">
+        <table className="w-full text-left border-collapse table-fixed min-w-[1040px]">
           <thead>
             <tr className="bg-stone-50/90 border-b border-stone-200/80 text-[11px] font-bold text-stone-500 uppercase tracking-wider font-jakarta">
               <th className="py-4 pl-5 pr-2 w-12 text-center">
@@ -161,9 +167,10 @@ export function ProductTable({
                   className="w-4 h-4 rounded text-[#007700] accent-[#007700] border-stone-300 focus:ring-[#007700] cursor-pointer transition-all"
                 />
               </th>
-              <th className="py-4 px-4 w-[36%]">THÔNG TIN CHI TIẾT</th>
-              <th className="py-4 px-3 w-[14%]">DANH MỤC</th>
-              <th className="py-4 px-3 w-[15%]">GIÁ BÁN & TỒN KHO</th>
+              <th className="py-4 px-4 w-[30%]">THÔNG TIN CHI TIẾT</th>
+              <th className="py-4 px-3 w-[12%]">DANH MỤC</th>
+              <th className="py-4 px-3 w-[14%]">GIÁ BÁN & TỒN KHO</th>
+              <th className="py-4 px-3 w-[9%]">SỨC KHOẺ</th>
               <th className="py-4 px-3 w-[12%]">TRẠNG THÁI</th>
               <th className="py-4 px-3 w-[10%]">TƯƠNG TÁC</th>
               <th className="py-4 px-2 w-[6%]">MÀU SẮC</th>
@@ -176,6 +183,7 @@ export function ProductTable({
               const skuDisplay = product.sku || `VC-${(product.category || 'VC').substring(0, 2).toUpperCase()}-${String(product.id || index + 101).slice(-3)}`;
               const stockDisplay = product.stock !== undefined && product.stock !== null ? product.stock : 20;
               const productColors = getProductColors(product);
+              const score = health?.get(product.id) ?? null;
 
               return (
                 <tr
@@ -254,6 +262,20 @@ export function ProductTable({
                       </span>{' '}
                       chiếc
                     </div>
+                  </td>
+
+                  <td className="py-3 px-3">
+                    {score === null ? (
+                      <span className="text-stone-400">{NA}</span>
+                    ) : (
+                      <Link
+                        to={`${INSIGHTS_ROOT}/listings/${product.id}`}
+                        className="font-jakarta text-lg font-extrabold tabular-nums no-underline hover:underline"
+                        style={{ color: TIER_COLOR[healthTier(score).tone] }}
+                      >
+                        {scoreText(score)}
+                      </Link>
+                    )}
                   </td>
 
                   {/* Status Badge */}
