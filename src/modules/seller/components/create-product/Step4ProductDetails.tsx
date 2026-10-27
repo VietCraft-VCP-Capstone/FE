@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, Filter, Plus, X, Tag as TagIcon, Loader2, Sparkles } from 'lucide-react';
+import { Star, Filter, Plus, X, Tag as TagIcon, Loader2 } from 'lucide-react';
 import { abs } from './useHTMLImage';
 import { commissionAmount, withCommission } from '../../../../shared/utils/commission';
 import { money } from '../../../../shared/utils/format';
@@ -33,7 +33,7 @@ export function Step4ProductDetails({
     categories, categoryId, setCategoryId,
     availableTags = [],
     selectedTags = [],
-    setSelectedTags = () => {},
+    setSelectedTags = () => { },
     onCategoryProposed,
     blank, selectedVariants, setSelectedVariants,
     selectedImages = [],
@@ -132,11 +132,10 @@ export function Step4ProductDetails({
                         {selectedImages.map((src, i) => (
                             <div
                                 key={i}
-                                className={`relative w-20 h-20 rounded-xl border overflow-hidden shrink-0 bg-stone-50 p-1 transition-all ${
-                                    coverImage === src
-                                        ? 'border-[#1a6b1a] ring-2 ring-[#1a6b1a]/20 shadow-xs'
-                                        : 'border-stone-200'
-                                }`}
+                                className={`relative w-20 h-20 rounded-xl border overflow-hidden shrink-0 bg-stone-50 p-1 transition-all ${coverImage === src
+                                    ? 'border-[#1a6b1a] ring-2 ring-[#1a6b1a]/20 shadow-xs'
+                                    : 'border-stone-200'
+                                    }`}
                             >
                                 <img
                                     src={abs(src)}
@@ -163,8 +162,7 @@ export function Step4ProductDetails({
                         onClick={() => setIsAiModalOpen(true)}
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-black shadow-sm transition active:scale-95 cursor-pointer self-start sm:self-auto"
                     >
-                        <Sparkles size={14} className="text-amber-300 animate-pulse" />
-                        <span>✨ AI Gợi ý tên, giá & từ khóa hot</span>
+                        <span>Gợi ý tên, giá & từ khóa hot</span>
                     </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -239,11 +237,10 @@ export function Step4ProductDetails({
                                     return (
                                         <span
                                             key={tag}
-                                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                                                isExisting
-                                                    ? 'bg-[#EAF0E2] text-[#005B00] border border-[#007700]/20'
-                                                    : 'bg-amber-50 text-amber-800 border border-amber-300'
-                                            }`}
+                                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold ${isExisting
+                                                ? 'bg-[#EAF0E2] text-[#005B00] border border-[#007700]/20'
+                                                : 'bg-amber-50 text-amber-800 border border-amber-300'
+                                                }`}
                                         >
                                             <TagIcon size={11} />
                                             {tag}
@@ -432,11 +429,10 @@ export function Step4ProductDetails({
                         <button
                             type="button"
                             onClick={() => setColorFilter('all')}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                                colorFilter === 'all'
-                                    ? 'bg-stone-800 text-white'
-                                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                            }`}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${colorFilter === 'all'
+                                ? 'bg-stone-800 text-white'
+                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                                }`}
                         >
                             Tất cả ({blank?.variations?.length || 0})
                         </button>
@@ -445,11 +441,10 @@ export function Step4ProductDetails({
                                 key={c}
                                 type="button"
                                 onClick={() => setColorFilter(c)}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                                    colorFilter === c
-                                        ? 'bg-[#1a6b1a] text-white'
-                                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                                }`}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${colorFilter === c
+                                    ? 'bg-[#1a6b1a] text-white'
+                                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                                    }`}
                             >
                                 {c}
                             </button>
@@ -531,11 +526,10 @@ export function Step4ProductDetails({
                                                 value={sv.markup}
                                                 disabled={!sv.on}
                                                 onChange={e => setV(v.sku, 'markup', e.target.value)}
-                                                className={`px-3 py-1.5 rounded text-xs font-bold w-28 outline-none border transition-colors ${
-                                                    sv.on
-                                                        ? 'bg-white border-stone-300 text-stone-900 focus:border-[#1a6b1a] focus:ring-1 focus:ring-[#1a6b1a] shadow-sm'
-                                                        : 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
-                                                }`}
+                                                className={`px-3 py-1.5 rounded text-xs font-bold w-28 outline-none border transition-colors ${sv.on
+                                                    ? 'bg-white border-stone-300 text-stone-900 focus:border-[#1a6b1a] focus:ring-1 focus:ring-[#1a6b1a] shadow-sm'
+                                                    : 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
+                                                    }`}
                                             />
                                         </td>
                                         <td className="text-stone-700 font-semibold">{money(net)}</td>
@@ -547,11 +541,10 @@ export function Step4ProductDetails({
                                                 value={sv.stock}
                                                 disabled={!sv.on}
                                                 onChange={e => setV(v.sku, 'stock', e.target.value)}
-                                                className={`px-3 py-1.5 rounded text-xs font-bold w-24 outline-none border transition-colors ${
-                                                    sv.on
-                                                        ? 'bg-white border-stone-300 text-stone-900 focus:border-[#1a6b1a] focus:ring-1 focus:ring-[#1a6b1a] shadow-sm'
-                                                        : 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
-                                                }`}
+                                                className={`px-3 py-1.5 rounded text-xs font-bold w-24 outline-none border transition-colors ${sv.on
+                                                    ? 'bg-white border-stone-300 text-stone-900 focus:border-[#1a6b1a] focus:ring-1 focus:ring-[#1a6b1a] shadow-sm'
+                                                    : 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
+                                                    }`}
                                             />
                                         </td>
                                     </tr>

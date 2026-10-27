@@ -7,9 +7,9 @@ export interface GeneralSizeManagerProps {
   categoryName?: string;
 }
 
-const COMMON_GENERAL_SPECS = ['Tiêu chuẩn', 'Nhỏ (S)', 'Vừa (M)', 'Lớn (L)', 'Cỡ đại (XL)', 'Freesize'];
+const COMMON_GENERAL_SPECS = ['Tiêu chuẩn', 'Nhỏ', 'Vừa', 'Lớn', 'Cỡ đại', 'Freesize'];
 const COMMON_DIMENSIONS = ['20x30 cm', '30x40 cm', '40x60 cm', '50x70 cm'];
-const DEFAULT_GENERAL_SPECS = ['Nhỏ (S)', 'Vừa (M)', 'Lớn (L)'];
+const DEFAULT_GENERAL_SPECS = ['Nhỏ', 'Vừa', 'Lớn'];
 
 export function GeneralSizeManager({
   sizes,

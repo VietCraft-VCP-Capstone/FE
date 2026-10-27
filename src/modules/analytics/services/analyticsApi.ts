@@ -72,6 +72,13 @@ export const analyticsApi = {
 
 export interface SmartProductSuggestionResult {
   category_detected: string;
+  category?: {
+    resolved_id?: string;
+    resolved_name?: string;
+    source?: string;
+    needs_confirmation?: boolean;
+  };
+  detected_material?: string;
   product_type: string;
   noun: string;
   suggested_titles: string[];
@@ -86,6 +93,29 @@ export interface SmartProductSuggestionResult {
     };
     market_sample_count: number;
     summary: string;
+    method?: string;
+    source_label?: string;
+    confidence?: string;
+    warnings?: string[];
+    value_factors?: string[];
+    ai_engine_status?: {
+      is_ai_live: boolean;
+      engine: string;
+      engine_label: string;
+      pricing_method: string;
+      source_label: string;
+      market_sample_count: number;
+      notice?: string;
+    };
+  };
+  ai_engine_status?: {
+    is_ai_live: boolean;
+    engine: string;
+    engine_label: string;
+    pricing_method: string;
+    source_label: string;
+    market_sample_count: number;
+    notice?: string;
   };
   trending_keywords: Array<{
     keyword: string;
@@ -94,6 +124,8 @@ export interface SmartProductSuggestionResult {
     gap_score: number;
     is_hot: boolean;
     tag_id?: string;
+    source?: string;
+    frequency?: number;
   }>;
   suggested_tags: string[];
   seo_description: string;

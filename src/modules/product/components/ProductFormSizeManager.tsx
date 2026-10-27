@@ -1,16 +1,4 @@
 import { useState, useEffect } from 'react';
-import {
-  Tag,
-  Ruler,
-  Shirt,
-  Footprints,
-  Scale,
-  Plus,
-  X,
-  Check,
-  Sparkles,
-  Info
-} from 'lucide-react';
 
 export { ApparelSizeManager } from './ApparelSizeManager';
 export { ShoeSizeManager } from './ShoeSizeManager';
@@ -29,13 +17,12 @@ export interface ProductFormSizeManagerProps {
 // 1. Cỡ chung
 const GENERAL_PRESETS = [
   'Tiêu chuẩn',
-  'Nhỏ (S)',
-  'Vừa (M)',
-  'Lớn (L)',
-  'Cỡ đại (XL)',
+  'Nhỏ',
+  'Vừa',
+  'Lớn',
+  'Cỡ đại',
   'Freesize',
-  'Mini',
-  'Cỡ vừa'
+  'Mini'
 ];
 
 // 2. Kích thước (cm / mm)
@@ -136,7 +123,6 @@ interface TabDef {
   id: SizeTabType;
   label: string;
   badge: string;
-  icon: typeof Tag;
   accentColor: string;
   badgeBg: string;
   activeBorder: string;
@@ -147,8 +133,7 @@ const TABS: TabDef[] = [
   {
     id: 'general',
     label: 'Cỡ chung',
-    badge: 'S, M, L, Tiêu chuẩn',
-    icon: Tag,
+    badge: 'Tiêu chuẩn, Đa kích cỡ',
     accentColor: 'text-amber-700',
     badgeBg: 'bg-amber-100 text-amber-800',
     activeBorder: 'border-amber-500',
@@ -158,7 +143,6 @@ const TABS: TabDef[] = [
     id: 'dimensions',
     label: 'Kích thước (cm)',
     badge: 'Tranh, Decor, Gốm sứ',
-    icon: Ruler,
     accentColor: 'text-orange-700',
     badgeBg: 'bg-orange-100 text-orange-800',
     activeBorder: 'border-orange-500',
@@ -168,7 +152,6 @@ const TABS: TabDef[] = [
     id: 'apparel',
     label: 'Thời trang / May mặc',
     badge: 'XS, S, M, L, XL...',
-    icon: Shirt,
     accentColor: 'text-emerald-700',
     badgeBg: 'bg-emerald-100 text-emerald-800',
     activeBorder: 'border-emerald-500',
@@ -178,7 +161,6 @@ const TABS: TabDef[] = [
     id: 'shoes',
     label: 'Giày dép / Guốc mộc',
     badge: 'Cỡ số 35 - 46',
-    icon: Footprints,
     accentColor: 'text-sky-700',
     badgeBg: 'bg-sky-100 text-sky-800',
     activeBorder: 'border-sky-500',
@@ -188,7 +170,6 @@ const TABS: TabDef[] = [
     id: 'volume_weight',
     label: 'Dung tích & Khối lượng',
     badge: 'ml, L, g, kg',
-    icon: Scale,
     accentColor: 'text-purple-700',
     badgeBg: 'bg-purple-100 text-purple-800',
     activeBorder: 'border-purple-500',
@@ -247,29 +228,18 @@ export function ProductFormSizeManager({
   };
 
   const currentTabDef = TABS.find((t) => t.id === activeTab) || TABS[0];
-  const IconComponent = currentTabDef.icon;
 
   return (
     <div className="space-y-3 pt-3 border-t border-stone-100 bg-stone-50/60 -mx-2 px-3 py-3 rounded-2xl border border-stone-200 shadow-xs">
       {/* Header & Count */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-stone-200/70 text-stone-700">
-            <IconComponent size={16} className={currentTabDef.accentColor} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-stone-800 uppercase tracking-wider font-jakarta">
-                Quy Cách / Kích Thước Sản Phẩm
-              </label>
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#007700] text-white">
-                {sizes.length} đã chọn
-              </span>
-            </div>
-            <p className="text-[11px] text-stone-500 font-normal">
-              Chọn nhóm quy chuẩn phù hợp bên dưới để người mua dễ dàng lựa chọn khi đặt hàng.
-            </p>
-          </div>
+          <label className="text-xs font-bold text-stone-800 uppercase tracking-wider font-jakarta">
+            Quy Cách / Kích Thước Sản Phẩm
+          </label>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#007700] text-white">
+            {sizes.length} đã chọn
+          </span>
         </div>
 
         {/* Action Buttons Right */}
@@ -286,9 +256,9 @@ export function ProductFormSizeManager({
           <button
             type="button"
             onClick={() => setShowAddCustom(!showAddCustom)}
-            className="px-2.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:border-[#007700] hover:text-[#007700] font-semibold text-xs flex items-center gap-1 cursor-pointer transition-all shadow-2xs font-jakarta"
+            className="px-2.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:border-[#007700] hover:text-[#007700] font-semibold text-xs cursor-pointer transition-all shadow-2xs font-jakarta"
           >
-            <Plus size={13} /> Nhập quy cách khác
+            + Nhập quy cách khác
           </button>
         </div>
       </div>
@@ -297,7 +267,6 @@ export function ProductFormSizeManager({
       <div className="bg-white p-1 rounded-xl border border-stone-200/80 shadow-2xs">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1">
           {TABS.map((tab) => {
-            const TabIcon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
@@ -307,20 +276,16 @@ export function ProductFormSizeManager({
                   setActiveTab(tab.id);
                   setHasManuallySwitched(true);
                 }}
-                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer font-jakarta ${
+                className={`px-3 py-2 rounded-lg text-left transition-all cursor-pointer font-jakarta ${
                   isActive
                     ? 'bg-[#007700] text-white shadow-xs font-bold'
                     : 'bg-stone-50/70 text-stone-600 hover:bg-stone-100/80 hover:text-stone-900 font-medium'
                 }`}
               >
-                <TabIcon
-                  size={15}
-                  className={isActive ? 'text-white shrink-0' : `${tab.accentColor} shrink-0`}
-                />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                   <div className="text-[12px] truncate leading-tight">{tab.label}</div>
                   <div
-                    className={`text-[10px] truncate ${
+                    className={`text-[10px] truncate mt-0.5 ${
                       isActive ? 'text-white/80' : 'text-stone-400'
                     }`}
                   >
@@ -337,8 +302,7 @@ export function ProductFormSizeManager({
       <div className={`p-3 rounded-xl border ${currentTabDef.activeBorder} ${currentTabDef.activeBg} space-y-3 transition-all`}>
         {/* Quick select helpers */}
         <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
-          <span className="text-[11px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1 font-jakarta">
-            <Sparkles size={13} className={currentTabDef.accentColor} />
+          <span className="text-[11px] font-bold text-stone-700 uppercase tracking-wider font-jakarta">
             Chọn nhanh theo gợi ý có sẵn:
           </span>
 
@@ -347,24 +311,24 @@ export function ProductFormSizeManager({
               <>
                 <button
                   type="button"
-                  onClick={() => addMultipleSizes(['Nhỏ (S)', 'Vừa (M)', 'Lớn (L)'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-amber-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  onClick={() => addMultipleSizes(['Nhỏ', 'Vừa', 'Lớn'])}
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-amber-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-amber-600" /> Thêm Nhỏ, Vừa, Lớn
+                  Thêm Nhỏ, Vừa, Lớn
                 </button>
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['Tiêu chuẩn'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-amber-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-amber-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-amber-600" /> 1 Cỡ tiêu chuẩn
+                  1 Cỡ tiêu chuẩn
                 </button>
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['Freesize'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-amber-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-amber-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-amber-600" /> Freesize
+                  Freesize
                 </button>
               </>
             )}
@@ -374,16 +338,16 @@ export function ProductFormSizeManager({
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['30x40 cm', '40x60 cm', '50x70 cm'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-orange-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-orange-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-orange-600" /> Bộ tranh phổ biến (30x40, 40x60, 50x70)
+                  Bộ tranh phổ biến (30x40, 40x60, 50x70)
                 </button>
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['Cao 20cm', 'Cao 30cm'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-orange-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-orange-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-orange-600" /> Bình/Tượng (Cao 20, 30cm)
+                  Bình/Tượng (Cao 20, 30cm)
                 </button>
               </>
             )}
@@ -393,16 +357,16 @@ export function ProductFormSizeManager({
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['S', 'M', 'L', 'XL'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-emerald-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-emerald-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-emerald-600" /> Bộ cơ bản: S, M, L, XL
+                  Bộ cơ bản: S, M, L, XL
                 </button>
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['XS', 'S', 'M', 'L', 'XL', '2XL'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-emerald-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-emerald-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-emerald-600" /> Đầy đủ: XS đến 2XL
+                  Đầy đủ: XS đến 2XL
                 </button>
               </>
             )}
@@ -412,16 +376,16 @@ export function ProductFormSizeManager({
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['36', '37', '38', '39'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-sky-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-sky-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-sky-600" /> Cỡ Nữ (36 - 39)
+                  Cỡ Nữ (36 - 39)
                 </button>
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['39', '40', '41', '42', '43'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-sky-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-sky-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-sky-600" /> Cỡ Nam (39 - 43)
+                  Cỡ Nam (39 - 43)
                 </button>
               </>
             )}
@@ -431,16 +395,16 @@ export function ProductFormSizeManager({
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['50ml', '100ml', '250ml'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-purple-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-purple-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-purple-600" /> Mẫu chai lọ: 50, 100, 250ml
+                  Mẫu chai lọ: 50, 100, 250ml
                 </button>
                 <button
                   type="button"
                   onClick={() => addMultipleSizes(['250g', '500g', '1kg'])}
-                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-purple-400 text-stone-700 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-1 rounded-md bg-white border border-stone-200 hover:border-purple-400 text-stone-700 font-semibold text-[11px] cursor-pointer shadow-2xs"
                 >
-                  <Check size={12} className="text-purple-600" /> Mẫu cân nặng: 250g, 500g, 1kg
+                  Mẫu cân nặng: 250g, 500g, 1kg
                 </button>
               </>
             )}
@@ -670,23 +634,16 @@ export function ProductFormSizeManager({
                 <button
                   type="button"
                   onClick={() => toggleSize(sz)}
-                  className="text-stone-400 group-hover:text-red-500 hover:bg-stone-100 rounded-full p-0.5 cursor-pointer transition-colors"
+                  className="text-stone-400 group-hover:text-red-500 hover:bg-stone-100 rounded-full px-1 cursor-pointer transition-colors text-xs font-bold"
                   title={`Xoá ${sz}`}
                 >
-                  <X size={12} />
+                  ✕
                 </button>
               </span>
             ))}
           </div>
         </div>
-      ) : (
-        <div className="flex items-start gap-2 p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-900">
-          <Info size={15} className="text-amber-700 shrink-0 mt-0.5" />
-          <p className="leading-relaxed">
-            <strong>Mẹo:</strong> Bạn có thể chọn nhiều quy cách cùng lúc bằng cách click vào các nút mẫu trên. Nếu sản phẩm chỉ có duy nhất 1 kích thước, bạn có thể để trống phần này.
-          </p>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
