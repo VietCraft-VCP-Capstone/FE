@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, Plus, X, Tag as TagIcon, Sparkles } from 'lucide-react';
+import { Star, Plus, X, Tag as TagIcon } from 'lucide-react';
 import { abs } from './useHTMLImage';
 import SmartProductAiModal from '../SmartProductAiModal';
 import { IntelPreviewSection } from './IntelPreviewSection';
@@ -118,8 +118,7 @@ export function Step4ProductDetails({
                         onClick={() => setIsAiModalOpen(true)}
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-black shadow-sm transition active:scale-95 cursor-pointer self-start sm:self-auto"
                     >
-                        <Sparkles size={14} className="text-amber-300 animate-pulse" />
-                        <span>✨ AI Gợi ý tên, giá & từ khóa hot</span>
+                        <span>Gợi ý tên, giá & từ khóa hot</span>
                     </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

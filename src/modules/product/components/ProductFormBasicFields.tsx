@@ -1,7 +1,7 @@
 import { ProductFormData, CatalogOption } from '../types/product';
 import { commissionAmount, withCommission } from '../../../shared/utils/commission';
 import { money } from '../../../shared/utils/format';
-import { Plus, Sparkles } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { ProductFormTagField } from './ProductFormTagField';
 import { MaterialInput } from './MaterialInput';
 
@@ -47,10 +47,9 @@ export function ProductFormBasicFields({
           <button
             type="button"
             onClick={onOpenAiModal}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-black shadow-sm transition active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-black shadow-sm transition active:scale-95 cursor-pointer"
           >
-            <Sparkles size={14} className="text-amber-300 animate-pulse" />
-            <span>✨ AI Gợi ý tên, giá & từ khóa hot</span>
+            <span>Gợi ý tên, giá & từ khóa hot</span>
           </button>
         </div>
       )}
@@ -65,9 +64,8 @@ export function ProductFormBasicFields({
           placeholder="VD: Bình gốm Bát Tràng men rạn cổ..."
           value={formData.title}
           onChange={(e) => onPatch({ title: e.target.value })}
-          className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] ${
-            errors.title ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
-          }`}
+          className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] ${errors.title ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
+            }`}
         />
         {errors.title && <p className="text-xs text-rose-500">{errors.title}</p>}
       </div>
@@ -95,9 +93,8 @@ export function ProductFormBasicFields({
             const picked = categories.find((c) => c._id === id);
             onPatch({ categoryId: id, category: picked?.name || '' });
           }}
-          className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] cursor-pointer font-medium disabled:opacity-60 disabled:cursor-not-allowed ${
-            errors.category ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
-          }`}
+          className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] cursor-pointer font-medium disabled:opacity-60 disabled:cursor-not-allowed ${errors.category ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
+            }`}
         >
           <option value="">
             {catalogLoading ? 'Đang tải danh mục...' : '— Chọn danh mục —'}
@@ -137,9 +134,8 @@ export function ProductFormBasicFields({
           placeholder="VD: 150000"
           value={formData.price || ''}
           onChange={(e) => onPatch({ price: Number(e.target.value) })}
-          className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] font-jakarta font-bold ${
-            errors.price ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
-          }`}
+          className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] font-jakarta font-bold ${errors.price ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
+            }`}
         />
         {errors.price && <p className="text-xs text-rose-500">{errors.price}</p>}
         <p className="text-xs text-stone-500">
@@ -169,9 +165,8 @@ export function ProductFormBasicFields({
           placeholder="VD: 50"
           value={formData.stock !== undefined ? formData.stock : ''}
           onChange={(e) => onPatch({ stock: Number(e.target.value) })}
-          className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] ${
-            errors.stock ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
-          }`}
+          className={`w-full px-3.5 py-2.5 bg-stone-50/80 border rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] ${errors.stock ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
+            }`}
         />
         {errors.stock && <p className="text-xs text-rose-500">{errors.stock}</p>}
       </div>
@@ -183,7 +178,7 @@ export function ProductFormBasicFields({
         </label>
         <input
           type="text"
-          placeholder="VD: Gốm Bát Tràng men rạn, Lụa tơ tằm, Gỗ hương..."
+          placeholder="VD:Lụa tơ tằm, Gỗ hương..."
           value={formData.material || ''}
           onChange={(e) => onPatch({ material: e.target.value })}
           className="w-full px-3.5 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700]"
