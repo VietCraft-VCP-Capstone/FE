@@ -9,7 +9,7 @@ export function RowActions({ id, title, field }: { id: string; title: string; fi
   const navigate = useNavigate();
   return (
     <div className="flex items-center justify-end gap-1.5">
-      <Tooltip title="Xem phân tích sức khoẻ & hướng dẫn tối ưu">
+      <Tooltip title="Xem phân tích tối ưu & độ sẵn sàng chuyển đổi">
         <Button
           size="small"
           className="!h-7 !w-7 !p-0 !border-stone-200 !text-stone-600 hover:!text-[#007700] hover:!border-[#BECAB6] hover:!bg-[#EAF0E2] !rounded-md"
@@ -18,7 +18,7 @@ export function RowActions({ id, title, field }: { id: string; title: string; fi
           onClick={() => navigate(detailLink(id))}
         />
       </Tooltip>
-      <Tooltip title={field ? 'Đi tới mục cần tối ưu trong bài đăng' : 'Mở trang chỉnh sửa bài đăng'}>
+      <Tooltip title={field ? 'Đi tới mục cần tối ưu của sản phẩm' : 'Mở trang chỉnh sửa sản phẩm'}>
         <Button
           type="primary"
           size="small"

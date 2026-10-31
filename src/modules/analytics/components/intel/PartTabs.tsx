@@ -54,7 +54,7 @@ export function PartTabs({
       label: (
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
           <Icon size={14} />
-          {p === 'sell' ? 'Khả năng ra đơn' : AXIS_SIMPLE[p]}
+          {p === 'sell' ? 'Độ sẵn sàng chuyển đổi' : AXIS_SIMPLE[p]}
         </span>
       ),
       children: (

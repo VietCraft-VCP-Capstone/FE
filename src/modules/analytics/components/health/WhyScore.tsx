@@ -82,7 +82,7 @@ export function WhyScore({ data }: { data: ListingHealth }) {
 
         <SectionCard title="3. Mục đích sử dụng" icon={<Info size={14} />}>
           <p className="m-0">
-            Điểm sức khoẻ là công cụ chẩn đoán giúp bạn tự phát hiện điểm còn thiếu để hoàn thiện tin đăng.
+            Điểm tối ưu sản phẩm là công cụ chẩn đoán giúp bạn tự phát hiện điểm còn thiếu để hoàn thiện thông tin sản phẩm.
           </p>
           <p className="m-0 mt-2 text-stone-500">
             Sàn không tự động phạt hay hạ bậc tin đăng nếu điểm chưa cao.
