@@ -37,7 +37,7 @@ export const analyticsApi = {
     return res.data.data;
   },
 
-  /** F29 · danh sách sản phẩm thật của shop kèm điểm sức khoẻ mới nhất. */
+  /** F29 · danh sách sản phẩm thật của shop kèm điểm tối ưu sản phẩm mới nhất. */
   async listingsHealth(status?: HealthStatus, signal?: AbortSignal): Promise<InsightEnvelope<ListingHealthList>> {
     const res = await api.get(`${BASE}/listings/health`, { params: clean({ status }), signal });
     return res.data;

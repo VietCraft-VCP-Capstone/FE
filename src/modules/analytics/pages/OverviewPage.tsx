@@ -715,7 +715,7 @@ export function OverviewPage() {
                 <div className="flex flex-col justify-between rounded-2xl border border-stone-200/80 bg-white p-5 shadow-sm sm:p-6">
                   <div>
                     <h3 className="m-0 text-base font-bold text-stone-900">5 sản phẩm bán chạy nhất</h3>
-                    <p className="mb-4 mt-1 text-xs text-stone-500">Xếp theo doanh thu · bấm để xem sức khoẻ sản phẩm</p>
+                    <p className="mb-4 mt-1 text-xs text-stone-500">Xếp theo doanh thu · bấm để xem điểm tối ưu sản phẩm</p>
 
                     {data.top_products.length === 0 ? (
                       <div className="py-8 text-center text-xs text-stone-400">
