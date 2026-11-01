@@ -861,11 +861,11 @@ export function SeasonalPage() {
                     onSelectCampaign={handleSelectCampaign}
                   />
 
-                  {/* Khối A: Tóm tắt nhanh 4 chỉ số */}
+                  {/* Tóm tắt nhanh 4 chỉ số */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                        A. Tóm tắt nhanh tình hình cao điểm
+                        Tóm tắt nhanh tình hình cao điểm
                       </h4>
                       <span className="text-[11px] text-stone-400">
                         Bấm ⓘ để kiểm tra bằng chứng từng chỉ số
@@ -877,10 +877,10 @@ export function SeasonalPage() {
                     />
                   </div>
 
-                  {/* Khối B & C: Việc cần làm tuần này & Kế hoạch đang chạy */}
+                  {/* Việc cần làm tuần này & Kế hoạch đang chạy */}
                   <div className="space-y-2">
                     <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                      B &amp; C. Việc ưu tiên tuần này &amp; Theo dõi tiến độ
+                      Việc ưu tiên tuần này &amp; Theo dõi tiến độ
                     </h4>
                     <HubActionFeed
                       actions={actionItems}
@@ -889,10 +889,10 @@ export function SeasonalPage() {
                     />
                   </div>
 
-                  {/* Khối D: Lịch 120 ngày tới */}
+                  {/* Lịch 120 ngày tới */}
                   <div className="space-y-2">
                     <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                      D. Lịch 120 ngày &amp; 4 giai đoạn vận hành
+                      Lộ trình 120 ngày &amp; 4 giai đoạn vận hành
                     </h4>
                     <HubCalendar120
                       rows={calendarRows}
@@ -902,10 +902,10 @@ export function SeasonalPage() {
                     />
                   </div>
 
-                  {/* Khối E: Nhóm sản phẩm nên cân nhắc */}
+                  {/* Nhóm sản phẩm nên cân nhắc */}
                   <div className="space-y-2">
                     <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                      E. Nhóm sản phẩm tiềm năng &amp; Mật độ đối thủ
+                      Nhóm sản phẩm tiềm năng &amp; Mật độ đối thủ
                     </h4>
                     <HubOpportunities
                       clusters={opportunityClusters}
@@ -913,11 +913,11 @@ export function SeasonalPage() {
                     />
                   </div>
 
-                  {/* Khối F: Biểu đồ đặc điểm mua sắm của dịp */}
+                  {/* Biểu đồ đặc điểm mua sắm của dịp */}
                   {activeCamp && (
                     <div className="space-y-2">
                       <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                        F. Khách mua khác ngày thường thế nào (Biểu đồ 6 trục)
+                        Khách mua khác ngày thường thế nào (Biểu đồ 6 trục)
                       </h4>
                       <OccasionTraitChart
                         occasionName={activeCamp.name}
@@ -930,10 +930,10 @@ export function SeasonalPage() {
                     </div>
                   )}
 
-                  {/* Khối G & H: Rủi ro giao hàng & Bảng chấm điểm dự báo */}
+                  {/* Rủi ro giao hàng & Bảng chấm điểm dự báo */}
                   <div className="space-y-2">
                     <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                      G &amp; H. Quản trị rủi ro &amp; Đánh giá độ tin cậy
+                      Quản trị rủi ro giao hàng &amp; Đánh giá độ tin cậy
                     </h4>
                     <HubRisksAndScorecard
                       risks={routeRisks}
