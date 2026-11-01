@@ -702,12 +702,22 @@ export interface SeasonalEvent {
   matching_shop_products?: MatchingShopProduct[];
 }
 
+export interface RadarProvenanceItem {
+  axis: string;
+  score: number;
+  benchmark: number;
+  source: string;
+  evidence: string;
+  formula?: string;
+}
+
 export interface CampaignRadar {
   axes: string[];
   current_values: number[];
   benchmark_values: number[];
   takeaways?: string[];
   overall_score?: number;
+  data_provenance?: RadarProvenanceItem[];
 }
 
 export interface SeasonalCampaign {
