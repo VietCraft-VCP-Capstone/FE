@@ -16,6 +16,7 @@ import {
   Package,
   Percent,
   Plus,
+  ShieldAlert,
   ShoppingBag,
   Sparkles,
   Store,
@@ -28,7 +29,10 @@ import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { fullDate } from '../format';
 import { useInsight } from '../hooks/useInsight';
-import type { PodBlankSuggestion, ReadyToShipIdea, SeasonalCampaign, SeasonalForecast } from '../types';
+import { OccasionTimeline } from '../components/occasions/OccasionTimeline';
+import { PotentialProfileDrawer } from '../components/product/PotentialProfileDrawer';
+import { StlDecompositionChart } from '../components/charts/StlDecompositionChart';
+import type { PodBlankSuggestion, PotentialProfile, ReadyToShipIdea, SeasonalCampaign, SeasonalForecast } from '../types';
 
 const CATEGORY_OPTIONS = [
   { value: 'thoi-trang', label: 'Thời trang & May mặc' },
@@ -449,6 +453,10 @@ export function SeasonalPage() {
   // Quản lý trạng thái đánh dấu hoàn thành các mốc kế hoạch
   const [checkedMilestones, setCheckedMilestones] = useState<Record<number, boolean>>({});
 
+  // Quản lý mở Drawer hồ sơ tiềm năng 5 lớp & tính hòa vốn
+  const [selectedProfile, setSelectedProfile] = useState<PotentialProfile | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   const toggleSaveIdea = (key: string) => {
     setSavedIdeas(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -675,6 +683,10 @@ export function SeasonalPage() {
               </div>
 
               {/* 3. CARD: CHI TIẾT CHIẾN DỊCH & RADAR TIỀM NĂNG (2 CỘT) */}
+              {activeCamp?.occasion_window && (
+                <OccasionTimeline window={activeCamp.occasion_window} className="shadow-sm" />
+              )}
+
               {activeCamp && (
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
                   {/* Cột trái (7 Cột): Kế hoạch theo mốc & Định hướng */}
@@ -820,6 +832,14 @@ export function SeasonalPage() {
                 </div>
               )}
 
+              {/* Phân rã chuỗi thời gian Google Trends STL */}
+              {data.decomposition && (
+                <StlDecompositionChart
+                  decomposition={data.decomposition}
+                  keyword={data.primary_keyword || activeCamp?.name || 'Xu hướng mùa vụ'}
+                />
+              )}
+
               {/* 4. CARD: GỢI Ý SẢN PHẨM MÙA VỤ */}
               <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-3">
@@ -896,6 +916,7 @@ export function SeasonalPage() {
                     const ideaId = `${activeTab}-${idx}-${item.title}`;
                     const isSaved = Boolean(savedIdeas[ideaId]);
                     const profitMargin = item.expected_profit_margin || item.estimated_profit || '45% – 60%';
+                    const profile = data.potential_profiles?.[idx % (data.potential_profiles?.length || 1)];
 
                     return (
                       <div
@@ -957,13 +978,45 @@ export function SeasonalPage() {
                               </p>
                             )}
                           </div>
+                          {/* Khối tóm tắt hồ sơ tiềm năng */}
+                          {profile && (
+                            <div className="mt-2.5 rounded-lg border border-stone-200 bg-stone-50/70 p-2.5 text-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-stone-700">{profile.signal_label}</span>
+                                <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-bold ${
+                                  profile.verdict === 'dat' ? 'bg-[#EAF0E2] text-[#005B00]' : profile.verdict === 'chua_chac' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {profile.verdict_label}
+                                </span>
+                              </div>
+                              <div className="mt-1 flex items-center justify-between text-[11px] text-stone-500">
+                                <span>Điểm hòa vốn ước tính:</span>
+                                <strong className="text-stone-800">{profile.break_even?.break_even_units > 0 ? `${profile.break_even.break_even_units} sản phẩm` : 'N/A'}</strong>
+                              </div>
+                            </div>
+                          )}
                         </div>
+
+                        {/* Nút xem hồ sơ 5 lớp */}
+                        {profile && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedProfile(profile);
+                              setDrawerOpen(true);
+                            }}
+                            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 py-2 text-xs font-bold text-stone-700 transition hover:border-[#007700] hover:text-[#007700] hover:bg-white"
+                          >
+                            <ShieldAlert size={14} className="text-amber-600" />
+                            Hồ sơ tiềm năng 5 lớp & Tính hòa vốn
+                          </button>
+                        )}
 
                         {/* Nút thêm vào kế hoạch */}
                         <button
                           type="button"
                           onClick={() => toggleSaveIdea(ideaId)}
-                          className={`mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
+                          className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
                             isSaved
                               ? 'bg-[#007700] text-white shadow-sm'
                               : 'border border-[#007700] text-[#007700] hover:bg-[#EAF0E2]/40 active:scale-98'
@@ -1100,6 +1153,11 @@ export function SeasonalPage() {
           );
         }}
       </InsightBlock>
+      <PotentialProfileDrawer
+        profile={selectedProfile}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      />
     </InsightPage>
   );
 }

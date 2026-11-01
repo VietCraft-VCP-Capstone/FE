@@ -141,14 +141,16 @@ export function ForecastPage() {
 
                 <div className="mt-5">
                   <ForecastBandChart
-                    points={data.points.map(p => ({ date: p.date, yhat: p.yhat, lo95: p.lo95, hi95: p.hi95 }))}
+                    points={[
+                      ...(data.history || []).map(h => ({ date: h.date, actual: h.y, yhat: null, lo95: null, hi95: null })),
+                      ...data.points.map(p => ({ date: p.date, actual: null, yhat: p.yhat, lo95: p.lo95, hi95: p.hi95 })),
+                    ]}
                     forecastFrom={first}
                     height={300}
                   />
                 </div>
                 <p className="mb-0 mt-3 text-xs leading-relaxed text-stone-500">
-                  Dữ liệu của tính năng này chỉ có phần dự báo, nên biểu đồ không có đoạn doanh thu đã xảy ra. Muốn xem
-                  phần đã bán, mở trang Tổng quan shop.
+                  Đoạn đường liền phản ánh doanh thu thực tế gần đây; đoạn đường nét đứt kèm vùng bóng mờ biểu thị dự báo tương lai và dải tin cậy 95% (theo BR-206, không âm BR-207).
                 </p>
               </InsightCard>
 
