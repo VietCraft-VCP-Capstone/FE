@@ -51,9 +51,9 @@ export function SeasonalMonthMatrix({
     <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-stone-100 pb-3">
         <div>
-          <h3 className="m-0 text-base font-bold text-stone-900">Vòng quay mùa vụ 12 tháng</h3>
+          <h3 className="m-0 text-base font-bold text-stone-900">Vòng quay các dịp cao điểm 12 tháng</h3>
           <p className="mb-0 mt-1 text-xs text-stone-500">
-            Bấm vào một mùa vụ để mở lộ trình chuẩn bị và ý tưởng ra hàng. Vạch đỏ đánh dấu vị trí hôm nay trong chu kỳ năm.
+            Bấm vào một dịp để mở lộ trình chuẩn bị và ý tưởng sản phẩm. Vạch đỏ đánh dấu vị trí hôm nay trong chu kỳ năm.
           </p>
         </div>
       </div>

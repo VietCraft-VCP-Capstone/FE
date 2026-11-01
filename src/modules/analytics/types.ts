@@ -740,6 +740,7 @@ export interface SeasonalCampaign {
   category_summary: string;
   search_keywords: string[];
   radar?: CampaignRadar;
+  occasion_traits?: any[];
 }
 
 export interface SeasonalForecast {
@@ -754,6 +755,7 @@ export interface SeasonalForecast {
   active_campaign?: SeasonalCampaign;
   potential_profiles?: PotentialProfile[];
   campaign_radar?: CampaignRadar;
+  occasion_traits?: any[];
   seller_shop_name?: string;
   seller_category?: { slug: string; name: string };
   is_live_shop?: boolean;
