@@ -1,7 +1,17 @@
 import React, { useMemo, useState } from 'react';
+import { HelpCircle, Lightbulb, Sparkles } from 'lucide-react';
 import type { OccasionTraitItem } from '../../types/evidence';
 import { ConfidenceBadge } from '../evidence/ConfidenceBadge';
 import { EvidenceTrigger } from '../evidence/EvidenceTrigger';
+
+const TRAIT_ACTIONABLE_ADVICE: Record<string, string> = {
+  ordersGrowth: 'Lượng đơn mỗi ngày tăng mạnh. Cần chủ động tăng tồn kho sản phẩm chủ lực và bố trí người đóng gói để tránh trễ hạn giao.',
+  higherSpending: 'Giá trị trung bình mỗi đơn tăng so với ngày thường. Hãy tạo combo đóng gói đẹp mắt hoặc bán kèm phụ kiện để tối ưu giỏ hàng.',
+  earlyOrder: 'Khách có thói quen mua sớm trước dịp. Cần đăng bài, chụp ảnh và thu thập 3-5 đánh giá đầu tiên từ trước ngày lễ 3-4 tuần.',
+  peakClustering: 'Đơn hàng tập trung dồn vào 3 ngày cao điểm nhất. Cần in sẵn tem vận chuyển và chuẩn bị sẵn thùng hộp trước để tránh nghẽn giao hàng.',
+  comboPurchase: 'Khách mua nhiều món trong một đơn tăng vọt. Nên kích hoạt tính năng "Mua kèm deal sốc" hoặc combo giảm 5-10% để chốt đơn.',
+  voucherSensitivity: 'Khách hàng chủ động săn mã giảm giá trước khi mua. Hãy thiết lập voucher riêng của shop (5k - 20k) để tăng tỷ lệ chuyển đổi.',
+};
 
 interface Props {
   occasionName: string;
@@ -158,12 +168,24 @@ export const OccasionTraitChart: React.FC<Props> = ({
                   onMouseLeave={() => setHoveredIndex(null)}
                   className="cursor-pointer"
                 >
+                  {/* Hào quang phát sáng khi hover */}
+                  {isHovered && (
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={14}
+                      fill="#007700"
+                      fillOpacity="0.2"
+                      className="pointer-events-none"
+                    />
+                  )}
+
                   {/* Điểm nút */}
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={isHovered ? 6 : 4.5}
-                    fill="#007700"
+                    r={isHovered ? 7 : 4.5}
+                    fill={isHovered ? '#007700' : '#16a34a'}
                     stroke="#ffffff"
                     strokeWidth="2"
                     className="transition-all duration-150"
@@ -182,7 +204,7 @@ export const OccasionTraitChart: React.FC<Props> = ({
                     }
                     dominantBaseline="central"
                     className={`text-[11px] font-semibold transition-colors ${
-                      isHovered ? 'fill-emerald-800 font-bold' : 'fill-stone-800'
+                      isHovered ? 'fill-[#007700] font-bold underline' : 'fill-stone-800'
                     }`}
                   >
                     {trait.name}
@@ -195,9 +217,60 @@ export const OccasionTraitChart: React.FC<Props> = ({
 
         {/* Dòng hướng dẫn chuẩn theo mục 9.2 */}
         <p className="text-center text-xs text-stone-500 max-w-lg mt-3 bg-stone-50 border border-stone-200/60 rounded-xl px-4 py-2.5 leading-relaxed">
-          <strong className="text-stone-700">Cách đọc biểu đồ:</strong> Vị trí 80 trên một trục nghĩa là dịp này cao hơn 80% các dịp còn lại ở đặc điểm đó. Biểu đồ so các dịp với nhau, không so với ngày thường. Vị trí cao không có nghĩa là dịp tốt hơn.
+          <strong className="text-stone-700">Cách đọc biểu đồ:</strong> Rê chuột vào từng trục để xem số liệu thật và gợi ý hành động. Vị trí 80 nghĩa là dịp này cao hơn 80% các dịp khác ở đặc điểm đó.
         </p>
       </div>
+
+      {/* 2.5 Khối giải thích chi tiết khi rê chuột vào trục biểu đồ */}
+      {(() => {
+        const activeTrait = traits[hoveredIndex !== null ? hoveredIndex : (topTrait ? traits.indexOf(topTrait) : 0)] || traits[0];
+        if (!activeTrait) return null;
+        return (
+          <div className="rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50/80 to-stone-50 p-4 transition-all shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-emerald-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-md bg-[#007700] text-white">
+                  <Sparkles size={14} />
+                </span>
+                <div>
+                  <span className="text-xs font-bold text-stone-900">
+                    {activeTrait.name} {hoveredIndex !== null ? '· Đang xem giải thích' : '· Đặc điểm nổi bật nhất'}
+                  </span>
+                  <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-[#007700]">
+                    Cao hơn {Math.round(activeTrait.percentileRank)}% các dịp khác
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-stone-600">
+                <span>Dịp {occasionName}:</span>
+                <strong className="text-[#007700] font-black">{activeTrait.occasionValue} {activeTrait.unit}</strong>
+                <span className="text-stone-300">|</span>
+                <span className="text-stone-400">Ngày thường: {activeTrait.baselineValue} {activeTrait.unit}</span>
+              </div>
+            </div>
+
+            <div className="mt-2.5 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="flex items-start gap-2 text-stone-700">
+                <HelpCircle size={15} className="mt-0.5 shrink-0 text-stone-400" />
+                <div>
+                  <strong className="text-stone-900">Ý nghĩa chỉ số:</strong> {activeTrait.question}
+                  <div className="text-[11px] text-stone-500 mt-0.5">
+                    Căn cứ: {activeTrait.evidence?.sources?.join(', ') || 'Đơn hàng thực tế trên sàn VietCraft'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 text-emerald-950 bg-white/80 rounded-lg p-2.5 border border-emerald-200/60 shadow-2xs">
+                <Lightbulb size={15} className="mt-0.5 shrink-0 text-emerald-700" />
+                <div>
+                  <strong className="text-emerald-900">Gợi ý người bán nên làm:</strong>{' '}
+                  {TRAIT_ACTIONABLE_ADVICE[activeTrait.key] || 'Chuẩn bị sản phẩm và kế hoạch đăng bán sớm.'}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 3. Bảng số thật so với ngày thường (Mục 9.2 & 9.5) */}
       <div className="space-y-3">

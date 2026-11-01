@@ -88,8 +88,8 @@ export type OccasionTraitKey =
   | 'higherSpending'
   | 'earlyOrder'
   | 'peakClustering'
-  | 'giftPurpose'
-  | 'customizationNeeded';
+  | 'comboPurchase'
+  | 'voucherSensitivity';
 
 export interface OccasionTraitItem {
   key: OccasionTraitKey;

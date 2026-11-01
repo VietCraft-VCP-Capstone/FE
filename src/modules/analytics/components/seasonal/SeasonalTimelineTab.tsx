@@ -27,15 +27,15 @@ export function SeasonalTimelineTab({
 
   const milestones = [
     {
-      title: `Tuần T-6 · ${activeCamp.launch_window?.start ? fullDate(activeCamp.launch_window.start) : 'Bắt đầu chuẩn bị'}`,
+      title: `Trước ngày dịp 6 tuần · ${activeCamp.launch_window?.start ? fullDate(activeCamp.launch_window.start) : 'Bắt đầu chuẩn bị'}`,
       desc: `Lấy mẫu thử, chụp ảnh concept theo chủ đề ${campName}, lên listing đón index sớm.`,
     },
     {
-      title: `Tuần T-3 · ${activeCamp.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'Hạn chót đăng bán'}`,
+      title: `Trước ngày dịp 3 tuần · ${activeCamp.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'Hạn chót đăng bán'}`,
       desc: `Đăng bán hoàn tất, gắn từ khoá ngách đón tìm kiếm sớm và gom 3-5 đánh giá đầu tiên.`,
     },
     {
-      title: `Tuần T-0 · ${activeCamp.launch_window?.peak_date ? fullDate(activeCamp.launch_window.peak_date) : 'Đỉnh cao điểm'}`,
+      title: `Tuần cao điểm & Hạn chốt nhận đơn · ${activeCamp.launch_window?.peak_date ? fullDate(activeCamp.launch_window.peak_date) : 'Đỉnh cao điểm'}`,
       desc: `Đỉnh mua sắm: tung combo quà tặng để nâng giá trị trung bình đơn hàng.`,
     },
   ];
@@ -79,7 +79,7 @@ export function SeasonalTimelineTab({
                 <div className="flex flex-col items-center">
                   <span className="h-3 w-3 rounded-full bg-amber-600 ring-4 ring-amber-100 shadow-xs mt-3" />
                   <span className="text-[11px] font-bold text-stone-800 mt-1">
-                    {activeCamp.launch_window?.start ? fullDate(activeCamp.launch_window.start) : 'T-6'}
+                    {activeCamp.launch_window?.start ? fullDate(activeCamp.launch_window.start) : 'Trước 6 tuần'}
                   </span>
                   <span className="text-[10px] text-stone-400">Chuẩn bị</span>
                 </div>

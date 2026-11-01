@@ -100,14 +100,14 @@ export const GLOSSARY = {
       question: 'Bao nhiêu phần đơn rơi vào 3 ngày đông nhất?',
       unit: '%',
     },
-    giftPurpose: {
-      name: 'Mua để tặng',
-      question: 'Bao nhiêu phần đơn là mua làm quà?',
+    comboPurchase: {
+      name: 'Mua theo bộ (Combo)',
+      question: 'Bao nhiêu phần đơn mua từ 2 món trở lên hoặc theo set?',
       unit: '%',
     },
-    customizationNeeded: {
-      name: 'Cần làm riêng',
-      question: 'Bao nhiêu phần đơn cần cá nhân hóa (khắc tên, in hình riêng)?',
+    voucherSensitivity: {
+      name: 'Dùng mã giảm giá',
+      question: 'Bao nhiêu phần đơn có áp dụng voucher khuyến mãi?',
       unit: '%',
     },
   },

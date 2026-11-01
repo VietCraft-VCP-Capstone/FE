@@ -31,12 +31,12 @@ export const SeasonalNavbar: React.FC<Props> = ({
   const tabs: NavTabItem[] = [
     {
       key: 'hub',
-      label: '1. Tổng quan (Khối A–H)',
+      label: '1. Tổng quan kế hoạch',
       icon: <LayoutDashboard size={15} />,
     },
     {
       key: 'traits',
-      label: '2. Đặc điểm dịp (6 trục)',
+      label: '2. Đặc điểm sức mua',
       icon: <BarChart3 size={15} />,
     },
     {
