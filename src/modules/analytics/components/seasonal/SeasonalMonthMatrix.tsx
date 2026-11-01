@@ -216,11 +216,11 @@ export function SeasonalMonthMatrix({
               <Calendar size={18} />
             </span>
             <h3 className="m-0 text-base font-bold text-stone-900">
-              Lộ trình 120 ngày cao điểm &amp; 4 giai đoạn vận hành
+              Lộ trình 4 tháng tới &amp; 4 giai đoạn vận hành
             </h3>
           </div>
           <p className="mb-0 mt-1 text-xs text-stone-500">
-            Thanh 4 pha thể hiện chính xác: Chuẩn bị mẫu $\rightarrow$ Đăng bán $\rightarrow$ Cao điểm $\rightarrow$ Hạn chốt nhận đơn. Đồi cong biểu thị sức mua dự kiến.
+            Cửa sổ trượt tự động 4 tháng tính từ hôm nay. Khi một dịp qua đi, dịp tiếp theo trong năm sẽ tự động nối tiếp vào lịch.
           </p>
         </div>
 
@@ -235,7 +235,7 @@ export function SeasonalMonthMatrix({
                 : 'text-stone-500 hover:text-stone-800'
             }`}
           >
-            120 ngày tới (T11/26 - T2/27)
+            4 tháng tới (Cửa sổ trượt)
           </button>
           <button
             type="button"

@@ -889,10 +889,10 @@ export function SeasonalPage() {
                     />
                   </div>
 
-                  {/* Lịch 120 ngày tới */}
+                  {/* Lịch 4 tháng tới */}
                   <div className="space-y-2">
                     <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                      Lộ trình 120 ngày &amp; 4 giai đoạn vận hành
+                      Lộ trình 4 tháng tới &amp; 4 giai đoạn vận hành
                     </h4>
                     <HubCalendar120
                       rows={calendarRows}
