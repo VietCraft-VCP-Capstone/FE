@@ -25,20 +25,22 @@ export function SeasonalTimelineTab({
   const campName = activeCamp.name?.replace(/Lễ Hội |Mùa /gi, '') || 'Chiến dịch';
   const completedCount = Object.values(checkedMilestones).filter(Boolean).length;
 
-  const milestones = [
-    {
-      title: `Trước ngày dịp 6 tuần · ${activeCamp.launch_window?.start ? fullDate(activeCamp.launch_window.start) : 'Bắt đầu chuẩn bị'}`,
-      desc: `Lấy mẫu thử, chụp ảnh concept theo chủ đề ${campName}, lên listing đón index sớm.`,
-    },
-    {
-      title: `Trước ngày dịp 3 tuần · ${activeCamp.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'Hạn chót đăng bán'}`,
-      desc: `Đăng bán hoàn tất, gắn từ khoá ngách đón tìm kiếm sớm và gom 3-5 đánh giá đầu tiên.`,
-    },
-    {
-      title: `Tuần cao điểm & Hạn chốt nhận đơn · ${activeCamp.launch_window?.peak_date ? fullDate(activeCamp.launch_window.peak_date) : 'Đỉnh cao điểm'}`,
-      desc: `Đỉnh mua sắm: tung combo quà tặng để nâng giá trị trung bình đơn hàng.`,
-    },
-  ];
+  const milestones = activeCamp.milestone_actions?.length
+    ? activeCamp.milestone_actions
+    : [
+        {
+          title: `Trước ngày dịp 6 tuần · ${activeCamp.launch_window?.start ? fullDate(activeCamp.launch_window.start) : 'Bắt đầu chuẩn bị'}`,
+          desc: `Lấy mẫu thử, chụp ảnh concept theo chủ đề ${campName}, lên listing đón index sớm.`,
+        },
+        {
+          title: `Trước ngày dịp 3 tuần · ${activeCamp.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'Hạn chót đăng bán'}`,
+          desc: `Đăng bán hoàn tất, gắn từ khoá ngách đón tìm kiếm sớm và gom 3-5 đánh giá đầu tiên.`,
+        },
+        {
+          title: `Tuần cao điểm & Hạn chốt nhận đơn · ${activeCamp.launch_window?.peak_date ? fullDate(activeCamp.launch_window.peak_date) : 'Đỉnh cao điểm'}`,
+          desc: `Đỉnh mua sắm: tung combo quà tặng để nâng giá trị trung bình đơn hàng.`,
+        },
+      ];
 
   return (
     <div className="space-y-5 pt-2">

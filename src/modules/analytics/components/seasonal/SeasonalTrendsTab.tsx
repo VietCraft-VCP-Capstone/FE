@@ -9,6 +9,8 @@ interface SeasonalTrendsTabProps {
   primaryKeyword?: string;
   activeCamp: SeasonalCampaign;
   traits: OccasionTraitItem[];
+  sampleSizeN?: number;
+  measuredCycles?: number;
   onOpenEvidence: (evidence: Evidence) => void;
   categoryName?: string;
 }
@@ -18,6 +20,8 @@ export function SeasonalTrendsTab({
   primaryKeyword,
   activeCamp,
   traits,
+  sampleSizeN = 1200,
+  measuredCycles = 2,
   onOpenEvidence,
   categoryName = 'Thời trang & Thủ công',
 }: SeasonalTrendsTabProps) {
@@ -29,8 +33,8 @@ export function SeasonalTrendsTab({
       <OccasionTraitChart
         occasionName={campName}
         categoryName={categoryName}
-        measuredCycles={2}
-        sampleSizeN={1840}
+        measuredCycles={measuredCycles}
+        sampleSizeN={sampleSizeN}
         traits={traits}
         onOpenEvidence={onOpenEvidence}
       />

@@ -89,7 +89,12 @@ export function SeasonalPotentialTab({
         {displayIdeas.slice(0, 4).map((item: any, idx: number) => {
           const ideaId = `${activeTab}-${idx}-${item.title || item.name}`;
           const isSaved = Boolean(savedIdeas[ideaId]);
-          const profitMargin = item.expected_profit_margin || item.estimated_profit || '45% – 60%';
+          const profitMargin =
+            item.expected_profit_margin ||
+            item.estimated_profit ||
+            (item.suggested_price && item.base_cost
+              ? `${Math.max(20, Math.round(((parseInt(String(item.suggested_price).replace(/\D/g, '')) - parseInt(String(item.base_cost).replace(/\D/g, ''))) / Math.max(1, parseInt(String(item.suggested_price).replace(/\D/g, '')))) * 100))}%`
+              : 'ước tính theo ngành');
           const profile = potentialProfiles[idx % (potentialProfiles.length || 1)];
 
           return (

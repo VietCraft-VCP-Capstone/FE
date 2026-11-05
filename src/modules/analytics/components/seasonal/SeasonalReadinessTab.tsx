@@ -41,53 +41,79 @@ export function SeasonalReadinessTab({
               {topProduct?.title || 'Sản phẩm chủ lực trong gian hàng'}
             </h4>
             <p className="mb-3 mt-1 text-xs text-stone-500">
-              Đang có doanh số tốt nhất: {count(topProduct?.orders || 12)} đơn · {money(topProduct?.revenue_vnd || 3570000)}
+              Đang có doanh số tốt nhất: {count(topProduct?.orders ?? 0)} đơn · {money(topProduct?.revenue_vnd ?? 0)}
             </p>
 
-            <div className="flex items-center gap-4">
-              {/* Vòng tròn 1/4 SVG */}
-              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center">
-                <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 36 36">
-                  <path
-                    className="text-stone-200"
-                    strokeWidth="3.5"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  <path
-                    className="text-[#007700]"
-                    strokeDasharray="25, 100"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                </svg>
-                <span className="absolute text-xs font-bold text-stone-800 font-jakarta">1/4</span>
-              </div>
+            {(() => {
+              const checklist = [
+                {
+                  label: `Ảnh concept theo chủ đề ${campName}`,
+                  isDone: Boolean(topProduct?.images?.length && topProduct.images.length >= 2),
+                },
+                {
+                  label: 'Từ khoá ngách đón tìm kiếm sớm',
+                  isDone: Boolean((topProduct?.tags?.length ?? 0) > 0 || (topProduct?.categories?.length ?? 0) > 0),
+                },
+                {
+                  label: 'Đóng gói combo set quà tặng',
+                  isDone: Boolean(/set|combo|hộp quà|quà tặng/i.test(topProduct?.title || '')),
+                },
+                {
+                  label: 'Tiêu đề & mô tả đã chuẩn SEO sàn',
+                  isDone: Boolean((topProduct?.title || '').length >= 30),
+                },
+              ];
+              const doneCount = checklist.filter(i => i.isDone).length;
+              const pct = Math.round((doneCount / checklist.length) * 100);
 
-              {/* 4 Mục trạng thái */}
-              <div className="space-y-1 text-xs">
-                <div className="flex items-center gap-1.5 text-stone-600">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-purple-300" />
-                  Ảnh concept theo chủ đề {campName}
+              return (
+                <div className="flex items-center gap-4">
+                  {/* Vòng tròn tiến độ SVG động */}
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center">
+                    <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 36 36">
+                      <path
+                        className="text-stone-200"
+                        strokeWidth="3.5"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <path
+                        className="text-[#007700]"
+                        strokeDasharray={`${pct}, 100`}
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                    <span className="absolute text-xs font-bold text-stone-800 font-jakarta">
+                      {doneCount}/{checklist.length}
+                    </span>
+                  </div>
+
+                  {/* 4 Mục trạng thái động */}
+                  <div className="space-y-1 text-xs">
+                    {checklist.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-1.5 ${
+                          item.isDone ? 'font-semibold text-emerald-800' : 'text-stone-600'
+                        }`}
+                      >
+                        {item.isDone ? (
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        ) : (
+                          <span className="h-2.5 w-2.5 rounded-sm bg-purple-300 shrink-0" />
+                        )}
+                        <span>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-stone-600">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-purple-300" />
-                  Từ khoá ngách đón tìm kiếm sớm
-                </div>
-                <div className="flex items-center gap-1.5 text-stone-600">
-                  <span className="h-2.5 w-2.5 rounded-sm bg-purple-300" />
-                  Đóng gói combo set quà tặng
-                </div>
-                <div className="flex items-center gap-1.5 font-semibold text-emerald-800">
-                  <CheckCircle2 size={13} className="text-emerald-600" />
-                  Tiêu đề &amp; mô tả đã chuẩn SEO sàn
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </div>
 

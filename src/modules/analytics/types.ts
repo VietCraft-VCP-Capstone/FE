@@ -741,6 +741,31 @@ export interface SeasonalCampaign {
   search_keywords: string[];
   radar?: CampaignRadar;
   occasion_traits?: any[];
+  confidence?: {
+    level: 'high' | 'fair' | 'preliminary' | 'insufficient';
+    text: 'Cao' | 'Khá' | 'Sơ bộ' | 'Chưa đủ';
+    dots: number;
+    reason?: string;
+  };
+  confidence_text?: 'Cao' | 'Khá' | 'Sơ bộ';
+  confidence_dots?: number;
+  expected_orders?: string;
+  weekday_text?: string;
+  next_deadline?: {
+    title: string;
+    date_text: string;
+    days_left: number;
+    is_urgent: boolean;
+  };
+  stages?: {
+    prep_start_days: number;
+    traction_start_days: number;
+    peak_days: number;
+    cutoff_days: number;
+    end_days: number;
+  };
+  is_dashed_curve?: boolean;
+  milestone_actions?: { title: string; desc: string }[];
 }
 
 export interface SeasonalForecast {
@@ -750,6 +775,12 @@ export interface SeasonalForecast {
   decomposition: { trend: number[]; seasonal: number[]; residual: number[]; window: string };
   amplitude: number;
   n_points: number;
+  sample_size_n?: number;
+  measured_cycles?: number;
+  route_risks?: any[];
+  scorecard_metrics?: any[];
+  saved_ideas?: string[];
+  checked_milestones?: Record<string, boolean>;
   events: SeasonalEvent[];
   all_campaigns?: SeasonalCampaign[];
   active_campaign?: SeasonalCampaign;

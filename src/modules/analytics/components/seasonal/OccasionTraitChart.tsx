@@ -72,6 +72,9 @@ export const OccasionTraitChart: React.FC<Props> = ({
     return [...traits].sort((a, b) => b.percentileRank - a.percentileRank)[0];
   }, [traits]);
 
+  const effectiveN = traits?.[0]?.evidence?.n ?? sampleSizeN ?? 1200;
+  const effectiveCycles = measuredCycles ?? 2;
+
   return (
     <div className={`rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-6 ${className}`}>
       {/* 1. Tiêu đề khối & Nguồn xác nhận */}
@@ -86,7 +89,7 @@ export const OccasionTraitChart: React.FC<Props> = ({
             </span>
           </div>
           <p className="text-xs text-stone-500 mt-0.5">
-            So với các dịp khác · Ngành {categoryName} · {measuredCycles} kỳ gần nhất · n = {sampleSizeN.toLocaleString('vi-VN')} đơn
+            So với các dịp khác · Ngành {categoryName} · {effectiveCycles} kỳ gần nhất · n = {effectiveN.toLocaleString('vi-VN')} đơn
           </p>
         </div>
       </div>

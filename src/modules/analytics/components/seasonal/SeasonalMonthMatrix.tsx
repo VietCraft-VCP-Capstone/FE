@@ -6,6 +6,7 @@ import {
   Gift,
   GraduationCap,
   Heart,
+  Info,
   ShoppingBag,
   Sparkles,
   Sun,
@@ -80,123 +81,116 @@ export function SeasonalMonthMatrix({
 }: SeasonalMonthMatrixProps) {
   const [viewMode, setViewMode] = useState<'120d' | '12m'>('120d');
 
-  // Danh sách các dịp cao điểm 120 ngày tới (T11/2026 - T2/2027) chuẩn theo thiết kế
-  const rows120d: CalendarTimelineRow[] = useMemo(() => [
-    {
-      id: '11/11',
-      name: '11.11',
-      weekdayText: 'Thứ Tư, 11/11',
-      expectedOrders: '60–90',
-      confidenceText: 'Cao',
-      confidenceDots: 4,
-      nextDeadline: {
-        title: 'Hạn chốt đơn 09/11',
-        dateText: '09/11',
-        daysLeft: 8,
-        isUrgent: true,
-      },
-      stages: {
-        prepStartDays: 0,
-        tractionStartDays: 3,
-        peakDays: 10,
-        cutoffDays: 8,
-        endDays: 14,
-      },
-    },
-    {
-      id: '12/12',
-      name: '12.12',
-      weekdayText: 'Thứ Bảy, 12/12',
-      expectedOrders: '140–210',
-      confidenceText: 'Khá',
-      confidenceDots: 3,
-      nextDeadline: {
-        title: 'Hạn nhập phôi 15/11',
-        dateText: '15/11',
-        daysLeft: 14,
-        isUrgent: true,
-      },
-      stages: {
-        prepStartDays: 0,
-        tractionStartDays: 17,
-        peakDays: 41,
-        cutoffDays: 34,
-        endDays: 45,
-      },
-    },
-    {
-      id: 'noel',
-      name: 'Giáng sinh',
-      weekdayText: 'Thứ Sáu, 25/12',
-      expectedOrders: '220–340',
-      confidenceText: 'Khá',
-      confidenceDots: 3,
-      nextDeadline: {
-        title: 'Bắt đầu chuẩn bị 07/11',
-        dateText: '07/11',
-        daysLeft: 6,
-        isUrgent: true,
-      },
-      stages: {
-        prepStartDays: 6,
-        tractionStartDays: 24,
-        peakDays: 54,
-        cutoffDays: 41,
-        endDays: 57,
-      },
-    },
-    {
-      id: 'tet',
-      name: 'Tết Nguyên Đán',
-      weekdayText: 'Thứ Bảy, 06/02/2027',
-      expectedOrders: '600–900',
-      confidenceText: 'Khá',
-      confidenceDots: 3,
-      nextDeadline: {
-        title: 'Bắt đầu chuẩn bị 01/12',
-        dateText: '01/12',
-        daysLeft: 30,
-        isUrgent: false,
-      },
-      stages: {
-        prepStartDays: 30,
-        tractionStartDays: 48,
-        peakDays: 97,
-        cutoffDays: 79,
-        endDays: 102,
-      },
-    },
-    {
-      id: 'valentine',
-      name: 'Valentine',
-      weekdayText: 'Chủ nhật, 14/02/2027',
-      expectedOrders: '90–160',
-      confidenceText: 'Sơ bộ',
-      confidenceDots: 1,
-      nextDeadline: {
-        title: 'Bắt đầu chuẩn bị 02/01',
-        dateText: '02/01',
-        daysLeft: 62,
-        isUrgent: false,
-      },
-      stages: {
-        prepStartDays: 62,
-        tractionStartDays: 75,
-        peakDays: 105,
-        cutoffDays: 95,
-        endDays: 110,
-      },
-      isDashedCurve: true,
-    },
-  ], []);
+  // Chuyển đổi toàn bộ campaigns thực tế từ Backend/AI sang định dạng hàng CalendarTimelineRow
+  const mappedCampaignRows: CalendarTimelineRow[] = useMemo(() => {
+    if (!campaigns || campaigns.length === 0) return [];
 
-  // Danh sách mở rộng tất cả các dịp từ campaigns
-  const rowsAll: CalendarTimelineRow[] = useMemo(() => {
-    if (!campaigns || campaigns.length === 0) return rows120d;
-    return rows120d;
-  }, [campaigns, rows120d]);
+    return campaigns.map(camp => {
+      const ocWin = camp.occasion_window;
+      const lw = camp.launch_window;
+      const evDateStr = ocWin?.peak_date || lw?.peak_date;
 
-  const displayRows = viewMode === '120d' ? rows120d : rowsAll;
+      // 1. Tên thứ và ngày
+      let weekdayText = camp.weekday_text;
+      if (!weekdayText && evDateStr) {
+        try {
+          const d = new Date(evDateStr);
+          const days = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+          const dayName = days[d.getDay()];
+          const datePart = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+          weekdayText = `${dayName}, ${datePart}`;
+        } catch {
+          weekdayText = camp.name;
+        }
+      }
+
+      // 2. Tọa độ các mốc thời gian 4 pha
+      const stages = camp.stages
+        ? {
+            prepStartDays: camp.stages.prep_start_days,
+            tractionStartDays: camp.stages.traction_start_days,
+            peakDays: camp.stages.peak_days,
+            cutoffDays: camp.stages.cutoff_days,
+            endDays: camp.stages.end_days,
+          }
+        : {
+            prepStartDays: 0,
+            tractionStartDays: Math.max(0, (ocWin?.days_to_peak || 30) - 20),
+            peakDays: Math.max(0, ocWin?.days_to_peak || 30),
+            cutoffDays: Math.max(0, ocWin?.days_to_cutoff || 14),
+            endDays: Math.max(0, (ocWin?.days_to_peak || 30) + 4),
+          };
+
+      // 3. Mốc hạn tiếp theo
+      const nextDeadline = camp.next_deadline
+        ? {
+            title: camp.next_deadline.title,
+            dateText: camp.next_deadline.date_text,
+            daysLeft: camp.next_deadline.days_left,
+            isUrgent: camp.next_deadline.is_urgent,
+          }
+        : {
+            title: camp.timing?.label || `Hạn chốt đơn còn ${camp.timing?.days_diff || 0} ngày`,
+            dateText: ocWin?.cut_off_date || '',
+            daysLeft: camp.timing?.days_diff || 0,
+            isUrgent: (camp.timing?.days_diff || 0) <= 14,
+          };
+
+      // 4. Mức độ tin cậy được tính từ BE/AI
+      const confText = camp.confidence?.text || camp.confidence_text || (stages.endDays > 60 ? 'Sơ bộ' : 'Khá');
+      const confDots =
+        camp.confidence?.dots ||
+        camp.confidence_dots ||
+        (confText === 'Cao' ? 4 : confText === 'Khá' ? 3 : 1);
+
+      return {
+        id: camp.id,
+        name: camp.name,
+        weekdayText: weekdayText || camp.name,
+        expectedOrders: camp.expected_orders || '80–150',
+        confidenceText: (confText === 'Cao' || confText === 'Khá' || confText === 'Sơ bộ') ? confText : 'Khá',
+        confidenceDots: confDots,
+        nextDeadline,
+        stages,
+        isDashedCurve: camp.is_dashed_curve ?? (confText === 'Sơ bộ' || stages.endDays > 60),
+      };
+    });
+  }, [campaigns]);
+
+  // Luôn dùng dữ liệu thực tế từ API backend
+  const activeRows = mappedCampaignRows;
+
+  // Lọc hiển thị:
+  // - 120d (cửa sổ trượt 4 tháng): Lọc các dịp bắt đầu chuẩn bị trong vòng 120 ngày tới
+  // - 12m (toàn bộ 12 tháng): Hiển thị tất cả các dịp trong chu kỳ năm
+  const displayRows = useMemo(() => {
+    if (viewMode === '120d') {
+      const filtered = activeRows.filter(r => r.stages.prepStartDays <= 120 && r.stages.endDays >= 0);
+      return filtered.length > 0 ? filtered : activeRows.slice(0, 5);
+    }
+    return activeRows;
+  }, [activeRows, viewMode]);
+
+  // Tính ngày hiện tại và mảng header 4 tháng động tính từ tháng này
+  const now = useMemo(() => new Date(), []);
+  const todayLabel = useMemo(() => {
+    const d = String(now.getDate()).padStart(2, '0');
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return `${d}/${m}`;
+  }, [now]);
+
+  const monthHeaders = useMemo(() => {
+    return [0, 1, 2, 3].map(offset => {
+      const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      const m = d.getMonth() + 1;
+      const y = d.getFullYear();
+      const showYear = offset === 0 || m === 1;
+      return {
+        label: showYear ? `T${m}/${y}` : `T${m}`,
+        isFirst: offset === 0,
+      };
+    });
+  }, [now]);
 
   // Tổng số ngày trong khung nhìn 120 ngày
   const totalDays = 120;
@@ -260,26 +254,52 @@ export function SeasonalMonthMatrix({
             
             {/* Header Timeline 4 tháng */}
             <div className="relative flex-1 grid grid-cols-4 text-xs font-medium">
-              <div className="text-left pl-1">
-                <span className="text-stone-700 font-bold">T11/2026</span>
-                <div className="text-[11px] font-bold text-rose-600 flex items-center gap-1 leading-none mt-0.5">
-                  <span className="text-[9px]">▼</span> Hôm nay 01/11
+              {monthHeaders.map((mH, idx) => (
+                <div key={idx} className={`text-left ${idx === 0 ? 'pl-1' : 'pl-2'}`}>
+                  <span className={idx === 0 ? 'text-stone-700 font-bold' : 'text-stone-600'}>
+                    {mH.label}
+                  </span>
+                  {mH.isFirst && (
+                    <div className="text-[11px] font-bold text-rose-600 flex items-center gap-1 leading-none mt-0.5">
+                      <span className="text-[9px]">▼</span> Hôm nay {todayLabel}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="text-left pl-2">
-                <span className="text-stone-600">T12</span>
-              </div>
-              <div className="text-left pl-2">
-                <span className="text-stone-600">T1/2027</span>
-              </div>
-              <div className="text-left pl-2">
-                <span className="text-stone-600">T2</span>
+              ))}
+            </div>
+
+            <div className="w-52 shrink-0 pl-4 flex items-center gap-1 group/th relative">
+              <span>Hạn tiếp theo</span>
+              <Info size={12} className="text-stone-400 cursor-help" />
+              <div className="absolute left-4 top-6 hidden group-hover/th:block z-30 w-60 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
+                <strong className="text-emerald-400 block mb-1">Căn cứ tính mốc hạn:</strong>
+                • Ngày lễ chính thức theo lịch quốc gia.<br />
+                • Trừ thời gian ship p90 (2–4 ngày) + xưởng in p90 (2–3 ngày) + 1 ngày đệm an toàn.<br />
+                • Đánh dấu <strong>Gấp</strong> khi còn dưới 14 ngày.
               </div>
             </div>
 
-            <div className="w-52 shrink-0 pl-4">Hạn tiếp theo</div>
-            <div className="w-24 shrink-0 pl-3">Dự kiến</div>
-            <div className="w-24 shrink-0 pl-3">Tin cậy</div>
+            <div className="w-24 shrink-0 pl-3 flex items-center gap-1 group/th relative">
+              <span>Dự kiến</span>
+              <Info size={12} className="text-stone-400 cursor-help" />
+              <div className="absolute left-0 top-6 hidden group-hover/th:block z-30 w-60 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
+                <strong className="text-emerald-400 block mb-1">Căn cứ dự kiến số đơn:</strong>
+                • Số đơn ngày thường của shop trong 8 tuần qua.<br />
+                • Nhân hệ số tăng trưởng đơn lịch sử ngành trên sàn (tăng 2.5x – 6x tùy dịp).<br />
+                • Thể hiện dưới dạng khoảng dao động an toàn.
+              </div>
+            </div>
+
+            <div className="w-24 shrink-0 pl-3 flex items-center gap-1 group/th relative">
+              <span>Tin cậy</span>
+              <Info size={12} className="text-stone-400 cursor-help" />
+              <div className="absolute right-0 top-6 hidden group-hover/th:block z-30 w-64 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
+                <strong className="text-emerald-400 block mb-1">Tiêu chí xếp hạng độ tin cậy:</strong>
+                • <strong>Cao (●●●●)</strong>: Có từ 2 kỳ lịch sử sàn, n ≥ 1.000 đơn.<br />
+                • <strong>Khá (●●●○)</strong>: Có 1 kỳ lịch sử hoặc trend Google rõ nét.<br />
+                • <strong>Sơ bộ (●○○○)</strong>: Dịp còn xa (&gt; 60 ngày), ước tính sơ bộ theo ngành.
+              </div>
+            </div>
           </div>
 
           {/* Danh sách các dịp trong khung lịch */}
@@ -483,7 +503,7 @@ export function SeasonalMonthMatrix({
           </div>
           <div className="flex items-center gap-1.5">
             <span className="h-3 w-[2px] bg-rose-500" />
-            <span className="font-semibold text-rose-600">Hôm nay 01/11</span>
+            <span className="font-semibold text-rose-600">Hôm nay {todayLabel}</span>
           </div>
         </div>
 
