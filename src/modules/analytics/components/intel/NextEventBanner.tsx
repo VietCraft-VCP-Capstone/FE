@@ -16,7 +16,7 @@ export function NextEventBanner() {
         <strong className="font-semibold text-stone-900">{event.name} ({shortDate(event.date)}):</strong>{' '}
         {prepNow ? 'Cần chuẩn bị hàng ngay để đón sóng mua sắm.' : `Bắt đầu chuẩn bị từ ${shortDate(event.prep_start)}.`}
       </span>
-      <Link to={`${INSIGHTS_ROOT}/seasonal`} className="shrink-0 font-semibold text-[#007700] no-underline hover:underline">Xem lịch mùa vụ</Link>
+      <Link to={`${INSIGHTS_ROOT}/seasonal`} className="shrink-0 font-semibold text-[#007700] no-underline hover:underline">Xem lịch dịp cao điểm</Link>
     </div>
   );
 }

@@ -55,7 +55,7 @@ export function StlDecompositionChart({
               Phân Rã Chuỗi Thời Gian Google Trends (STL Decomposition)
             </h4>
             <InfoTip
-              text="Thuật toán STL (Seasonal and Trend decomposition using Loess) phân tích chuỗi tìm kiếm thực tế thành 3 thành phần: Sóng mùa vụ lặp lại hàng năm, Xu hướng tăng trưởng nền, và Nhiễu ngẫu nhiên. Giúp phân biệt nhu cầu mùa vụ thật với đột biến nhất thời."
+              text="Thuật toán STL (Seasonal and Trend decomposition using Loess) phân tích chuỗi tìm kiếm thực tế thành 3 thành phần: Sóng chu kỳ lặp lại hàng năm, Xu hướng tăng trưởng nền, và Nhiễu ngẫu nhiên. Giúp phân biệt nhu cầu theo dịp thật với đột biến nhất thời."
               label="Giải thích STL Decomposition"
             />
           </div>
@@ -75,7 +75,7 @@ export function StlDecompositionChart({
                 : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            Sóng mùa vụ (Seasonal)
+            Chu kỳ lặp lại (Seasonal)
           </button>
           <button
             type="button"
@@ -122,7 +122,7 @@ export function StlDecompositionChart({
                     <span className="font-bold text-stone-900 block mb-1">Mốc {d.label}</span>
                     {activeTab === 'seasonal' ? (
                       <span className="text-emerald-700 font-semibold">
-                        Sóng mùa vụ: {d.seasonal > 0 ? `+${d.seasonal}` : d.seasonal} điểm
+                        Chu kỳ lặp lại: {d.seasonal > 0 ? `+${d.seasonal}` : d.seasonal} điểm
                       </span>
                     ) : (
                       <span className="text-sky-700 font-semibold">

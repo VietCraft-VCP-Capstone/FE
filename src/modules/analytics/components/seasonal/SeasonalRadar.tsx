@@ -26,7 +26,7 @@ export function SeasonalRadar({
       score: currentValues[0] ?? 85,
       benchmark: benchmarkValues[0] ?? 52,
       source: 'Google Trends VN (52 tuần qua) + 14,200 lượt tìm kiếm ngành trên sàn',
-      evidence: 'Lượt tìm kiếm nhóm từ khóa mùa vụ tăng vọt so với mức trung bình ngày thường.',
+      evidence: 'Lượt tìm kiếm nhóm từ khóa theo dịp tăng vọt so với mức trung bình ngày thường.',
       formula: 'Trung bình trượt 6 tuần Google Trends / 100',
     },
     {
@@ -51,7 +51,7 @@ export function SeasonalRadar({
       benchmark: benchmarkValues[3] ?? 48,
       source: 'Lịch sử 1,840 đơn hàng sàn dịp tương tự',
       evidence: 'Tỷ lệ khách hàng mua theo combo hoặc yêu cầu đóng hộp quà tặng tăng gấp 2.8 lần ngày thường.',
-      formula: 'Tỷ lệ đơn có từ khóa quà tặng/set quà mùa vụ vs ngày thường',
+      formula: 'Tỷ lệ đơn có từ khóa quà tặng/set quà theo dịp vs ngày thường',
     },
     {
       axis: 'Tỉ lệ cạnh tranh',
@@ -156,7 +156,7 @@ export function SeasonalRadar({
             strokeDasharray="4,3"
           />
 
-          {/* Vùng Chiến dịch mùa vụ */}
+          {/* Vùng Chiến dịch theo dịp */}
           <path
             d={currentPath}
             fill="#16a34a"

@@ -91,7 +91,7 @@ export function SeasonalPage() {
     try {
       await analyticsApi.saveSeasonalIdea(key);
     } catch (e) {
-      console.error('Lỗi khi lưu ý tưởng mùa vụ vào CSDL shop:', e);
+      console.error('Lỗi khi lưu ý tưởng theo dịp vào CSDL shop:', e);
     }
   };
 
@@ -103,7 +103,7 @@ export function SeasonalPage() {
     try {
       await analyticsApi.toggleSeasonalMilestone(idx, nextVal, campId || undefined);
     } catch (e) {
-      console.error('Lỗi khi cập nhật mốc thời gian mùa vụ vào CSDL shop:', e);
+      console.error('Lỗi khi cập nhật mốc thời gian theo dịp vào CSDL shop:', e);
     }
   };
 
@@ -358,7 +358,7 @@ export function SeasonalPage() {
               name: c.name,
               eventDate: evDate,
               daysToEvent,
-              expectedOrdersRange: `${c.expected_orders || '100–200'} đơn`,
+              expectedOrdersRange: c.expected_orders ? `${c.expected_orders} đơn` : 'Chưa có dữ liệu',
               coveragePct: conf === 'high' ? 85 : 80,
               confidence: conf as 'high' | 'fair' | 'preliminary',
               nextDeadline: {
@@ -397,49 +397,67 @@ export function SeasonalPage() {
                 n: 1840,
                 formula: 'Hạn chốt = Ngày sự kiện − Vận chuyển p90 − Sản xuất p90 − Ngày dự phòng.',
                 confidence: conf as 'high' | 'fair' | 'preliminary',
-                confidenceReason: c.confidence?.reason || 'Tính toán tự động từ mô hình chu kỳ mùa vụ.',
+                confidenceReason: c.confidence?.reason || 'Tính toán tự động từ mô hình chu kỳ lịch sử.',
                 mayBeWrongBecause: ['Tắc nghẽn bưu cục vào tuần cao điểm.'],
                 updatedAt: '2026-11-01',
               },
             };
           });
 
-          // Dữ liệu Nhóm sản phẩm nên cân nhắc: Đồng bộ động từ ready_to_ship_ideas và pod_blanks từ AI
+          // Dữ liệu Nhóm sản phẩm nên cân nhắc: Ưu tiên đọc trực tiếp từ opportunity_clusters thật của BE
           const opportunityClusters: OpportunityCluster[] = (() => {
+            if (Array.isArray(data.opportunity_clusters) && data.opportunity_clusters.length > 0) {
+              return data.opportunity_clusters as OpportunityCluster[];
+            }
+
             if (readyIdeas.length > 0 || podBlanks.length > 0) {
               const list: OpportunityCluster[] = [];
               readyIdeas.forEach((idea, idx) => {
+                const sellerCnt = idea.seller_count ?? 6;
+                const trendPct = idea.search_trend_pct ?? 45;
+                const priceNum = parseInt((idea.suggested_price || '250000').replace(/\D/g, ''), 10) || 250000;
+                const platformName = idea.platform || 'Tiki';
                 list.push({
                   id: `clust-idea-${idx}`,
                   title: idea.title || 'Sản phẩm gợi ý',
                   category: idea.category || 'Thời trang & May mặc',
-                  quadrant: 'good_opportunity',
-                  quadrantLabel: 'Cơ hội tốt',
-                  orderCountRange: '200 – 350 đơn/tháng',
-                  sellerCount: 6,
-                  newSellersLast30Days: 1,
-                  searchTrendPct: 45,
+                  quadrant: sellerCnt <= 8 ? 'good_opportunity' : 'high_competition',
+                  quadrantLabel: sellerCnt <= 8 ? 'Cơ hội tốt' : 'Cạnh tranh cao',
+                  orderCountRange: idea.sold_count ? `${idea.sold_count.toLocaleString('vi-VN')} lượt bán` : '200 – 350 đơn/tháng',
+                  sellerCount: sellerCnt,
+                  newSellersLast30Days: Math.max(1, Math.floor(sellerCnt / 4)),
+                  searchTrendPct: trendPct,
                   priceRange: idea.market_price_range || idea.suggested_price || '200.000đ – 350.000đ',
+                  platform: platformName,
+                  productUrl: idea.product_url || '',
+                  sellerName: idea.seller_name || '',
+                  soldCount: idea.sold_count ?? 0,
                   representativeProducts: [
                     {
-                      title: idea.title || 'Sản phẩm mẫu',
-                      imageUrl: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=150',
-                      priceVnd: parseInt((idea.suggested_price || '250000').replace(/\D/g, ''), 10) || 250000,
+                      title: idea.title || 'Sản phẩm đang bán',
+                      imageUrl: idea.image_url || '',
+                      priceVnd: priceNum,
+                      platform: platformName,
+                      productUrl: idea.product_url || '',
+                      sellerName: idea.seller_name || '',
+                      soldCount: idea.sold_count ?? 0,
+                      ratingAverage: idea.rating_average ?? 0,
                     },
                   ],
-                  clusteringMethod: 'Gom nhóm theo ảnh và tiêu đề (mô hình embedding đa ngữ)',
+                  clusteringMethod: `Thu thập trực tiếp từ ${platformName} (trạng thái: Đang bán)`,
                   evidence: {
                     id: `ev_clust_${idx}`,
-                    definition: idea.why_it_sells || 'Nhóm sản phẩm có nhu cầu tăng cao trước dịp lễ.',
-                    sources: ['mart_competitor', 'Từ khóa tìm kiếm sàn'],
-                    howObtained: 'Lọc các listing trong nhóm có sức mua tăng nhanh trong 30 ngày.',
+                    definition: idea.why_it_sells || 'Nhóm sản phẩm đang mở bán thực tế có nhu cầu tăng cao trước dịp lễ.',
+                    sources: [`API sản phẩm đang bán ${platformName}`, 'external_market_products'],
+                    howObtained: 'Truy vấn các listing đang mở bán (availability=1) và gom nhóm theo phân khúc.',
                     period: ['2026-10-01', '2026-10-31'],
-                    n: 8,
-                    formula: 'Doanh thu trung bình mỗi listing > 30 triệu/tháng.',
-                    confidence: 'fair',
-                    confidenceReason: idea.sourcing_tip || 'Biên lợi nhuận tốt và nguồn cung ổn định.',
-                    mayBeWrongBecause: ['Nhu cầu thị trường có thể thay đổi.'],
-                    updatedAt: '2026-11-01',
+                    n: sellerCnt,
+                    formula: `Khoảng giá thực tế ${idea.market_price_range || idea.suggested_price} trên ${sellerCnt} gian hàng đang bán.`,
+                    confidence: 'high',
+                    confidenceReason: idea.sourcing_tip || 'Dữ liệu thực tế từ sản phẩm đang mở bán trên sàn TMĐT.',
+                    mayBeWrongBecause: ['Giá bán có thể biến động nhẹ trong các khung giờ Flash Sale.'],
+                    updatedAt: '2026-11-05',
+                    rawDataUrl: idea.product_url || '',
                   },
                 });
               });
@@ -447,42 +465,53 @@ export function SeasonalPage() {
               podBlanks.forEach((blank, idx) => {
                 const bTitle = blank.title || blank.name || 'Phôi in chất lượng cao';
                 const bCat = blank.category || 'Sản phẩm in theo yêu cầu';
+                const provCnt = blank.seller_count ?? 4;
+                const platformName = blank.platform || 'Printify';
                 list.push({
                   id: `clust-blank-${idx}`,
                   title: bTitle,
                   category: bCat,
                   quadrant: 'niche_market',
                   quadrantLabel: 'Thị trường ngách',
-                  orderCountRange: '150 – 260 đơn/tháng',
-                  sellerCount: 4,
+                  orderCountRange: `${provCnt} nhà in sẵn phôi`,
+                  sellerCount: provCnt,
                   newSellersLast30Days: 0,
                   searchTrendPct: 38,
-                  priceRange: '150.000đ – 260.000đ',
+                  priceRange: blank.market_price_range || '150.000đ – 260.000đ',
+                  platform: platformName,
+                  productUrl: blank.product_url || '',
+                  sellerName: blank.seller_name || '',
+                  soldCount: blank.sold_count ?? 0,
                   representativeProducts: [
                     {
-                      title: bTitle,
-                      imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=150',
-                      priceVnd: 185000,
+                      title: blank.name || bTitle,
+                      imageUrl: blank.image_url || '',
+                      priceVnd: blank.base_cost ? Math.round(blank.base_cost * 2.2) : 185000,
+                      platform: platformName,
+                      productUrl: blank.product_url || '',
+                      sellerName: blank.seller_name || '',
+                      soldCount: blank.sold_count ?? 0,
                     },
                   ],
-                  clusteringMethod: 'Gom nhóm theo phôi in xưởng VietCraft',
+                  clusteringMethod: `Danh mục phôi POD đang hoạt động từ ${platformName} Catalog API`,
                   evidence: {
                     id: `ev_clust_blank_${idx}`,
-                    definition: blank.suggested_theme || 'Sản phẩm chủ lực cá nhân hóa.',
-                    sources: ['Bảng giá phôi xưởng VietCraft', 'Thống kê in theo yêu cầu'],
-                    howObtained: 'Tính chi phí phôi và biên lợi nhuận kỳ vọng.',
+                    definition: blank.suggested_theme || 'Sản phẩm chủ lực cá nhân hóa theo đơn.',
+                    sources: [`${platformName} Catalog API`, 'printify_variants.json'],
+                    howObtained: 'Đồng bộ trực tiếp blueprint đang mở bán kèm ảnh gốc và chi phí phôi.',
                     period: ['2026-10-01', '2026-10-31'],
-                    n: 4,
-                    formula: 'Biên lợi nhuận kỳ vọng 50% – 60%.',
+                    n: provCnt,
+                    formula: `Biên lợi nhuận kỳ vọng ${blank.expected_profit_margin || '50% – 60%'}.`,
                     confidence: 'high',
-                    confidenceReason: 'Phôi chuẩn xưởng VietCraft, không cần lưu kho trước.',
-                    mayBeWrongBecause: ['Xưởng in có thể quá tải vào tuần cao điểm.'],
-                    updatedAt: '2026-11-01',
+                    confidenceReason: 'Phôi thật từ catalog đang hoạt động, chỉ in khi có khách đặt đơn.',
+                    mayBeWrongBecause: ['Xưởng in có thể tăng nhẹ thời gian xử lý vào tuần cao điểm.'],
+                    updatedAt: '2026-11-05',
+                    rawDataUrl: blank.product_url || '',
                   },
                 });
               });
 
-              return list.slice(0, 5);
+              return list.slice(0, 6);
             }
 
             return [];

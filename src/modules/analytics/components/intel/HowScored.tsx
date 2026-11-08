@@ -16,7 +16,7 @@ export function HowScored({ data }: { data: ListingIntel }) {
           <li>Cách chấm này ước tính điểm: sản phẩm của bạn tốt hơn bao nhiêu phần trăm sản phẩm nhóm {group} trong dữ liệu tham chiếu.</li>
           <li>Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Kém.</li>
           {data.base !== null && data.demand_factor !== null && (
-            <li>Điểm chuẩn {decimal(data.base, 0)} nhân với mức độ quan tâm theo mùa ×{decimal(data.demand_factor, 2)} của ngày đang xem, nên điểm có thể thay đổi theo mùa vụ.</li>
+            <li>Điểm chuẩn {decimal(data.base, 0)} nhân với mức độ quan tâm theo thời điểm ×{decimal(data.demand_factor, 2)} của ngày đang xem, nên điểm có thể thay đổi theo từng dịp cao điểm.</li>
           )}
           <li>Điểm từng phần là chỉ báo riêng, không cộng lại thành điểm tổng. Đánh giá của khách nằm trong việc cần làm, không cộng vào điểm.</li>
           <li>Điểm để bạn tự cải thiện, không ảnh hưởng thứ hạng tìm kiếm và không phải cam kết bán được.</li>

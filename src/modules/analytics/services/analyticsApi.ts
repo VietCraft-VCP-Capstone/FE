@@ -97,7 +97,7 @@ export const analyticsApi = {
     return res.data?.data;
   },
 
-  /** Lưu hoặc bỏ lưu ý tưởng sản phẩm mùa vụ vào database gian hàng */
+  /** Lưu hoặc bỏ lưu ý tưởng sản phẩm theo dịp vào database gian hàng */
   async saveSeasonalIdea(ideaId: string): Promise<{ success: boolean; saved_ideas: string[] }> {
     const res = await api.post(`${BASE}/forecast/seasonal/save-idea`, { idea_id: ideaId });
     return res.data;

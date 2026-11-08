@@ -1,16 +1,21 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   BookOpen,
   Calendar,
+  Clock,
   Flame,
   Gift,
   GraduationCap,
   Heart,
   Info,
+  PackageCheck,
   ShoppingBag,
   Sparkles,
   Sun,
+  Tag,
   Trees,
+  Truck,
+  X,
   Zap,
 } from 'lucide-react';
 import type { SeasonalCampaign } from '../../types';
@@ -72,6 +77,61 @@ interface CalendarTimelineRow {
     endDays: number;
   };
   isDashedCurve?: boolean;
+  rawCampaign?: SeasonalCampaign;
+}
+
+interface TimelineMilestone {
+  label: string;
+  date: string;
+}
+
+interface OccasionDetails {
+  title: string;
+  badge: string;
+  categoryFocus: string[];
+  keywords: string[];
+  milestones: TimelineMilestone[];
+  cutoffFormula: string;
+  leadTimeDays: number | null;
+  warning: string | null;
+}
+
+function fmtDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+/**
+ * Chỉ lấy dữ liệu có thật do backend trả về (lịch dịp + mốc tính theo công thức).
+ * Không có nội dung tự viết: thiếu dữ liệu thì bỏ trống, không bịa.
+ */
+export function getOccasionDetails(row: CalendarTimelineRow): OccasionDetails {
+  const raw = row.rawCampaign;
+  const oc = raw?.occasion_window;
+  const lw = raw?.launch_window;
+
+  const candidates: TimelineMilestone[] = [
+    { label: 'Bắt đầu chuẩn bị mẫu', date: fmtDate(oc?.rd_start || lw?.start) },
+    { label: 'Bắt đầu đăng bán', date: fmtDate(oc?.traction_start || (lw as any)?.traction_start) },
+    { label: 'Bắt đầu cao điểm', date: fmtDate(oc?.peak_start || (lw as any)?.peak_start) },
+    { label: 'Hạn chốt nhận đơn', date: fmtDate(oc?.cut_off_date || lw?.end) },
+    { label: 'Ngày diễn ra dịp', date: fmtDate(oc?.peak_date || lw?.peak_date) },
+  ];
+
+  return {
+    title: raw?.name || row.name,
+    badge: raw?.badge || '',
+    categoryFocus: raw?.category_summary
+      ? raw.category_summary.split(',').map(s => s.trim()).filter(Boolean)
+      : [],
+    keywords: raw?.search_keywords || [],
+    milestones: candidates.filter(m => m.date),
+    cutoffFormula: lw?.basis || '',
+    leadTimeDays: oc?.lead_time_days ?? null,
+    warning: oc?.timing_warning || null,
+  };
 }
 
 export function SeasonalMonthMatrix({
@@ -80,6 +140,26 @@ export function SeasonalMonthMatrix({
   onSelectCampaign,
 }: SeasonalMonthMatrixProps) {
   const [viewMode, setViewMode] = useState<'120d' | '12m'>('120d');
+
+  // State cho Form Popup / Modal khi click
+  const [activeModalOccasion, setActiveModalOccasion] = useState<CalendarTimelineRow | null>(null);
+
+  // State cho Hover Tooltip Card khi rê chuột
+  const [hoveredOccasion, setHoveredOccasion] = useState<CalendarTimelineRow | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ top: number; left: number } | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Đóng modal khi nhấn Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveModalOccasion(null);
+        setHoveredOccasion(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Chuyển đổi toàn bộ campaigns thực tế từ Backend/AI sang định dạng hàng CalendarTimelineRow
   const mappedCampaignRows: CalendarTimelineRow[] = useMemo(() => {
@@ -147,12 +227,13 @@ export function SeasonalMonthMatrix({
         id: camp.id,
         name: camp.name,
         weekdayText: weekdayText || camp.name,
-        expectedOrders: camp.expected_orders || '80–150',
+        expectedOrders: camp.expected_orders || '',
         confidenceText: (confText === 'Cao' || confText === 'Khá' || confText === 'Sơ bộ') ? confText : 'Khá',
         confidenceDots: confDots,
         nextDeadline,
         stages,
         isDashedCurve: camp.is_dashed_curve ?? (confText === 'Sơ bộ' || stages.endDays > 60),
+        rawCampaign: camp,
       };
     });
   }, [campaigns]);
@@ -200,8 +281,38 @@ export function SeasonalMonthMatrix({
     return Math.max(0, Math.min(100, (days / totalDays) * 100));
   };
 
+  // Xử lý sự kiện rê chuột vào hàng
+  const handleRowMouseEnter = (row: CalendarTimelineRow, e: React.MouseEvent<HTMLDivElement>) => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cardWidth = 400;
+    const cardHeight = 200;
+
+    // Tính toán tọa độ hiển thị để không tràn màn hình
+    let top = rect.bottom + 6;
+    if (top + cardHeight > window.innerHeight) {
+      top = Math.max(10, rect.top - cardHeight - 6);
+    }
+    const left = Math.max(16, Math.min(window.innerWidth - cardWidth - 16, rect.left + 24));
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoverPos({ top, left });
+      setHoveredOccasion(row);
+    }, 120);
+  };
+
+  const handleRowMouseLeave = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setHoveredOccasion(null);
+    setHoverPos(null);
+  };
+
+  const hoveredDetails = hoveredOccasion ? getOccasionDetails(hoveredOccasion) : null;
+  const modalDetails = activeModalOccasion ? getOccasionDetails(activeModalOccasion) : null;
+
   return (
-    <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6 space-y-4">
+    <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6 space-y-4 relative">
       {/* 1. Header & Điều khiển xem */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-stone-100 pb-3.5">
         <div>
@@ -250,8 +361,8 @@ export function SeasonalMonthMatrix({
         <div className="min-w-[940px] select-none text-stone-800">
           {/* Header Bảng */}
           <div className="flex items-center border-b border-stone-200 pb-2 text-xs font-semibold text-stone-500">
-            <div className="w-44 shrink-0 pl-2">Dịp</div>
-            
+            <div className="w-48 shrink-0 pl-2">Dịp</div>
+
             {/* Header Timeline 4 tháng */}
             <div className="relative flex-1 grid grid-cols-4 text-xs font-medium">
               {monthHeaders.map((mH, idx) => (
@@ -273,8 +384,8 @@ export function SeasonalMonthMatrix({
               <Info size={12} className="text-stone-400 cursor-help" />
               <div className="absolute left-4 top-6 hidden group-hover/th:block z-30 w-60 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
                 <strong className="text-emerald-400 block mb-1">Căn cứ tính mốc hạn:</strong>
-                • Ngày lễ chính thức theo lịch quốc gia.<br />
-                • Trừ thời gian ship p90 (2–4 ngày) + xưởng in p90 (2–3 ngày) + 1 ngày đệm an toàn.<br />
+                • Ngày diễn ra dịp theo lịch.<br />
+                • Hạn chốt = ngày dịp trừ số ngày sản xuất và giao hàng cấu hình cho từng dịp.<br />
                 • Đánh dấu <strong>Gấp</strong> khi còn dưới 14 ngày.
               </div>
             </div>
@@ -283,10 +394,8 @@ export function SeasonalMonthMatrix({
               <span>Dự kiến</span>
               <Info size={12} className="text-stone-400 cursor-help" />
               <div className="absolute left-0 top-6 hidden group-hover/th:block z-30 w-60 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
-                <strong className="text-emerald-400 block mb-1">Căn cứ dự kiến số đơn:</strong>
-                • Số đơn ngày thường của shop trong 8 tuần qua.<br />
-                • Nhân hệ số tăng trưởng đơn lịch sử ngành trên sàn (tăng 2.5x – 6x tùy dịp).<br />
-                • Thể hiện dưới dạng khoảng dao động an toàn.
+                <strong className="text-emerald-400 block mb-1">Dự kiến số đơn:</strong>
+                • Chưa có mô hình dự báo từ dữ liệu đơn hàng thật nên chưa hiển thị con số.
               </div>
             </div>
 
@@ -294,10 +403,9 @@ export function SeasonalMonthMatrix({
               <span>Tin cậy</span>
               <Info size={12} className="text-stone-400 cursor-help" />
               <div className="absolute right-0 top-6 hidden group-hover/th:block z-30 w-64 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
-                <strong className="text-emerald-400 block mb-1">Tiêu chí xếp hạng độ tin cậy:</strong>
-                • <strong>Cao (●●●●)</strong>: Có từ 2 kỳ lịch sử sàn, n ≥ 1.000 đơn.<br />
-                • <strong>Khá (●●●○)</strong>: Có 1 kỳ lịch sử hoặc trend Google rõ nét.<br />
-                • <strong>Sơ bộ (●○○○)</strong>: Dịp còn xa (&gt; 60 ngày), ước tính sơ bộ theo ngành.
+                <strong className="text-emerald-400 block mb-1">Cách xếp mức này:</strong>
+                • Xếp theo quy tắc khoảng cách ngày tới dịp (dịp xa hơn 60 ngày là Sơ bộ).<br />
+                • Chưa đối chiếu với số liệu đơn hàng thực tế.
               </div>
             </div>
           </div>
@@ -308,7 +416,7 @@ export function SeasonalMonthMatrix({
             <div
               className="pointer-events-none absolute top-0 bottom-0 z-20 border-l-2 border-rose-500"
               style={{
-                left: `calc(176px + 2px)`,
+                left: `calc(192px + 2px)`,
               }}
             />
 
@@ -335,20 +443,31 @@ export function SeasonalMonthMatrix({
               return (
                 <div
                   key={row.id}
-                  onClick={() => onSelectCampaign(row.id)}
+                  onClick={() => {
+                    onSelectCampaign(row.id);
+                    setActiveModalOccasion(row);
+                  }}
+                  onMouseEnter={e => handleRowMouseEnter(row, e)}
+                  onMouseLeave={handleRowMouseLeave}
                   className={`group relative flex items-center py-4 px-2 rounded-xl transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-emerald-50/50 ring-1 ring-emerald-300/80 shadow-2xs'
-                      : 'hover:bg-stone-50/70'
+                      : 'hover:bg-stone-50/80'
                   }`}
                 >
                   {/* Cột 1: Tên Dịp & Thứ/Ngày */}
-                  <div className="w-44 shrink-0 pr-3">
-                    <div className="text-sm font-bold text-stone-900 group-hover:text-[#007700] transition-colors">
-                      {row.name}
+                  <div className="w-48 shrink-0 pr-3">
+                    <div className="text-sm font-bold text-stone-900 group-hover:text-[#007700] transition-colors flex items-center gap-1.5">
+                      <span className="p-1 rounded-md bg-stone-100 group-hover:bg-emerald-100/70 transition-colors">
+                        {getCampaignLucideIcon(row.id)}
+                      </span>
+                      <span>{row.name}</span>
                     </div>
-                    <div className="text-xs text-stone-500 mt-0.5">
-                      {row.weekdayText}
+                    <div className="text-xs text-stone-500 mt-0.5 flex items-center justify-between">
+                      <span>{row.weekdayText}</span>
+                      <span className="text-[10px] font-bold text-[#007700] opacity-0 group-hover:opacity-100 transition-opacity">
+                        Xem chi tiết →
+                      </span>
                     </div>
                   </div>
 
@@ -420,7 +539,7 @@ export function SeasonalMonthMatrix({
                     <div
                       style={{ left: `${pEnd + 4}%` }}
                       className="absolute top-2 bottom-2 w-[2.5px] bg-stone-900 z-20 pointer-events-none rounded-xs"
-                      title="Hạn chót nhận đơn"
+                      title="Hạn chốt nhận đơn"
                     />
                   </div>
 
@@ -443,12 +562,14 @@ export function SeasonalMonthMatrix({
 
                   {/* Cột 4: Dự kiến */}
                   <div className="w-24 shrink-0 pl-3">
-                    <div className="font-bold text-xs text-stone-900">
-                      {row.expectedOrders}
-                    </div>
-                    <div className="text-[11px] text-stone-400">
-                      đơn
-                    </div>
+                    {row.expectedOrders ? (
+                      <>
+                        <div className="font-bold text-xs text-stone-900">{row.expectedOrders}</div>
+                        <div className="text-[11px] text-stone-400">đơn</div>
+                      </>
+                    ) : (
+                      <div className="text-[11px] text-stone-400">Chưa có dữ liệu</div>
+                    )}
                   </div>
 
                   {/* Cột 5: Tin cậy (với các chấm tròn) */}
@@ -507,10 +628,196 @@ export function SeasonalMonthMatrix({
           </div>
         </div>
 
-        <span className="text-[11px] text-stone-400">
-          Bấm vào hàng bất kỳ để đồng bộ lộ trình chi tiết
+        <span className="text-[11px] text-stone-500 font-medium flex items-center gap-1">
+          <span>💡 Rê chuột hoặc ấn vào hàng bất kỳ để xem form mô tả chi tiết nội dung dịp</span>
         </span>
       </div>
+
+      {/* 4. HOVER PREVIEW CARD: chỉ hiển thị dữ liệu có thật */}
+      {hoveredOccasion && hoverPos && !activeModalOccasion && hoveredDetails && (
+        <div
+          style={{
+            position: 'fixed',
+            top: hoverPos.top,
+            left: hoverPos.left,
+            width: 400,
+            maxWidth: 'calc(100vw - 32px)',
+            zIndex: 60,
+          }}
+          className="pointer-events-none rounded-xl border border-stone-200/95 bg-white p-4 shadow-xl text-stone-800"
+        >
+          <div className="flex items-center gap-2.5 border-b border-stone-100 pb-2.5">
+            <span className="p-1.5 rounded-lg bg-emerald-50 text-[#007700]">
+              {getCampaignLucideIcon(hoveredOccasion.id)}
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-stone-900 m-0">{hoveredDetails.title}</h4>
+                {hoveredDetails.badge && (
+                  <span className="rounded bg-emerald-100/80 px-1.5 py-0.5 text-[10.5px] font-bold text-emerald-800">
+                    {hoveredDetails.badge}
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] text-stone-500 font-medium">{hoveredOccasion.weekdayText}</span>
+            </div>
+          </div>
+
+          <div className="mt-2.5 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-stone-700">{hoveredOccasion.nextDeadline.title}</span>
+              <span className="text-stone-500">còn {hoveredOccasion.nextDeadline.daysLeft} ngày</span>
+            </div>
+
+            {hoveredDetails.categoryFocus.length > 0 && (
+              <div className="rounded-lg bg-stone-50/90 p-2 border border-stone-100">
+                <span className="block text-[11px] font-bold text-stone-700 mb-1">Nhóm hàng gợi ý của dịp:</span>
+                <div className="flex flex-wrap gap-1">
+                  {hoveredDetails.categoryFocus.slice(0, 4).map((p, idx) => (
+                    <span key={idx} className="rounded bg-white px-1.5 py-0.5 text-[10.5px] border border-stone-200/80 text-stone-700">
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-stone-100 text-[11px] text-emerald-700 font-semibold">
+              Bấm chuột để xem mô tả chi tiết các mốc thời gian
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. FORM CHI TIẾT khi bấm vào dịp: chỉ dữ liệu có nguồn */}
+      {activeModalOccasion && modalDetails && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60"
+          onClick={() => setActiveModalOccasion(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="relative w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-stone-200 overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100 bg-stone-50/80">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 rounded-xl bg-emerald-100 text-[#007700]">
+                  {getCampaignLucideIcon(activeModalOccasion.id)}
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="m-0 text-base sm:text-lg font-bold text-stone-900">{modalDetails.title}</h3>
+                    {modalDetails.badge && (
+                      <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
+                        {modalDetails.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="m-0 text-xs text-stone-500 mt-0.5">{activeModalOccasion.weekdayText}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveModalOccasion(null)}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors cursor-pointer"
+                aria-label="Đóng form"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-sm text-stone-700">
+              <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/90">
+                <div className="flex items-center gap-2.5">
+                  <Clock size={16} className="text-amber-800 shrink-0" />
+                  <div>
+                    <div className="font-bold text-xs uppercase tracking-wide text-amber-800">Mốc tiếp theo</div>
+                    <div className="text-sm font-bold text-stone-900 mt-0.5">{activeModalOccasion.nextDeadline.title}</div>
+                  </div>
+                </div>
+                <span className="px-3 py-1 rounded-lg text-xs font-extrabold bg-amber-200 text-amber-900">
+                  Còn {activeModalOccasion.nextDeadline.daysLeft} ngày
+                </span>
+              </div>
+
+              {modalDetails.warning && (
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50/70 border border-rose-200/70 text-xs text-rose-900">
+                  <Truck size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                  <span>{modalDetails.warning}</span>
+                </div>
+              )}
+
+              {modalDetails.milestones.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900 m-0">Các mốc thời gian</h4>
+                  <ul className="m-0 p-0 list-none divide-y divide-stone-100 rounded-xl border border-stone-200/80">
+                    {modalDetails.milestones.map((m, i) => (
+                      <li key={i} className="flex items-center justify-between px-3 py-2 text-xs">
+                        <span className="text-stone-700">{m.label}</span>
+                        <strong className="text-stone-900">{m.date}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="m-0 text-[11px] text-stone-500 leading-relaxed">
+                    {modalDetails.cutoffFormula && <>Cách tính hạn chốt: {modalDetails.cutoffFormula}. </>}
+                    {modalDetails.leadTimeDays !== null && (
+                      <>
+                        Số ngày sản xuất và giao hàng ({modalDetails.leadTimeDays} ngày) là tham số cấu hình cho từng dịp,
+                        chưa được đo từ dữ liệu đơn hàng của shop.
+                      </>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {modalDetails.categoryFocus.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5 m-0">
+                    <PackageCheck size={14} className="text-[#007700]" />
+                    Nhóm hàng gợi ý của dịp
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {modalDetails.categoryFocus.map((p, idx) => (
+                      <span key={idx} className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-800 border border-stone-200/70">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="m-0 text-[11px] text-stone-500">Danh sách do hệ thống cấu hình sẵn cho dịp này, chưa phải số liệu bán chạy đo được.</p>
+                </div>
+              )}
+
+              {modalDetails.keywords.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5 m-0">
+                    <Tag size={14} className="text-amber-600" />
+                    Từ khóa theo dịp
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {modalDetails.keywords.map((kw, idx) => (
+                      <span key={idx} className="rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 border border-amber-200/70">
+                        #{kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between px-6 py-3.5 border-t border-stone-100 bg-stone-50">
+              <button
+                type="button"
+                onClick={() => setActiveModalOccasion(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:text-stone-900 hover:bg-stone-200/70 transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

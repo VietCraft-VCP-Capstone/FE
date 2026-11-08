@@ -89,7 +89,7 @@ export function SeasonalHeader({
                 )}
               </div>
               <p className="mb-0 mt-0.5 text-xs text-stone-500 leading-relaxed">
-                {activeCamp.description || 'Lên kế hoạch sản xuất, đón đầu sức mua mùa vụ lớn.'}
+                {activeCamp.description || 'Lên kế hoạch sản xuất, đón đầu sức mua dịp cao điểm lớn.'}
               </p>
             </div>
           </div>
