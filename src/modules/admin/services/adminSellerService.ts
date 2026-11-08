@@ -15,6 +15,11 @@ export interface AdminSellerApplicationItem {
     account_holder: string;
     account_number_masked: string;
     is_name_matched: boolean;
+    /** Đối chiếu thông tin nộp với kết quả quét OCR CCCD (null với hồ sơ cũ / doanh nghiệp) */
+    ocr_check?: {
+        status: 'MATCH' | 'MISMATCH' | 'LOW_QUALITY' | 'NOT_SCANNED';
+        mismatches: string[];
+    } | null;
     created_at: string;
     updated_at: string;
 }

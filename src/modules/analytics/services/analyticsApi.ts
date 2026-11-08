@@ -126,6 +126,24 @@ export interface SmartProductSuggestionResult {
     confidence?: string;
     warnings?: string[];
     value_factors?: string[];
+    comparables?: Array<{
+      title: string;
+      price: number;
+      similarity?: number;
+      source?: string;
+      segment?: string;
+    }>;
+    market_signals?: string[];
+    evidence_stats?: {
+      sample_size?: number;
+      p25?: number;
+      p50?: number;
+      p75?: number;
+      p90?: number;
+      blank_cost?: number;
+      profit?: number;
+      profit_margin_pct?: number;
+    };
     ai_engine_status?: {
       is_ai_live: boolean;
       engine: string;

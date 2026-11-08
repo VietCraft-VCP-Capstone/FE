@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { BarChart2, TrendingUp, Calculator, ShoppingBag } from 'lucide-react';
 import { analyticsApi, SmartProductSuggestionResult } from '../../analytics/services/analyticsApi';
 
 export interface SmartProductAiModalProps {
@@ -66,7 +67,13 @@ export function SmartProductAiModal({
     setTimeout(() => setAppliedField(null), 2200);
   };
 
+  // Huỷ lượt gọi trước khi gọi lượt mới: đổi danh mục nhanh thì phản hồi cũ về sau không được đè kết quả mới
+  const inflightRef = useRef<AbortController | null>(null);
+
   const fetchSuggestion = useCallback(async (overrides?: { catId?: string; kw?: string; mat?: string }) => {
+    inflightRef.current?.abort();
+    const controller = new AbortController();
+    inflightRef.current = controller;
     setLoading(true);
     setError(null);
     try {
@@ -84,7 +91,7 @@ export function SmartProductAiModal({
         keywords: kwToUse.trim(),
         material: matToUse.trim(),
         blank_cost: blankCost,
-      });
+      }, controller.signal);
 
       if (result) {
         setData(result);
@@ -116,10 +123,11 @@ export function SmartProductAiModal({
         }
       }
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       console.error('Failed to fetch AI product suggestion:', err);
       setError('Chưa thể lấy dữ liệu phân tích lúc này. Vui lòng thử lại sau.');
     } finally {
-      setLoading(false);
+      if (inflightRef.current === controller) setLoading(false);
     }
   }, [selectedCategory, keywordIdea, material, blankCost, categories]);
 
@@ -588,17 +596,152 @@ export function SmartProductAiModal({
                         </div>
                       </div>
 
-                      {/* Hộp Căn cứ phân tích thị trường & định giá */}
-                      {data.pricing_insight.summary && (
-                        <div className="p-3.5 bg-emerald-50/50 border border-emerald-200/70 rounded-2xl space-y-1 text-xs">
-                          <span className="text-[10.5px] uppercase font-black text-emerald-900 tracking-wider">
-                            Căn cứ phân tích mức giá:
+                      {/* BẰNG CHỨNG & SỐ LIỆU ĐỐI CHUẨN THỊ TRƯỜNG */}
+                      <div className="p-4 bg-stone-50/80 border border-stone-200 rounded-2xl space-y-3.5">
+                        <div className="flex items-center justify-between border-b border-stone-200/70 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                              <BarChart2 size={14} />
+                            </div>
+                            <span className="text-[11px] uppercase font-black text-stone-900 tracking-wider">
+                              Bằng chứng & Số liệu đối chuẩn thị trường
+                            </span>
+                          </div>
+                          <span className="text-[10.5px] font-bold text-stone-500 bg-white px-2 py-0.5 rounded-md border border-stone-200 shadow-2xs">
+                            {data.pricing_insight.market_sample_count > 0 
+                              ? `Mẫu khảo sát: ${data.pricing_insight.market_sample_count} sản phẩm`
+                              : (data.pricing_insight.source_label || 'Số liệu thị trường thực tế')}
                           </span>
-                          <p className="text-stone-700 font-medium leading-relaxed">
-                            {data.pricing_insight.summary}
-                          </p>
                         </div>
-                      )}
+
+                        {/* Thước đo phân vị giá cụ thể */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs space-y-0.5">
+                            <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider block">
+                              P25 (Giá sàn)
+                            </span>
+                            <span className="text-sm font-extrabold text-stone-800 block">
+                              {data.pricing_insight.price_range.low.toLocaleString('vi-VN')}đ
+                            </span>
+                            <span className="text-[9.5px] text-stone-500 block">Phân khúc cạnh tranh</span>
+                          </div>
+
+                          <div className="bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200 shadow-2xs space-y-0.5">
+                            <span className="text-[10px] text-emerald-800 font-black uppercase tracking-wider block">
+                              P50 (Trung vị)
+                            </span>
+                            <span className="text-sm font-black text-emerald-700 block">
+                              {data.pricing_insight.recommended_price.toLocaleString('vi-VN')}đ
+                            </span>
+                            <span className="text-[9.5px] text-emerald-800/80 font-bold block">Điểm cân bằng tối ưu</span>
+                          </div>
+
+                          <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs space-y-0.5">
+                            <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider block">
+                              P75 (Cao cấp)
+                            </span>
+                            <span className="text-sm font-extrabold text-stone-800 block">
+                              {data.pricing_insight.price_range.high.toLocaleString('vi-VN')}đ
+                            </span>
+                            <span className="text-[9.5px] text-stone-500 block">Chất lượng cao / Mall</span>
+                          </div>
+
+                          <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs space-y-0.5">
+                            <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider block">
+                              P90 (Đặc biệt)
+                            </span>
+                            <span className="text-sm font-extrabold text-amber-900 block">
+                              {(data.pricing_insight.price_range.premium || data.pricing_insight.price_range.high).toLocaleString('vi-VN')}đ
+                            </span>
+                            <span className="text-[9.5px] text-amber-700/80 block">Bản đầy đủ / Phụ kiện</span>
+                          </div>
+                        </div>
+
+                        {/* Bóc tách công thức giá vốn nếu có blankCost */}
+                        {blankCost > 0 && (
+                          <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200 text-xs flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 font-bold text-emerald-950">
+                              <Calculator size={14} className="text-emerald-700" />
+                              <span>Cấu trúc chi phí giá vốn:</span>
+                            </div>
+                            <div className="text-[11px] font-bold text-stone-700 flex items-center gap-2">
+                              <span>Giá phôi: <strong className="text-stone-900">{blankCost.toLocaleString('vi-VN')}đ</strong></span>
+                              <span>+</span>
+                              <span>Lợi nhuận gộp: <strong className="text-emerald-700">+{Math.max(0, data.pricing_insight.recommended_price - blankCost).toLocaleString('vi-VN')}đ ({Math.round(Math.max(0, data.pricing_insight.recommended_price - blankCost) / data.pricing_insight.recommended_price * 100)}%)</strong></span>
+                              <span>=</span>
+                              <span className="text-emerald-800 font-black">Giá bán {data.pricing_insight.recommended_price.toLocaleString('vi-VN')}đ</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Danh sách sản phẩm / phiên bản bằng chứng đối chiếu thực tế */}
+                        {data.pricing_insight.comparables && data.pricing_insight.comparables.length > 0 && (
+                          <div className="space-y-2 pt-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10.5px] font-black text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <ShoppingBag size={12} className="text-stone-500" />
+                                Sản phẩm & phiên bản đối chiếu thực tế từ thị trường:
+                              </span>
+                              <span className="text-[10px] text-stone-500 font-medium">
+                                ({data.pricing_insight.comparables.length} sản phẩm minh chứng)
+                              </span>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {data.pricing_insight.comparables.map((item, cIdx) => (
+                                <div
+                                  key={cIdx}
+                                  className="flex items-center justify-between gap-3 p-2 bg-white rounded-xl border border-stone-200 text-xs shadow-2xs hover:border-emerald-200 transition"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                    <span className="font-semibold text-stone-800 truncate text-[11px]">
+                                      {item.title}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="font-black text-emerald-700 text-xs bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                                      {item.price.toLocaleString('vi-VN')}đ
+                                    </span>
+                                    <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
+                                      item.source?.toLowerCase().includes('vietcraft')
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : 'bg-sky-50 text-sky-800 border-sky-200'
+                                    }`}>
+                                      {item.source?.toLowerCase() === 'tiki' ? 'Thị trường TMĐT' : (item.source || 'Thị trường TMĐT')}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tín hiệu nhu cầu tìm kiếm thực tế nếu có */}
+                        {data.pricing_insight.market_signals && data.pricing_insight.market_signals.length > 0 && (
+                          <div className="p-2.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs space-y-1">
+                            <span className="text-[10px] font-black text-blue-900 uppercase tracking-wider flex items-center gap-1">
+                              <TrendingUp size={12} className="text-blue-700" />
+                              Tín hiệu nhu cầu thực tế:
+                            </span>
+                            <div className="space-y-0.5">
+                              {data.pricing_insight.market_signals.map((sig, sIdx) => (
+                                <p key={sIdx} className="text-[11px] text-blue-950 font-medium">
+                                  • {sig}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Căn cứ số liệu súc tích */}
+                        {data.pricing_insight.summary && (
+                          <div className="pt-1 text-[11px] text-stone-600 font-medium leading-relaxed border-t border-stone-200/60">
+                            <span className="font-bold text-stone-800">Căn cứ số liệu: </span>
+                            <span>{data.pricing_insight.summary}</span>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Warnings if any */}
                       {data.pricing_insight.warnings && data.pricing_insight.warnings.length > 0 && (

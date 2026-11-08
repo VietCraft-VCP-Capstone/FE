@@ -69,18 +69,20 @@ export function ProductFormModal({
     <ModalOverlay>
       <div className="bg-white rounded-2xl border border-stone-200 shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-stone-200 bg-stone-50/90">
-          <div>
+        <div className="relative flex items-center justify-center px-6 py-4.5 border-b border-stone-200 bg-stone-50/90">
+          <div className="text-center">
             <h3 className="text-lg font-extrabold text-stone-900 font-jakarta">
               {isEdit ? 'Chỉnh sửa thông tin sản phẩm' : 'Thêm sản phẩm mới'}
             </h3>
-            <p className="text-xs text-stone-500 mt-0.5">
-              {isEdit ? `Mã SKU: ${product?.sku}` : 'Điền đầy đủ thông tin mẫu áo, hình in và bảng size'}
-            </p>
+            {isEdit && product?.sku && (
+              <p className="text-xs text-stone-500 mt-0.5">
+                Mã SKU: {product.sku}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
-            className="text-stone-400 hover:text-stone-700 p-1.5 rounded-lg hover:bg-stone-200 transition-colors cursor-pointer"
+            className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1.5 rounded-lg hover:bg-stone-200 transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>

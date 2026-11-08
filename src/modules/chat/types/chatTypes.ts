@@ -29,7 +29,6 @@ export interface ConversationPartner {
   id: string;
   full_name: string;
   avatar?: string;
-  email: string;
   role: string;
   shop?: {
     id: string;
@@ -70,7 +69,8 @@ export function appendUniqueMessage(prev: ChatMessage[], newMsg: ChatMessage): C
   const newId = newMsg.id || (newMsg as any)._id;
   if (newId) {
     const exists = prev.some((m) => (m.id && m.id === newId) || ((m as any)._id && (m as any)._id === newId));
-    if (exists) return prev;
+    // Có id thì id là căn cứ duy nhất: gõ "ok" hai lần liên tiếp là 2 tin thật, không được gộp
+    return exists ? prev : [...prev, newMsg];
   }
   const isDuplicate = prev.some(
     (m) =>

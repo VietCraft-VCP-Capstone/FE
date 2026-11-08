@@ -337,7 +337,7 @@ export function SellerChatPage() {
                       : 'hover:bg-stone-50 bg-white'
                   }`}
                 >
-                  {/* Avatar + chấm online */}
+                  {/* Avatar */}
                   <div className="relative shrink-0 mt-0.5">
                     {c.partner.avatar ? (
                       <img
@@ -350,7 +350,6 @@ export function SellerChatPage() {
                         {getInitials(c.partner.full_name)}
                       </div>
                     )}
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-purple-600 border-2 border-white rounded-full" />
                   </div>
 
                   {/* Nội dung tóm tắt */}
