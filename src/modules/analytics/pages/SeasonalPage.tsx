@@ -242,10 +242,10 @@ export function SeasonalPage() {
               actionType: backendRec.action_type,
             } : {
               title: isOverduePrep
-                ? 'Chốt đơn & ưu tiên xuất hàng sẵn có'
+                ? 'Chốt đơn & xử lý hàng sẵn có'
                 : isTractionPhase
                 ? `Tối ưu listing & từ khóa "${kw}"`
-                : 'Chuẩn bị phôi xưởng & duyệt mẫu',
+                : 'Chuẩn bị nguồn hàng & lên mẫu mới',
               advice: isOverduePrep
                 ? `Sắp đến hạn chốt nhận đơn (${fmtShortDate(cutoffIso)}, còn ${daysToCutoff} ngày). Đã qua thời điểm làm mẫu mới. Nên tập trung xử lý các đơn hàng sẵn phôi trong kho để bảo đảm giao kịp trước ngày ${fmtShortDate(evDateIso)}.`
                 : isTractionPhase
@@ -257,11 +257,11 @@ export function SeasonalPage() {
                 ? `Bắt đầu mở bán ${fmtShortDate(tractionIso)} = Trước cao điểm 10 ngày để kịp index từ khóa.`
                 : `Bắt đầu chuẩn bị ${fmtShortDate(rdIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 38 ngày (lead time xưởng & đón sóng).`,
               ctaLabel: isOverduePrep
-                ? 'Xem phôi & tồn kho'
+                ? 'Xem sản phẩm shop & tồn kho'
                 : isTractionPhase
-                ? 'Xem từ khóa & đối thủ'
-                : 'Xem phôi xưởng có sẵn',
-              targetTab: (isTractionPhase ? 'opps' : 'ideas'),
+                ? 'Xem xu hướng & sức mua'
+                : 'Xem gợi ý sản phẩm đón dịp',
+              targetTab: (isOverduePrep ? 'readiness' : isTractionPhase ? 'traits' : 'potential'),
               actionType: (isOverduePrep ? 'close_orders' : isTractionPhase ? 'boost_traffic' : 'prepare_blank'),
             };
 
@@ -513,7 +513,12 @@ export function SeasonalPage() {
                       occasions={unifiedActions}
                       onOpenEvidence={handleOpenEvidence}
                       onToggleMilestone={handleToggleCampMilestone}
-                      onNavigateTab={handleSelectTab}
+                      onNavigateTab={(tabKey, campId) => {
+                        handleSelectTab(tabKey);
+                        if (campId) {
+                          handleSelectCampaign(campId);
+                        }
+                      }}
                     />
                   </div>
 

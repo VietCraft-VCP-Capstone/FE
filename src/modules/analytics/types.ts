@@ -788,14 +788,14 @@ export interface SeasonalCampaign {
   is_dashed_curve?: boolean;
   milestone_actions?: { title: string; desc: string }[];
   action_recommendation?: {
-    action_type: 'close_orders' | 'boost_traffic' | 'prepare_blank';
+    action_type: 'close_orders' | 'boost_traffic' | 'prepare_inventory' | 'prepare_blank';
     badge_text: string;
     badge_variant: 'amber' | 'blue' | 'emerald';
     title: string;
     advice: string;
     calculation_basis: string;
     cta_label: string;
-    target_tab: 'ideas' | 'opps' | 'hub';
+    target_tab: 'potential' | 'readiness' | 'traits' | 'timeline' | 'hub' | 'trial';
     is_urgent: boolean;
   };
 }

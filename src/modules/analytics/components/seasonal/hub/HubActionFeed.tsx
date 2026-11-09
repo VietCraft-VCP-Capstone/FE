@@ -37,8 +37,8 @@ export interface UnifiedOccasionAction {
     advice: string;
     calculationBasis: string;
     ctaLabel: string;
-    targetTab: 'ideas' | 'opps' | 'hub';
-    actionType: 'close_orders' | 'boost_traffic' | 'prepare_blank';
+    targetTab: 'potential' | 'readiness' | 'traits' | 'timeline' | 'hub' | 'trial';
+    actionType: string;
   };
   milestones: OccasionMilestone[];
   savedIdeasCount: number;
@@ -54,7 +54,7 @@ interface Props {
   occasions: UnifiedOccasionAction[];
   onOpenEvidence: (evidence: Evidence) => void;
   onToggleMilestone?: (occasionId: string, stageIdx: number) => void;
-  onNavigateTab?: (targetTab: string) => void;
+  onNavigateTab?: (targetTab: string, occasionId?: string) => void;
   className?: string;
 }
 
@@ -120,7 +120,7 @@ export const HubActionFeed: React.FC<Props> = ({
               {item.recommendation.ctaLabel && (
                 <button
                   type="button"
-                  onClick={() => onNavigateTab?.(item.recommendation.targetTab)}
+                  onClick={() => onNavigateTab?.(item.recommendation.targetTab, item.occasionId)}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-[#007700] hover:text-[#005500] hover:underline transition-colors pt-0.5 cursor-pointer"
                 >
                   <span>{item.recommendation.ctaLabel}</span>
