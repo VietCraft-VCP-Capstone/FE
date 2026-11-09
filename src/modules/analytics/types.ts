@@ -658,6 +658,15 @@ export interface ReadyToShipIdea {
   expected_profit_margin?: string;
   upsell_bundle_tip?: string;
   target_buyer?: string;
+  image_url?: string;
+  product_url?: string;
+  platform?: string;
+  seller_name?: string;
+  seller_count?: number;
+  sold_count?: number;
+  rating_average?: number;
+  review_count?: number;
+  search_trend_pct?: number;
 }
 
 export interface PodBlankSuggestion {
@@ -670,6 +679,18 @@ export interface PodBlankSuggestion {
   color_palette?: string;
   estimated_profit?: string;
   target_audience?: string;
+  market_price_range?: string;
+  expected_profit_margin?: string;
+  sourcing_tip?: string;
+  why_it_sells?: string;
+  upsell_bundle_tip?: string;
+  signal_label?: string;
+  image_url?: string;
+  product_url?: string;
+  platform?: string;
+  seller_name?: string;
+  seller_count?: number;
+  sold_count?: number;
   base_cost?: number;
   matched_blank?: {
     _id: string;
@@ -792,6 +813,7 @@ export interface SeasonalForecast {
   is_live_shop?: boolean;
   ready_to_ship_ideas?: ReadyToShipIdea[];
   pod_blanks?: PodBlankSuggestion[];
+  opportunity_clusters?: any[];
   ai_model?: string;
   flat_keywords: string[];
   method: string;

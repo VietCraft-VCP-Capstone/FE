@@ -131,10 +131,30 @@ export interface OpportunityCluster {
   newSellersLast30Days: number;
   searchTrendPct: number;
   priceRange: string;
+  platform?: string;
+  productUrl?: string;
+  sellerName?: string;
+  soldCount?: number;
   representativeProducts: Array<{
     title: string;
     imageUrl: string;
     priceVnd: number;
+    platform?: string;
+    productUrl?: string;
+    sellerName?: string;
+    soldCount?: number;
+    ratingAverage?: number;
+  }>;
+  sellers?: Array<{
+    sellerName: string;
+    platform?: string;
+    listingCount: number;
+    soldCount: number;
+    minPriceVnd?: number | null;
+    maxPriceVnd?: number | null;
+    topProductTitle?: string;
+    topProductUrl?: string;
+    ratingAverage?: number;
   }>;
   clusteringMethod: string;
   evidence: Evidence;

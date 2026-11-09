@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  AlertTriangle,
   BookOpen,
   Calendar,
   Clock,
@@ -107,6 +108,65 @@ function fmtDate(iso?: string): string {
  * Chỉ lấy dữ liệu có thật do backend trả về (lịch dịp + mốc tính theo công thức).
  * Không có nội dung tự viết: thiếu dữ liệu thì bỏ trống, không bịa.
  */
+export interface PrepWarning {
+  level: 'missed' | 'late' | 'warn';
+  short: string;
+  text: string;
+}
+
+function toDay(iso?: string): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function shortDate(d: Date): string {
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Cảnh báo trễ chuẩn bị: so sánh hôm nay với các mốc thật do backend trả về.
+ * Không có mốc thì không cảnh báo.
+ */
+export function getPrepWarning(row: CalendarTimelineRow): PrepWarning | null {
+  const raw = row.rawCampaign;
+  const oc = raw?.occasion_window;
+  const lw = raw?.launch_window;
+  const tractionStart = toDay(oc?.traction_start || (lw as any)?.traction_start);
+  const peakStart = toDay(oc?.peak_start || (lw as any)?.peak_start);
+  const cutoff = toDay(oc?.cut_off_date || lw?.end);
+  if (!cutoff) return null;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayMs = 24 * 60 * 60 * 1000;
+  const daysToCutoff = Math.round((cutoff.getTime() - today.getTime()) / dayMs);
+
+  if (daysToCutoff < 0) {
+    return {
+      level: 'missed',
+      short: 'Không kịp chuẩn bị',
+      text: `Đã quá hạn chốt đơn (${shortDate(cutoff)}). Đơn đặt mới có nguy cơ không giao kịp trước dịp này.`,
+    };
+  }
+  if (peakStart && today.getTime() >= peakStart.getTime()) {
+    return {
+      level: 'late',
+      short: 'Trễ chuẩn bị',
+      text: `Đã qua giai đoạn chuẩn bị mẫu và đăng bán (cao điểm bắt đầu từ ${shortDate(peakStart)}). Chỉ còn ${daysToCutoff} ngày đến hạn chốt đơn (${shortDate(cutoff)}). Nếu chưa có mẫu và hàng sẵn sàng thì rất khó kịp.`,
+    };
+  }
+  if (tractionStart && today.getTime() >= tractionStart.getTime()) {
+    return {
+      level: 'warn',
+      short: 'Cần đăng bán ngay',
+      text: `Đã qua mốc bắt đầu đăng bán (${shortDate(tractionStart)}). Cần đăng bán sớm, còn ${daysToCutoff} ngày đến hạn chốt đơn (${shortDate(cutoff)}).`,
+    };
+  }
+  return null;
+}
+
 export function getOccasionDetails(row: CalendarTimelineRow): OccasionDetails {
   const raw = row.rawCampaign;
   const oc = raw?.occasion_window;
@@ -142,7 +202,7 @@ export function SeasonalMonthMatrix({
   const [viewMode, setViewMode] = useState<'120d' | '12m'>('120d');
 
   // State cho Form Popup / Modal khi click
-  const [activeModalOccasion, setActiveModalOccasion] = useState<CalendarTimelineRow | null>(null);
+  const [activeModalId, setActiveModalId] = useState<string | null>(null);
 
   // State cho Hover Tooltip Card khi rê chuột
   const [hoveredOccasion, setHoveredOccasion] = useState<CalendarTimelineRow | null>(null);
@@ -153,7 +213,7 @@ export function SeasonalMonthMatrix({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setActiveModalOccasion(null);
+        setActiveModalId(null);
         setHoveredOccasion(null);
       }
     };
@@ -308,6 +368,11 @@ export function SeasonalMonthMatrix({
     setHoverPos(null);
   };
 
+  const activeModalOccasion = useMemo(() => {
+    if (!activeModalId) return null;
+    return mappedCampaignRows.find(r => r.id === activeModalId) || null;
+  }, [mappedCampaignRows, activeModalId]);
+
   const hoveredDetails = hoveredOccasion ? getOccasionDetails(hoveredOccasion) : null;
   const modalDetails = activeModalOccasion ? getOccasionDetails(activeModalOccasion) : null;
 
@@ -444,8 +509,11 @@ export function SeasonalMonthMatrix({
                 <div
                   key={row.id}
                   onClick={() => {
+                    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+                    setHoveredOccasion(null);
+                    setHoverPos(null);
                     onSelectCampaign(row.id);
-                    setActiveModalOccasion(row);
+                    setActiveModalId(row.id);
                   }}
                   onMouseEnter={e => handleRowMouseEnter(row, e)}
                   onMouseLeave={handleRowMouseLeave}
@@ -558,6 +626,20 @@ export function SeasonalMonthMatrix({
                     <div className="text-xs text-stone-400 mt-0.5">
                       còn {row.nextDeadline.daysLeft} ngày
                     </div>
+                    {(() => {
+                      const pw = getPrepWarning(row);
+                      if (!pw) return null;
+                      return (
+                        <span
+                          title={pw.text}
+                          className={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${
+                            pw.level === 'warn' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'
+                          }`}
+                        >
+                          <AlertTriangle size={10} /> {pw.short}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* Cột 4: Dự kiến */}
@@ -669,6 +751,25 @@ export function SeasonalMonthMatrix({
               <span className="text-stone-500">còn {hoveredOccasion.nextDeadline.daysLeft} ngày</span>
             </div>
 
+            {(() => {
+              const pw = getPrepWarning(hoveredOccasion);
+              if (!pw) return null;
+              return (
+                <div
+                  className={`flex items-start gap-1.5 rounded-lg p-2 text-[11px] leading-relaxed border ${
+                    pw.level === 'warn'
+                      ? 'bg-amber-50 border-amber-200 text-amber-900'
+                      : 'bg-rose-50 border-rose-200 text-rose-900'
+                  }`}
+                >
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                  <span>
+                    <strong>{pw.short}.</strong> {pw.text}
+                  </span>
+                </div>
+              );
+            })()}
+
             {hoveredDetails.categoryFocus.length > 0 && (
               <div className="rounded-lg bg-stone-50/90 p-2 border border-stone-100">
                 <span className="block text-[11px] font-bold text-stone-700 mb-1">Nhóm hàng gợi ý của dịp:</span>
@@ -695,7 +796,7 @@ export function SeasonalMonthMatrix({
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60"
-          onClick={() => setActiveModalOccasion(null)}
+          onClick={() => setActiveModalId(null)}
         >
           <div
             onClick={e => e.stopPropagation()}
@@ -720,7 +821,7 @@ export function SeasonalMonthMatrix({
               </div>
               <button
                 type="button"
-                onClick={() => setActiveModalOccasion(null)}
+                onClick={() => setActiveModalId(null)}
                 className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors cursor-pointer"
                 aria-label="Đóng form"
               >
@@ -742,7 +843,27 @@ export function SeasonalMonthMatrix({
                 </span>
               </div>
 
-              {modalDetails.warning && (
+              {(() => {
+                const pw = getPrepWarning(activeModalOccasion);
+                if (!pw) return null;
+                return (
+                  <div
+                    className={`flex items-start gap-2.5 p-3 rounded-xl text-xs border ${
+                      pw.level === 'warn'
+                        ? 'bg-amber-50 border-amber-200 text-amber-900'
+                        : 'bg-rose-50 border-rose-300 text-rose-900'
+                    }`}
+                  >
+                    <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                    <div className="leading-relaxed">
+                      <strong className="block mb-0.5">{pw.short}</strong>
+                      {pw.text}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {modalDetails.warning && !getPrepWarning(activeModalOccasion) && (
                 <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50/70 border border-rose-200/70 text-xs text-rose-900">
                   <Truck size={16} className="text-rose-600 shrink-0 mt-0.5" />
                   <span>{modalDetails.warning}</span>
@@ -809,7 +930,7 @@ export function SeasonalMonthMatrix({
             <div className="flex items-center justify-between px-6 py-3.5 border-t border-stone-100 bg-stone-50">
               <button
                 type="button"
-                onClick={() => setActiveModalOccasion(null)}
+                onClick={() => setActiveModalId(null)}
                 className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:text-stone-900 hover:bg-stone-200/70 transition-colors cursor-pointer"
               >
                 Đóng

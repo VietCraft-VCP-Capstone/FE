@@ -2,9 +2,11 @@ import { useState } from 'react';
 import {
   Boxes,
   Check,
+  ExternalLink,
   Package,
   Plus,
   ShieldAlert,
+  ShoppingBag,
   Sparkles,
   Database,
 } from 'lucide-react';
@@ -103,11 +105,57 @@ export function SeasonalPotentialTab({
               className="flex flex-col justify-between rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm transition hover:border-stone-300"
             >
               <div>
-                {/* Header thẻ: Tên + Biên lãi */}
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="m-0 text-sm font-bold text-stone-900 leading-snug">
-                    {item.title || item.name}
-                  </h4>
+                {/* Header thẻ: Ảnh thật + Tên + Biên lãi */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    {item.image_url && (
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-stone-200 bg-stone-100">
+                        <img
+                          src={item.image_url}
+                          alt={item.title || item.name}
+                          className="h-full w-full object-cover"
+                          onError={e => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                        {item.platform && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                            <ShoppingBag size={10} />
+                            {item.platform} · Đang bán
+                          </span>
+                        )}
+                        {item.sold_count > 0 && (
+                          <span className="text-[11px] font-medium text-stone-500">
+                            Đã bán {item.sold_count.toLocaleString('vi-VN')}
+                          </span>
+                        )}
+                      </div>
+                      {item.product_url ? (
+                        <a
+                          href={item.product_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="m-0 text-sm font-bold text-stone-900 hover:text-[#007700] leading-snug inline-flex items-center gap-1"
+                        >
+                          <span className="line-clamp-2">{item.title || item.name}</span>
+                          <ExternalLink size={12} className="shrink-0 text-stone-400" />
+                        </a>
+                      ) : (
+                        <h4 className="m-0 text-sm font-bold text-stone-900 leading-snug">
+                          {item.title || item.name}
+                        </h4>
+                      )}
+                      {item.seller_name && (
+                        <span className="block text-[11px] text-stone-400 mt-0.5">
+                          Gian hàng: {item.seller_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200/60">
                     Lãi {profitMargin}
                   </span>

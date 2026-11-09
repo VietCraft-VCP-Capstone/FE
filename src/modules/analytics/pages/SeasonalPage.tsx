@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SeasonalNavbar } from '../components/seasonal/SeasonalNavbar';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
-import { useInsight } from '../hooks/useInsight';
+import { useInsight, type InsightState } from '../hooks/useInsight';
 import { PotentialProfileDrawer } from '../components/product/PotentialProfileDrawer';
 import { EvidenceDrawer } from '../components/evidence/EvidenceDrawer';
 import { SeasonalHeader } from '../components/seasonal/SeasonalHeader';
@@ -19,17 +19,31 @@ import { analyticsApi } from '../services/analyticsApi';
 // Hub components (Khối A-H)
 import { HubKpiStrip } from '../components/seasonal/hub/HubKpiStrip';
 import { HubActionFeed, type ActionItem, type RunningPlan } from '../components/seasonal/hub/HubActionFeed';
-import { HubCalendar120, type OccasionCalendarRow } from '../components/seasonal/hub/HubCalendar120';
 import { HubOpportunities } from '../components/seasonal/hub/HubOpportunities';
 import { HubRisksAndScorecard, type RouteRiskItem, type ScorecardMetric } from '../components/seasonal/hub/HubRisksAndScorecard';
 
 import type {
+  InsightMeta,
   PotentialProfile,
   SeasonalCampaign,
   SeasonalForecast,
 } from '../types';
 import type { Evidence, Metric, OccasionTraitItem, OpportunityCluster } from '../types/evidence';
 import { GLOSSARY } from '../i18n/vi.glossary';
+
+function toDay(iso?: string): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function fmtShortDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
 
 export function SeasonalPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -70,6 +84,23 @@ export function SeasonalPage() {
 
   const { state, reload } = useInsight<SeasonalForecast>('/forecast/seasonal', query);
 
+  // Giữ lại dữ liệu đã sẵn sàng khi tải dữ liệu cho dịp mới để tránh unmount toàn trang gây reload giật lag và mất form chi tiết
+  const lastReadyDataRef = useRef<{ data: SeasonalForecast; meta: InsightMeta } | null>(null);
+  if (state.kind === 'ready' && state.data) {
+    lastReadyDataRef.current = { data: state.data, meta: state.meta };
+  }
+
+  const effectiveState = useMemo<InsightState<SeasonalForecast>>(() => {
+    if (state.kind === 'loading' && lastReadyDataRef.current) {
+      return {
+        kind: 'ready',
+        data: lastReadyDataRef.current.data,
+        meta: lastReadyDataRef.current.meta,
+      };
+    }
+    return state;
+  }, [state]);
+
   // Khởi tạo trạng thái ý tưởng đã lưu & checklist từ MongoDB qua BE
   useEffect(() => {
     if (state.kind === 'ready' && state.data) {
@@ -107,6 +138,17 @@ export function SeasonalPage() {
     }
   };
 
+  const handleToggleCampMilestone = async (campId: string, stageIdx: number) => {
+    const key = `${campId}_${stageIdx}`;
+    const nextVal = !checkedMilestones[key];
+    setCheckedMilestones(prev => ({ ...prev, [key]: nextVal }));
+    try {
+      await analyticsApi.toggleSeasonalMilestone(stageIdx, nextVal, campId);
+    } catch (e) {
+      console.error('Lỗi khi cập nhật mốc thời gian theo dịp vào CSDL shop:', e);
+    }
+  };
+
   const savedIdeasCount = Object.values(savedIdeas).filter(Boolean).length;
 
   const handleSelectCampaign = (id: string) => {
@@ -133,7 +175,7 @@ export function SeasonalPage() {
       title={GLOSSARY.featureTitle}
       question={GLOSSARY.featureSubtitle}
     >
-      <InsightBlock state={state} onRetry={reload}>
+      <InsightBlock state={effectiveState} onRetry={reload}>
         {(data: SeasonalForecast, _meta) => {
           const campaigns: SeasonalCampaign[] = data.all_campaigns || [];
           const activeCamp: SeasonalCampaign | undefined = data.active_campaign;
@@ -262,143 +304,207 @@ export function SeasonalPage() {
             } as Metric<string>,
           };
 
-          // Dữ liệu Khối B: Việc cần làm tuần này (Tạo động từ các chiến dịch sắp diễn ra)
-          const actionItems: ActionItem[] = campaigns
+          // Dữ liệu Khối B: Việc gợi ý ưu tiên theo dịp (3 dịp gần nhất, tính toán động theo thời gian thực tế)
+          const targetCampaigns = campaigns
             .filter(c => (c.next_deadline?.days_left ?? 999) > 0)
-            .slice(0, 3)
-            .map((c, idx) => {
-              const daysLeft = c.next_deadline?.days_left ?? 7;
-              const deadlineTitle = c.next_deadline?.title || `Hạn chốt ${daysLeft} ngày`;
-              const kw = c.search_keywords?.[0] || 'sản phẩm quà tặng';
+            .slice(0, 3);
+          const activeList = targetCampaigns.length > 0 ? targetCampaigns : campaigns.slice(0, 3);
 
-              return {
-                id: `act-${c.id}`,
-                occasionName: `Dịp ${c.name}`,
-                title: idx === 0
-                  ? `Chốt phôi & mẫu in cho từ khóa "${kw}" đón đầu dịp ${c.name}`
-                  : `Lên ảnh mẫu và listing đón đầu đợt tìm kiếm mùa ${c.name}`,
-                deadlineText: deadlineTitle,
-                daysLeft,
-                expectedProfitVnd: idx === 0 ? '6.400.000 đ' : '12.800.000 đ',
-                successProbabilityPct: c.confidence_dots ? Math.min(92, 60 + c.confidence_dots * 8) : 78,
-                whyDescription: `Khách bắt đầu tìm kiếm từ khóa "${kw}" tăng mạnh. Đăng bán sớm giúp listing nhận index từ khóa và đón lượt yêu thích sớm.`,
-                evidence: {
-                  id: `ev_act_${c.id}`,
-                  definition: `Căn cứ thời điểm đặt hàng của ngành ${data.seller_category?.name || 'thời trang'} cho dịp ${c.name}.`,
-                  sources: ['Dữ liệu đơn hàng sàn VietCraft', 'Google Trends'],
-                  howObtained: 'Phân tích ngày bắt đầu tăng đơn của các shop cùng phân khúc.',
-                  period: ['2025-10-01', '2026-10-31'],
-                  n: 640,
-                  formula: 'Ngày đơn tăng bền = Ngày sự kiện − 21 ngày. Lùi thêm 5 ngày nhập phôi.',
-                  confidence: (c.confidence?.level || 'fair') as 'high' | 'fair' | 'preliminary',
-                  confidenceReason: c.confidence?.reason || 'Lặp lại xu hướng đặt sớm qua các kỳ.',
-                  mayBeWrongBecause: ['Khách đặt trễ hơn do thời tiết hoặc đơn vị vận chuyển.'],
-                  updatedAt: '2026-11-01',
-                },
-                precedent: {
-                  id: `prec-${c.id}`,
-                  action: 'Đăng bán sớm và gom tương tác trước hạn chốt 14 ngày',
-                  where: `Sàn VietCraft · Ngành ${data.seller_category?.name || 'Thủ công & Thời trang'}`,
-                  when: `Dịp ${c.name} kỳ trước`,
-                  result: 'Tăng 38% – 52% số đơn so với nhóm đăng trễ',
-                  method: 'So sánh có nhóm đối chiếu trên sàn',
-                  grade: 'B' as const,
-                  similarity: 'Cao (cùng quy mô và phân khúc giá)',
-                  sourceUrl: '',
-                  checkedAt: '2026-10-18',
-                  reviewer: 'Ban biên tập dữ liệu VietCraft',
-                },
-              };
-            });
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-          // Dữ liệu Khối C: Kế hoạch đang chạy (Đồng bộ theo chiến dịch active)
-          const runningPlans: RunningPlan[] = activeCamp ? [
-            {
-              id: `plan-${activeCamp.id}`,
-              occasionName: `Dịp ${activeCamp.name}`,
-              planName: data.ready_to_ship_ideas?.[0]?.title || `Thử nghiệm mẫu theo chủ đề ${activeCamp.name}`,
-              lockedAt: '12/10/2026',
-              actualOrders: 64,
-              expectedMinOrders: 50,
-              expectedMaxOrders: 80,
-              actualRevenueVnd: '11.520.000 đ',
-              expectedRevenueRange: '9.000.000đ – 14.400.000đ',
-              status: 'on_track',
-              evidence: {
-                id: `ev_running_plan_${activeCamp.id}`,
-                definition: `Đối chiếu số đơn hàng thực tế của kế hoạch ${activeCamp.name} đến hôm nay.`,
-                sources: ['Bản chụp kế hoạch đã lập', 'Đơn hàng thực tế trong kỳ'],
-                howObtained: 'Cộng dồn số đơn và doanh thu thực tế phát sinh của các listing trong kế hoạch.',
-                period: ['2026-10-12', '2026-10-31'],
-                n: 64,
-                formula: 'So sánh: 64 đơn nằm trong khoảng kỳ vọng [50, 80].',
-                confidence: 'high',
-                confidenceReason: 'Dữ liệu đơn hàng thực tế đã được xác nhận thanh toán.',
-                mayBeWrongBecause: ['Không có.'],
-                updatedAt: '2026-11-01',
-              },
-            },
-          ] : [];
-
-          // Dữ liệu Khối D: Lịch 120 ngày tới (Chuyển đổi động từ toàn bộ campaigns của API)
-          const calendarRows: OccasionCalendarRow[] = campaigns.map(c => {
+          const actionItems: ActionItem[] = activeList.map((c) => {
             const ocWin = c.occasion_window;
             const lw = c.launch_window;
-            const daysToEvent = ocWin?.days_to_peak ?? c.stages?.end_days ?? 30;
-            const daysToCutoff = ocWin?.days_to_cutoff ?? c.stages?.cutoff_days ?? 14;
-            const conf = c.confidence?.level || (c.confidence_text === 'Cao' ? 'high' : c.confidence_text === 'Khá' ? 'fair' : 'preliminary');
+            const evDateIso = ocWin?.peak_date || lw?.peak_date || '';
+            const cutoffIso = ocWin?.cut_off_date || lw?.end || '';
+            const rdIso = ocWin?.rd_start || lw?.start || '';
+            const tractionIso = ocWin?.traction_start || rdIso;
+            const peakIso = ocWin?.peak_start || tractionIso;
 
-            const evDate = ocWin?.peak_date || lw?.peak_date || '';
-            const cutoffDate = ocWin?.cut_off_date || lw?.end || '';
-            const rdDate = ocWin?.rd_start || lw?.start || '';
-            const tractionDate = ocWin?.traction_start || rdDate;
+            const daysLeft = c.next_deadline?.days_left ?? ocWin?.days_to_cutoff ?? 7;
+            const daysToCutoff = ocWin?.days_to_cutoff ?? daysLeft;
+            const deadlineTitle = c.next_deadline?.title || `Hạn chốt đơn ${fmtShortDate(cutoffIso)}`;
+            const kw = c.search_keywords?.[0] || 'sản phẩm quà tặng';
+
+            const peakStartDay = toDay(peakIso);
+            const tractionStartDay = toDay(tractionIso);
+
+            const isOverduePrep = (peakStartDay && today.getTime() >= peakStartDay.getTime()) || daysToCutoff <= 3;
+            const isTractionPhase = !isOverduePrep && tractionStartDay && today.getTime() >= tractionStartDay.getTime();
+
+            let phaseBadge: ActionItem['phaseBadge'];
+            let title = '';
+            let whyDescription = '';
+            let calculationBasis = '';
+
+            if (isOverduePrep) {
+              phaseBadge = {
+                text: daysToCutoff <= 1 ? 'Hạn chốt 1 ngày · Trễ làm mẫu mới' : 'Trễ làm mẫu mới · Đang chốt đơn',
+                variant: 'amber',
+              };
+              title = `Rà soát hàng sẵn có & chuẩn bị chốt nhận đơn dịp ${c.name}`;
+              whyDescription = `Dịp ${c.name} đã qua giai đoạn làm mẫu mới và sắp đến hạn chốt nhận đơn (${fmtShortDate(cutoffIso)}, còn ${daysToCutoff} ngày). Nên ưu tiên xử lý đơn cho các mặt hàng đã có sẵn phôi/tồn kho trong shop; chỉ nhận đơn giao hỏa tốc hoặc nội thành và chuẩn bị dừng nhận đơn chuẩn trước hạn để bảo đảm giao kịp trước ngày ${fmtShortDate(evDateIso)}.`;
+              calculationBasis = `Căn cứ tính mốc: Hạn chốt ${fmtShortDate(cutoffIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 10 ngày (sản xuất P90 & giao hàng an toàn).`;
+            } else if (isTractionPhase) {
+              phaseBadge = {
+                text: 'Giai đoạn đăng bán & gom đơn',
+                variant: 'blue',
+              };
+              title = `Tối ưu listing & đẩy mạnh hiển thị đón dịp ${c.name}`;
+              whyDescription = `Dịp đang trong giai đoạn tìm kiếm tăng trưởng trước tuần cao điểm (${fmtShortDate(peakIso)}). Nên hoàn thiện hình ảnh mẫu, tối ưu từ khóa "${kw}" cho listing và gom các đơn đặt trước để nhận đánh giá sớm.`;
+              calculationBasis = `Căn cứ tính mốc: Bắt đầu mở bán ${fmtShortDate(tractionIso)} = Trước cao điểm 10 ngày để kịp index từ khóa.`;
+            } else {
+              phaseBadge = {
+                text: 'Giai đoạn chuẩn bị mẫu & phôi',
+                variant: 'emerald',
+              };
+              title = `Chuẩn bị phôi & thiết kế mẫu đón đầu dịp ${c.name}`;
+              whyDescription = `Khung thời gian phù hợp để duyệt mẫu thiết kế và liên hệ xưởng chuẩn bị phôi cho nhóm từ khóa "${kw}" trước khi bước vào giai đoạn mở bán (${fmtShortDate(tractionIso)}).`;
+              calculationBasis = `Căn cứ tính mốc: Bắt đầu chuẩn bị ${fmtShortDate(rdIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 38 ngày (lead time xưởng & đón sóng).`;
+            }
 
             return {
-              id: c.id,
-              name: c.name,
-              eventDate: evDate,
-              daysToEvent,
-              expectedOrdersRange: c.expected_orders ? `${c.expected_orders} đơn` : 'Chưa có dữ liệu',
-              coveragePct: conf === 'high' ? 85 : 80,
-              confidence: conf as 'high' | 'fair' | 'preliminary',
-              nextDeadline: {
-                title: c.next_deadline?.title || `Hạn chốt đơn ${cutoffDate}`,
-                date: c.next_deadline?.date_text || cutoffDate,
-                daysLeft: c.next_deadline?.days_left ?? daysToCutoff,
-              },
-              stages: {
-                preparation: {
-                  start: rdDate,
-                  end: tractionDate,
-                  status: c.timing?.status === 'active' && daysToCutoff > 14 ? 'active' : 'upcoming',
-                },
-                traction: {
-                  start: tractionDate,
-                  end: cutoffDate,
-                  status: c.timing?.status === 'active' && daysToCutoff <= 14 ? 'active' : 'upcoming',
-                },
-                peak: {
-                  start: ocWin?.peak_start || tractionDate,
-                  end: evDate,
-                  status: daysToEvent <= 7 ? 'active' : 'upcoming',
-                },
-                cutoff: {
-                  date: cutoffDate,
-                  daysLeft: daysToCutoff,
-                  status: daysToCutoff <= 0 ? 'passed' : 'upcoming',
-                },
-              },
+              id: `act-${c.id}`,
+              occasionId: c.id,
+              occasionName: `Dịp ${c.name}`,
+              phaseBadge,
+              deadlineText: deadlineTitle,
+              daysLeft,
+              isUrgent: daysLeft <= 7,
+              isOverduePrep,
+              title,
+              whyDescription,
+              calculationBasis,
               evidence: {
-                id: `ev_cal_${c.id}`,
-                definition: `Mốc 4 giai đoạn chuẩn hóa từ lịch sử sức mua dịp ${c.name}.`,
-                sources: ['calendar_vn', 'Dữ liệu đơn hàng sàn VietCraft'],
-                howObtained: 'Tính lùi từ ngày sự kiện theo thời gian sản xuất và vận chuyển p90.',
-                period: ['2025-01-01', '2026-10-31'],
-                n: 1840,
-                formula: 'Hạn chốt = Ngày sự kiện − Vận chuyển p90 − Sản xuất p90 − Ngày dự phòng.',
-                confidence: conf as 'high' | 'fair' | 'preliminary',
-                confidenceReason: c.confidence?.reason || 'Tính toán tự động từ mô hình chu kỳ lịch sử.',
-                mayBeWrongBecause: ['Tắc nghẽn bưu cục vào tuần cao điểm.'],
+                id: `ev_act_${c.id}`,
+                definition: `Căn cứ thời điểm và gợi ý vận hành dịp ${c.name}.`,
+                sources: ['Lịch sự kiện Việt Nam (calendar_vn)', 'Thời gian sản xuất & giao hàng thực tế của xưởng'],
+                howObtained: 'Tính toán lùi từ ngày diễn ra sự kiện theo thời gian sản xuất p90 và vận chuyển an toàn.',
+                period: ['2026-10-01', '2026-11-30'],
+                n: 1,
+                formula: calculationBasis,
+                confidence: (c.confidence?.level || 'fair') as 'high' | 'fair' | 'preliminary',
+                confidenceReason: 'Tính toán theo công thức ngày thực tế, không có số liệu ước lượng ảo.',
+                mayBeWrongBecause: ['Thời tiết bất lợi hoặc đơn vị vận chuyển quá tải vào tuần cao điểm.'],
+                updatedAt: '2026-11-01',
+              },
+            };
+          });
+
+          // Dữ liệu Khối C: Theo dõi tiến độ & Mốc của shop (Đồng bộ đối xứng cho chính 3 dịp sắp tới)
+          const runningPlans: RunningPlan[] = activeList.map((c) => {
+            const ocWin = c.occasion_window;
+            const lw = c.launch_window;
+            const evDateIso = ocWin?.peak_date || lw?.peak_date || '';
+            const cutoffIso = ocWin?.cut_off_date || lw?.end || '';
+            const rdIso = ocWin?.rd_start || lw?.start || '';
+            const tractionIso = ocWin?.traction_start || rdIso;
+            const peakIso = ocWin?.peak_start || tractionIso;
+
+            const daysLeft = c.next_deadline?.days_left ?? ocWin?.days_to_cutoff ?? 7;
+            const daysToCutoff = ocWin?.days_to_cutoff ?? daysLeft;
+            const deadlineTitle = c.next_deadline?.title || `Hạn chốt đơn ${fmtShortDate(cutoffIso)}`;
+
+            const rdStartDay = toDay(rdIso);
+            const tractionStartDay = toDay(tractionIso);
+            const peakStartDay = toDay(peakIso);
+            const cutoffDay = toDay(cutoffIso);
+
+            const isOverduePrep = (peakStartDay && today.getTime() >= peakStartDay.getTime()) || daysToCutoff <= 3;
+            const isTractionPhase = !isOverduePrep && tractionStartDay && today.getTime() >= tractionStartDay.getTime();
+
+            // Mốc vận hành 4 bước chuẩn
+            const milestones = [
+              {
+                stageIdx: 0,
+                label: 'Chuẩn bị mẫu',
+                dateText: fmtShortDate(rdIso),
+                isPassed: rdStartDay ? today.getTime() >= rdStartDay.getTime() : false,
+                isCurrent: rdStartDay && tractionStartDay ? today.getTime() >= rdStartDay.getTime() && today.getTime() < tractionStartDay.getTime() : false,
+                checked: checkedMilestones[`${c.id}_0`] !== undefined
+                  ? checkedMilestones[`${c.id}_0`]
+                  : (rdStartDay ? today.getTime() >= rdStartDay.getTime() : false),
+              },
+              {
+                stageIdx: 1,
+                label: 'Mở bán listing',
+                dateText: fmtShortDate(tractionIso),
+                isPassed: tractionStartDay ? today.getTime() >= tractionStartDay.getTime() : false,
+                isCurrent: tractionStartDay && peakStartDay ? today.getTime() >= tractionStartDay.getTime() && today.getTime() < peakStartDay.getTime() : false,
+                checked: checkedMilestones[`${c.id}_1`] !== undefined
+                  ? checkedMilestones[`${c.id}_1`]
+                  : (tractionStartDay ? today.getTime() >= tractionStartDay.getTime() : false),
+              },
+              {
+                stageIdx: 2,
+                label: 'Đón cao điểm',
+                dateText: fmtShortDate(peakIso),
+                isPassed: peakStartDay ? today.getTime() >= peakStartDay.getTime() : false,
+                isCurrent: peakStartDay && cutoffDay ? today.getTime() >= peakStartDay.getTime() && today.getTime() < cutoffDay.getTime() : false,
+                checked: checkedMilestones[`${c.id}_2`] !== undefined
+                  ? checkedMilestones[`${c.id}_2`]
+                  : (peakStartDay ? today.getTime() >= peakStartDay.getTime() : false),
+              },
+              {
+                stageIdx: 3,
+                label: 'Hạn chốt đơn',
+                dateText: fmtShortDate(cutoffIso),
+                isPassed: cutoffDay ? today.getTime() >= cutoffDay.getTime() : false,
+                isCurrent: daysToCutoff <= 3 && daysToCutoff >= 0,
+                checked: checkedMilestones[`${c.id}_3`] !== undefined
+                  ? checkedMilestones[`${c.id}_3`]
+                  : (cutoffDay ? today.getTime() >= cutoffDay.getTime() : false),
+              },
+            ];
+
+            let statusText = 'Đang chuẩn bị mẫu';
+            let statusVariant: RunningPlan['statusVariant'] = 'emerald';
+            if (daysToCutoff <= 1) {
+              statusText = 'Hạn chốt đơn 1 ngày';
+              statusVariant = 'amber';
+            } else if (daysToCutoff <= 3) {
+              statusText = 'Giai đoạn chốt đơn';
+              statusVariant = 'amber';
+            } else if (isTractionPhase) {
+              statusText = 'Đang mở bán đón đầu';
+              statusVariant = 'blue';
+            }
+
+            let operationalNote = '';
+            if (daysToCutoff <= 3) {
+              operationalNote = `Lưu ý vận hành: Chỉ còn ${daysToCutoff} ngày đến hạn chốt (${fmtShortDate(cutoffIso)}). Đề xuất ưu tiên xử lý các đơn hàng sẵn có và chuẩn bị dừng nhận đơn thường.`;
+            } else if (isOverduePrep) {
+              operationalNote = 'Lưu ý vận hành: Đã qua kỳ làm mẫu mới. Khuyến nghị tập trung xuất bán các mẫu sẵn có.';
+            } else if (daysLeft <= 7) {
+              operationalNote = `Lưu ý vận hành: Sắp đến mốc tiếp theo (${deadlineTitle}). Rà soát danh mục phôi xưởng để kịp chuẩn bị.`;
+            }
+
+            const campSavedCount = Object.keys(savedIdeas).filter(k => k.startsWith(c.id)).length;
+
+            return {
+              id: `plan-${c.id}`,
+              occasionId: c.id,
+              occasionName: `Dịp ${c.name}`,
+              eventDateText: fmtShortDate(evDateIso),
+              deadlineText: deadlineTitle,
+              daysLeft,
+              statusText,
+              statusVariant,
+              milestones,
+              savedIdeasCount: campSavedCount > 0 ? campSavedCount : (c.id === activeCamp?.id ? savedIdeasCount : 0),
+              operationalNote,
+              evidence: {
+                id: `ev_track_${c.id}`,
+                definition: `Tiến độ mốc thời gian và kế hoạch chuẩn bị thực tế của shop cho dịp ${c.name}.`,
+                sources: ['Checklist mốc vận hành của shop', 'Danh mục ý tưởng đã lưu'],
+                howObtained: 'Theo dõi trực tiếp từ các mốc người bán đã tích chọn và ý tưởng đã lưu.',
+                period: ['2026-10-01', '2026-11-30'],
+                n: 4,
+                formula: `Tiến độ = Số mốc đã đánh dấu hoàn thành ÷ 4 mốc chuẩn. Hạn chốt: ${fmtShortDate(cutoffIso)}.`,
+                confidence: 'high',
+                confidenceReason: 'Ghi nhận trực tiếp từ thao tác thực tế của người bán trên hệ thống.',
+                mayBeWrongBecause: ['Không có.'],
                 updatedAt: '2026-11-01',
               },
             };
@@ -577,19 +683,7 @@ export function SeasonalPage() {
                       actions={actionItems}
                       runningPlans={runningPlans}
                       onOpenEvidence={handleOpenEvidence}
-                    />
-                  </div>
-
-                  {/* Lịch 4 tháng tới */}
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                      Lộ trình 4 tháng tới &amp; 4 giai đoạn vận hành
-                    </h4>
-                    <HubCalendar120
-                      rows={calendarRows}
-                      activeOccasionId={activeCamp?.id}
-                      onSelectOccasion={handleSelectCampaign}
-                      onOpenEvidence={handleOpenEvidence}
+                      onToggleMilestone={handleToggleCampMilestone}
                     />
                   </div>
 
