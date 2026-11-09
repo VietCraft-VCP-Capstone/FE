@@ -242,15 +242,15 @@ export function SeasonalPage() {
               actionType: backendRec.action_type,
             } : {
               title: isOverduePrep
-                ? `Chốt đơn & ưu tiên xử lý hàng sẵn có dịp ${c.name}`
+                ? 'Chốt đơn & ưu tiên xuất hàng sẵn có'
                 : isTractionPhase
-                ? `Tối ưu listing & đẩy từ khóa "${kw}"`
-                : `Chuẩn bị phôi xưởng & duyệt mẫu đón ${c.name}`,
+                ? `Tối ưu listing & từ khóa "${kw}"`
+                : 'Chuẩn bị phôi xưởng & duyệt mẫu',
               advice: isOverduePrep
-                ? `Dịp ${c.name} sắp đến hạn chốt (${fmtShortDate(cutoffIso)}, còn ${daysToCutoff} ngày). Nên ưu tiên xử lý các đơn hàng sẵn phôi trong kho để bảo đảm giao kịp trước ngày ${fmtShortDate(evDateIso)}.`
+                ? `Sắp đến hạn chốt nhận đơn (${fmtShortDate(cutoffIso)}, còn ${daysToCutoff} ngày). Đã qua thời điểm làm mẫu mới. Nên tập trung xử lý các đơn hàng sẵn phôi trong kho để bảo đảm giao kịp trước ngày ${fmtShortDate(evDateIso)}.`
                 : isTractionPhase
-                ? `Nhu cầu tìm kiếm đang tăng tốc trước tuần cao điểm (${fmtShortDate(peakIso)}). Hoàn thiện hình ảnh mẫu, tối ưu tiêu đề gắn từ khóa "${kw}" để tăng hiển thị.`
-                : `Khung thời gian phù hợp để duyệt mẫu thiết kế và liên hệ xưởng chuẩn bị phôi cho nhóm từ khóa "${kw}" trước khi bước vào giai đoạn mở bán (${fmtShortDate(tractionIso)}).`,
+                ? `Nhu cầu tìm kiếm tăng tốc trước cao điểm (${fmtShortDate(peakIso)}). Khuyến nghị hoàn thiện ảnh thật, tối ưu tiêu đề gắn từ khóa "${kw}" để đón đơn sớm.`
+                : `Thời điểm phù hợp để duyệt mẫu thiết kế và liên hệ xưởng chuẩn bị phôi cho nhóm từ khóa "${kw}" trước khi mở bán (${fmtShortDate(tractionIso)}).`,
               calculationBasis: isOverduePrep
                 ? `Hạn chốt ${fmtShortDate(cutoffIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 10 ngày (sản xuất P90 & giao hàng an toàn).`
                 : isTractionPhase
@@ -281,7 +281,7 @@ export function SeasonalPage() {
             const milestones = [
               {
                 stageIdx: 0,
-                label: 'Chuẩn bị mẫu',
+                label: 'Chuẩn bị',
                 dateText: fmtShortDate(rdIso),
                 isPassed: rdStartDay ? today.getTime() >= rdStartDay.getTime() : false,
                 isCurrent: rdStartDay && tractionStartDay ? today.getTime() >= rdStartDay.getTime() && today.getTime() < tractionStartDay.getTime() : false,
@@ -291,7 +291,7 @@ export function SeasonalPage() {
               },
               {
                 stageIdx: 1,
-                label: 'Mở bán listing',
+                label: 'Mở bán',
                 dateText: fmtShortDate(tractionIso),
                 isPassed: tractionStartDay ? today.getTime() >= tractionStartDay.getTime() : false,
                 isCurrent: tractionStartDay && peakStartDay ? today.getTime() >= tractionStartDay.getTime() && today.getTime() < peakStartDay.getTime() : false,
@@ -301,7 +301,7 @@ export function SeasonalPage() {
               },
               {
                 stageIdx: 2,
-                label: 'Đón cao điểm',
+                label: 'Cao điểm',
                 dateText: fmtShortDate(peakIso),
                 isPassed: peakStartDay ? today.getTime() >= peakStartDay.getTime() : false,
                 isCurrent: peakStartDay && cutoffDay ? today.getTime() >= peakStartDay.getTime() && today.getTime() < cutoffDay.getTime() : false,
@@ -311,7 +311,7 @@ export function SeasonalPage() {
               },
               {
                 stageIdx: 3,
-                label: 'Hạn chốt đơn',
+                label: 'Hạn chốt',
                 dateText: fmtShortDate(cutoffIso),
                 isPassed: cutoffDay ? today.getTime() >= cutoffDay.getTime() : false,
                 isCurrent: daysToCutoff <= 3 && daysToCutoff >= 0,
