@@ -127,13 +127,27 @@ export interface SmartProductSuggestionResult {
   seo_description: string;
 }
 
+/** Câu thông báo theo đúng bảng MSG của SRS mục 3.9; khoá là số MSG. */
+export const MSG = {
+  136: 'Không thể tải dữ liệu đối thủ cạnh tranh. Vui lòng thử lại.',
+  137: 'Bạn chưa có sản phẩm đăng bán trong danh mục này.',
+  138: 'Không thể tải dữ liệu so sánh shop. Vui lòng thử lại.',
+  140: 'Không thể tải dữ liệu phân tích từ khóa. Vui lòng thử lại.',
+  142: 'Không thể tải dữ liệu phân tích giá cạnh tranh. Vui lòng thử lại.',
+  143: 'Bạn chỉ được theo dõi tối đa 10 shop đối thủ.',
+  144: 'Shop đối thủ này đã có trong danh sách theo dõi của bạn.',
+  145: 'Thêm shop đối thủ thất bại. Vui lòng thử lại.',
+  146: 'Xóa shop đối thủ thất bại. Vui lòng thử lại.',
+  147: 'Không thể tải danh sách shop đối thủ đang theo dõi.',
+} as const;
+
 /** Câu thông báo cho các mã lỗi riêng của khu phân tích (400 do AI trả về theo hợp đồng). */
 export function analyticsErrorMessage(err: any, fallback = 'Không thực hiện được, vui lòng thử lại.'): string {
   const code = err?.response?.data?.error;
   const field = err?.response?.data?.field;
   const expected = err?.response?.data?.expected;
-  if (code === 'tracking_limit_reached') return `Đã theo dõi tối đa ${err.response.data.limit ?? 10} shop. Bỏ bớt một shop để thêm shop mới.`;
-  if (code === 'invalid_param' && expected === 'already_tracked') return 'Shop này đã có trong danh sách theo dõi.';
+  if (code === 'tracking_limit_reached') return MSG[143];
+  if (code === 'invalid_param' && expected === 'already_tracked') return MSG[144];
   if (code === 'invalid_param' && field === 'shop_id') return expected ? `Mã shop không hợp lệ: ${expected}.` : 'Mã shop không hợp lệ.';
   if (code === 'not_found') return 'Không tìm thấy shop này trong dữ liệu phân tích.';
   if (typeof code === 'string' && code) return fallback;

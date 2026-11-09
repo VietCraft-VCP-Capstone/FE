@@ -70,11 +70,13 @@ const UNAVAILABLE_TEXT: Record<string, string> = {
 };
 
 /** Chỉ phần trạng thái (không có khung thẻ). Trả null khi đã có dữ liệu. */
-export function InsightStatusView<T>({ state, onRetry, compact, skeleton }: {
+export function InsightStatusView<T>({ state, onRetry, compact, skeleton, errorText }: {
   state: InsightState<T>;
   onRetry?: () => void;
   compact?: boolean;
   skeleton?: React.ReactNode;
+  /** Câu báo lỗi tải riêng của trang (MSG trong SRS), thay tiêu đề chung khi tải hỏng. */
+  errorText?: string;
 }) {
   switch (state.kind) {
     case 'loading':
@@ -134,7 +136,7 @@ export function InsightStatusView<T>({ state, onRetry, compact, skeleton }: {
         <Panel
           compact={compact}
           icon={<PlugZap size={18} />}
-          title="Không lấy được số liệu lúc này"
+          title={errorText ?? 'Không lấy được số liệu lúc này'}
           body={UNAVAILABLE_TEXT[state.code] ?? UNAVAILABLE_TEXT.ai_unavailable}
           action={onRetry && <RetryButton onClick={onRetry} />}
         />
@@ -146,7 +148,7 @@ export function InsightStatusView<T>({ state, onRetry, compact, skeleton }: {
         <Panel
           compact={compact}
           icon={<AlertTriangle size={18} />}
-          title="Có lỗi khi đọc số liệu"
+          title={errorText ?? 'Có lỗi khi đọc số liệu'}
           body={state.message}
           action={onRetry && <RetryButton onClick={onRetry} />}
         />
@@ -160,15 +162,16 @@ export function InsightStatusView<T>({ state, onRetry, compact, skeleton }: {
  * Bọc một khối số liệu: có dữ liệu thì gọi children(data, meta), không thì vẽ trạng thái.
  * Trạng thái `partial` vẫn hiện số nhưng kèm một dòng cảnh báo lý do độ tin cậy thấp.
  */
-export function InsightBlock<T>({ state, onRetry, compact, skeleton, children }: {
+export function InsightBlock<T>({ state, onRetry, compact, skeleton, errorText, children }: {
   state: InsightState<T>;
   onRetry?: () => void;
   compact?: boolean;
   skeleton?: React.ReactNode;
+  errorText?: string;
   children: (data: T, meta: InsightMeta) => React.ReactNode;
 }) {
   if (state.kind !== 'ready') {
-    return <InsightStatusView state={state} onRetry={onRetry} compact={compact} skeleton={skeleton} />;
+    return <InsightStatusView state={state} onRetry={onRetry} compact={compact} skeleton={skeleton} errorText={errorText} />;
   }
   return (
     <>

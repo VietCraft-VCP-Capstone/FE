@@ -13,7 +13,7 @@ import { Pagination } from 'antd';
 import { ArrowUp, CalendarCheck, Crosshair, Radar, UserPlus, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { invalidateInsights, useInsight, type InsightState } from '../hooks/useInsight';
-import { analyticsApi, analyticsErrorMessage } from '../services/analyticsApi';
+import { MSG, analyticsApi, analyticsErrorMessage } from '../services/analyticsApi';
 import type { CompetitorBrief, CompetitorTracking, Competitors, ShopComparison } from '../types';
 import { InsightPage } from '../components/InsightPage';
 import { InsightBlock, InsightStatusView } from '../components/InsightBlock';
@@ -28,6 +28,7 @@ import { GIAI_THICH, NhanTinCay } from '../components/competitors/giaiThich';
 import { NA, decimal } from '../format';
 import { categoryLabel } from '../labels';
 import { count, money } from '../../../shared/utils/format';
+import { useToast } from '../../../shared/components/Toast';
 
 const INSIGHTS_ROOT = '/seller/insights';
 
@@ -46,6 +47,10 @@ const MUC: { id: string; icon: LucideIcon; title: string }[] = [
 const PILL_CLASS =
   'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-stone-700 no-underline transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] motion-reduce:transition-none';
 const PILL_DANG_XEM = '!border-[#007700] !bg-[#007700] !text-white';
+
+const NUT_THEO_DOI =
+  'inline-flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none';
+const SO_GOI_Y = 3;
 
 const rutGon = (s: string | null | undefined, n = 48) => {
   const t = s ?? '';
@@ -233,7 +238,7 @@ function Top20ShopKhac({ rows, canTrack, trackedIds, pendingShop, khoa, onTrack 
                 onClick={() => onTrack(row.shop_id!, row.shop_name)}
                 disabled={khoa}
                 aria-label={`Theo dõi ${row.shop_name}`}
-                className="inline-flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-[#007700] hover:text-[#007700] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
+                className={NUT_THEO_DOI}
               >
                 <UserPlus size={13} aria-hidden />
                 {pendingShop === row.shop_id ? 'Đang thêm' : 'Theo dõi'}
@@ -393,17 +398,82 @@ function PageSection({ id, icon: Icon, title, question, action, children }: (typ
   );
 }
 
+/** Shop nên theo dõi: mặc định trên mọi danh mục của bạn, chọn một danh mục để lọc; shop đã theo dõi thì bỏ. */
+function GoiYTheoDoi({ data, trackedIds, full, pendingShop, onTrack }: {
+  data: Competitors;
+  trackedIds: Set<string>;
+  full: boolean;
+  pendingShop: string | null;
+  onTrack: (shopId: string, shopName: string) => void;
+}) {
+  const [dm, setDm] = useState('all');
+  const g = data.rival_shops_by_category!;
+  const tenDm = (id: string) => categoryLabel(id, data.category_names?.[id]);
+  const goc = dm === 'all' ? g.all : g.by_category[dm] ?? [];
+  const ds = goc.filter(s => !trackedIds.has(s.shop_id)).slice(0, SO_GOI_Y);
+  const trong = dm === 'all' ? '' : ` trong ${tenDm(dm)}`;
+  const options = [
+    { value: 'all', label: 'Tất cả danh mục' },
+    ...data.available_categories.map(id => ({ value: id, label: tenDm(id) })).sort((a, b) => a.label.localeCompare(b.label, 'vi')),
+  ];
+  return (
+    <section aria-label="Gợi ý theo dõi" className="mt-3 rounded-md border border-[#007700]/15 bg-white px-3 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="m-0 text-[13px] font-bold text-stone-900">Gợi ý theo dõi{trong}</h3>
+        {/* Một danh mục thì "Tất cả" cũng là danh mục đó, không cần ô chọn. */}
+        {data.available_categories.length > 1 && <SelectField label="Danh mục" value={dm} onChange={setDm} options={options} />}
+      </div>
+      {ds.length === 0 ? (
+        <p className="m-0 mt-2 text-[13px] leading-relaxed text-stone-600">
+          {goc.length > 0 ? `Bạn đã theo dõi hết các shop bán hàng giống bạn${trong}.` : `AI chưa thấy shop nào bán hàng giống bạn${trong}.`}{' '}
+          Có thể chọn theo shop bán chạy ở phần <a href="#ban-chay" className="font-semibold text-[#007700] no-underline hover:underline">Ai đang bán chạy</a>.
+        </p>
+      ) : (
+        <ul className="m-0 mt-1 list-none divide-y divide-stone-100 p-0">
+          {ds.map(s => (
+            <li key={s.shop_id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
+              <div className="min-w-0 flex-1">
+                <Link to={`/seller/competitors/${s.shop_id}`} title={`Xem hồ sơ ${s.shop_name ?? ''}`} className="text-[13.5px] font-semibold text-stone-900 no-underline hover:text-[#007700]">
+                  {s.shop_name ?? 'Shop chưa đặt tên'}
+                </Link>
+                <span className="block text-xs leading-relaxed text-stone-500">
+                  Có hàng giống {count(s.overlap)} sản phẩm của bạn
+                  {dm === 'all' && s.categories?.length ? ` · ở ${s.categories.map(tenDm).join(', ')}` : ''}
+                  {` · giống nhất ${Math.round(s.best_similarity * 100)}%`}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onTrack(s.shop_id, s.shop_name ?? '')}
+                disabled={full || pendingShop !== null}
+                aria-label={`Theo dõi ${s.shop_name ?? ''}`}
+                className={NUT_THEO_DOI}
+              >
+                <UserPlus size={13} aria-hidden />
+                {pendingShop === s.shop_id ? 'Đang thêm' : 'Theo dõi'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {full && ds.length > 0 && <Note tone="warn">{MSG[143]} Bỏ bớt ở phần Theo dõi đối thủ để thêm shop mới.</Note>}
+    </section>
+  );
+}
+
 /** Kết luận chung: mỗi phần góp một câu và một con số; phần nào chưa tải xong thì bỏ qua. */
-function TongQuan({ comp, trk, cmp, action }: {
+function TongQuan({ comp, trk, cmp, action, goiY }: {
   comp: Competitors | null;
   trk: { data: CompetitorTracking; live: boolean } | null;
   cmp: ShopComparison | null;
   action?: React.ReactNode;
+  goiY?: React.ReactNode;
 }) {
   if (!comp && !trk && !cmp) return null;
   const catName = comp ? categoryLabel(comp.category_id, comp.category_names?.[comp.category_id]) : '';
   const best = comp?.my_listings[0];
-  const rival = comp?.direct_rival_shops?.[0];
+  // Cùng nguồn với khung Gợi ý theo dõi (mọi danh mục), để câu này không nói khác khung bên dưới.
+  const rival = comp?.rival_shops_by_category?.all[0] ?? comp?.direct_rival_shops?.[0];
   const top = comp?.competitors[0];
   const latest = trk?.data.alerts[0];
   const ss = cmp ? soVoiDanDau(cmp) : null;
@@ -463,6 +533,7 @@ function TongQuan({ comp, trk, cmp, action }: {
             </li>
           ))}
         </ul>
+        {goiY}
       </section>
       {itDon && (
         <p role="note" className="m-0 rounded-md border border-sky-100 bg-sky-50 px-4 py-2.5 text-[13px] leading-relaxed text-sky-900">
@@ -555,18 +626,17 @@ export function CompetitorsPage() {
     [tracking.state],
   );
   const [pendingShop, setPendingShop] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
+  const { showToast } = useToast();
 
   async function track(shopId: string, shopName: string) {
     setPendingShop(shopId);
-    setNotice(null);
     try {
       await analyticsApi.trackCompetitor(shopId);
       invalidateInsights('/competitor-tracking');
       tracking.reload();
-      setNotice({ tone: 'good', text: `Đã theo dõi ${shopName}. Hàng mới của shop này sẽ hiện ở phần Theo dõi đối thủ bên dưới.` });
+      showToast(`Đã theo dõi ${shopName}. Hàng mới của shop này sẽ hiện ở phần Theo dõi đối thủ bên dưới.`, 'success');
     } catch (err) {
-      setNotice({ tone: 'bad', text: analyticsErrorMessage(err, 'Không theo dõi được shop này.') });
+      showToast(analyticsErrorMessage(err, MSG[145]), 'error');
     } finally {
       setPendingShop(null);
     }
@@ -585,6 +655,8 @@ export function CompetitorsPage() {
       ?? state.data.competitors.find(c => c.shop_id && !trackedIds.has(c.shop_id))
     : undefined;
   const yeuNhat = comparison.state.kind === 'ready' ? soVoiDanDau(comparison.state.data).weakest : undefined;
+  // Có khung gợi ý (shop thật) thì nút theo dõi nằm trong khung; đầu khung Điểm chính để cho việc cần cải thiện.
+  const coGoiY = !!(state.kind === 'ready' && state.data.rival_shops_by_category && canTrack && tracking.state.kind === 'ready');
 
   return (
     <InsightPage title="Phân tích đối thủ" question="Ai đang bán giống tôi, họ vừa ra hàng gì, và tôi hơn kém họ ở đâu?">
@@ -598,8 +670,17 @@ export function CompetitorsPage() {
         comp={state.kind === 'ready' ? state.data : null}
         trk={tracking.state.kind === 'ready' ? { data: tracking.state.data, live: tracking.state.meta.source.mode === 'live' } : null}
         cmp={comparison.state.kind === 'ready' ? comparison.state.data : null}
+        goiY={state.kind === 'ready' && state.data.rival_shops_by_category && canTrack && tracking.state.kind === 'ready' ? (
+          <GoiYTheoDoi
+            data={state.data}
+            trackedIds={trackedIds}
+            full={tracking.state.data.slots_used >= tracking.state.data.slots_limit}
+            pendingShop={pendingShop}
+            onTrack={track}
+          />
+        ) : undefined}
         action={
-          nextRival ? (
+          !coGoiY && nextRival ? (
             <button
               type="button"
               onClick={() => track(nextRival.shop_id!, nextRival.shop_name ?? '')}
@@ -614,11 +695,6 @@ export function CompetitorsPage() {
           ) : undefined
         }
       />
-      {notice && (
-        <p aria-live="polite" className={`m-0 text-[13px] font-medium ${notice.tone === 'good' ? 'text-[#005B00]' : 'text-red-700'}`}>
-          {notice.text}
-        </p>
-      )}
       </div>
 
       <PageSection
@@ -627,7 +703,7 @@ export function CompetitorsPage() {
       >
       {state.kind !== 'ready' ? (
         <InsightCard>
-          <InsightStatusView state={state} onRetry={reload} />
+          <InsightStatusView state={state} onRetry={reload} errorText={MSG[136]} />
         </InsightCard>
       ) : (
         <InsightBlock state={state} onRetry={reload}>
@@ -694,9 +770,7 @@ export function CompetitorsPage() {
                     footer={<SourceFooter meta={meta} limitation={data.note} />}
                   >
                     {data.my_listings.length === 0 ? (
-                      <Note>
-                        Bạn chưa có sản phẩm nào trong danh mục {catName}. Chọn danh mục khác để xem vị trí của mình.
-                      </Note>
+                      <Note>{MSG[137]} Chọn danh mục khác để xem vị trí của mình.</Note>
                     ) : (
                       <SanPhamCuaBan key={data.category_id} rows={data.my_listings} />
                     )}
