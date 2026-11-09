@@ -166,42 +166,47 @@ export function SeasonalReadinessTab({
               return (
                 <div
                   key={prod._id || idx}
-                  className="rounded-2xl border border-stone-200 bg-white p-5 shadow-2xs hover:border-stone-300 transition-all grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-center"
+                  className="rounded-2xl border border-stone-200 bg-white p-5 shadow-2xs hover:border-stone-300 transition-all space-y-4"
                 >
-                  {/* Cột trái (7 Cột): Thông tin sản phẩm + Vòng tròn tiến độ + Checklist */}
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center lg:col-span-7">
-                    <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-stone-100 text-stone-400 overflow-hidden border border-stone-200">
-                      {imgSrc ? (
-                        <img
-                          src={imgSrc}
-                          alt={prod.title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLElement).style.display = 'none';
-                            const fallback = e.currentTarget.parentElement?.querySelector('.img-fallback');
-                            if (fallback) (fallback as HTMLElement).classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      <div className={`img-fallback ${imgSrc ? 'hidden' : 'flex'} flex-col items-center justify-center w-full h-full text-stone-400 p-1 text-center`}>
-                        <ShoppingBag size={22} className="text-stone-400 mb-0.5" />
-                        <span className="text-[9px] text-stone-400 leading-tight">Chưa có ảnh</span>
+                  {/* PHẦN 1: THANH TỔNG QUAN SẢN PHẨM & ĐỘ SẴN SÀNG */}
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-stone-100">
+                    {/* Cụm trái: Ảnh + Tên sản phẩm + Giá + Tồn kho */}
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-400 overflow-hidden border border-stone-200">
+                        {imgSrc ? (
+                          <img
+                            src={imgSrc}
+                            alt={prod.title}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                              const fallback = e.currentTarget.parentElement?.querySelector('.img-fallback');
+                              if (fallback) (fallback as HTMLElement).classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`img-fallback ${imgSrc ? 'hidden' : 'flex'} flex-col items-center justify-center w-full h-full text-stone-400 p-1 text-center`}>
+                          <ShoppingBag size={20} className="text-stone-400 mb-0.5" />
+                          <span className="text-[8px] text-stone-400 leading-tight">Chưa có ảnh</span>
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <h4 className="m-0 text-sm font-bold text-stone-900 leading-snug truncate" title={prod.title}>
+                          {prod.title}
+                        </h4>
+                        <p className="mb-0 mt-1 text-xs text-stone-500">
+                          Giá: <span className="font-semibold text-stone-700">{prod.price_vnd ? money(prod.price_vnd) : 'Chưa đặt giá'}</span>
+                          {prod.stock !== undefined ? ` · Tồn kho: ${prod.stock} sp` : ''}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <h4 className="m-0 text-sm font-bold text-stone-900 leading-snug line-clamp-2" title={prod.title}>
-                        {prod.title}
-                      </h4>
-                      <p className="mb-2.5 mt-1 text-xs text-stone-500">
-                        Giá: {prod.price_vnd ? money(prod.price_vnd) : 'Chưa đặt giá'}
-                        {prod.stock !== undefined ? ` · Tồn kho: ${prod.stock} sp` : ''}
-                      </p>
-
-                      <div className="flex items-center gap-4">
-                        {/* Vòng tròn tiến độ SVG */}
-                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center">
+                    {/* Cụm phải: Vòng tròn tiến độ + 4 tiêu chí tóm tắt + Nút sửa */}
+                    <div className="flex flex-wrap items-center gap-4 lg:gap-5 shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center">
                           <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 36 36">
                             <path
                               className="text-stone-200"
@@ -225,89 +230,96 @@ export function SeasonalReadinessTab({
                           </span>
                         </div>
 
-                        {/* 4 Mục trạng thái */}
-                        <div className="space-y-1 text-xs">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                           {checklist.map((item, cIdx) => (
                             <div
                               key={cIdx}
                               className={`flex items-center gap-1.5 ${
-                                item.isDone ? 'font-semibold text-emerald-800' : 'text-stone-500'
+                                item.isDone ? 'font-medium text-emerald-800' : 'text-stone-400'
                               }`}
                             >
                               {item.isDone ? (
                                 <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
                               ) : (
-                                <span className="h-2 w-2 rounded-sm bg-stone-300 shrink-0" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-stone-300 shrink-0" />
                               )}
-                              <span className="text-[11px]">{item.label}</span>
+                              <span className="text-[11px] truncate max-w-[130px]">{item.label}</span>
                             </div>
                           ))}
                         </div>
                       </div>
+
+                      <Link
+                        to="/seller/products"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                      >
+                        Chỉnh sửa sản phẩm <ChevronRight size={13} />
+                      </Link>
                     </div>
                   </div>
 
-                  {/* Cột phải (5 Cột): Khối Việc nên làm tiếp - Hướng dẫn cụ thể từng tiêu chí thiếu */}
-                  <div className="flex flex-col justify-center rounded-xl border border-stone-200 bg-stone-50/70 p-4 lg:col-span-5 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-stone-700 uppercase tracking-wider">
-                        Việc nên chỉnh sửa ngay
-                      </span>
-                      {uncompleted.length > 0 ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
-                          Còn {uncompleted.length} tiêu chí
+                  {/* PHẦN 2: CÁC TIÊU CHÍ CẦN CHỈNH SỬA (BỐ CỤC 2 CỘT CÂN ĐỐI) */}
+                  {uncompleted.length > 0 ? (
+                    <div className="space-y-3 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                          <AlertCircle size={14} className="text-amber-600" />
+                          Việc nên chỉnh sửa ngay đón dịp {campName} ({uncompleted.length} tiêu chí chưa đạt)
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                          Đạt 4/4 tiêu chuẩn
-                        </span>
-                      )}
-                    </div>
+                        {activeCamp?.launch_window?.end && (
+                          <span className="text-[11px] text-stone-400">
+                            Hạn chốt chuẩn bị: {fullDate(activeCamp.launch_window.end)}
+                          </span>
+                        )}
+                      </div>
 
-                    {uncompleted.length > 0 ? (
-                      <div className="space-y-2 text-xs">
+                      {/* Lưới các thẻ việc cần làm: 2 cột khi có từ 2 mục, cân đối và thoáng */}
+                      <div className={`grid grid-cols-1 ${uncompleted.length > 1 ? 'md:grid-cols-2' : ''} gap-3`}>
                         {uncompleted.map((item) => (
-                          <div key={item.id} className="rounded-lg border border-stone-200/80 bg-white p-2.5 shadow-2xs space-y-1">
-                            <div className="font-semibold text-stone-800 text-[11px]">
-                              {item.actionTitle}
-                            </div>
-                            <div className="text-[11px] text-stone-600 leading-relaxed">
-                              {item.actionDetail}
-                            </div>
-                            {item.tipForSeller && (
-                              <div className="text-[11px] text-emerald-800 bg-emerald-50/90 rounded px-2 py-1 font-medium border border-emerald-100">
-                                💡 {item.tipForSeller}
+                          <div
+                            key={item.id}
+                            className="rounded-xl border border-stone-200/90 bg-stone-50/70 p-3.5 flex flex-col justify-between space-y-2.5 hover:border-stone-300 transition-colors"
+                          >
+                            <div>
+                              <div className="font-semibold text-stone-900 text-xs flex items-center gap-1.5">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <span>{item.actionTitle}</span>
                               </div>
-                            )}
-                            {item.evidenceNote && (
-                              <div className="text-[10px] text-stone-500 bg-stone-50/90 rounded px-2 py-0.5 border border-stone-100 flex items-start gap-1">
-                                <span className="font-semibold text-stone-600 shrink-0">📊 Bằng chứng:</span>
-                                <span>{item.evidenceNote}</span>
-                              </div>
-                            )}
+                              <p className="text-xs text-stone-600 mt-1 leading-relaxed">
+                                {item.actionDetail}
+                              </p>
+                            </div>
+
+                            <div className="space-y-1.5 pt-1 border-t border-stone-200/60">
+                              {item.tipForSeller && (
+                                <div className="text-[11px] text-emerald-800 bg-emerald-50/90 rounded-lg p-2 font-medium border border-emerald-100 flex items-start gap-1.5">
+                                  <span className="shrink-0">💡</span>
+                                  <span className="leading-relaxed">{item.tipForSeller}</span>
+                                </div>
+                              )}
+                              {item.evidenceNote && (
+                                <div className="text-[10px] text-stone-500 bg-white rounded-lg p-2 border border-stone-200/70 flex items-start gap-1.5">
+                                  <span className="shrink-0 font-semibold text-stone-700">📊 Bằng chứng:</span>
+                                  <span className="leading-snug">{item.evidenceNote}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-xs text-emerald-900 leading-relaxed">
-                        Sản phẩm đã đạt chuẩn 4/4 tiêu chí đón cao điểm dịp <strong>{campName}</strong>! Bạn có thể kiểm tra lại tồn kho và gắn thêm voucher khuyến mãi để bứt phá doanh số.
-                      </div>
-                    )}
-
-                    <div className="pt-1 flex items-center justify-between">
-                      <Link
-                        to="/seller/products"
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-[#007700] hover:underline"
-                      >
-                        Chỉnh sửa sản phẩm trong kho <ChevronRight size={13} />
-                      </Link>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 flex items-center justify-between text-xs text-emerald-900">
+                      <span>
+                        🎉 Sản phẩm đã đạt chuẩn <strong>4/4 tiêu chí</strong> sẵn sàng đón cao điểm dịp <strong>{campName}</strong>! Hãy chuẩn bị tồn kho và thiết lập ưu đãi để bứt phá doanh số.
+                      </span>
                       {activeCamp?.launch_window?.end && (
-                        <span className="text-[10px] text-stone-400">
-                          Hạn chốt: {fullDate(activeCamp.launch_window.end)}
+                        <span className="text-stone-500 shrink-0 ml-4">
+                          Hạn chốt mở bán: {fullDate(activeCamp.launch_window.end)}
                         </span>
                       )}
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
