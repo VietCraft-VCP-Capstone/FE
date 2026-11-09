@@ -66,24 +66,45 @@ export function SeasonalReadinessTab({
           <div className="space-y-4">
             {matchingProducts.map((prod, idx) => {
               const imgSrc = getProductImageSrc(prod);
+              const prodTitle = prod?.title || 'Sản phẩm';
+              const titleLen = prodTitle.length;
+
+              const hasImages = Boolean((prod?.images?.length ?? 0) >= 2 || imgSrc);
+              const hasKeywords = Boolean((prod?.tags?.length ?? 0) > 0 || (prod?.categories?.length ?? 0) > 0);
+              const hasCombo = Boolean(/set|combo|hộp quà|quà tặng/i.test(prodTitle));
+              const hasSeo = Boolean(titleLen >= 30);
+
               const checklist = [
                 {
+                  id: 'images',
                   label: `Ảnh concept theo chủ đề ${campName}`,
-                  isDone: Boolean((prod?.images?.length ?? 0) >= 2 || imgSrc),
+                  isDone: hasImages,
+                  actionTitle: `Bổ sung ảnh concept dịp ${campName}`,
+                  actionDetail: `Tải thêm ảnh chụp sản phẩm với bối cảnh hoặc hộp quà theo chủ đề dịp ${campName} để tăng tỷ lệ click (CTR).`,
                 },
                 {
+                  id: 'keywords',
                   label: 'Từ khoá ngách đón tìm kiếm sớm',
-                  isDone: Boolean((prod?.tags?.length ?? 0) > 0 || (prod?.categories?.length ?? 0) > 0),
+                  isDone: hasKeywords,
+                  actionTitle: 'Gắn từ khoá ngách đón tìm kiếm sớm',
+                  actionDetail: `Bổ sung các từ khóa tìm kiếm theo dịp vào thẻ tag hoặc danh mục (gợi ý: "quà tặng ${campName.toLowerCase()}", "set quà tri ân").`,
                 },
                 {
+                  id: 'combo',
                   label: 'Đóng gói combo set quà tặng',
-                  isDone: Boolean(/set|combo|hộp quà|quà tặng/i.test(prod?.title || '')),
+                  isDone: hasCombo,
+                  actionTitle: 'Tạo combo set quà tặng',
+                  actionDetail: `Tạo thêm phân loại bán kèm phụ kiện hoặc hộp quà nơ đóng sẵn (gợi ý: "Set ${prodTitle.slice(0, 35)} Kèm Hộp Quà & Thiệp Tri Ân") để tăng giá trị đơn.`,
                 },
                 {
+                  id: 'seo',
                   label: 'Tiêu đề & mô tả chuẩn SEO sàn',
-                  isDone: Boolean((prod?.title || '').length >= 30),
+                  isDone: hasSeo,
+                  actionTitle: `Kéo dài tiêu đề chuẩn SEO (hiện ${titleLen}/30+ ký tự)`,
+                  actionDetail: `Tiêu đề quá ngắn khiến sàn khó phân bổ tìm kiếm. Gợi ý đổi thành: "${prodTitle.slice(0, 30)} - Quà Tặng ${campName} Cao Cấp Ý Nghĩa".`,
                 },
               ];
+              const uncompleted = checklist.filter((i) => !i.isDone);
               const doneCount = checklist.filter((i) => i.isDone).length;
               const pct = Math.round((doneCount / checklist.length) * 100);
 
@@ -171,23 +192,55 @@ export function SeasonalReadinessTab({
                     </div>
                   </div>
 
-                  {/* Cột phải (5 Cột): Khối Việc nên làm tiếp */}
-                  <div className="flex flex-col justify-center rounded-xl border border-stone-200 bg-stone-50/70 p-4 lg:col-span-5 space-y-2">
-                    <span className="text-[11px] font-bold text-stone-700 uppercase tracking-wider">
-                      Việc nên làm tiếp
-                    </span>
-                    <p className="mb-0 text-xs text-stone-600 leading-relaxed">
-                      Cập nhật ảnh concept quà tặng cho dịp <strong>{campName}</strong> và bổ sung từ khoá ngách vào mô tả để sàn kịp index trước{' '}
-                      <strong>
-                        {activeCamp?.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'ngày chốt đơn'}
-                      </strong>.
-                    </p>
-                    <Link
-                      to="/seller/products"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-[#007700] hover:underline pt-1"
-                    >
-                      Mở Quản lý kho hàng để cập nhật ảnh <ChevronRight size={13} />
-                    </Link>
+                  {/* Cột phải (5 Cột): Khối Việc nên làm tiếp - Hướng dẫn cụ thể từng tiêu chí thiếu */}
+                  <div className="flex flex-col justify-center rounded-xl border border-stone-200 bg-stone-50/70 p-4 lg:col-span-5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-stone-700 uppercase tracking-wider">
+                        Việc nên chỉnh sửa ngay
+                      </span>
+                      {uncompleted.length > 0 ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                          Còn {uncompleted.length} tiêu chí
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                          Đạt 4/4 tiêu chuẩn
+                        </span>
+                      )}
+                    </div>
+
+                    {uncompleted.length > 0 ? (
+                      <div className="space-y-2 text-xs">
+                        {uncompleted.map((item) => (
+                          <div key={item.id} className="rounded-lg border border-stone-200/80 bg-white p-2.5 shadow-2xs">
+                            <div className="font-semibold text-stone-800 text-[11px]">
+                              {item.actionTitle}
+                            </div>
+                            <div className="text-[11px] text-stone-600 mt-0.5 leading-relaxed">
+                              {item.actionDetail}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-xs text-emerald-900 leading-relaxed">
+                        Sản phẩm đã đạt chuẩn 4/4 tiêu chí đón cao điểm dịp <strong>{campName}</strong>! Bạn có thể kiểm tra lại tồn kho và gắn thêm voucher khuyến mãi để bứt phá doanh số.
+                      </div>
+                    )}
+
+                    <div className="pt-1 flex items-center justify-between">
+                      <Link
+                        to="/seller/products"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-[#007700] hover:underline"
+                      >
+                        Chỉnh sửa sản phẩm trong kho <ChevronRight size={13} />
+                      </Link>
+                      {activeCamp?.launch_window?.end && (
+                        <span className="text-[10px] text-stone-400">
+                          Hạn chốt: {fullDate(activeCamp.launch_window.end)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
