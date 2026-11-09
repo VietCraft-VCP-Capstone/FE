@@ -18,6 +18,21 @@ interface SeasonalReadinessTabProps {
   activeCamp: SeasonalCampaign;
 }
 
+function getProductImageSrc(prod: any): string | null {
+  if (!prod) return null;
+  if (Array.isArray(prod.images) && prod.images.length > 0) {
+    const first = prod.images[0];
+    if (typeof first === 'string' && first.trim()) return first.trim();
+    if (typeof first === 'object' && first?.url) return first.url.trim();
+  }
+  if (typeof prod.thumbnail === 'string' && prod.thumbnail.trim()) return prod.thumbnail.trim();
+  if (typeof prod.image_url === 'string' && prod.image_url.trim()) return prod.image_url.trim();
+  if (typeof prod.imageUrl === 'string' && prod.imageUrl.trim()) return prod.imageUrl.trim();
+  if (typeof prod.default_image === 'string' && prod.default_image.trim()) return prod.default_image.trim();
+  if (typeof prod.image === 'string' && prod.image.trim()) return prod.image.trim();
+  return null;
+}
+
 export function SeasonalReadinessTab({
   matchingProducts = [],
   allShopProducts = [],
@@ -50,10 +65,11 @@ export function SeasonalReadinessTab({
 
           <div className="space-y-4">
             {matchingProducts.map((prod, idx) => {
+              const imgSrc = getProductImageSrc(prod);
               const checklist = [
                 {
                   label: `Ảnh concept theo chủ đề ${campName}`,
-                  isDone: Boolean(prod?.images?.length && prod.images.length >= 2),
+                  isDone: Boolean((prod?.images?.length ?? 0) >= 2 || imgSrc),
                 },
                 {
                   label: 'Từ khoá ngách đón tìm kiếm sớm',
@@ -78,16 +94,24 @@ export function SeasonalReadinessTab({
                 >
                   {/* Cột trái (7 Cột): Thông tin sản phẩm + Vòng tròn tiến độ + Checklist */}
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center lg:col-span-7">
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-stone-100 text-stone-400 overflow-hidden border border-stone-200">
-                      {prod?.images?.[0] ? (
+                    <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-stone-100 text-stone-400 overflow-hidden border border-stone-200">
+                      {imgSrc ? (
                         <img
-                          src={prod.images[0]}
+                          src={imgSrc}
                           alt={prod.title}
                           className="h-full w-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                            const fallback = e.currentTarget.parentElement?.querySelector('.img-fallback');
+                            if (fallback) (fallback as HTMLElement).classList.remove('hidden');
+                          }}
                         />
-                      ) : (
-                        <ShoppingBag size={28} className="text-stone-400" />
-                      )}
+                      ) : null}
+                      <div className={`img-fallback ${imgSrc ? 'hidden' : 'flex'} flex-col items-center justify-center w-full h-full text-stone-400 p-1 text-center`}>
+                        <ShoppingBag size={22} className="text-stone-400 mb-0.5" />
+                        <span className="text-[9px] text-stone-400 leading-tight">Chưa có ảnh</span>
+                      </div>
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -207,52 +231,64 @@ export function SeasonalReadinessTab({
 
             {allShopProducts.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {allShopProducts.map((prod) => (
-                  <div
-                    key={prod._id}
-                    className="rounded-xl border border-stone-200 bg-white p-3.5 flex flex-col justify-between space-y-3 hover:border-stone-300 transition-colors shadow-2xs"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-14 h-14 rounded-lg bg-stone-100 overflow-hidden border border-stone-200 shrink-0 flex items-center justify-center">
-                        {prod.images?.[0] ? (
-                          <img
-                            src={prod.images[0]}
-                            alt={prod.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <ShoppingBag size={22} className="text-stone-400" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h5
-                          className="font-bold text-stone-900 text-xs leading-snug line-clamp-2"
-                          title={prod.title}
-                        >
-                          {prod.title}
-                        </h5>
-                        <p className="text-[11px] text-stone-500 mt-1">
-                          {prod.price_vnd ? money(prod.price_vnd) : 'Chưa đặt giá'}
-                          {prod.stock !== undefined ? ` · Tồn: ${prod.stock} sp` : ''}
-                        </p>
-                      </div>
-                    </div>
+                {allShopProducts.map((prod) => {
+                  const imgSrc = getProductImageSrc(prod);
 
-                    <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs">
-                      <span className="inline-flex items-center gap-1 text-[11px] text-stone-400">
-                        <Tag size={10} />
-                        Chưa tối ưu dịp này
-                      </span>
-                      <Link
-                        to="/seller/products"
-                        className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#007700] hover:underline"
-                      >
-                        <span>Tối ưu đón dịp</span>
-                        <ChevronRight size={12} />
-                      </Link>
+                  return (
+                    <div
+                      key={prod._id}
+                      className="rounded-xl border border-stone-200 bg-white p-3.5 flex flex-col justify-between space-y-3 hover:border-stone-300 transition-colors shadow-2xs"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="relative w-14 h-14 rounded-lg bg-stone-100 overflow-hidden border border-stone-200 shrink-0 flex items-center justify-center">
+                          {imgSrc ? (
+                            <img
+                              src={imgSrc}
+                              alt={prod.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                                const fallback = e.currentTarget.parentElement?.querySelector('.img-fallback');
+                                if (fallback) (fallback as HTMLElement).classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          <div className={`img-fallback ${imgSrc ? 'hidden' : 'flex'} flex-col items-center justify-center w-full h-full text-stone-400 p-1 text-center`}>
+                            <ShoppingBag size={18} className="text-stone-400 mb-0.5" />
+                            <span className="text-[8px] text-stone-400 leading-tight">Chưa có ảnh</span>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h5
+                            className="font-bold text-stone-900 text-xs leading-snug line-clamp-2"
+                            title={prod.title}
+                          >
+                            {prod.title}
+                          </h5>
+                          <p className="text-[11px] text-stone-500 mt-1">
+                            {prod.price_vnd ? money(prod.price_vnd) : 'Chưa đặt giá'}
+                            {prod.stock !== undefined ? ` · Tồn: ${prod.stock} sp` : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs">
+                        <span className="inline-flex items-center gap-1 text-[11px] text-stone-400">
+                          <Tag size={10} />
+                          Chưa tối ưu dịp này
+                        </span>
+                        <Link
+                          to="/seller/products"
+                          className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#007700] hover:underline"
+                        >
+                          <span>Tối ưu đón dịp</span>
+                          <ChevronRight size={12} />
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               /* Trường hợp shop hoàn toàn chưa có sản phẩm nào */
