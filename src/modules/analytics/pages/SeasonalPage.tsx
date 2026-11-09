@@ -17,7 +17,6 @@ import { OccasionTraitChart } from '../components/seasonal/OccasionTraitChart';
 import { analyticsApi } from '../services/analyticsApi';
 
 // Hub components (Khối A-H)
-import { HubKpiStrip } from '../components/seasonal/hub/HubKpiStrip';
 import { HubActionFeed, type ActionItem, type RunningPlan } from '../components/seasonal/hub/HubActionFeed';
 import { HubOpportunities } from '../components/seasonal/hub/HubOpportunities';
 import { HubRisksAndScorecard, type RouteRiskItem, type ScorecardMetric } from '../components/seasonal/hub/HubRisksAndScorecard';
@@ -28,7 +27,7 @@ import type {
   SeasonalCampaign,
   SeasonalForecast,
 } from '../types';
-import type { Evidence, Metric, OccasionTraitItem, OpportunityCluster } from '../types/evidence';
+import type { Evidence, OccasionTraitItem, OpportunityCluster } from '../types/evidence';
 import { GLOSSARY } from '../i18n/vi.glossary';
 
 function toDay(iso?: string): Date | null {
@@ -199,88 +198,6 @@ export function SeasonalPage() {
 
           // Dữ liệu 6 trục Đặc điểm mua sắm của dịp (Mục 9) - Lấy trực tiếp từ AI API
           const traits: OccasionTraitItem[] = (data.occasion_traits as OccasionTraitItem[]) || [];
-
-          // Dữ liệu Khối A: Tóm tắt nhanh (Tính toán động từ danh sách campaigns và data thực tế)
-          const urgentCampaigns = campaigns.filter(c => {
-            const daysLeft = c.next_deadline?.days_left ?? c.timing?.days_diff ?? 999;
-            return daysLeft >= 0 && daysLeft <= 14;
-          });
-          const actionsDueCount = urgentCampaigns.length;
-          const urgentNames = urgentCampaigns.slice(0, 2).map(c => c.name).join(' & ');
-
-          const reliableList = campaigns.filter(c =>
-            c.confidence?.level === 'high' ||
-            c.confidence?.level === 'fair' ||
-            c.confidence_text === 'Cao' ||
-            c.confidence_text === 'Khá'
-          );
-          const reliableCount = reliableList.length;
-          const totalCampsCount = campaigns.length || 7;
-
-          const residualVals = data.decomposition?.residual?.slice(-8) || [];
-          const avgResidual = residualVals.length > 0
-            ? Math.round(Math.abs(residualVals.reduce((a, b) => a + b, 0) / residualVals.length) * 10) / 10
-            : 1.9;
-          const stabilityScore = Math.round((100 - avgResidual) * 10) / 10;
-
-          const hubKpis = {
-            actionsDue14d: {
-              value: actionsDueCount,
-              unit: 'dịp',
-              comparedWith: urgentCampaigns.length > 0
-                ? `Dịp ${urgentNames} có hạn cần làm trong 14 ngày tới`
-                : 'Không có dịp nào sát hạn chốt trong 14 ngày tới',
-              label: 'observed',
-              evidence: {
-                id: 'ev_kpi_actions_14d',
-                definition: 'Số dịp mua sắm có hạn nhập hàng hoặc hạn chốt đơn rơi vào 14 ngày tới.',
-                sources: ['calendar_vn', 'Thống kê thời gian làm hàng của shop'],
-                howObtained: 'Đếm các dịp có hạn chốt hoặc bắt đầu chuẩn bị nằm trong 14 ngày tới.',
-                period: ['2026-11-01', '2026-11-15'],
-                n: campaigns.length,
-                formula: 'Đếm dịp thỏa điều kiện ngày hạn <= Hôm nay + 14 ngày.',
-                confidence: 'high',
-                confidenceReason: 'Tính toán trực tiếp từ thời gian giao hàng thực tế của shop.',
-                updatedAt: '2026-11-01',
-              },
-            } as Metric<number>,
-            reliableOccasionsCount: {
-              value: reliableCount,
-              unit: 'dịp',
-              comparedWith: `${reliableCount} trong số ${totalCampsCount} dịp lớn trong năm đạt độ tin cậy Cao hoặc Khá`,
-              label: 'observed',
-              evidence: {
-                id: 'ev_kpi_reliable_count',
-                definition: 'Số dịp mua sắm đạt mức tin cậy Cao hoặc Khá trong năm.',
-                sources: ['Dữ liệu lịch sử các đợt cao điểm', 'Mô hình phân tích AI'],
-                howObtained: 'Lọc các dịp có dữ liệu lịch sử sàn và mô hình dự báo ổn định.',
-                period: ['2024-01-01', '2026-10-31'],
-                n: 5200,
-                formula: 'Đếm số dịp có confidence in (high, fair).',
-                confidence: 'high',
-                confidenceReason: 'Đã kiểm chứng độc lập trên dữ liệu thật của sàn.',
-                updatedAt: '2026-11-01',
-              },
-            } as Metric<number>,
-            previousErrorPct: {
-              value: String(stabilityScore),
-              unit: '%',
-              comparedWith: `Nhu cầu tìm kiếm lặp lại rất đều hàng năm (độ lệch ngẫu nhiên chỉ ${avgResidual}%)`,
-              label: 'observed',
-              evidence: {
-                id: 'ev_kpi_stability',
-                definition: 'Độ ổn định của chu kỳ tìm kiếm nhu cầu mua sắm qua các năm.',
-                sources: ['Google Trends Việt Nam (2021-2026)', 'Mô hình phân rã chuỗi thời gian STL'],
-                howObtained: `Tách chuỗi tuần thành Trend + Seasonal + Residual. Độ ổn định = 100% − Sai số ngẫu nhiên (${avgResidual}%).`,
-                period: ['2021-01-01', '2026-10-31'],
-                n: 260,
-                formula: `100% − ${avgResidual}% sai số dư = ${stabilityScore}%.`,
-                confidence: 'high',
-                confidenceReason: 'Chu kỳ nhu cầu các đợt cao điểm lặp lại đều đặn hàng năm.',
-                updatedAt: '2026-11-01',
-              },
-            } as Metric<string>,
-          };
 
           // Dữ liệu Khối B: Việc gợi ý ưu tiên theo dịp (3 dịp gần nhất, tính toán động theo thời gian thực tế)
           const targetCampaigns = campaigns
@@ -635,22 +552,6 @@ export function SeasonalPage() {
                     activeCampId={activeCamp?.id}
                     onSelectCampaign={handleSelectCampaign}
                   />
-
-                  {/* Tóm tắt nhanh 4 chỉ số */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                        Tóm tắt nhanh tình hình cao điểm
-                      </h4>
-                      <span className="text-[11px] text-stone-400">
-                        Bấm ⓘ để kiểm tra bằng chứng từng chỉ số
-                      </span>
-                    </div>
-                    <HubKpiStrip
-                      kpis={hubKpis}
-                      onOpenEvidence={handleOpenEvidence}
-                    />
-                  </div>
 
                   {/* Việc cần làm tuần này & Kế hoạch đang chạy */}
                   <div className="space-y-2">
