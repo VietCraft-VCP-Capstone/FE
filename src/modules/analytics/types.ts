@@ -825,6 +825,8 @@ export interface SeasonalForecast {
   ready_to_ship_ideas?: ReadyToShipIdea[];
   pod_blanks?: PodBlankSuggestion[];
   opportunity_clusters?: any[];
+  shop_products?: any[];
+  matching_shop_products?: any[];
   ai_model?: string;
   flat_keywords: string[];
   method: string;

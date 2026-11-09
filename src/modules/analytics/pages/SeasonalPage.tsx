@@ -180,21 +180,8 @@ export function SeasonalPage() {
           const activeCamp: SeasonalCampaign | undefined = data.active_campaign;
           const readyIdeas = data.ready_to_ship_ideas || [];
           const podBlanks = data.pod_blanks || [];
-          const primaryEvent = data.events?.[0];
-          const matchingProducts = primaryEvent?.matching_shop_products || [];
-
-          // Sản phẩm bán chạy nhất trong shop hoặc gợi ý dẫn dắt
-          const topProduct = matchingProducts[0] || (readyIdeas[0] ? {
-            title: readyIdeas[0].title,
-            orders: 0,
-            revenue_vnd: 0,
-            images: [],
-          } : {
-            title: `${data.seller_category?.name || 'Sản phẩm chủ lực'} cho dịp ${activeCamp?.name || 'cao điểm'}`,
-            orders: 0,
-            revenue_vnd: 0,
-            images: [],
-          });
+          const matchingProducts: any[] = data.matching_shop_products || [];
+          const allShopProducts: any[] = data.shop_products || [];
 
           // Dữ liệu 6 trục Đặc điểm mua sắm của dịp (Mục 9) - Lấy trực tiếp từ AI API
           const traits: OccasionTraitItem[] = (data.occasion_traits as OccasionTraitItem[]) || [];
@@ -624,7 +611,8 @@ export function SeasonalPage() {
               {activeDetailTab === 'readiness' && activeCamp && (
                 <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
                   <SeasonalReadinessTab
-                    topProduct={topProduct}
+                    matchingProducts={matchingProducts}
+                    allShopProducts={allShopProducts}
                     activeCamp={activeCamp}
                   />
                 </div>
