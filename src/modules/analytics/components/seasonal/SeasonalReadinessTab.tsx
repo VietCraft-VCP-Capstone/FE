@@ -33,6 +33,52 @@ function getProductImageSrc(prod: any): string | null {
   return null;
 }
 
+/**
+ * Trích xuất gợi ý động theo từng ngành hàng và đặc tính thực tế của sản phẩm
+ */
+function getProductSuggestion(prod: any, campName: string) {
+  const title = (prod?.title || 'Sản phẩm').trim();
+  const lower = `${title} ${(prod?.categories || []).join(' ')} ${(prod?.tags || []).join(' ')}`.toLowerCase();
+
+  let comboItemTip = 'kèm phụ kiện hoặc hộp quà nơ đóng sẵn';
+  let sampleCombo = `Set ${title.slice(0, 30)} Kèm Hộp Quà & Thiệp ${campName}`;
+  let sampleKeywords = `"quà tặng ${campName.toLowerCase()}", "set quà tri ân"`;
+
+  if (/áo|quần|đầm|váy|khoác|len|thun|hoodie|may mặc|thời trang/i.test(lower)) {
+    comboItemTip = 'kèm hộp quà nơ sang trọng, thiệp chúc hoặc phụ kiện phối kèm';
+    sampleCombo = `Set ${title.slice(0, 28)} Kèm Hộp Quà Sang Trọng & Thiệp ${campName}`;
+    sampleKeywords = `"quà tặng thời trang", "set đồ ${campName.toLowerCase()}", "quà tri ân"`;
+  } else if (/khăn|choàng|lụa|len|mũ|nón|túi|ví|phụ kiện/i.test(lower)) {
+    comboItemTip = 'kèm hộp đựng lót nhung/lụa, túi quà quai xách và thiệp mừng';
+    sampleCombo = `Hộp Quà Cao Cấp ${title.slice(0, 25)} Kèm Thiệp Tri Ân ${campName}`;
+    sampleKeywords = `"khăn quà tặng", "hộp quà phụ kiện", "quà ${campName.toLowerCase()} tinh tế"`;
+  } else if (/gốm|sứ|ly|cốc|bình|chén|ấm|tách|gia dụng/i.test(lower)) {
+    comboItemTip = 'ghép cặp đôi hoặc kèm thìa mạ vàng, đế lót gỗ và hộp quà kraft';
+    sampleCombo = `Set 2 ${title.slice(0, 25)} Kèm Thìa Vàng & Hộp Quà ${campName}`;
+    sampleKeywords = `"ly sứ quà tặng", "quà lưu niệm ${campName.toLowerCase()}", "set gốm quà tặng"`;
+  } else if (/tranh|đèn|decor|trang trí|nến|tượng|gỗ|thủ công|mỹ nghệ/i.test(lower)) {
+    comboItemTip = 'kèm hộp giấy kraft bọc rơm mộc mạc, tag thiệp handmade và nến thơm';
+    sampleCombo = `Combo Quà Handmade ${title.slice(0, 25)} Kèm Thiệp Gỗ ${campName}`;
+    sampleKeywords = `"quà handmade", "đồ decor ${campName.toLowerCase()}", "quà thủ công mỹ nghệ"`;
+  } else if (/trà|cà phê|bánh|mứt|kẹo|thực phẩm/i.test(lower)) {
+    comboItemTip = 'kèm tách thưởng trà hoặc giỏ quà mây tre đan cao cấp';
+    sampleCombo = `Hộp Quà Thưởng Trà ${title.slice(0, 25)} Kèm Thiệp Chúc ${campName}`;
+    sampleKeywords = `"hộp quà thực phẩm", "quà biếu ${campName.toLowerCase()}", "trà quà tặng"`;
+  }
+
+  let seoTitleSample = `${title} - Quà Tặng ${campName} Cao Cấp Ý Nghĩa`;
+  if (title.length < 22) {
+    seoTitleSample = `${title} Cao Cấp - Quà Tặng Dịp ${campName} Sang Trọng Ý Nghĩa`;
+  }
+
+  return {
+    comboItemTip,
+    sampleCombo,
+    sampleKeywords,
+    seoTitleSample,
+  };
+}
+
 export function SeasonalReadinessTab({
   matchingProducts = [],
   allShopProducts = [],
@@ -68,6 +114,7 @@ export function SeasonalReadinessTab({
               const imgSrc = getProductImageSrc(prod);
               const prodTitle = prod?.title || 'Sản phẩm';
               const titleLen = prodTitle.length;
+              const suggestion = getProductSuggestion(prod, campName);
 
               const hasImages = Boolean((prod?.images?.length ?? 0) >= 2 || imgSrc);
               const hasKeywords = Boolean((prod?.tags?.length ?? 0) > 0 || (prod?.categories?.length ?? 0) > 0);
@@ -87,21 +134,21 @@ export function SeasonalReadinessTab({
                   label: 'Từ khoá ngách đón tìm kiếm sớm',
                   isDone: hasKeywords,
                   actionTitle: 'Gắn từ khoá ngách đón tìm kiếm sớm',
-                  actionDetail: `Bổ sung các từ khóa tìm kiếm theo dịp vào thẻ tag hoặc danh mục (gợi ý: "quà tặng ${campName.toLowerCase()}", "set quà tri ân").`,
+                  actionDetail: `Bổ sung các từ khóa tìm kiếm theo dịp vào thẻ tag hoặc danh mục (gợi ý: ${suggestion.sampleKeywords}).`,
                 },
                 {
                   id: 'combo',
                   label: 'Đóng gói combo set quà tặng',
                   isDone: hasCombo,
                   actionTitle: 'Tạo combo set quà tặng',
-                  actionDetail: `Tạo thêm phân loại bán kèm phụ kiện hoặc hộp quà nơ đóng sẵn (gợi ý: "Set ${prodTitle.slice(0, 35)} Kèm Hộp Quà & Thiệp Tri Ân") để tăng giá trị đơn.`,
+                  actionDetail: `Tạo thêm phân loại ${suggestion.comboItemTip} (gợi ý: "${suggestion.sampleCombo}") để tăng giá trị đơn.`,
                 },
                 {
                   id: 'seo',
                   label: 'Tiêu đề & mô tả chuẩn SEO sàn',
                   isDone: hasSeo,
                   actionTitle: `Kéo dài tiêu đề chuẩn SEO (hiện ${titleLen}/30+ ký tự)`,
-                  actionDetail: `Tiêu đề quá ngắn khiến sàn khó phân bổ tìm kiếm. Gợi ý đổi thành: "${prodTitle.slice(0, 30)} - Quà Tặng ${campName} Cao Cấp Ý Nghĩa".`,
+                  actionDetail: `Tiêu đề quá ngắn khiến sàn khó phân bổ tìm kiếm. Gợi ý đổi thành: "${suggestion.seoTitleSample}".`,
                 },
               ];
               const uncompleted = checklist.filter((i) => !i.isDone);
