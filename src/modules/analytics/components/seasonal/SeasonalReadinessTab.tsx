@@ -74,7 +74,7 @@ export function SeasonalReadinessTab({
               const checklist: any[] = analysis?.checklist || [
                 {
                   id: 'images',
-                  label: `Ảnh concept theo chủ đề ${campName}`,
+                  label: `Ảnh concept dịp ${campName}`,
                   is_done: Boolean((prod?.images?.length ?? 0) >= 2 || imgSrc),
                   action_title: `Bổ sung ảnh concept dịp ${campName}`,
                   action_detail: `Tải thêm ảnh chụp sản phẩm với bối cảnh hoặc hộp quà theo chủ đề dịp ${campName}.`,
@@ -177,20 +177,20 @@ export function SeasonalReadinessTab({
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                           {checklist.map((item, cIdx) => (
                             <div
                               key={cIdx}
                               className={`flex items-center gap-1.5 ${
-                                (item.is_done ?? item.isDone) ? 'font-medium text-emerald-800' : 'text-stone-400'
+                                (item.is_done ?? item.isDone) ? 'font-medium text-emerald-800' : 'text-stone-500'
                               }`}
                             >
                               {(item.is_done ?? item.isDone) ? (
-                                <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
                               ) : (
                                 <span className="h-1.5 w-1.5 rounded-full bg-stone-300 shrink-0" />
                               )}
-                              <span className="text-[11px] truncate max-w-[130px]">{item.label}</span>
+                              <span className="text-[11px] whitespace-nowrap">{item.label}</span>
                             </div>
                           ))}
                         </div>
