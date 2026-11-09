@@ -1,26 +1,16 @@
 import React from 'react';
-import { CheckCircle, Clock, Sparkles, AlertTriangle, Bookmark, CheckSquare, Square, Calculator } from 'lucide-react';
+import {
+  CheckCircle,
+  Clock,
+  Sparkles,
+  Bookmark,
+  CheckSquare,
+  Square,
+  Calculator,
+  ArrowRight,
+} from 'lucide-react';
 import type { Evidence } from '../../../types/evidence';
 import { EvidenceTrigger } from '../../evidence/EvidenceTrigger';
-
-export interface ActionItem {
-  id: string;
-  occasionId: string;
-  occasionName: string;
-  phaseBadge: {
-    text: string;
-    variant: 'amber' | 'blue' | 'emerald' | 'rose';
-  };
-  deadlineText: string;
-  daysLeft: number;
-  isUrgent: boolean;
-  isOverduePrep?: boolean;
-  title: string;
-  whyDescription: string;
-  noteText?: string;
-  calculationBasis: string;
-  evidence: Evidence;
-}
 
 export interface OccasionMilestone {
   stageIdx: number;
@@ -31,193 +21,172 @@ export interface OccasionMilestone {
   checked: boolean;
 }
 
-export interface RunningPlan {
+export interface UnifiedOccasionAction {
   id: string;
   occasionId: string;
   occasionName: string;
-  eventDateText: string;
+  phaseBadge: {
+    text: string;
+    variant: 'amber' | 'blue' | 'emerald' | 'stone';
+  };
   deadlineText: string;
   daysLeft: number;
-  statusText: string;
-  statusVariant: 'amber' | 'emerald' | 'blue' | 'stone';
+  isUrgent: boolean;
+  recommendation: {
+    title: string;
+    advice: string;
+    calculationBasis: string;
+    ctaLabel: string;
+    targetTab: 'ideas' | 'opps' | 'hub';
+    actionType: 'close_orders' | 'boost_traffic' | 'prepare_blank';
+  };
   milestones: OccasionMilestone[];
   savedIdeasCount: number;
-  operationalNote: string;
+  calculationBasis: string;
   evidence: Evidence;
 }
 
+// Aliases for backward compatibility if needed
+export type ActionItem = UnifiedOccasionAction;
+export type RunningPlan = UnifiedOccasionAction;
+
 interface Props {
-  actions: ActionItem[];
-  runningPlans: RunningPlan[];
+  occasions: UnifiedOccasionAction[];
   onOpenEvidence: (evidence: Evidence) => void;
   onToggleMilestone?: (occasionId: string, stageIdx: number) => void;
+  onNavigateTab?: (targetTab: string) => void;
   className?: string;
 }
 
 export const HubActionFeed: React.FC<Props> = ({
-  actions,
-  runningPlans,
+  occasions,
   onOpenEvidence,
   onToggleMilestone,
+  onNavigateTab,
   className = '',
 }) => {
   return (
-    <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${className}`}>
-      {/* Cột trái: Gợi ý việc nên làm theo dịp (Gợi ý tham khảo, không bắt buộc) */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-4 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="p-1 rounded-md bg-emerald-50 text-[#007700]">
-                <Sparkles size={16} />
-              </span>
-              <div>
-                <h3 className="font-bold text-stone-900 text-sm">Việc gợi ý ưu tiên theo dịp</h3>
-              </div>
-            </div>
-            <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-              {actions.length} dịp sắp tới
-            </span>
-          </div>
+    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}>
+      {occasions.map((item) => {
+        const badgeClasses = {
+          amber: 'text-amber-800 bg-amber-50 border-amber-200',
+          blue: 'text-blue-700 bg-blue-50 border-blue-200',
+          emerald: 'text-emerald-800 bg-emerald-50 border-emerald-200',
+          stone: 'text-stone-700 bg-stone-50 border-stone-200',
+        }[item.phaseBadge.variant];
 
-          <div className="space-y-3.5 mt-3.5">
-            {actions.map(action => {
-              const badgeVariantClasses = {
-                rose: 'text-rose-700 bg-rose-50 border-rose-200',
-                amber: 'text-amber-800 bg-amber-50 border-amber-200',
-                blue: 'text-blue-700 bg-blue-50 border-blue-200',
-                emerald: 'text-emerald-800 bg-emerald-50 border-emerald-200',
-              }[action.phaseBadge.variant];
+        const checkedMilestonesCount = item.milestones.filter((m) => m.checked).length;
 
-              return (
-                <div
-                  key={action.id}
-                  className="rounded-xl border border-stone-200/90 bg-stone-50/40 p-4 space-y-2.5 hover:bg-stone-50/80 transition-colors flex flex-col justify-between min-h-[190px]"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-xs font-bold text-stone-900 bg-white px-2 py-0.5 rounded border border-stone-200 shadow-2xs">
-                          {action.occasionName}
-                        </span>
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded border ${badgeVariantClasses}`}>
-                          {action.phaseBadge.text}
-                        </span>
-                        <span className="flex items-center gap-1 text-[11px] font-semibold text-stone-700 bg-white px-2 py-0.5 rounded border border-stone-200">
-                          <Clock size={11} className="text-stone-500" />
-                          {action.deadlineText} (còn {action.daysLeft} ngày)
-                        </span>
-                      </div>
-                      <EvidenceTrigger evidence={action.evidence} onOpen={onOpenEvidence} />
-                    </div>
-
-                    <h4 className="font-bold text-stone-900 text-sm leading-snug">{action.title}</h4>
-                    <p className="text-xs text-stone-600 leading-relaxed">{action.whyDescription}</p>
+        return (
+          <div
+            key={item.id}
+            className="rounded-2xl border border-stone-200 bg-white p-4.5 shadow-2xs hover:border-stone-300 transition-all flex flex-col justify-between space-y-3.5"
+          >
+            {/* 1. Header: Dịp & Trạng thái */}
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-2 border-b border-stone-100 pb-2.5">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-stone-900 text-sm">{item.occasionName}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClasses}`}>
+                      {item.phaseBadge.text}
+                    </span>
                   </div>
-
-                  <div className="pt-2 border-t border-stone-200/60">
-                    <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                      <Calculator size={12} className="text-stone-400 shrink-0" />
-                      <span className="truncate">{action.calculationBasis}</span>
-                    </div>
+                  <div className="flex items-center gap-1 text-[11px] font-medium text-stone-500">
+                    <Clock size={12} className="text-stone-400 shrink-0" />
+                    <span>
+                      {item.deadlineText} (còn {item.daysLeft} ngày)
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Cột phải: Theo dõi tiến độ & Mốc của shop */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-4 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="p-1 rounded-md bg-sky-50 text-sky-700">
-                <CheckCircle size={16} />
-              </span>
-              <div>
-                <h3 className="font-bold text-stone-900 text-sm">Theo dõi tiến độ &amp; Mốc của shop</h3>
-                <p className="text-[11px] text-stone-500">Checklist 4 mốc vận hành &amp; ý tưởng đã lưu theo từng dịp</p>
+                <EvidenceTrigger evidence={item.evidence} onOpen={onOpenEvidence} />
               </div>
-            </div>
-            <span className="text-[11px] font-medium text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
-              {runningPlans.length} kế hoạch theo dõi
-            </span>
-          </div>
 
-          <div className="space-y-3.5 mt-3.5">
-            {runningPlans.map(plan => {
-              const statusClasses = {
-                amber: 'bg-amber-50 text-amber-800 border-amber-200',
-                emerald: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-                blue: 'bg-blue-50 text-blue-800 border-blue-200',
-                stone: 'bg-stone-50 text-stone-700 border-stone-200',
-              }[plan.statusVariant];
+              {/* 2. Khuyến nghị AI có căn cứ từ Backend */}
+              <div className="rounded-xl bg-stone-50/70 border border-stone-200/80 p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-stone-900">
+                  <Sparkles size={13} className="text-[#007700] shrink-0" />
+                  <h4>{item.recommendation.title}</h4>
+                </div>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  {item.recommendation.advice}
+                </p>
+                {item.recommendation.ctaLabel && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab?.(item.recommendation.targetTab)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#007700] hover:text-[#005500] hover:underline transition-colors pt-1 cursor-pointer"
+                  >
+                    <span>{item.recommendation.ctaLabel}</span>
+                    <ArrowRight size={12} />
+                  </button>
+                )}
+              </div>
 
-              return (
-                <div
-                  key={plan.id}
-                  className="rounded-xl border border-stone-200/90 bg-white p-4 space-y-3 shadow-2xs hover:border-stone-300 transition-colors flex flex-col justify-between min-h-[190px]"
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-bold text-stone-900 text-sm">{plan.occasionName}</span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${statusClasses}`}>
-                          {plan.statusText}
-                        </span>
-                      </div>
-                      <EvidenceTrigger evidence={plan.evidence} onOpen={onOpenEvidence} />
-                    </div>
+              {/* 3. Checklist 4 mốc tiến độ chuẩn */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-stone-700 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                    <CheckCircle size={12} className="text-stone-400" />
+                    Tiến độ 4 mốc chuẩn
+                  </span>
+                  <span className="text-[11px] text-stone-500 font-medium">
+                    {checkedMilestonesCount}/4 mốc
+                  </span>
+                </div>
 
-                    {/* Checklist 4 mốc vận hành thực tế */}
-                    <div className="grid grid-cols-2 gap-2 text-xs bg-stone-50/70 p-2.5 rounded-lg border border-stone-200/70">
-                      {plan.milestones.map(ms => (
-                        <button
-                          key={ms.stageIdx}
-                          type="button"
-                          onClick={() => onToggleMilestone?.(plan.occasionId, ms.stageIdx)}
-                          className="flex items-center gap-1.5 text-left text-xs text-stone-700 hover:text-stone-900 transition-colors group cursor-pointer"
-                          title="Bấm để đánh dấu hoàn thành mốc này"
-                        >
-                          {ms.checked ? (
-                            <CheckSquare size={13} className="text-[#007700] shrink-0" />
-                          ) : (
-                            <Square size={13} className="text-stone-400 group-hover:text-stone-600 shrink-0" />
-                          )}
-                          <span className={`truncate text-[11px] ${ms.checked ? 'line-through text-stone-400 font-normal' : 'font-medium'}`}>
-                            {ms.label} <span className="text-stone-500 font-normal">({ms.dateText})</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-2 border-t border-stone-100">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5 text-stone-600">
-                        <Bookmark size={12} className="text-[#007700]" />
-                        <span>Ý tưởng đã lưu: <strong className="text-stone-900 font-semibold">{plan.savedIdeasCount}</strong> mẫu</span>
-                      </div>
-                      <span className="text-[11px] text-stone-500">
-                        {plan.deadlineText} (còn {plan.daysLeft} ngày)
+                <div className="grid grid-cols-2 gap-2 bg-stone-50/50 p-2.5 rounded-xl border border-stone-200/60">
+                  {item.milestones.map((ms) => (
+                    <button
+                      key={ms.stageIdx}
+                      type="button"
+                      onClick={() => onToggleMilestone?.(item.occasionId, ms.stageIdx)}
+                      className="flex items-center gap-1.5 text-left text-xs text-stone-700 hover:text-stone-900 transition-colors group cursor-pointer"
+                      title="Bấm để đánh dấu hoàn thành mốc này"
+                    >
+                      {ms.checked ? (
+                        <CheckSquare size={13} className="text-[#007700] shrink-0" />
+                      ) : (
+                        <Square size={13} className="text-stone-400 group-hover:text-stone-600 shrink-0" />
+                      )}
+                      <span
+                        className={`truncate text-[11px] ${
+                          ms.checked
+                            ? 'line-through text-stone-400 font-normal'
+                            : ms.isCurrent
+                            ? 'font-bold text-stone-900'
+                            : 'font-medium'
+                        }`}
+                      >
+                        {ms.label} <span className="text-stone-400 font-normal">({ms.dateText})</span>
                       </span>
-                    </div>
-
-                    {plan.operationalNote && (
-                      <div className="flex items-start gap-1.5 text-[11px] text-stone-600 bg-amber-50/60 p-2 rounded-md border border-amber-200/60 leading-relaxed">
-                        <AlertTriangle size={13} className="text-amber-700 shrink-0 mt-0.5" />
-                        <span>{plan.operationalNote}</span>
-                      </div>
-                    )}
-                  </div>
+                    </button>
+                  ))}
                 </div>
-              );
-            })}
+              </div>
+            </div>
+
+            {/* 4. Footer: Ý tưởng đã lưu & Căn cứ tính toán */}
+            <div className="pt-2.5 border-t border-stone-100 space-y-1.5 text-[11px]">
+              <div className="flex items-center justify-between text-stone-500">
+                <span className="flex items-center gap-1">
+                  <Bookmark size={11} className="text-[#007700]" />
+                  Ý tưởng đã lưu: <strong className="text-stone-800 font-semibold">{item.savedIdeasCount}</strong> mẫu
+                </span>
+                <span className="text-[10px] text-stone-400">
+                  {item.isUrgent ? 'Hạn chốt gấp' : 'Theo lịch chuẩn'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-stone-400">
+                <Calculator size={11} className="shrink-0 text-stone-400" />
+                <span className="truncate" title={item.calculationBasis}>
+                  {item.calculationBasis}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })}
     </div>
   );
 };
