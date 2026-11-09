@@ -102,6 +102,7 @@ export interface OccasionTraitItem {
   /** Vị trí 0–100 trên trục: càng xa tâm thì dịp này càng cao hơn các dịp khác ở đặc điểm đó */
   percentileRank: number;
   confidence: ConfidenceLevel;
+  actionableAdvice?: string;
   evidence: Evidence;
 }
 

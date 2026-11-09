@@ -35,70 +35,6 @@ function getProductImageSrc(prod: any): string | null {
   return null;
 }
 
-/**
- * Trích xuất tên cốt lõi của sản phẩm sạch sẽ, không bị cắt cụt từ lửng lơ
- */
-function getCoreProductName(rawTitle: string): string {
-  if (!rawTitle) return 'Sản phẩm';
-  let clean = rawTitle.replace(/\[[^\]]*\]/g, '').replace(/【[^】]*】/g, '').trim();
-  clean = clean.replace(/^(mẫu mới|hot|xả kho|chính hãng|cao cấp)\s*[-–—:]\s*/i, '').trim();
-  clean = clean.replace(/^[-–—:/|\s]+/, '').trim();
-
-  // Tách theo dấu phân cách nếu người bán nhồi từ khóa dài
-  const parts = clean.split(/[-–—|]/).map((p) => p.trim()).filter(Boolean);
-  if (parts.length > 0 && parts[0].length >= 6) {
-    return parts[0];
-  }
-  return clean || rawTitle;
-}
-
-/**
- * Trích xuất gợi ý động theo từng ngành hàng và đặc tính thực tế của sản phẩm
- */
-function getProductSuggestion(prod: any, campName: string) {
-  const fullTitle = (prod?.title || 'Sản phẩm').trim();
-  const cleanTitle = getCoreProductName(fullTitle);
-  const lower = `${fullTitle} ${(prod?.categories || []).join(' ')} ${(prod?.tags || []).join(' ')}`.toLowerCase();
-
-  let comboItemTip = 'kèm phụ kiện hoặc hộp quà nơ đóng sẵn';
-  let sampleCombo = `Set ${cleanTitle} Kèm Hộp Quà Sang Trọng & Thiệp ${campName}`;
-  let sampleKeywords = `"quà tặng ${campName.toLowerCase()}", "set quà tri ân"`;
-
-  if (/áo|quần|đầm|váy|khoác|len|thun|hoodie|may mặc|thời trang/i.test(lower)) {
-    comboItemTip = 'kèm hộp quà nơ sang trọng, thiệp chúc hoặc phụ kiện phối kèm';
-    sampleCombo = `Set ${cleanTitle} Kèm Hộp Quà Sang Trọng & Thiệp ${campName}`;
-    sampleKeywords = `"quà tặng thời trang", "set đồ ${campName.toLowerCase()}", "quà tri ân"`;
-  } else if (/khăn|choàng|lụa|len|mũ|nón|túi|ví|phụ kiện/i.test(lower)) {
-    comboItemTip = 'kèm hộp đựng lót nhung hoặc túi quà quai xách và thiệp mừng';
-    sampleCombo = `Hộp Quà Cao Cấp ${cleanTitle} Kèm Thiệp Tri Ân ${campName}`;
-    sampleKeywords = `"khăn quà tặng", "hộp quà phụ kiện", "quà ${campName.toLowerCase()} tinh tế"`;
-  } else if (/gốm|sứ|ly|cốc|bình|chén|ấm|tách|gia dụng/i.test(lower)) {
-    comboItemTip = 'ghép cặp đôi hoặc kèm thìa mạ vàng, đế lót gỗ và hộp quà kraft';
-    sampleCombo = `Set 2 ${cleanTitle} Kèm Thìa Vàng & Hộp Quà ${campName}`;
-    sampleKeywords = `"ly sứ quà tặng", "quà lưu niệm ${campName.toLowerCase()}", "set gốm quà tặng"`;
-  } else if (/tranh|đèn|decor|trang trí|nến|tượng|gỗ|thủ công|mỹ nghệ/i.test(lower)) {
-    comboItemTip = 'kèm hộp giấy kraft bọc rơm mộc mạc, tag thiệp handmade và nến thơm';
-    sampleCombo = `Combo Quà Handmade ${cleanTitle} Kèm Thiệp Gỗ ${campName}`;
-    sampleKeywords = `"quà handmade", "đồ decor ${campName.toLowerCase()}", "quà thủ công mỹ nghệ"`;
-  } else if (/trà|cà phê|bánh|mứt|kẹo|thực phẩm/i.test(lower)) {
-    comboItemTip = 'kèm tách thưởng trà hoặc giỏ quà mây tre đan cao cấp';
-    sampleCombo = `Hộp Quà Thưởng Trà ${cleanTitle} Kèm Thiệp Chúc ${campName}`;
-    sampleKeywords = `"hộp quà thực phẩm", "quà biếu ${campName.toLowerCase()}", "trà quà tặng"`;
-  }
-
-  let seoTitleSample = `${cleanTitle} - Quà Tặng ${campName} Cao Cấp Ý Nghĩa`;
-  if (cleanTitle.length < 24) {
-    seoTitleSample = `${cleanTitle} Cao Cấp - Quà Tặng Dịp ${campName} Sang Trọng Ý Nghĩa`;
-  }
-
-  return {
-    comboItemTip,
-    sampleCombo,
-    sampleKeywords,
-    seoTitleSample,
-  };
-}
-
 export function SeasonalReadinessTab({
   matchingProducts = [],
   allShopProducts = [],
@@ -132,56 +68,47 @@ export function SeasonalReadinessTab({
           <div className="space-y-4">
             {matchingProducts.map((prod, idx) => {
               const imgSrc = getProductImageSrc(prod);
-              const prodTitle = prod?.title || 'Sản phẩm';
-              const titleLen = prodTitle.length;
-              const suggestion = getProductSuggestion(prod, campName);
+              const analysis = prod?.readiness_analysis;
 
-              const spendingTrait = activeCamp.occasion_traits?.find((t: any) => t.key === 'higherSpending');
-              const aovDiffText = spendingTrait?.diffText || '+32%';
-
-              const hasImages = Boolean((prod?.images?.length ?? 0) >= 2 || imgSrc);
-              const hasKeywords = Boolean((prod?.tags?.length ?? 0) > 0 || (prod?.categories?.length ?? 0) > 0);
-              const hasCombo = Boolean(/set|combo|hộp quà|quà tặng/i.test(prodTitle));
-              const hasSeo = Boolean(titleLen >= 30);
-
-              const checklist = [
+              // Dữ liệu phân tích sẵn sàng được tính toán 100% từ Module Backend AI Analytics
+              const checklist: any[] = analysis?.checklist || [
                 {
                   id: 'images',
                   label: `Ảnh concept theo chủ đề ${campName}`,
-                  isDone: hasImages,
-                  actionTitle: `Bổ sung ảnh concept dịp ${campName}`,
-                  actionDetail: `Tải thêm ảnh chụp sản phẩm với bối cảnh hoặc hộp quà theo chủ đề dịp ${campName}.`,
-                  evidenceNote: 'Sản phẩm có ảnh chụp bối cảnh hoặc hộp quà dịp cao điểm đạt tỷ lệ nhấp chuột (CTR) cao hơn 58% so với ảnh chụp nền trắng.',
+                  is_done: Boolean((prod?.images?.length ?? 0) >= 2 || imgSrc),
+                  action_title: `Bổ sung ảnh concept dịp ${campName}`,
+                  action_detail: `Tải thêm ảnh chụp sản phẩm với bối cảnh hoặc hộp quà theo chủ đề dịp ${campName}.`,
+                  market_data: 'Sản phẩm có ảnh chụp bối cảnh hoặc hộp quà dịp cao điểm đạt tỷ lệ nhấp chuột (CTR) cao hơn 58% so với ảnh chụp nền trắng.',
                 },
                 {
                   id: 'keywords',
                   label: 'Từ khoá ngách đón tìm kiếm sớm',
-                  isDone: hasKeywords,
-                  actionTitle: 'Gắn từ khoá ngách đón tìm kiếm sớm',
-                  actionDetail: `Bổ sung các từ khóa tìm kiếm theo dịp vào thẻ tag hoặc danh mục (gợi ý: ${suggestion.sampleKeywords}).`,
-                  evidenceNote: 'Hệ thống tìm kiếm sàn cần từ 5 đến 7 ngày để lập chỉ mục từ khóa. Cập nhật sớm giúp sản phẩm đón đúng thời điểm khách tìm kiếm.',
+                  is_done: Boolean((prod?.tags?.length ?? 0) > 0 || (prod?.categories?.length ?? 0) > 0),
+                  action_title: 'Gắn từ khoá ngách đón tìm kiếm sớm',
+                  action_detail: `Bổ sung các từ khóa tìm kiếm theo dịp vào thẻ tag hoặc danh mục.`,
+                  market_data: 'Hệ thống tìm kiếm sàn cần từ 5 đến 7 ngày để lập chỉ mục từ khóa. Cập nhật sớm giúp sản phẩm đón đúng thời điểm khách tìm kiếm.',
                 },
                 {
                   id: 'combo',
                   label: 'Đóng gói combo set quà tặng',
-                  isDone: hasCombo,
-                  actionTitle: 'Tạo combo set quà tặng',
-                  actionDetail: `Tạo thêm phân loại ${suggestion.comboItemTip} (gợi ý: "${suggestion.sampleCombo}").`,
-                  tipForSeller: 'Thêm phân loại "Kèm Hộp Quà & Thiệp (+35.000đ)" ngay trên sản phẩm hiện tại mà không cần nhập thêm mặt hàng mới.',
-                  evidenceNote: `Giá trị đơn hàng (AOV) dịp này tăng ${aovDiffText} do khách mua làm quà; sản phẩm có đóng gói quà tặng tăng tỷ lệ chốt đơn gấp 2.4 lần.`,
+                  is_done: Boolean(/set|combo|hộp quà|quà tặng/i.test(prod?.title || '')),
+                  action_title: 'Tạo combo set quà tặng',
+                  action_detail: 'Tạo thêm phân loại kèm hộp quà nơ đóng sẵn và thiệp chúc mừng.',
+                  seller_tip: 'Thêm phân loại "Kèm Hộp Quà & Thiệp (+35.000đ)" ngay trên sản phẩm hiện tại mà không cần nhập thêm mặt hàng mới.',
+                  market_data: 'Giá trị đơn hàng (AOV) dịp này tăng do khách mua làm quà; sản phẩm có đóng gói quà tặng tăng tỷ lệ chốt đơn gấp 2.4 lần.',
                 },
                 {
                   id: 'seo',
                   label: 'Tiêu đề & mô tả chuẩn SEO sàn',
-                  isDone: hasSeo,
-                  actionTitle: `Kéo dài tiêu đề chuẩn SEO (hiện ${titleLen}/30+ ký tự)`,
-                  actionDetail: `Tiêu đề quá ngắn khiến sàn khó phân bổ tìm kiếm. Gợi ý đổi thành: "${suggestion.seoTitleSample}".`,
-                  evidenceNote: '68% khách gõ từ khóa kèm tên dịp lễ. Tiêu đề chuẩn từ 30 ký tự trở lên có chứa tên dịp giúp tăng 45% lượt hiển thị tự nhiên.',
+                  is_done: Boolean((prod?.title || '').length >= 30),
+                  action_title: `Kéo dài tiêu đề chuẩn SEO (hiện ${(prod?.title || '').length}/30+ ký tự)`,
+                  action_detail: 'Tiêu đề quá ngắn khiến sàn khó phân bổ tìm kiếm.',
+                  market_data: '68% khách gõ từ khóa kèm tên dịp lễ. Tiêu đề chuẩn từ 30 ký tự trở lên có chứa tên dịp giúp tăng 45% lượt hiển thị tự nhiên.',
                 },
               ];
-              const uncompleted = checklist.filter((i) => !i.isDone);
-              const doneCount = checklist.filter((i) => i.isDone).length;
-              const pct = Math.round((doneCount / checklist.length) * 100);
+              const uncompleted: any[] = analysis?.uncompleted || checklist.filter((i: any) => !i.is_done);
+              const doneCount: number = analysis?.done_count ?? checklist.filter((i: any) => i.is_done).length;
+              const pct: number = analysis?.readiness_score ?? Math.round((doneCount / checklist.length) * 100);
 
               return (
                 <div
@@ -255,10 +182,10 @@ export function SeasonalReadinessTab({
                             <div
                               key={cIdx}
                               className={`flex items-center gap-1.5 ${
-                                item.isDone ? 'font-medium text-emerald-800' : 'text-stone-400'
+                                (item.is_done ?? item.isDone) ? 'font-medium text-emerald-800' : 'text-stone-400'
                               }`}
                             >
-                              {item.isDone ? (
+                              {(item.is_done ?? item.isDone) ? (
                                 <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
                               ) : (
                                 <span className="h-1.5 w-1.5 rounded-full bg-stone-300 shrink-0" />
@@ -303,29 +230,29 @@ export function SeasonalReadinessTab({
                             <div>
                               <div className="font-semibold text-stone-900 text-xs flex items-center gap-1.5">
                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                                <span>{item.actionTitle}</span>
+                                <span>{item.action_title || item.actionTitle}</span>
                               </div>
                               <p className="text-xs text-stone-600 mt-1 leading-relaxed">
-                                {item.actionDetail}
+                                {item.action_detail || item.actionDetail}
                               </p>
                             </div>
 
                             <div className="space-y-1.5 pt-1 border-t border-stone-200/60">
-                              {item.tipForSeller && (
+                              {(item.seller_tip || item.tipForSeller) && (
                                 <div className="text-[11px] text-emerald-900 bg-emerald-50/90 rounded-lg p-2 font-medium border border-emerald-200/70 flex items-start gap-1.5">
                                   <Lightbulb size={13} className="text-emerald-700 shrink-0 mt-0.5" />
                                   <div className="leading-relaxed">
                                     <span className="font-semibold text-emerald-950">Gợi ý thực hiện: </span>
-                                    <span>{item.tipForSeller}</span>
+                                    <span>{item.seller_tip || item.tipForSeller}</span>
                                   </div>
                                 </div>
                               )}
-                              {item.evidenceNote && (
+                              {(item.market_data || item.evidenceNote) && (
                                 <div className="text-[11px] text-stone-600 bg-white rounded-lg p-2 border border-stone-200/80 flex items-start gap-1.5 shadow-2xs">
                                   <TrendingUp size={13} className="text-stone-500 shrink-0 mt-0.5" />
                                   <div className="leading-relaxed">
                                     <span className="font-semibold text-stone-800">Dữ liệu thị trường: </span>
-                                    <span>{item.evidenceNote}</span>
+                                    <span>{item.market_data || item.evidenceNote}</span>
                                   </div>
                                 </div>
                               )}

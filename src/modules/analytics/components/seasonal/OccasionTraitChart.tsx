@@ -267,7 +267,7 @@ export const OccasionTraitChart: React.FC<Props> = ({
                 <Lightbulb size={15} className="mt-0.5 shrink-0 text-emerald-700" />
                 <div>
                   <strong className="text-emerald-900">Gợi ý người bán nên làm:</strong>{' '}
-                  {TRAIT_ACTIONABLE_ADVICE[activeTrait.key] || 'Chuẩn bị sản phẩm và kế hoạch đăng bán sớm.'}
+                  {activeTrait.actionableAdvice || TRAIT_ACTIONABLE_ADVICE[activeTrait.key] || 'Chuẩn bị sản phẩm và kế hoạch đăng bán sớm.'}
                 </div>
               </div>
             </div>
