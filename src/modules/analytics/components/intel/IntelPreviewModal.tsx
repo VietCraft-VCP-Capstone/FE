@@ -9,7 +9,7 @@ import { useIntelPreview } from './useIntelPreview';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-function useFocusTrap(onClose: () => void) {
+export function useFocusTrap(onClose: () => void) {
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;

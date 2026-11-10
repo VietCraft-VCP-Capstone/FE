@@ -79,9 +79,15 @@ export const analyticsApi = {
     return res.data;
   },
 
-  /** F36 · tìm shop trên sàn theo tên để theo dõi (shop mẫu luôn nhận danh sách rỗng). */
-  async searchShops(q: string, signal?: AbortSignal): Promise<ShopSearchResult[]> {
-    const res = await api.get(`${BASE}/competitor-tracking/search`, { params: { q }, signal });
+  /** F36 · tìm shop trên sàn theo tên và/hoặc danh mục cấp 1 để theo dõi (shop mẫu luôn nhận danh sách rỗng). */
+  async searchShops(params: { q?: string; categoryId?: string }, signal?: AbortSignal): Promise<ShopSearchResult[]> {
+    const res = await api.get(`${BASE}/competitor-tracking/search`, { params, signal });
+    return res.data.data;
+  },
+
+  /** Danh mục cấp 1 đang hoạt động của sàn, cho ô chọn khi tìm shop theo danh mục. */
+  async trackingCategories(): Promise<{ id: string; name: string }[]> {
+    const res = await api.get(`${BASE}/competitor-tracking/categories`);
     return res.data.data;
   },
 

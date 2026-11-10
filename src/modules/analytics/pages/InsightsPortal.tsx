@@ -46,7 +46,7 @@ export function InsightsPortal({ user, onLogout }: { user: any; onLogout: () => 
 
         <Route path="competitors" element={<CompetitorsPage />} />
         {/* Hai tab cũ đã gộp vào Phân tích đối thủ; giữ đường dẫn để link cũ vẫn tới đúng phần. */}
-        <Route path="benchmark" element={<Navigate to="/seller/insights/competitors#manh-yeu" replace />} />
+        <Route path="benchmark" element={<Navigate to="/seller/insights/competitors#so-sanh" replace />} />
         <Route path="tag-gap" element={<TagGapPage />} />
         <Route path="pricing" element={<PricingPage />} />
         <Route path="tracking" element={<Navigate to="/seller/insights/competitors#theo-doi" replace />} />
