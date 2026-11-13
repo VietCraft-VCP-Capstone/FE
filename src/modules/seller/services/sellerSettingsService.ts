@@ -9,8 +9,29 @@ import {
   OnboardingState
 } from '../types/settings';
 
-const SETTINGS_STORAGE_KEY = 'vietcraft_seller_settings_cache';
-const ONBOARDING_STORAGE_KEY = 'vietcraft_seller_onboarding_mock';
+function getSettingsStorageKey(): string {
+  try {
+    const raw = localStorage.getItem('user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      const uid = u._id || u.id;
+      if (uid) return `vietcraft_seller_settings_${uid}`;
+    }
+  } catch {}
+  return 'vietcraft_seller_settings_cache';
+}
+
+function getOnboardingStorageKey(): string {
+  try {
+    const raw = localStorage.getItem('user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      const uid = u._id || u.id;
+      if (uid) return `vietcraft_seller_onboarding_${uid}`;
+    }
+  } catch {}
+  return 'vietcraft_seller_onboarding_mock';
+}
 
 export const INITIAL_SELLER_SETTINGS: SellerSettingsState = {
   brand: {
@@ -154,7 +175,7 @@ export const sellerSettingsService = {
       const res = await api.get('/seller/settings');
       if (res.data && res.data.brand) {
         const clean = filterOutViettel(res.data);
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitizeForLocalStorage(clean)));
+        localStorage.setItem(getSettingsStorageKey(), JSON.stringify(sanitizeForLocalStorage(clean)));
         return clean;
       }
     } catch (e) {
@@ -163,7 +184,7 @@ export const sellerSettingsService = {
     }
 
     try {
-      const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      const stored = localStorage.getItem(getSettingsStorageKey());
       if (stored) {
         return filterOutViettel(JSON.parse(stored));
       }
@@ -174,7 +195,7 @@ export const sellerSettingsService = {
 
   getCachedSettings: (): SellerSettingsState => {
     try {
-      const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      const stored = localStorage.getItem(getSettingsStorageKey());
       if (stored) {
         return filterOutViettel(JSON.parse(stored));
       }
@@ -182,12 +203,21 @@ export const sellerSettingsService = {
     return INITIAL_SELLER_SETTINGS;
   },
 
+  clearCachedSettings: (): void => {
+    try {
+      localStorage.removeItem(getSettingsStorageKey());
+      localStorage.removeItem('vietcraft_seller_settings_cache');
+      localStorage.removeItem(getOnboardingStorageKey());
+      localStorage.removeItem('vietcraft_seller_onboarding_mock');
+    } catch {}
+  },
+
   updateSettings: async (payload: Partial<SellerSettingsState>): Promise<SellerSettingsState> => {
     try {
       const res = await api.put('/seller/settings', payload);
       if (res.data && res.data.brand) {
         const clean = filterOutViettel(res.data);
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitizeForLocalStorage(clean)));
+        localStorage.setItem(getSettingsStorageKey(), JSON.stringify(sanitizeForLocalStorage(clean)));
         return clean;
       }
     } catch (e) {
@@ -197,7 +227,7 @@ export const sellerSettingsService = {
 
     const current = sellerSettingsService.getCachedSettings();
     const merged = filterOutViettel({ ...current, ...payload, updatedAt: new Date().toISOString() });
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitizeForLocalStorage(merged)));
+    localStorage.setItem(getSettingsStorageKey(), JSON.stringify(sanitizeForLocalStorage(merged)));
     return merged;
   },
 
@@ -271,7 +301,7 @@ export const sellerSettingsService = {
 
   getOnboardingState: (): OnboardingState => {
     try {
-      const stored = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+      const stored = localStorage.getItem(getOnboardingStorageKey());
       if (stored) {
         return JSON.parse(stored);
       }
@@ -279,7 +309,7 @@ export const sellerSettingsService = {
       console.warn('Could not load onboarding state:', e);
     }
     const initial: OnboardingState = { currentStep: 1, isCompleted: false };
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(initial));
+    localStorage.setItem(getOnboardingStorageKey(), JSON.stringify(initial));
     return initial;
   },
 
@@ -294,7 +324,7 @@ export const sellerSettingsService = {
   },
 
   saveOnboardingState: (state: OnboardingState): OnboardingState => {
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(getOnboardingStorageKey(), JSON.stringify(state));
     return state;
   }
 };

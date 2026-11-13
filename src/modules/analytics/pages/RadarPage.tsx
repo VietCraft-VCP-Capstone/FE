@@ -85,11 +85,11 @@ export function RadarPage() {
                     head={
                       <>
                         <th scope="col" className="w-10">#</th>
-                        <th scope="col">Tag</th>
-                        <th scope="col" className="text-right">Tăng</th>
-                        <th scope="col" className="text-right">Đà tăng</th>
+                        <th scope="col">Tag & Ngành</th>
+                        <th scope="col" className="text-right">Tăng WoW</th>
+                        <th scope="col" className="text-right">Gia tốc 3w</th>
+                        <th scope="col" className="text-right">Điểm đà tăng</th>
                         <th scope="col" className="text-right">Chỉ số cầu</th>
-                        <th scope="col" className="text-right">Listing đang có</th>
                         <th scope="col" className="text-right">Lượt tìm/tuần</th>
                         <th scope="col">Xu hướng</th>
                       </>
@@ -100,11 +100,31 @@ export function RadarPage() {
                       return (
                         <tr key={tag.tag_id}>
                           <td className="tabular-nums text-stone-400">{tag.rank}</td>
-                          <td className="font-semibold text-stone-800">{tagLabel(tag.name_vi, tag.tag_id)}</td>
-                          <td className="text-right font-semibold tabular-nums text-[#005B00]">{pct(tag.growth_pct)}</td>
-                          <td className="text-right tabular-nums text-stone-700">{decimal(tag.momentum)}</td>
+                          <td>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-stone-800">{tagLabel(tag.name_vi, tag.tag_id)}</span>
+                              {tag.axis && (
+                                <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10.5px] text-stone-600 font-medium">
+                                  {tag.axis}
+                                </span>
+                              )}
+                              {tag.low_base && (
+                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10.5px] text-amber-700 font-semibold border border-amber-200" title="Chỉ số cầu < 5, biến động % có thể phóng đại do mẫu số nhỏ">
+                                  Nền thấp
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className={`text-right font-semibold tabular-nums ${tag.growth_pct >= 0 ? 'text-[#005B00]' : 'text-stone-600'}`}>
+                            {pct(tag.growth_pct)}
+                          </td>
+                          <td className="text-right tabular-nums text-stone-700">
+                            {tag.acceleration != null ? (tag.acceleration > 0 ? `+${decimal(tag.acceleration)}` : decimal(tag.acceleration)) : NA}
+                          </td>
+                          <td className="text-right tabular-nums text-stone-900 font-bold">
+                            {tag.momentum_pct != null ? `${tag.momentum_pct}/100` : decimal(tag.momentum)}
+                          </td>
                           <td className="text-right tabular-nums text-stone-700">{decimal(tag.demand_index)}</td>
-                          <td className="text-right tabular-nums text-stone-600">{count(tag.supply_n_listings)}</td>
                           <td className="text-right text-stone-400">{tag.searches_per_week === null ? NA : count(tag.searches_per_week)}</td>
                           <td>
                             <Chip tone={tr.tone} icon={<tr.Icon size={12} aria-hidden />}>{tr.label}</Chip>

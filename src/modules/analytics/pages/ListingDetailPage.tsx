@@ -235,7 +235,7 @@ function ListingDetail({ id }: { id: string }) {
                       Lưu lượng truy cập &amp; Cơ hội tăng đơn
                     </h3>
                     <p className="m-0 mt-1 text-xs text-stone-500">
-                      Theo dõi lượt xem, tỷ lệ khách bấm mua và xu hướng theo mùa vụ để lên kế hoạch bán hàng tốt nhất.
+                      Theo dõi lượt xem, tỷ lệ khách bấm mua và xu hướng theo dịp cao điểm để lên kế hoạch bán hàng tốt nhất.
                     </p>
                   </div>
 
@@ -262,7 +262,7 @@ function ListingDetail({ id }: { id: string }) {
                         label: (
                           <span className="flex items-center gap-1.5 font-semibold text-xs">
                             <TrendingUp size={13} />
-                            <span>Mùa vụ &amp; Xu hướng</span>
+                            <span>Dịp cao điểm &amp; Xu hướng</span>
                           </span>
                         ),
                         children: (

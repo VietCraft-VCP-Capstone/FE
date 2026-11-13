@@ -96,6 +96,18 @@ export const analyticsApi = {
     const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
     return res.data?.data;
   },
+
+  /** Lưu hoặc bỏ lưu ý tưởng sản phẩm theo dịp vào database gian hàng */
+  async saveSeasonalIdea(ideaId: string): Promise<{ success: boolean; saved_ideas: string[] }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/save-idea`, { idea_id: ideaId });
+    return res.data;
+  },
+
+  /** Cập nhật tiến độ checklist mốc thời gian vào database gian hàng */
+  async toggleSeasonalMilestone(milestoneIdx: number, isDone: boolean, campId?: string): Promise<{ success: boolean; checked_milestones: Record<string, boolean> }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/milestone`, { milestone_idx: milestoneIdx, is_done: isDone, camp_id: campId });
+    return res.data;
+  },
 };
 
 export interface SmartProductSuggestionResult {

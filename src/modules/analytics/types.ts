@@ -550,7 +550,10 @@ export interface RevenueForecast {
   target_id: string;
   horizon_days: number;
   model: string;
+  history?: { date: string; y: number }[];
   points: { date: string; yhat: number; lo95: number; hi95: number }[];
+  orders_hat?: { date: string; yhat: number; lo95: number; hi95: number }[];
+  views_hat?: { date: string; yhat: number; lo95: number; hi95: number }[];
   total_forecast_vnd: number;
   validation: {
     metric: string;
@@ -572,26 +575,136 @@ export interface RevenueForecast {
 
 /* ------------------------------------------------------------ F38 -------- */
 
+export interface OccasionWindow {
+  event_id: string;
+  name: string;
+  peak_date: string;
+  lead_time_days: number;
+  rd_start: string;
+  traction_start: string;
+  peak_start: string;
+  cut_off_date: string;
+  current_phase: 'rd_sprint' | 'traction' | 'peak' | 'cut_off_passed' | 'upcoming';
+  days_to_peak: number;
+  days_to_cutoff: number;
+  status: 'active' | 'upcoming' | 'passed';
+  is_safe_to_launch: boolean;
+  timing_warning: string | null;
+}
+
+export interface EvidenceLayer {
+  name: string;
+  status: 'dat' | 'chua_chac' | 'khong_dat';
+  question: string;
+  claim: string;
+  evidence: string;
+  metric_value: string | number | null;
+  target_value: string | number | null;
+}
+
+export interface BreakEvenFinancials {
+  retail_price: number;
+  base_cost: number;
+  platform_fee: number;
+  gross_margin: number;
+  gross_margin_pct: number;
+  estimated_cpa: number;
+  net_margin_per_unit: number;
+  net_margin_pct: number;
+  fixed_test_budget: number;
+  break_even_units: number;
+  is_viable: boolean;
+  verdict_note: string;
+}
+
+export interface TrialPlanStep {
+  step: number;
+  name: string;
+  action: string;
+  threshold: string;
+}
+
+export interface TrialPlan {
+  mode: 'make_to_order' | 'small_batch';
+  mode_label: string;
+  ladder_steps: TrialPlanStep[];
+  test_quantity: number;
+  test_budget_vnd: number;
+  success_criteria: string;
+  stop_loss_rules: string[];
+  timeframe_days: number;
+}
+
+export interface PotentialProfile {
+  product_id: string;
+  product_name: string;
+  category_name: string;
+  product_type: 'pod' | 'ready_to_ship';
+  keyword: string;
+  verdict: 'dat' | 'chua_chac' | 'khong_dat';
+  verdict_label: string;
+  signal_label: string;
+  signal_score: number;
+  layers: {
+    demand: EvidenceLayer;
+    repeatability: EvidenceLayer;
+    competition: EvidenceLayer;
+    profitability: EvidenceLayer;
+    capacity: EvidenceLayer;
+  };
+  break_even: BreakEvenFinancials;
+  anti_evidence: string[];
+  trial_plan: TrialPlan;
+}
+
 export interface ReadyToShipIdea {
   title: string;
   category: string;
-  market_price_range: string;
-  sourcing_tip: string;
+  market_price_range?: string;
+  suggested_price?: string;
+  base_cost?: string;
+  expected_profit?: string;
+  why?: string;
+  signal_label?: string;
+  sourcing_tip?: string;
   why_it_sells?: string;
   expected_profit_margin?: string;
   upsell_bundle_tip?: string;
   target_buyer?: string;
+  image_url?: string;
+  product_url?: string;
+  platform?: string;
+  seller_name?: string;
+  seller_count?: number;
+  sold_count?: number;
+  rating_average?: number;
+  review_count?: number;
+  search_trend_pct?: number;
 }
 
 export interface PodBlankSuggestion {
   blank_type: string;
-  title: string;
-  category: string;
-  suggested_theme: string;
+  title?: string;
+  name?: string;
+  category?: string;
+  suggested_theme?: string;
   design_hook?: string;
   color_palette?: string;
   estimated_profit?: string;
   target_audience?: string;
+  market_price_range?: string;
+  expected_profit_margin?: string;
+  sourcing_tip?: string;
+  why_it_sells?: string;
+  upsell_bundle_tip?: string;
+  signal_label?: string;
+  image_url?: string;
+  product_url?: string;
+  platform?: string;
+  seller_name?: string;
+  seller_count?: number;
+  sold_count?: number;
+  base_cost?: number;
   matched_blank?: {
     _id: string;
     title: string;
@@ -623,12 +736,22 @@ export interface SeasonalEvent {
   matching_shop_products?: MatchingShopProduct[];
 }
 
+export interface RadarProvenanceItem {
+  axis: string;
+  score: number;
+  benchmark: number;
+  source: string;
+  evidence: string;
+  formula?: string;
+}
+
 export interface CampaignRadar {
   axes: string[];
   current_values: number[];
   benchmark_values: number[];
   takeaways?: string[];
   overall_score?: number;
+  data_provenance?: RadarProvenanceItem[];
 }
 
 export interface SeasonalCampaign {
@@ -640,6 +763,7 @@ export interface SeasonalCampaign {
   peak_week: number;
   description: string;
   launch_window: { peak_week: string; peak_date: string; start: string; end: string; basis: string };
+  occasion_window?: OccasionWindow;
   timing: {
     status: 'active' | 'upcoming' | 'passed';
     label: string;
@@ -650,23 +774,157 @@ export interface SeasonalCampaign {
   category_summary: string;
   search_keywords: string[];
   radar?: CampaignRadar;
+  occasion_traits?: any[];
+  confidence?: {
+    level: 'high' | 'fair' | 'preliminary' | 'insufficient';
+    text: 'Cao' | 'Khá' | 'Sơ bộ' | 'Chưa đủ';
+    dots: number;
+    reason?: string;
+  };
+  confidence_text?: 'Cao' | 'Khá' | 'Sơ bộ';
+  confidence_dots?: number;
+  expected_orders?: string;
+  weekday_text?: string;
+  next_deadline?: {
+    title: string;
+    date_text: string;
+    days_left: number;
+    is_urgent: boolean;
+  };
+  stages?: {
+    prep_start_days: number;
+    traction_start_days: number;
+    peak_days: number;
+    cutoff_days: number;
+    end_days: number;
+  };
+  is_dashed_curve?: boolean;
+  milestone_actions?: { title: string; desc: string }[];
+  action_recommendation?: {
+    action_type: 'close_orders' | 'boost_traffic' | 'prepare_inventory' | 'prepare_blank';
+    badge_text: string;
+    badge_variant: 'amber' | 'blue' | 'emerald';
+    title: string;
+    advice: string;
+    calculation_basis: string;
+    cta_label: string;
+    target_tab: 'potential' | 'readiness' | 'traits' | 'timeline' | 'hub' | 'trial' | 'act1' | 'act2' | 'act3';
+    is_urgent: boolean;
+  };
+}
+
+export interface OpportunityKeywordItem {
+  id: string;
+  tag: string;
+  volume: number;
+  volume_level: 'high' | 'medium' | 'low';
+  competition: number;
+  competition_level: 'high' | 'medium' | 'low';
+  keyword_score: number;
+  listing_type?: 'physical' | 'pod' | 'custom' | string;
+  customizable?: boolean;
+  when_made?: string;
+  avg_price_vnd?: number;
+  conversion_rate_pct?: number;
+  is_starred?: boolean;
+  is_in_shop?: boolean;
+  matched_product?: {
+    id: string;
+    title: string;
+    images?: any[];
+  };
+  evidence?: any;
+}
+
+export interface CampaignFunnel {
+  impressions: number;
+  clicks: number;
+  ctr_pct: number;
+  ctr_vs_baseline_pct?: number;
+  cart_adds: number;
+  cart_rate_pct: number;
+  orders: number;
+  conversion_rate_pct: number;
+  pv_uv_ratio?: number;
+  actual?: {
+    orders: number;
+    gmv_vnd?: number;
+    orders_progress_pct?: number;
+    remaining_orders?: number;
+    impressions?: number;
+    clicks?: number;
+    cart_adds?: number;
+    window_label?: string;
+    window_start?: string;
+    window_end?: string;
+  };
+}
+
+export interface ChannelSampleOrder {
+  order_code: string;
+  created_at?: string;
+  total_amount?: number;
+  item_summary?: string;
+  attribution_reason?: string;
+}
+
+export interface ChannelBreakdownItem {
+  channel_key: string;
+  name: string;
+  share_pct: number;
+  gmv_vnd: number;
+  orders_count: number;
+  sku_orders: number;
+  items_sold: number;
+  aov_vnd: number;
+  growth_pct?: number | null;
+  action_tip: string;
+  source_type?: 'shop_actual' | 'industry_benchmark';
+  criteria_rule?: string;
+  sample_orders?: ChannelSampleOrder[];
+  action_checklist?: string[];
+}
+
+export interface MotivationBreakdown {
+  gift_purchases_pct: number;
+  self_purchases_pct: number;
+  top_reasons: { reason: string; pct: number }[];
+  source_type?: 'shop_actual' | 'industry_benchmark';
+  sample_size?: number;
+  source_description?: string;
 }
 
 export interface SeasonalForecast {
   keyword: string;
+  primary_keyword?: string;
   tag_ids: string[];
   decomposition: { trend: number[]; seasonal: number[]; residual: number[]; window: string };
   amplitude: number;
   n_points: number;
+  sample_size_n?: number;
+  measured_cycles?: number;
+  route_risks?: any[];
+  scorecard_metrics?: any[];
+  opportunity_keywords?: OpportunityKeywordItem[];
+  campaign_funnel?: CampaignFunnel;
+  channel_breakdown?: ChannelBreakdownItem[];
+  motivation_breakdown?: MotivationBreakdown;
+  saved_ideas?: string[];
+  checked_milestones?: Record<string, boolean>;
   events: SeasonalEvent[];
   all_campaigns?: SeasonalCampaign[];
   active_campaign?: SeasonalCampaign;
+  potential_profiles?: PotentialProfile[];
   campaign_radar?: CampaignRadar;
+  occasion_traits?: any[];
   seller_shop_name?: string;
   seller_category?: { slug: string; name: string };
   is_live_shop?: boolean;
   ready_to_ship_ideas?: ReadyToShipIdea[];
   pod_blanks?: PodBlankSuggestion[];
+  opportunity_clusters?: any[];
+  shop_products?: any[];
+  matching_shop_products?: any[];
   ai_model?: string;
   flat_keywords: string[];
   method: string;
@@ -719,12 +977,17 @@ export interface TrendRadar {
     name_vi: string;
     growth_pct: number;
     momentum: number;
+    momentum_pct?: number;
     demand_index: number;
-    supply_n_listings: number;
+    acceleration?: number;
+    low_base?: boolean;
+    axis?: string;
+    supply_n_listings?: number;
     trend: string;
+    sparkline?: number[];
     searches_per_week: number | null;
   }[];
-  radar: { axes: string[]; values: number[]; values_raw: number[]; scale: string };
+  radar: { axes: string[]; values: number[]; values_raw?: number[]; scale: string };
   limitation: string | null;
 }
 

@@ -74,7 +74,7 @@ export const INSIGHTS_NAV: InsightNavGroup[] = [
     hint: 'Tháng sau nên chuẩn bị gì',
     items: [
       { to: `${INSIGHTS_ROOT}/forecast`, label: 'Dự báo doanh thu', icon: LineChart, feature: 'F37' },
-      { to: `${INSIGHTS_ROOT}/seasonal`, label: 'Mùa vụ và lịch ra hàng', icon: CalendarClock, feature: 'F38' },
+      { to: `${INSIGHTS_ROOT}/seasonal`, label: 'Kế hoạch Cao điểm', icon: CalendarClock, feature: 'F38' },
       { to: `${INSIGHTS_ROOT}/niches`, label: 'Ngách tiềm năng', icon: Compass, feature: 'F39' },
       { to: `${INSIGHTS_ROOT}/radar`, label: 'Tag đang tăng nhanh', icon: Radar, feature: 'F40' },
     ],

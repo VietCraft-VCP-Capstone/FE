@@ -24,7 +24,7 @@ export function IntelPreviewSection({ source, onMaterialsChange }: { source: Dra
                     <Sparkles size={14} aria-hidden /> Chấm thử trước khi đăng
                 </button>
                 <span className="text-xs text-stone-500">
-                    {hasTitle ? 'Xem điểm ảnh, từ khoá, tag và mùa vụ của bản nháp này. Chưa lưu gì.' : 'Nhập tên sản phẩm để chấm thử.'}
+                    {hasTitle ? 'Xem điểm ảnh, từ khoá, tag và độ phù hợp dịp của bản nháp này. Chưa lưu gì.' : 'Nhập tên sản phẩm để chấm thử.'}
                 </span>
             </div>
 
