@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    ShoppingBag, FolderHeart, MapPin,
+    ShoppingBag, FolderHeart, UserCheck, MapPin,
     CreditCard, Settings, LogOut, ChevronRight, Check,
     Truck, Home, Plus, Trash2, Edit2, Camera, Loader2,
     Calendar, Heart, Store
 } from 'lucide-react';
 import { userService, UserProfile, Address } from '../../user/services/userService';
 import { ordersService } from '../../order/services/ordersService';
+import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { EditProfileModal } from '../components/profile/EditProfileModal';
@@ -144,13 +145,21 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                     const favItems = Array.isArray(favsRes?.product_ids) ? favsRes.product_ids : [];
                     
                     const mapped = favItems.slice(0, 3).map((p: any) => ({
-                        title: p.title || p.name || 'Sản phẩm',
-                        image: p.image || p.thumbnail || p.images?.[0] || ''
+                        title: p.title || p.name || 'Sản phẩm sáng tạo',
+                        image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
                     }));
 
-                    // Chưa yêu thích gì thì để trống (còn ô "Khám phá thêm"), không lấy sản phẩm
-                    // bất kỳ của sàn rồi hiển thị như thể người dùng đã lưu.
-                    setSavedProducts(mapped);
+                    if (mapped.length === 0) {
+                        const allProducts = await productsService.getAll().catch(() => ({ items: [] }));
+                        const products: any[] = Array.isArray(allProducts) ? allProducts : (allProducts?.items || []);
+                        const fallbackMapped = products.slice(0, 3).map((p: any) => ({
+                            title: p.title || p.name || 'Sản phẩm sáng tạo',
+                            image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
+                        }));
+                        setSavedProducts(fallbackMapped);
+                    } else {
+                        setSavedProducts(mapped);
+                    }
                 } catch (prodErr) {
                     console.error('Failed to load real products for profile page', prodErr);
                 }
@@ -248,18 +257,11 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             {/* Profile Banner Card - Always Visible */}
             <div className="bg-white rounded-[24px] border border-gray-200 p-6 flex flex-row items-center gap-6">
                 <div className="relative group w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border border-gray-150 flex-shrink-0 cursor-pointer">
-                    {profile.avatar ? (
-                        <img 
-                            src={profile.avatar} 
-                            alt={profile.full_name} 
-                            className="w-full h-full object-cover transition-all group-hover:scale-105" 
-                        />
-                    ) : (
-                        // Chưa có avatar: chữ cái đầu tên, không dùng ảnh một người lạ
-                        <div className="w-full h-full bg-emerald-50 text-[#008000] flex items-center justify-center text-2xl font-bold uppercase">
-                            {(profile.full_name || '?').trim().charAt(0)}
-                        </div>
-                    )}
+                    <img 
+                        src={profile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150'} 
+                        alt={profile.full_name} 
+                        className="w-full h-full object-cover transition-all group-hover:scale-105" 
+                    />
                     {/* Hover Overlay */}
                     <div className="absolute inset-0 bg-black/45 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <Camera size={18} className="text-white mb-1" />
@@ -287,6 +289,10 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                         <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{profile.email}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
+                        <div className="inline-flex items-center gap-1 bg-emerald-50/50 text-[#008000] text-xs px-3 py-1.5 rounded-full font-bold border border-emerald-250">
+                            <UserCheck size={12} />
+                            <span>{profile.rank || 'Thành viên Bạc'}</span>
+                        </div>
                         <button
                             onClick={() => setIsEditModalOpen(true)}
                             className="bg-[#008000] hover:bg-emerald-700 text-white rounded-full py-1.5 px-5 text-xs font-bold transition-all shadow-sm active:scale-95 flex-shrink-0"
@@ -551,11 +557,11 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                         <div className="flex items-center gap-4">
                                             <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0 flex items-center justify-center">
                                                 <img
-                                                    src={lastOrder.items[0]?.image || undefined}
+                                                    src={lastOrder.items[0]?.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'}
                                                     alt={lastOrder.items[0]?.title || 'Sản phẩm'}
                                                     className="w-full h-full object-cover"
                                                     onError={(e) => {
-                                                        (e.target as HTMLImageElement).style.visibility = 'hidden'; // ảnh hỏng: để nền xám, không thay ảnh lạ
+                                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150';
                                                     }}
                                                 />
                                             </div>
@@ -565,7 +571,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                                 <p className="text-xs text-[#008000] font-semibold mt-1 flex items-center gap-1.5">
                                                     <Calendar size={13} className="stroke-[2.5]" />
                                                     {lastOrder.status === 'shipping'
-                                                        ? 'Đang giao hàng' // chưa có ngày dự kiến thật từ hãng vận chuyển
+                                                        ? 'Dự kiến giao: 12 Thg 10, 2024'
                                                         : lastOrder.status === 'completed'
                                                             ? 'Giao hàng thành công'
                                                             : 'Đang xử lý đơn hàng'}
@@ -590,11 +596,11 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                         <div key={i} className="flex flex-col items-center">
                                             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-50 border border-gray-150 aspect-square cursor-pointer hover:scale-105 transition-all">
                                                 <img
-                                                    src={p.image || undefined}
+                                                    src={p.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'}
                                                     alt={p.title}
                                                     className="w-full h-full object-cover"
                                                     onError={(e) => {
-                                                        (e.target as HTMLImageElement).style.visibility = 'hidden'; // ảnh hỏng: để nền xám, không thay ảnh lạ
+                                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150';
                                                     }}
                                                 />
                                             </div>

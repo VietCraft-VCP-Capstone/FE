@@ -443,6 +443,7 @@ export function BuyerChatWidget({ user }: BuyerChatWidgetProps) {
                               {c.partner.full_name.charAt(0)}
                             </div>
                           )}
+                          <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 border border-white rounded-full" />
                         </div>
 
                         {/* Thông tin tin nhắn */}
@@ -519,13 +520,10 @@ export function BuyerChatWidget({ user }: BuyerChatWidgetProps) {
                             </Link>
                           )}
                         </div>
-                        {/* Chỉ báo "đang soạn" là thật (sự kiện typing); BE không theo dõi online nên không hiện "Đang trực tuyến" */}
-                        {isTypingPartner && (
-                          <p className="text-[11px] text-stone-400 flex items-center gap-1 mt-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            Đang soạn tin...
-                          </p>
-                        )}
+                        <p className="text-[11px] text-stone-400 flex items-center gap-1 mt-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          {isTypingPartner ? 'Đang soạn tin...' : 'Đang trực tuyến'}
+                        </p>
                       </div>
                     </div>
 

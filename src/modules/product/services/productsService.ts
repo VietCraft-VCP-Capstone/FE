@@ -184,8 +184,9 @@ export const productsService = {
     return res.data;
   },
 
-  getTags: async () => {
-    const res = await api.get('/products/meta/tags');
+  /** Có `categoryId` thì mỗi thẻ kèm `related_count` (số SP cùng nhóm danh mục đang dùng). */
+  getTags: async (categoryId?: string) => {
+    const res = await api.get('/products/meta/tags', { params: categoryId ? { categoryId } : undefined });
     return res.data;
   },
 
