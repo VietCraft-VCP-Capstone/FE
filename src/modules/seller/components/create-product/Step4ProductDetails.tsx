@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, Plus, X, Tag as TagIcon, Sparkles } from 'lucide-react';
+import { Star, Plus, X, Tag as TagIcon } from 'lucide-react';
 import { abs } from './useHTMLImage';
 import SmartProductAiModal from '../SmartProductAiModal';
 import { IntelPreviewSection } from './IntelPreviewSection';
@@ -45,7 +45,14 @@ export function Step4ProductDetails({
     commissionPercent,
 }: Step4Props) {
     const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-    const baseBlankCost = blank?.variations?.[0]?.print_cost_vnd || blank?.variations?.[0]?.price || 0;
+    // Giá phôi xưởng in khai báo nằm ở variations[].base_cost (trước đây đọc nhầm print_cost_vnd/price → 0,
+    // AI không biết giá vốn nên gợi ý 145k cho phôi 125k). Lấy biến thể ĐẮT NHẤT seller đã chọn để không
+    // biến thể nào bị bán lỗ.
+    const chosenCosts = (blank?.variations || [])
+        .filter((v: any) => selectedVariants?.[v.sku]?.on)
+        .map((v: any) => Number(v.base_cost) || 0);
+    const allCosts = (blank?.variations || []).map((v: any) => Number(v.base_cost) || 0);
+    const baseBlankCost = Math.max(0, ...(chosenCosts.length ? chosenCosts : allCosts));
     const [newTagInput, setNewTagInput] = useState('');
 
     const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -118,8 +125,7 @@ export function Step4ProductDetails({
                         onClick={() => setIsAiModalOpen(true)}
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-xs font-black shadow-sm transition active:scale-95 cursor-pointer self-start sm:self-auto"
                     >
-                        <Sparkles size={14} className="text-amber-300 animate-pulse" />
-                        <span>✨ AI Gợi ý tên, giá & từ khóa hot</span>
+                        <span>Gợi ý tên, giá & từ khóa hot</span>
                     </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -277,9 +283,11 @@ export function Step4ProductDetails({
                 initialTitle={title || (blank?.title ? `${blank.title} Nghệ Thuật` : '')}
                 initialMaterial={blank?.material || blank?.variations?.[0]?.material || ''}
                 blankCost={baseBlankCost}
+                commissionPercent={commissionPercent}
                 isPod={true}
                 onApplyTitle={setTitle}
                 onApplyDescription={setDescription}
+                onApplyTags={(tags) => tags.forEach(t => handleAddTag(t))}
                 onApplyMarkup={(markupVal) => {
                     setSelectedVariants((prev: any) => {
                         const next = { ...prev };
@@ -293,6 +301,7 @@ export function Step4ProductDetails({
                     if (aiData.title) setTitle(aiData.title);
                     if (aiData.description) setDescription(aiData.description);
                     if (aiData.categoryId) setCategoryId(aiData.categoryId);
+                    if (aiData.tags?.length) aiData.tags.forEach((t: string) => handleAddTag(t));
                     if (aiData.markup && aiData.markup > 0) {
                         setSelectedVariants((prev: any) => {
                             const next = { ...prev };

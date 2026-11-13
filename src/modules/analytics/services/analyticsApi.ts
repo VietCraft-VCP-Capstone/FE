@@ -96,10 +96,46 @@ export const analyticsApi = {
     const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
     return res.data?.data;
   },
+
+  /** Ảnh sản phẩm (tối đa 6 data URL đã thu nhỏ, cùng sản phẩm) → tên gợi ý, danh mục, chất liệu, các màu. */
+  async recognizeProductImage(imageDataUrls: string[]): Promise<ImageRecognitionResult> {
+    const res = await api.post(`${BASE}/product/recognize-image`, { images: imageDataUrls.slice(0, 6) }, { timeout: 50000 });
+    return res.data?.data;
+  },
 };
 
+export interface ImageRecognitionResult {
+  is_product: boolean;
+  product_name: string;
+  product_type: string;
+  category: string | null;
+  materials: string[];
+  colors: { name: string; hex: string }[];
+  brand: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  notes: string;
+}
+
 export interface SmartProductSuggestionResult {
+  /** Kết quả AI lọc tiêu đề seller nhập: tiêu đề sạch, thuộc tính đã tách, cụm quảng cáo đã bỏ, điều nên sửa */
+  input_analysis?: {
+    raw_title: string;
+    clean_title: string;
+    pricing_query: string;
+    quantity: number;
+    condition: 'new' | 'used';
+    attributes: Record<string, string>;
+    removed: string[];
+    issues: string[];
+  };
   category_detected: string;
+  category?: {
+    resolved_id?: string;
+    resolved_name?: string;
+    source?: string;
+    needs_confirmation?: boolean;
+  };
+  detected_material?: string;
   product_type: string;
   noun: string;
   suggested_titles: string[];
@@ -114,6 +150,48 @@ export interface SmartProductSuggestionResult {
     };
     market_sample_count: number;
     summary: string;
+    method?: string;
+    source_label?: string;
+    confidence?: string;
+    warnings?: string[];
+    value_factors?: string[];
+    comparables?: Array<{
+      title: string;
+      price: number;
+      similarity?: number;
+      source?: string;
+      segment?: string;
+    }>;
+    market_signals?: string[];
+    demand_signal?: { keyword: string; momentum: number; direction: 'up' | 'down' | 'flat' } | null;
+    evidence_stats?: {
+      sample_size?: number;
+      p25?: number;
+      p50?: number;
+      p75?: number;
+      p90?: number;
+      blank_cost?: number;
+      profit?: number;
+      profit_margin_pct?: number;
+    };
+    ai_engine_status?: {
+      is_ai_live: boolean;
+      engine: string;
+      engine_label: string;
+      pricing_method: string;
+      source_label: string;
+      market_sample_count: number;
+      notice?: string;
+    };
+  };
+  ai_engine_status?: {
+    is_ai_live: boolean;
+    engine: string;
+    engine_label: string;
+    pricing_method: string;
+    source_label: string;
+    market_sample_count: number;
+    notice?: string;
   };
   trending_keywords: Array<{
     keyword: string;
@@ -122,6 +200,8 @@ export interface SmartProductSuggestionResult {
     gap_score: number;
     is_hot: boolean;
     tag_id?: string;
+    source?: string;
+    frequency?: number;
   }>;
   suggested_tags: string[];
   seo_description: string;

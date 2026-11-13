@@ -58,7 +58,7 @@ export interface SellerOrder {
   isPod?: boolean;
   orderType?: 'POD' | 'READY_TO_SHIP' | 'STANDARD';
   paymentStatus: 'PENDING' | 'PAID' | 'REFUNDED';
-  paymentMethod: 'VNPAY' | 'PAYOS' | 'COD';
+  paymentMethod: 'PAYOS' | 'COD';
   createdAt: string;
   updatedAt: string;
   buyer: { id: string; name: string };

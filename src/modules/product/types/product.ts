@@ -15,6 +15,15 @@ export interface ProductColorVariant {
   hex: string;
 }
 
+/** 1 dòng bảng phân loại: mẫu (set/lẻ/combo) × size, giá người bán nhận + kho riêng. */
+export interface ProductSkuRow {
+  option: string;
+  image?: string;
+  size?: string;
+  price: number;
+  stock: number;
+}
+
 export interface InventoryTrendPoint {
   date: string;
   stock: number;
@@ -50,6 +59,8 @@ export interface ProductItem {
     stock: number;
     mockupImage?: string;
   }[];
+  /** 'SKU' = seller khai bảng phân loại; không có = kiểu màu + chia đều kho. */
+  variantMode?: 'SKU';
   engagementTrend: number[]; // 5-7 data points for sparkline
   inventoryTrends: InventoryTrendPoint[]; // Timeline points for detail line chart
   /** BE luôn trả kèm (xem BE product.dto.ts: ProductItemResponseDTO.shopInfo). */
@@ -74,6 +85,8 @@ export interface CatalogOption {
   name: string;
   slug?: string;
   color?: string;
+  /** Chỉ có ở thẻ: số sản phẩm cùng nhóm danh mục đang dùng thẻ này. */
+  related_count?: number;
 }
 
 export interface ProductFormData {
@@ -95,7 +108,8 @@ export interface ProductFormData {
   images: string[];
   colors: ProductColorVariant[];
   sizes?: string[];
-  material?: string;
+  /** Có mảng này (kể cả rỗng) = đang dùng bảng phân loại thay cho màu. */
+  skus?: ProductSkuRow[];
 }
 
 export type ProductSortOption = 

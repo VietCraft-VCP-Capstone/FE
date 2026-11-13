@@ -222,7 +222,6 @@ export function BuyerOrderDetailPage() {
     const getPaymentMethodLabel = (method: string | undefined) => {
         switch (method?.toLowerCase()) {
             case 'payos': return 'payOS (QR ngân hàng)';
-            case 'vnpay': return 'VNPay';
             case 'cod': return 'Thanh toán khi nhận hàng (COD)';
             default: return 'Ví điện tử';
         }
@@ -236,7 +235,7 @@ export function BuyerOrderDetailPage() {
         }
     };
 
-    // Đơn trả trước (payOS/VNPay) đã nhận tiền nhưng shop chưa duyệt: khách phải thấy rõ là đã trả.
+    // Đơn trả trước (payOS) đã nhận tiền nhưng shop chưa duyệt: khách phải thấy rõ là đã trả.
     const isPrepaidPaid = order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID';
     const paidAmountText = `${Number(order.totalAmount || 0).toLocaleString('vi-VN')}đ`;
 

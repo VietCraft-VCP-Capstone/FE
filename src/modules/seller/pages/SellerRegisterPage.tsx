@@ -49,10 +49,29 @@ function toDisplayDate(str: string): string {
 }
 
 function formatConfidenceScore(score: number | undefined | null): string {
-    if (score === undefined || score === null) return '0%';
-    // Nếu điểm trả về tỷ lệ thập phân 0–1 (ví dụ 0.83) thì nhân 100 thành 83%, nếu đã là 0-100 thì giữ nguyên
-    const pct = score <= 1 && score > 0 ? Math.round(score * 100) : Math.round(score);
-    return `${pct}%`;
+    // Service OCR luôn trả confidence_score là số nguyên 0–100 (tỷ lệ tiêu chí đạt)
+    if (score === undefined || score === null || Number.isNaN(Number(score))) return '—';
+    return `${Math.round(Number(score))}%`;
+}
+
+/** Ô kết quả kiểm tra: true = đạt, false = cảnh báo, undefined = chưa kiểm tra (không mặc định là đạt). */
+function OcrCheckCell({ label, value, ok, bad }: { label: string; value: boolean | undefined; ok: string; bad: string }) {
+    const tone = value === true ? 'text-[#007700]' : value === false ? 'text-amber-600' : 'text-slate-400';
+    return (
+        <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
+            <span className="text-[10.5px] text-slate-500 block">{label}</span>
+            <span className={`font-bold block ${tone}`}>
+                {value === true ? ok : value === false ? bad : '— Chưa kiểm tra'}
+            </span>
+        </div>
+    );
+}
+
+/** Số CCCD đạt khi đúng định dạng VÀ không lệch năm sinh / giới tính mã hóa trong số. */
+function idCheckValue(v: CccdVerification | null): boolean | undefined {
+    const c = v?.checks;
+    if (!c || c.id_format_valid === undefined) return undefined;
+    return c.id_format_valid && c.id_matches_dob !== false && c.id_matches_gender !== false;
 }
 
 function toIsoDate(str: string): string {
@@ -1031,9 +1050,16 @@ export function SellerRegisterPage() {
                             message: `Đã trích xuất thông tin, nhưng có cảnh báo: ${res.verification.warnings.join('; ')}`
                         });
                     } else {
+                        const filled = [
+                            res.ocr_data.full_name && 'họ tên',
+                            res.ocr_data.id_number && 'số CCCD',
+                            res.ocr_data.date_of_birth && 'ngày sinh',
+                        ].filter(Boolean).join(', ');
                         setOcrNotice({
                             type: 'success',
-                            message: `AI đã quét thành công mặt trước CCCD (${res.verification?.confidence_score || 95}% tin cậy) và tự động điền họ tên, số CCCD, ngày sinh.`
+                            message: filled
+                                ? `Đã quét mặt trước CCCD (đạt ${formatConfidenceScore(res.verification?.confidence_score)} tiêu chí kiểm tra) và tự động điền ${filled}. Vui lòng đối chiếu lại với thẻ.`
+                                : `Đã quét mặt trước CCCD nhưng chưa đọc được trường nào. Vui lòng nhập tay.`
                         });
                     }
                 } else if (side === 'back') {
@@ -1754,34 +1780,34 @@ export function SellerRegisterPage() {
                                         </div>
 
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                                                <span className="text-[10.5px] text-slate-500 block">Độ sắc nét</span>
-                                                <span className={`font-bold block ${(frontVerification?.checks?.blur_check ?? true) ? 'text-[#007700]' : 'text-amber-600'
-                                                    }`}>
-                                                    {(frontVerification?.checks?.blur_check ?? true) ? '✓ Đạt chuẩn' : '⚠ Ảnh hơi mờ'}
-                                                </span>
-                                            </div>
-                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                                                <span className="text-[10.5px] text-slate-500 block">Bố cục thẻ</span>
-                                                <span className={`font-bold block ${(frontVerification?.checks?.layout_check ?? true) ? 'text-[#007700]' : 'text-amber-600'
-                                                    }`}>
-                                                    {(frontVerification?.checks?.layout_check ?? true) ? '✓ Chuẩn Quốc huy' : '⚠ Bố cục lạ'}
-                                                </span>
-                                            </div>
-                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                                                <span className="text-[10.5px] text-slate-500 block">Chống chụp màn hình</span>
-                                                <span className={`font-bold block ${(frontVerification?.checks?.screen_capture_check ?? true) ? 'text-[#007700]' : 'text-rose-600'
-                                                    }`}>
-                                                    {(frontVerification?.checks?.screen_capture_check ?? true) ? '✓ Thẻ vật lý' : '⚠ Nghi chụp màn hình'}
-                                                </span>
-                                            </div>
-                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                                                <span className="text-[10.5px] text-slate-500 block">Cấu trúc 12 số</span>
-                                                <span className={`font-bold block ${(frontVerification?.checks?.id_number_format ?? true) ? 'text-[#007700]' : 'text-amber-600'
-                                                    }`}>
-                                                    {(frontVerification?.checks?.id_number_format ?? true) ? '✓ Quy chuẩn BCA' : '⚠ Cần đối soát'}
-                                                </span>
-                                            </div>
+                                            <OcrCheckCell
+                                                label="Chất lượng ảnh"
+                                                value={frontVerification?.checks?.image_quality_ok ?? backVerification?.checks?.image_quality_ok}
+                                                ok="✓ Rõ nét, đủ sáng"
+                                                bad="⚠ Mờ / tối / lóa"
+                                            />
+                                            <OcrCheckCell
+                                                label="Bố cục thẻ"
+                                                value={frontVerification?.checks?.layout_detected ?? backVerification?.checks?.layout_detected}
+                                                ok="✓ Đúng bố cục CCCD"
+                                                bad="⚠ Không giống CCCD"
+                                            />
+                                            <OcrCheckCell
+                                                label="Dấu hiệu chụp màn hình"
+                                                value={frontVerification?.checks?.no_screen_capture ?? backVerification?.checks?.no_screen_capture}
+                                                ok="✓ Không phát hiện"
+                                                bad="⚠ Có thể chụp từ màn hình"
+                                            />
+                                            <OcrCheckCell
+                                                label="Số CCCD 12 chữ số"
+                                                value={idCheckValue(frontVerification)}
+                                                ok="✓ Hợp lệ, khớp ngày sinh & giới tính"
+                                                bad={
+                                                    frontVerification?.checks?.id_format_valid
+                                                        ? '⚠ Lệch ngày sinh / giới tính'
+                                                        : '⚠ Không đọc được / sai định dạng'
+                                                }
+                                            />
                                         </div>
 
                                         {/* Warnings List */}

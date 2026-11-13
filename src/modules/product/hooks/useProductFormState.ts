@@ -2,6 +2,19 @@ import { useState, useEffect } from 'react';
 import { ProductItem, ProductFormData, CatalogOption } from '../types/product';
 import { productsService } from '../services/productsService';
 import { netFromGross } from '../../../shared/utils/commission';
+import { syncSkus } from '../components/ProductFormSkuTable';
+
+/** Bảng phân loại của sản phẩm đã lưu; giá từ API là giá niêm yết, `percent` có thì bóc hoa hồng ra. */
+function skusFromProduct(product: ProductItem, percent?: number) {
+  if (product.variantMode !== 'SKU') return undefined;
+  return (product.variants || []).map(v => ({
+    option: v.color || '',
+    image: v.mockupImage,
+    size: v.size || undefined,
+    price: percent === undefined ? v.price : netFromGross(v.price, percent),
+    stock: v.stock,
+  }));
+}
 
 const EMPTY_FORM: ProductFormData = {
   title: '',
@@ -20,7 +33,6 @@ const EMPTY_FORM: ProductFormData = {
   images: [],
   colors: [{ name: 'Gỗ sồi tự nhiên', hex: '#5C4033' }],
   sizes: [],
-  material: ''
 };
 
 function formFromProduct(product: ProductItem): ProductFormData {
@@ -38,7 +50,10 @@ function formFromProduct(product: ProductItem): ProductFormData {
     category: product.category || '',
     categoryId: '',
     tagIds: [],
-    materials: product.materials ? [...product.materials] : [],
+    // Sản phẩm cũ chỉ lưu chất liệu ở biến thể (variants[0].material): đưa sang ô chất liệu để không mất
+    materials: product.materials && product.materials.length > 0
+      ? [...product.materials]
+      : (product.variants?.[0]?.material ? [product.variants[0].material] : []),
     price: product.price || 0,
     stock: product.stock !== undefined ? product.stock : 10,
     sku: product.sku || '',
@@ -52,7 +67,7 @@ function formFromProduct(product: ProductItem): ProductFormData {
     sizes: product.sizes && product.sizes.length > 0
       ? product.sizes
       : Array.from(new Set((product.variants || []).map(v => v.size).filter(Boolean))) as string[],
-    material: product.variants?.[0]?.material || (product as any).material || ''
+    skus: skusFromProduct(product),
   };
 }
 
@@ -77,7 +92,6 @@ function newProductForm(): ProductFormData {
       { name: 'Trắng', hex: '#FFFFFF' }
     ],
     sizes: [],
-    material: ''
   };
 }
 
@@ -136,7 +150,23 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
       categoryId: matchedCategory?._id || '',
       tagIds: matchedTagIds,
     }));
-  }, [product, categories, tags]);
+    // Thẻ seller tự đề xuất chưa được duyệt không có trong danh sách sàn: giữ lại dạng "chờ duyệt",
+    // nếu không lần lưu này ghi đè và làm mất thẻ. BE tìm lại đúng thẻ cũ theo slug, không tạo trùng.
+    setNewTagNames((product.tags || []).filter(name => !tags.some(t => key(t.name) === key(name))));
+    // Cố ý không theo dõi `tags`: thẻ được tải lại khi đổi danh mục, chạy lại ở đó sẽ ghi đè lựa chọn đang sửa.
+    // `tags` và `categories` được set cùng một lượt nên ở đây đã có đủ.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product, categories]);
+
+  // Đổi danh mục thì tải lại thẻ kèm độ liên quan, để ô thẻ gợi ý đúng ngành hàng
+  useEffect(() => {
+    if (!isOpen || !formData.categoryId) return;
+    let alive = true;
+    productsService.getTags(formData.categoryId)
+      .then(t => { if (alive && Array.isArray(t)) setTags(t); })
+      .catch(() => { /* giữ danh sách thẻ đang có */ });
+    return () => { alive = false; };
+  }, [isOpen, formData.categoryId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -150,7 +180,11 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
 
   useEffect(() => {
     if (!product || commissionPercent === null) return;
-    setFormData(prev => ({ ...prev, price: netFromGross(product.price || 0, commissionPercent) }));
+    setFormData(prev => ({
+      ...prev,
+      price: netFromGross(product.price || 0, commissionPercent),
+      skus: prev.skus && skusFromProduct(product, commissionPercent),
+    }));
   }, [product, commissionPercent]);
 
   const toggleTag = (id: string) => {
@@ -187,7 +221,11 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     if (!formData.title.trim()) errs.title = 'Vui lòng nhập tên sản phẩm';
     if (!formData.categoryId) errs.category = 'Vui lòng chọn danh mục';
     if (formData.tagIds.length === 0 && newTagNames.length === 0) errs.tags = 'Vui lòng chọn hoặc đề xuất ít nhất 1 thẻ';
-    if (formData.price <= 0) errs.price = 'Giá bán phải lớn hơn 0';
+    if (formData.skus) {
+      const rows = syncSkus(formData.skus, formData.sizes || [], formData.price);
+      if (rows.length === 0) errs.skus = 'Thêm ít nhất 1 mẫu, hoặc tắt phân loại theo mẫu';
+      else if (rows.some(r => !(r.price > 0))) errs.skus = 'Mỗi phân loại phải có giá lớn hơn 0';
+    } else if (formData.price <= 0) errs.price = 'Giá bán phải lớn hơn 0';
     if (formData.stock < 0) errs.stock = 'Tồn kho không được âm';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -199,7 +237,11 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
     if (targetCover && finalImages.includes(targetCover)) {
       finalImages = [targetCover, ...finalImages.filter(img => img !== targetCover)];
     }
-    return { ...formData, newTagNames, images: finalImages, thumbnail: targetCover };
+    const base = { ...formData, newTagNames, images: finalImages, thumbnail: targetCover };
+    if (!formData.skus) return base;
+    // Giá/kho tổng chỉ để hiển thị danh sách; BE ghi từng SKU theo `skus`.
+    const skus = syncSkus(formData.skus, formData.sizes || [], formData.price);
+    return { ...base, skus, price: Math.min(...skus.map(s => s.price)), stock: skus.reduce((n, s) => n + s.stock, 0) };
   };
 
   return {
