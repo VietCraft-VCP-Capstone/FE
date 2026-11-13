@@ -149,9 +149,16 @@ export const CampaignFunnelCard: React.FC<Props> = ({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-stone-100 pb-3">
         <div className="flex items-center gap-2">
           <Layers size={16} className="text-[#007700]" />
-          <h3 className="font-bold text-stone-900 text-sm sm:text-base">
-            Phễu chuyển đổi {occasionName}
-          </h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-bold text-stone-900 text-sm sm:text-base">
+              Phễu chuyển đổi {occasionName}
+            </h3>
+            {currentFunnel?.actual?.window_label && (
+              <span className="text-[11px] font-medium text-stone-500 bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200/60 font-sans">
+                {currentFunnel.actual.window_label}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Nút điều khiển tinh gọn */}

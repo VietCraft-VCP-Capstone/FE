@@ -841,6 +841,9 @@ export interface CampaignFunnel {
     impressions?: number;
     clicks?: number;
     cart_adds?: number;
+    window_label?: string;
+    window_start?: string;
+    window_end?: string;
   };
 }
 
