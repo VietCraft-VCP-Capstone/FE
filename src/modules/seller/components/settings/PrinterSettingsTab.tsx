@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { 
-  Printer, 
-  CheckCircle2, 
-  AlertCircle, 
-  Radio, 
-  ExternalLink, 
-  RefreshCw, 
-  ShieldCheck, 
-  Trash2, 
-  HelpCircle, 
+import {
+  Printer,
+  CheckCircle2,
+  AlertCircle,
+  Radio,
+  ExternalLink,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  HelpCircle,
   Building2,
   PlusCircle
 } from 'lucide-react';
@@ -198,8 +198,8 @@ export function PrinterSettingsTab() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {connectedPrinters.map((p) => (
-              <div 
-                key={p.printer_id || p.api_key} 
+              <div
+                key={p.printer_id || p.api_key}
                 className="p-4 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-white flex flex-col justify-between gap-3 shadow-xs"
               >
                 <div>
@@ -262,15 +262,15 @@ export function PrinterSettingsTab() {
           <div>
             <h4 className="text-base font-bold text-stone-900 font-jakarta flex items-center gap-2">
               <PlusCircle size={18} className="text-[#007700]" />
-              {connectedPrinters.length > 0 
-                ? 'Liên kết thêm xưởng in mới / Cập nhật thỏa thuận' 
+              {connectedPrinters.length > 0
+                ? 'Liên kết thêm xưởng in mới / Cập nhật thỏa thuận'
                 : 'Xác thực & Liên kết Xưởng in (Printify-Style Workflow)'}
             </h4>
             <p className="text-xs text-stone-500 mt-1">
               Bạn có thể hợp tác với nhiều xưởng in khác nhau. Nhập API Key do từng xưởng cấp để tích hợp phôi và đơn hàng.
             </p>
           </div>
-          
+
           <button
             type="button"
             onClick={handleFillDemoCredentials}
@@ -286,9 +286,9 @@ export function PrinterSettingsTab() {
             <HelpCircle size={14} /> Quy trình thỏa thuận và kết nối:
           </div>
           <p className="text-[11.5px]">
-            1. Mở <a href="http://localhost:3001" target="_blank" rel="noreferrer" className="underline font-bold text-[#007700]">Cổng Xưởng In (Port 3001)</a> và đăng nhập/đăng ký tài khoản vai trò <strong>Người Bán (Seller)</strong> (bằng Google hoặc Email).<br/>
-            2. Vào tab <strong>"Hợp tác xưởng in"</strong> bên Printing Shop ➔ Chọn xưởng và bấm <strong>"Gửi yêu cầu hợp tác"</strong>.<br/>
-            3. Chờ xưởng duyệt. Sau khi xưởng duyệt, bạn sẽ nhận được <strong>API Key</strong> riêng.<br/>
+            1. Mở <a href="http://localhost:3001" target="_blank" rel="noreferrer" className="underline font-bold text-[#007700]">Cổng Xưởng In (Port 3001)</a> và đăng nhập/đăng ký tài khoản vai trò <strong>Người Bán (Seller)</strong> (bằng Google hoặc Email).<br />
+            2. Vào tab <strong>"Hợp tác xưởng in"</strong> bên Printing Shop ➔ Chọn xưởng và bấm <strong>"Gửi yêu cầu hợp tác"</strong>.<br />
+            3. Chờ xưởng duyệt. Sau khi xưởng duyệt, bạn sẽ nhận được <strong>API Key</strong> riêng.<br />
             4. Nhập Email và API Key vào bên dưới để xác thực liên kết. <em>(💡 Nếu bạn đăng nhập bên xưởng bằng Google: Bạn <strong>chỉ cần nhập Email Google & API Key</strong>, để trống ô Mật khẩu).</em>
           </p>
         </div>
@@ -360,7 +360,7 @@ export function PrinterSettingsTab() {
           {/* API Key */}
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-stone-700 mb-1.5">
-              Khóa API Key xưởng cấp <span className="text-rose-500">*</span> <span className="text-stone-400 font-normal">(Sinh ra khi xưởng in phê duyệt thỏa thuận hợp tác)</span>
+              Khóa API Key xưởng cấp <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -384,13 +384,12 @@ export function PrinterSettingsTab() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
             {/* Chế độ 1: Duyệt thủ công */}
-            <label 
+            <label
               onClick={() => setPrinterData({ ...printerData, auto_approve: false })}
-              className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                !printerData.auto_approve
+              className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${!printerData.auto_approve
                   ? 'bg-emerald-50/50 border-[#007700] ring-1 ring-[#007700]'
                   : 'bg-white border-stone-200 hover:border-stone-300'
-              }`}
+                }`}
             >
               <input
                 type="radio"
@@ -410,13 +409,12 @@ export function PrinterSettingsTab() {
             </label>
 
             {/* Chế độ 2: Tự động đẩy đơn */}
-            <label 
+            <label
               onClick={() => setPrinterData({ ...printerData, auto_approve: true })}
-              className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                printerData.auto_approve
+              className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${printerData.auto_approve
                   ? 'bg-emerald-50/50 border-[#007700] ring-1 ring-[#007700]'
                   : 'bg-white border-stone-200 hover:border-stone-300'
-              }`}
+                }`}
             >
               <input
                 type="radio"
@@ -430,7 +428,7 @@ export function PrinterSettingsTab() {
                   Tự động chuyển xưởng (Auto-dispatch)
                 </span>
                 <span className="text-[11.5px] text-stone-500 mt-0.5 block leading-relaxed">
-                  Ngay khi khách thanh toán thành công (VNPAY/PAYOS), hệ thống sẽ tự động kích hoạt đẩy file và đơn sang xưởng in ngay lập tức.
+                  Ngay khi khách thanh toán thành công (payOS), hệ thống sẽ tự động kích hoạt đẩy file và đơn sang xưởng in ngay lập tức.
                 </span>
               </div>
             </label>
@@ -439,11 +437,10 @@ export function PrinterSettingsTab() {
 
         {/* Test Connection Alert Box */}
         {testResult && (
-          <div className={`p-4 rounded-xl text-xs flex items-start gap-2.5 ${
-            testResult.success 
-              ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' 
+          <div className={`p-4 rounded-xl text-xs flex items-start gap-2.5 ${testResult.success
+              ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
               : 'bg-rose-50 text-rose-900 border border-rose-200'
-          }`}>
+            }`}>
             {testResult.success ? (
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
             ) : (

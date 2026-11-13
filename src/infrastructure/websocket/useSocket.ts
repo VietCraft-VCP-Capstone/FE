@@ -60,14 +60,7 @@ export function useSocket(currentRoomId?: string) {
 
     subscriberCount++;
 
-    // Chỉ tạo khi chưa có: socket đang kết nối dở (chưa "connected") mà tạo thêm thì mỗi lần nhiều
-    // component cùng mount lại mở một kết nối mới, kết nối cũ bị bỏ rơi không bao giờ đóng.
-    // socket.io tự kết nối lại khi rớt mạng nên không cần tạo lại.
-    if (sharedSocket && (sharedSocket.auth as any)?.token !== token) {
-      sharedSocket.disconnect(); // đổi tài khoản: không dùng lại socket mang token cũ
-      sharedSocket = null;
-    }
-    if (!sharedSocket) {
+    if (!sharedSocket || !sharedSocket.connected) {
       const socket = io(SOCKET_URL, {
         auth: { token },
         transports: ['websocket', 'polling'],
@@ -199,11 +192,8 @@ export function useSocket(currentRoomId?: string) {
         payload = arg1 as SendMessageOptions;
       }
 
-      // Không có timeout thì rớt mạng giữa chừng sẽ treo mãi: ô nhập đã xoá, tin mất mà không báo lỗi
-      socket.timeout(10000).emit('send_message', payload, (err: any, response: any) => {
-        if (err) {
-          reject(new Error('Gửi tin nhắn quá thời gian chờ'));
-        } else if (response?.error) {
+      socket.emit('send_message', payload, (response: any) => {
+        if (response?.error) {
           reject(new Error(response.error));
         } else {
           resolve(response?.data);

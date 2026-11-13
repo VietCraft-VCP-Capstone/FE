@@ -444,7 +444,7 @@ export function SellerRegisterPage() {
     const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
     const searchAddressRef = useRef<HTMLDivElement>(null);
 
-    const [bankCode, setBankCode] = useState(''); // người bán tự chọn, không chọn sẵn Vietcombank
+    const [bankCode, setBankCode] = useState('VCB');
     const [accountNumber, setAccountNumber] = useState('');
     const [accountNumberError, setAccountNumberError] = useState<string | null>(null);
     const [accountHolder, setAccountHolder] = useState('');
@@ -966,7 +966,7 @@ export function SellerRegisterPage() {
                     }
                 }
                 if (app.bank_info) {
-                    setBankCode(app.bank_info.bank_code || '');
+                    setBankCode(app.bank_info.bank_code || 'VCB');
                     setAccountHolder(app.bank_info.account_holder || '');
                 }
 
@@ -2437,7 +2437,6 @@ export function SellerRegisterPage() {
                                             onChange={(e) => setBankCode(e.target.value)}
                                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                         >
-                                            <option value="" disabled>-- Chọn ngân hàng --</option>
                                             {SUPPORTED_BANKS.map(b => (
                                                 <option key={b.code} value={b.code}>{b.name}</option>
                                             ))}
@@ -2559,10 +2558,6 @@ export function SellerRegisterPage() {
                                         if (!isValidVietnamesePhone(cleanPickupPhone)) {
                                             setPickupPhoneError('Số điện thoại liên hệ kho không hợp lệ. Vui lòng nhập số điện thoại di động 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09).');
                                             setError('Số điện thoại liên hệ kho không hợp lệ. Vui lòng nhập số điện thoại di động 10 chữ số (bắt đầu bằng 03, 05, 07, 08, 09).');
-                                            return;
-                                        }
-                                        if (!bankCode) {
-                                            setError('Vui lòng chọn ngân hàng thụ hưởng.');
                                             return;
                                         }
                                         const cleanAcc = accountNumber.trim();

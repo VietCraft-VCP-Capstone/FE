@@ -26,6 +26,14 @@ export function ProductFormTagField({
   onRemoveNewTag,
 }: ProductFormTagFieldProps) {
   const [input, setInput] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  // Thẻ hợp danh mục (SP cùng ngành đang dùng) xếp trước; thẻ ngành khác ẩn sau nút, trừ thẻ đã chọn.
+  // Danh mục mới chưa có SP nào dùng thẻ thì không có gì để lọc → hiện tất cả.
+  const hasRelated = tags.some(t => (t.related_count ?? 0) > 0);
+  const related = [...tags.filter(t => (t.related_count ?? 0) > 0)].sort((a, b) => (b.related_count ?? 0) - (a.related_count ?? 0));
+  const others = tags.filter(t => !((t.related_count ?? 0) > 0));
+  const visible = !hasRelated || showAll ? [...related, ...others] : [...related, ...others.filter(t => tagIds.includes(t._id))];
+  const hiddenCount = tags.length - visible.length;
   const add = () => {
     if (!input.trim()) return;
     onAddTag(input.trim());
@@ -88,7 +96,7 @@ export function ProductFormTagField({
             </button>
           </span>
         ))}
-        {tags.map((tag) => {
+        {visible.map((tag) => {
           const picked = tagIds.includes(tag._id);
           return (
             <button
@@ -107,6 +115,15 @@ export function ProductFormTagField({
           );
         })}
       </div>
+      {hasRelated && (hiddenCount > 0 || showAll) && (
+        <button
+          type="button"
+          onClick={() => setShowAll(v => !v)}
+          className="text-xs font-semibold text-[#007700] hover:underline cursor-pointer"
+        >
+          {showAll ? 'Chỉ hiện thẻ hợp danh mục' : `Xem thêm ${hiddenCount} thẻ thuộc ngành hàng khác`}
+        </button>
+      )}
       {error && <p className="text-xs text-rose-500">{error}</p>}
     </div>
   );

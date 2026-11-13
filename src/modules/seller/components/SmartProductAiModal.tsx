@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BarChart2, TrendingUp, Calculator, ShoppingBag } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 import { analyticsApi, SmartProductSuggestionResult } from '../../analytics/services/analyticsApi';
 
 export interface SmartProductAiModalProps {
@@ -11,6 +11,8 @@ export interface SmartProductAiModalProps {
   initialTitle?: string;
   initialMaterial?: string;
   blankCost?: number;
+  /** % hoa hồng sàn cộng lên giá seller nhận → giá niêm yết. POD: lời = giá niêm yết bỏ hoa hồng − giá phôi */
+  commissionPercent?: number | null;
   isPod?: boolean;
   onApplyTitle?: (title: string) => void;
   onApplyPrice?: (price: number) => void;
@@ -38,6 +40,7 @@ export function SmartProductAiModal({
   initialTitle = '',
   initialMaterial = '',
   blankCost = 0,
+  commissionPercent = null,
   isPod = false,
   onApplyTitle,
   onApplyPrice,
@@ -58,7 +61,11 @@ export function SmartProductAiModal({
   const [chosenTitle, setChosenTitle] = useState('');
   const [chosenPrice, setChosenPrice] = useState<number>(0);
   const [chosenMarkup, setChosenMarkup] = useState<number>(0);
+  // Seller tự chọn mức giá: không bắt buộc lấy giá AI đề xuất
+  const [priceChoice, setPriceChoice] = useState<'rec' | 'p25' | 'p50' | 'p75' | 'custom'>('rec');
+  const [customPrice, setCustomPrice] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTagInput, setCustomTagInput] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [appliedField, setAppliedField] = useState<string | null>(null);
 
@@ -100,10 +107,15 @@ export function SmartProductAiModal({
         }
         if (result.pricing_insight) {
           setChosenPrice(result.pricing_insight.recommended_price);
-          setChosenMarkup(result.pricing_insight.recommended_markup);
+          setPriceChoice('rec');
+          setCustomPrice('');
+          setChosenMarkup(isPod && blankCost > 0
+            ? markupFor(result.pricing_insight.recommended_price)
+            : result.pricing_insight.recommended_markup);
         }
         if (result.suggested_tags) {
-          setSelectedTags(result.suggested_tags.slice(0, 6));
+          // Chọn sẵn 5 thẻ đầu (AI đã xếp thẻ sát sản phẩm lên trước) — seller bấm để bỏ/chọn thêm
+          setSelectedTags(result.suggested_tags.slice(0, 5));
         }
 
         // Tự động nhận diện và khớp danh mục nếu người bán chưa chọn
@@ -125,7 +137,7 @@ export function SmartProductAiModal({
     } catch (err: any) {
       if (controller.signal.aborted) return;
       console.error('Failed to fetch AI product suggestion:', err);
-      setError('Chưa thể lấy dữ liệu phân tích lúc này. Vui lòng thử lại sau.');
+      setError('Chưa lấy được gợi ý, vui lòng thử lại.');
     } finally {
       if (inflightRef.current === controller) setLoading(false);
     }
@@ -163,6 +175,17 @@ export function SmartProductAiModal({
     markApplied('title');
   };
 
+  const selectPrice = (choice: 'rec' | 'p25' | 'p50' | 'p75' | 'custom', value: number) => {
+    setPriceChoice(choice);
+    setChosenPrice(value);
+    // POD: giá bán = giá phôi + markup → đổi mức giá thì markup đổi theo
+    if (isPod && blankCost > 0) setChosenMarkup(markupFor(value));
+  };
+
+  /** Tiền lời của seller ở giá niêm yết `listPrice`: bỏ hoa hồng sàn rồi trừ giá phôi. */
+  const markupFor = (listPrice: number) =>
+    Math.max(0, Math.round(listPrice / (1 + (Number(commissionPercent) || 0) / 100)) - blankCost);
+
   const handleApplySinglePrice = () => {
     const p = chosenPrice || data?.pricing_insight?.recommended_price || 0;
     if (p > 0 && onApplyPrice) {
@@ -187,10 +210,19 @@ export function SmartProductAiModal({
     }
   };
 
+  const sameTag = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const toggleTag = (tag: string) =>
+    setSelectedTags(prev => prev.some(t => sameTag(t, tag)) ? prev.filter(t => !sameTag(t, tag)) : [...prev, tag]);
+  const addCustomTag = () => {
+    const tag = customTagInput.replace(/#/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 30);
+    if (tag && !selectedTags.some(t => sameTag(t, tag))) setSelectedTags(prev => [...prev, tag]);
+    setCustomTagInput('');
+  };
+
+  // Chỉ áp dụng đúng những thẻ seller đang chọn (trước đây không chọn gì thì đẩy hết mọi thẻ vào form)
   const handleApplySingleTags = () => {
-    const tagsToApply = selectedTags.length > 0 ? selectedTags : (data?.suggested_tags ?? []);
-    if (tagsToApply.length > 0 && onApplyTags) {
-      onApplyTags(tagsToApply);
+    if (selectedTags.length > 0 && onApplyTags) {
+      onApplyTags(selectedTags);
       markApplied('tags');
     }
   };
@@ -200,7 +232,7 @@ export function SmartProductAiModal({
     const finalMarkup = chosenMarkup || data?.pricing_insight?.recommended_markup || 0;
     const finalTitle = chosenTitle || (data?.suggested_titles?.[0] ?? '');
     const finalDesc = data?.seo_description || '';
-    const finalTags = selectedTags.length > 0 ? selectedTags : (data?.suggested_tags ?? []);
+    const finalTags = selectedTags;
     const finalMaterial = material.trim();
     const finalCatId = selectedCategory || categories.find(c =>
       c.name?.toLowerCase() === (data?.category_detected || data?.category?.resolved_name || '').toLowerCase()
@@ -241,20 +273,17 @@ export function SmartProductAiModal({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-black tracking-tight text-white">
-                VietCraft AI Studio
+                Gợi ý đăng sản phẩm
               </h3>
-              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-stone-950 px-2 py-0.5 rounded-full shadow-xs">
-                Trợ Lý Niêm Yết
-              </span>
             </div>
             <p className="text-[11px] text-emerald-100 font-medium mt-0.5">
-              Gợi ý Tên chuẩn SEO, Định giá thị trường & Thẻ tag phổ biến trên sàn
+              Tên sản phẩm, giá bán, thẻ tag và mô tả
             </p>
           </div>
 
           <button
             onClick={onClose}
-            title={mode === 'inline' ? 'Thu gọn trợ lý' : 'Đóng'}
+            title={mode === 'inline' ? 'Thu gọn' : 'Đóng'}
             className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white rounded-full hover:bg-white/10 transition-colors cursor-pointer text-base font-bold"
           >
             ✕
@@ -266,7 +295,7 @@ export function SmartProductAiModal({
             <div className="sm:col-span-4">
               <input
                 type="text"
-                placeholder="Ý tưởng / chủ đề (VD: hoa sen, vintage...)"
+                placeholder="Tên sản phẩm (VD: Bình hoa gốm men rạn)"
                 value={keywordIdea}
                 onChange={e => setKeywordIdea(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && fetchSuggestion()}
@@ -308,7 +337,7 @@ export function SmartProductAiModal({
                 disabled={loading}
                 className="w-full py-2 px-2 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold rounded-xl text-xs transition flex items-center justify-center shadow-sm active:scale-95 disabled:opacity-60 cursor-pointer"
               >
-                <span>{loading ? 'Đang phân tích...' : 'Phân tích lại'}</span>
+                <span>{loading ? 'Đang tải...' : 'Gợi ý lại'}</span>
               </button>
             </div>
           </div>
@@ -321,10 +350,7 @@ export function SmartProductAiModal({
           {loading ? (
             <div className="py-16 text-center space-y-3">
               <div className="w-12 h-12 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
-              <h4 className="text-sm font-bold text-stone-800">Đang tổng hợp dữ liệu ngành hàng...</h4>
-              <p className="text-xs text-stone-500 max-w-md mx-auto">
-                Đang phân tích phân vị giá thị trường, thẻ tag phổ biến và đề xuất tiêu đề SEO chuẩn mực.
-              </p>
+              <h4 className="text-sm font-bold text-stone-800">Đang chuẩn bị gợi ý...</h4>
             </div>
           ) : error ? (
             <div className="p-6 text-center bg-rose-50 border border-rose-200 rounded-2xl space-y-2">
@@ -339,33 +365,44 @@ export function SmartProductAiModal({
             </div>
           ) : data ? (
             <>
-              {/* STATUS & TRANSPARENCY NOTICE */}
-              {data.ai_engine_status && (
-                <div className={`p-3 rounded-2xl border text-xs flex items-start gap-2.5 ${
-                  data.ai_engine_status.is_ai_live
-                    ? 'bg-emerald-50/60 border-emerald-200/80 text-emerald-950'
-                    : 'bg-amber-50/70 border-amber-200/80 text-amber-950'
-                }`}>
-                  <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${
-                    data.ai_engine_status.is_ai_live ? 'bg-emerald-600 animate-pulse' : 'bg-amber-500'
-                  }`} />
-                  <div className="space-y-0.5 flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-extrabold text-[11px] uppercase tracking-wider">
-                        Phân Tích Chuyên Sâu
-                      </span>
-                      {data.pricing_insight?.source_label && !data.pricing_insight.source_label.toLowerCase().includes('ước lượng') && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/80 border border-stone-200/60 font-semibold text-stone-700">
-                          {data.pricing_insight.source_label}
-                        </span>
-                      )}
-                    </div>
-                    {data.ai_engine_status.notice && (
-                      <p className="text-[11px] text-amber-900/90 leading-tight">
-                        {data.ai_engine_status.notice}
-                      </p>
+              {data.ai_engine_status?.notice && (
+                <p className="p-3 rounded-2xl border bg-amber-50/70 border-amber-200/80 text-[11px] text-amber-900">
+                  {data.ai_engine_status.notice}
+                </p>
+              )}
+
+              {/* Tên sản phẩm sau khi làm gọn — kết quả lọc tiêu đề seller nhập */}
+              {data.input_analysis && data.input_analysis.clean_title && (
+                <div className="p-3.5 bg-white border border-stone-200 rounded-2xl space-y-2 text-xs">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-[10.5px] font-black text-stone-700 uppercase tracking-wider">Tên sản phẩm của bạn</span>
+                    {data.input_analysis.clean_title !== keywordIdea.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setKeywordIdea(data.input_analysis!.clean_title)}
+                        className="text-[10.5px] font-bold text-emerald-700 hover:underline cursor-pointer"
+                      >
+                        Dùng tên này
+                      </button>
                     )}
                   </div>
+                  <p className="font-bold text-stone-900">{data.input_analysis.clean_title}</p>
+                  {Object.keys(data.input_analysis.attributes || {}).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(data.input_analysis.attributes).map(([k, v]) => (
+                        <span key={k} className="px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-[10.5px] text-stone-700">
+                          {k}: <strong className="text-stone-900">{v}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {data.input_analysis.issues?.length > 0 && (
+                    <ul className="space-y-0.5">
+                      {data.input_analysis.issues.map((it, i) => (
+                        <li key={i} className="text-[10.5px] text-amber-800 leading-snug">⚠ {it}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
 
@@ -374,10 +411,7 @@ export function SmartProductAiModal({
                 <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-xs flex items-center justify-between gap-3 text-amber-950">
                   <div className="space-y-0.5">
                     <p className="font-bold text-[11px]">
-                      Hệ thống ước lượng ngành hàng: <span className="underline font-extrabold">{data.category.resolved_name}</span>
-                    </p>
-                    <p className="text-[10px] text-amber-800">
-                      Độ chắc chắn chưa cao. Bạn có thể chọn để xác nhận ngành hàng này hoặc tự chọn lại.
+                      Danh mục phù hợp: <span className="underline font-extrabold">{data.category.resolved_name}</span>
                     </p>
                   </div>
                   {data.category.resolved_id && (
@@ -394,56 +428,73 @@ export function SmartProductAiModal({
                 </div>
               )}
 
-              {/* SECTION 1: Thẻ Tags Phổ Biến */}
+              {/* SECTION 1: Thẻ tag */}
               <div className="bg-white p-4.5 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black text-stone-900 uppercase tracking-wider">
-                    Thẻ Tag Khai Thác Từ Ngành Hàng
+                    Thẻ tag
                   </h4>
                   {onApplyTags && (
                     <button
                       type="button"
                       onClick={handleApplySingleTags}
-                      className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      disabled={selectedTags.length === 0}
+                      className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span>{appliedField === 'tags' ? 'Đã áp dụng thẻ!' : 'Áp dụng thẻ vào form'}</span>
+                      <span>{appliedField === 'tags' ? 'Đã thêm vào form' : `Thêm ${selectedTags.length} thẻ vào form`}</span>
                     </button>
                   )}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {data.trending_keywords?.map((item, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        const kw = item.keyword;
-                        if (!chosenTitle.toLowerCase().includes(kw.toLowerCase())) {
-                          setChosenTitle(prev => `${prev} - ${kw}`);
-                        }
-                      }}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                        item.is_hot
-                          ? 'bg-orange-50/80 text-orange-800 border-orange-200 hover:bg-orange-100 hover:border-orange-300'
-                          : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100 hover:border-stone-300'
-                      }`}
-                    >
-                      <span>{item.keyword}</span>
-                      {item.growth && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded-md font-semibold bg-stone-200/70 text-stone-700">
-                          {item.growth}
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                  {[
+                    ...(data.suggested_tags ?? []),
+                    ...selectedTags.filter(t => !(data.suggested_tags ?? []).some(s => sameTag(s, t))),   // thẻ seller tự thêm
+                  ].map(tag => {
+                    const on = selectedTags.some(t => sameTag(t, tag));
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => toggleTag(tag)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                          on
+                            ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                            : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100 hover:border-stone-300'
+                        }`}
+                      >
+                        <span>{on ? '✓' : '+'} {tag}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    value={customTagInput}
+                    onChange={e => setCustomTagInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag(); } }}
+                    maxLength={30}
+                    placeholder="Thêm thẻ khác..."
+                    className="flex-1 px-3 py-1.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:border-emerald-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomTag}
+                    disabled={!customTagInput.trim()}
+                    className="px-3 py-1.5 rounded-xl bg-stone-800 text-white text-xs font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Thêm
+                  </button>
                 </div>
               </div>
 
-              {/* SECTION 2: Gợi Ý Tiêu Đề Chuẩn SEO */}
+              {/* SECTION 2: Tên sản phẩm */}
               <div className="bg-white p-4.5 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black text-stone-900 uppercase tracking-wider">
-                    Gợi Ý Tiêu Đề Chuẩn SEO (Chọn 1 tiêu đề tối ưu nhất)
+                    Tên sản phẩm
                   </h4>
                 </div>
 
@@ -504,27 +555,22 @@ export function SmartProductAiModal({
                 </div>
               </div>
 
-              {/* SECTION 3: Phân Tích Giá & Lợi Nhuận Thị Trường */}
+              {/* SECTION 3: Giá bán */}
               {data.pricing_insight && (
                 <div className="bg-white p-4.5 rounded-2xl border border-stone-200/80 shadow-xs space-y-3.5">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-black text-stone-900 uppercase tracking-wider">
-                      Định Giá Bán & Phân Khúc Thị Trường
+                      Giá bán
                     </h4>
-                    <span className="text-[11px] font-bold text-stone-600 bg-stone-100 px-2.5 py-0.5 rounded-full border border-stone-200">
-                      {data.pricing_insight.source_label || (data.pricing_insight.market_sample_count > 0 
-                        ? `Dữ liệu từ ${data.pricing_insight.market_sample_count} sản phẩm cùng ngành`
-                        : 'Căn cứ dữ liệu phân tích')}
-                    </span>
                   </div>
 
                   {data.pricing_insight.recommended_price <= 0 || data.pricing_insight.method === 'none' ? (
                     <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl text-center space-y-1.5">
                       <p className="text-xs font-bold text-stone-700">
-                        Chưa đủ dữ liệu thị trường để đề xuất mức giá chuẩn xác
+                        Chưa tìm thấy đủ sản phẩm tương tự để gợi ý giá
                       </p>
                       <p className="text-[11px] text-stone-500 max-w-lg mx-auto">
-                        Hệ thống không tự ý đưa ra mức giá mặc định khi thiếu căn cứ so sánh. Vui lòng cung cấp tiêu đề chi tiết hơn hoặc nhập giá vốn (nếu là sản phẩm sản xuất / POD) để tính giá theo chi phí (Cost-Plus).
+                        Bạn thử ghi tên sản phẩm rõ hơn (loại, chất liệu, thương hiệu) rồi bấm "Gợi ý lại".
                       </p>
                     </div>
                   ) : (
@@ -534,14 +580,11 @@ export function SmartProductAiModal({
                         <div className="p-3.5 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl space-y-2 flex flex-col justify-between">
                           <div className="space-y-1">
                             <span className="text-[10px] uppercase font-black text-emerald-800 tracking-wider">
-                              Giá Bán Đề Xuất Hợp Lý
+                              {priceChoice === 'rec' ? 'Giá gợi ý' : 'Giá bạn chọn'}
                             </span>
                             <div className="text-xl font-black text-emerald-700">
-                              {data.pricing_insight.recommended_price.toLocaleString('vi-VN')}đ
+                              {(chosenPrice || data.pricing_insight.recommended_price).toLocaleString('vi-VN')}đ
                             </div>
-                            <p className="text-[10px] text-emerald-800/80 font-medium">
-                              Mức giá cân bằng, tối ưu tỉ lệ chốt đơn
-                            </p>
                           </div>
                           {onApplyPrice && !isPod && (
                             <button
@@ -549,7 +592,7 @@ export function SmartProductAiModal({
                               onClick={handleApplySinglePrice}
                               className="w-full py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold shadow-xs transition flex items-center justify-center cursor-pointer active:scale-95"
                             >
-                              <span>{appliedField === 'price' ? 'Đã áp dụng giá!' : 'Áp dụng giá này'}</span>
+                              <span>{appliedField === 'price' ? 'Đã áp dụng' : 'Áp dụng giá này'}</span>
                             </button>
                           )}
                         </div>
@@ -557,32 +600,29 @@ export function SmartProductAiModal({
                         {/* Thẻ Khoảng Giá Thị Trường */}
                         <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl space-y-1">
                           <span className="text-[10px] uppercase font-black text-stone-500 tracking-wider">
-                            Khoảng Giá Phổ Biến Thị Trường
+                            Giá phổ biến
                           </span>
                           <div className="text-sm font-black text-stone-800">
                             {data.pricing_insight.price_range.low.toLocaleString('vi-VN')}đ — {data.pricing_insight.price_range.high.toLocaleString('vi-VN')}đ
                           </div>
-                          <p className="text-[10px] text-stone-500">
-                            Dải giá người tiêu dùng sẵn sàng chi trả
-                          </p>
                         </div>
 
                         {/* Thẻ Lợi Nhuận Markup (POD) */}
                         <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2 flex flex-col justify-between">
                           <div className="space-y-1">
                             <span className="text-[10px] uppercase font-black text-amber-800 tracking-wider">
-                              {isPod ? 'Lợi Nhuận Markup Đề Xuất' : 'Phân Khúc Cao Cấp'}
+                              {isPod ? 'Tiền lời mỗi sản phẩm' : 'Giá hàng cao cấp'}
                             </span>
                             <div className="text-xl font-black text-amber-700">
                               {isPod 
-                                ? `${data.pricing_insight.recommended_markup.toLocaleString('vi-VN')}đ`
+                                ? `${chosenMarkup.toLocaleString('vi-VN')}đ`
                                 : `${data.pricing_insight.price_range.premium.toLocaleString('vi-VN')}đ`}
                             </div>
-                            <p className="text-[10px] text-amber-800/80 font-medium">
-                              {isPod && blankCost > 0 
-                                ? `(Giá phôi ${blankCost.toLocaleString('vi-VN')}đ + Lời ${data.pricing_insight.recommended_markup.toLocaleString('vi-VN')}đ)`
-                                : 'Dành cho hàng cao cấp hoặc đóng gói đặc biệt'}
-                            </p>
+                            {isPod && blankCost > 0 && (
+                              <p className="text-[10px] text-amber-800/80 font-medium">
+                                Giá phôi {blankCost.toLocaleString('vi-VN')}đ{commissionPercent ? `, đã trừ phí sàn ${commissionPercent}%` : ''}
+                              </p>
+                            )}
                           </div>
                           {isPod && onApplyMarkup && (
                             <button
@@ -590,102 +630,77 @@ export function SmartProductAiModal({
                               onClick={handleApplySingleMarkup}
                               className="w-full py-1.5 px-2 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold rounded-xl text-[11px] shadow-xs transition flex items-center justify-center cursor-pointer active:scale-95"
                             >
-                              <span>{appliedField === 'markup' ? 'Đã áp dụng markup!' : 'Áp dụng markup này'}</span>
+                              <span>{appliedField === 'markup' ? 'Đã áp dụng' : 'Áp dụng tiền lời này'}</span>
                             </button>
                           )}
                         </div>
                       </div>
 
-                      {/* BẰNG CHỨNG & SỐ LIỆU ĐỐI CHUẨN THỊ TRƯỜNG */}
-                      <div className="p-4 bg-stone-50/80 border border-stone-200 rounded-2xl space-y-3.5">
-                        <div className="flex items-center justify-between border-b border-stone-200/70 pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                              <BarChart2 size={14} />
+                      {/* CHỌN MỨC GIÁ MONG MUỐN */}
+                      {(() => {
+                        const pi = data.pricing_insight;
+                        const median = pi.price_range.median || pi.recommended_price;
+                        const options: { key: 'p25' | 'rec' | 'p50' | 'p75'; label: string; sub: string; value: number }[] = [
+                          { key: 'p25', label: 'Dễ bán', sub: '', value: pi.price_range.low },
+                          { key: 'rec', label: 'Gợi ý', sub: pi.demand_signal?.direction === 'up' ? 'Đang được tìm nhiều' : pi.demand_signal?.direction === 'down' ? 'Đang ít người tìm' : '', value: pi.recommended_price },
+                          ...(median !== pi.recommended_price ? [{ key: 'p50' as const, label: 'Trung bình', sub: '', value: median }] : []),
+                          { key: 'p75', label: 'Cao cấp', sub: '', value: pi.price_range.high },
+                        ];
+                        const shown = priceChoice === 'custom' ? (Number(customPrice) || 0) : chosenPrice;
+                        const warn = shown > 0 && blankCost > 0 && shown < blankCost
+                          ? 'Giá thấp hơn giá vốn, bạn sẽ bán lỗ.'
+                          : shown > 0 && shown < pi.price_range.low
+                            ? 'Rẻ hơn hầu hết sản phẩm tương tự.'
+                            : shown > (pi.price_range.premium || pi.price_range.high)
+                              ? 'Đắt hơn hầu hết sản phẩm tương tự.'
+                              : '';
+                        return (
+                          <div className="p-3.5 bg-white border border-stone-200 rounded-2xl space-y-2.5">
+                            <span className="text-[10.5px] font-black text-stone-700 uppercase tracking-wider block">
+                              Chọn mức giá bạn muốn
+                            </span>
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                              {options.map(o => (
+                                <button
+                                  key={o.key}
+                                  type="button"
+                                  onClick={() => selectPrice(o.key, o.value)}
+                                  className={`p-2 rounded-xl border text-left transition cursor-pointer ${priceChoice === o.key ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500' : 'border-stone-200 hover:border-emerald-300'}`}
+                                >
+                                  <span className="text-[10px] font-black text-stone-600 uppercase block">{o.label}</span>
+                                  <span className="text-sm font-black text-stone-900 block">{o.value.toLocaleString('vi-VN')}đ</span>
+                                  {o.sub && <span className="text-[9.5px] text-stone-500 block">{o.sub}</span>}
+                                </button>
+                              ))}
+                              <div className={`p-2 rounded-xl border ${priceChoice === 'custom' ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500' : 'border-stone-200'}`}>
+                                <span className="text-[10px] font-black text-stone-600 uppercase block">Tự nhập</span>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="VD: 120000"
+                                  value={customPrice}
+                                  onChange={e => {
+                                    const raw = e.target.value.replace(/\D/g, '');
+                                    setCustomPrice(raw);
+                                    selectPrice('custom', Number(raw) || 0);
+                                  }}
+                                  className="w-full mt-0.5 text-sm font-black text-stone-900 bg-transparent outline-none border-b border-stone-300 focus:border-emerald-500"
+                                />
+                                <span className="text-[9.5px] text-stone-500 block">đồng</span>
+                              </div>
                             </div>
-                            <span className="text-[11px] uppercase font-black text-stone-900 tracking-wider">
-                              Bằng chứng & Số liệu đối chuẩn thị trường
-                            </span>
+                            {warn && <p className="text-[11px] font-semibold text-amber-700">⚠ {warn}</p>}
                           </div>
-                          <span className="text-[10.5px] font-bold text-stone-500 bg-white px-2 py-0.5 rounded-md border border-stone-200 shadow-2xs">
-                            {data.pricing_insight.market_sample_count > 0 
-                              ? `Mẫu khảo sát: ${data.pricing_insight.market_sample_count} sản phẩm`
-                              : (data.pricing_insight.source_label || 'Số liệu thị trường thực tế')}
-                          </span>
-                        </div>
+                        );
+                      })()}
 
-                        {/* Thước đo phân vị giá cụ thể */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs space-y-0.5">
-                            <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider block">
-                              P25 (Giá sàn)
-                            </span>
-                            <span className="text-sm font-extrabold text-stone-800 block">
-                              {data.pricing_insight.price_range.low.toLocaleString('vi-VN')}đ
-                            </span>
-                            <span className="text-[9.5px] text-stone-500 block">Phân khúc cạnh tranh</span>
-                          </div>
-
-                          <div className="bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200 shadow-2xs space-y-0.5">
-                            <span className="text-[10px] text-emerald-800 font-black uppercase tracking-wider block">
-                              P50 (Trung vị)
-                            </span>
-                            <span className="text-sm font-black text-emerald-700 block">
-                              {data.pricing_insight.recommended_price.toLocaleString('vi-VN')}đ
-                            </span>
-                            <span className="text-[9.5px] text-emerald-800/80 font-bold block">Điểm cân bằng tối ưu</span>
-                          </div>
-
-                          <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs space-y-0.5">
-                            <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider block">
-                              P75 (Cao cấp)
-                            </span>
-                            <span className="text-sm font-extrabold text-stone-800 block">
-                              {data.pricing_insight.price_range.high.toLocaleString('vi-VN')}đ
-                            </span>
-                            <span className="text-[9.5px] text-stone-500 block">Chất lượng cao / Mall</span>
-                          </div>
-
-                          <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs space-y-0.5">
-                            <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider block">
-                              P90 (Đặc biệt)
-                            </span>
-                            <span className="text-sm font-extrabold text-amber-900 block">
-                              {(data.pricing_insight.price_range.premium || data.pricing_insight.price_range.high).toLocaleString('vi-VN')}đ
-                            </span>
-                            <span className="text-[9.5px] text-amber-700/80 block">Bản đầy đủ / Phụ kiện</span>
-                          </div>
-                        </div>
-
-                        {/* Bóc tách công thức giá vốn nếu có blankCost */}
-                        {blankCost > 0 && (
-                          <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200 text-xs flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 font-bold text-emerald-950">
-                              <Calculator size={14} className="text-emerald-700" />
-                              <span>Cấu trúc chi phí giá vốn:</span>
-                            </div>
-                            <div className="text-[11px] font-bold text-stone-700 flex items-center gap-2">
-                              <span>Giá phôi: <strong className="text-stone-900">{blankCost.toLocaleString('vi-VN')}đ</strong></span>
-                              <span>+</span>
-                              <span>Lợi nhuận gộp: <strong className="text-emerald-700">+{Math.max(0, data.pricing_insight.recommended_price - blankCost).toLocaleString('vi-VN')}đ ({Math.round(Math.max(0, data.pricing_insight.recommended_price - blankCost) / data.pricing_insight.recommended_price * 100)}%)</strong></span>
-                              <span>=</span>
-                              <span className="text-emerald-800 font-black">Giá bán {data.pricing_insight.recommended_price.toLocaleString('vi-VN')}đ</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Danh sách sản phẩm / phiên bản bằng chứng đối chiếu thực tế */}
+                      {/* Sản phẩm tương tự đang bán */}
                         {data.pricing_insight.comparables && data.pricing_insight.comparables.length > 0 && (
-                          <div className="space-y-2 pt-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10.5px] font-black text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
-                                <ShoppingBag size={12} className="text-stone-500" />
-                                Sản phẩm & phiên bản đối chiếu thực tế từ thị trường:
-                              </span>
-                              <span className="text-[10px] text-stone-500 font-medium">
-                                ({data.pricing_insight.comparables.length} sản phẩm minh chứng)
-                              </span>
-                            </div>
+                          <div className="p-3.5 bg-stone-50/80 border border-stone-200 rounded-2xl space-y-2">
+                            <span className="text-[10.5px] font-black text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
+                              <ShoppingBag size={12} className="text-stone-500" />
+                              Sản phẩm tương tự đang bán
+                            </span>
 
                             <div className="space-y-1.5">
                               {data.pricing_insight.comparables.map((item, cIdx) => (
@@ -708,7 +723,7 @@ export function SmartProductAiModal({
                                         ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                         : 'bg-sky-50 text-sky-800 border-sky-200'
                                     }`}>
-                                      {item.source?.toLowerCase() === 'tiki' ? 'Thị trường TMĐT' : (item.source || 'Thị trường TMĐT')}
+                                      {item.source?.toLowerCase().includes('vietcraft') ? 'VietCraft' : 'Sàn khác'}
                                     </span>
                                   </div>
                                 </div>
@@ -716,32 +731,6 @@ export function SmartProductAiModal({
                             </div>
                           </div>
                         )}
-
-                        {/* Tín hiệu nhu cầu tìm kiếm thực tế nếu có */}
-                        {data.pricing_insight.market_signals && data.pricing_insight.market_signals.length > 0 && (
-                          <div className="p-2.5 bg-blue-50/60 rounded-xl border border-blue-100 text-xs space-y-1">
-                            <span className="text-[10px] font-black text-blue-900 uppercase tracking-wider flex items-center gap-1">
-                              <TrendingUp size={12} className="text-blue-700" />
-                              Tín hiệu nhu cầu thực tế:
-                            </span>
-                            <div className="space-y-0.5">
-                              {data.pricing_insight.market_signals.map((sig, sIdx) => (
-                                <p key={sIdx} className="text-[11px] text-blue-950 font-medium">
-                                  • {sig}
-                                </p>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Căn cứ số liệu súc tích */}
-                        {data.pricing_insight.summary && (
-                          <div className="pt-1 text-[11px] text-stone-600 font-medium leading-relaxed border-t border-stone-200/60">
-                            <span className="font-bold text-stone-800">Căn cứ số liệu: </span>
-                            <span>{data.pricing_insight.summary}</span>
-                          </div>
-                        )}
-                      </div>
 
                       {/* Warnings if any */}
                       {data.pricing_insight.warnings && data.pricing_insight.warnings.length > 0 && (
@@ -753,30 +742,16 @@ export function SmartProductAiModal({
                           ))}
                         </div>
                       )}
-                      {/* Yếu tố cấu thành giá (nếu có) */}
-                      {data.pricing_insight.value_factors && data.pricing_insight.value_factors.length > 0 && (
-                        <div className="p-3 bg-stone-50 rounded-xl text-xs text-stone-600 flex flex-wrap items-center gap-1.5 border border-stone-200/60">
-                          <span className="text-[10.5px] font-bold text-stone-500">Yếu tố cấu thành giá:</span>
-                          {data.pricing_insight.value_factors.map((factor, fIdx) => (
-                            <span 
-                              key={fIdx}
-                              className="inline-flex items-center text-[10px] font-bold bg-amber-100/70 text-amber-900 border border-amber-200 px-2 py-0.5 rounded-md"
-                            >
-                              {factor}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </>
                   )}
                 </div>
               )}
 
-              {/* SECTION 4: Gợi Ý Mô Tả & Thẻ Tags */}
+              {/* SECTION 4: Mô tả */}
               <div className="bg-white p-4.5 rounded-2xl border border-stone-200/80 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black text-stone-900 uppercase tracking-wider">
-                    Mô Tả Sản Phẩm & Thẻ Tags Tối Ưu
+                    Mô tả sản phẩm
                   </h4>
                   <div className="flex items-center gap-2">
                     <button
@@ -792,7 +767,7 @@ export function SmartProductAiModal({
                         onClick={handleApplySingleDescription}
                         className="text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition cursor-pointer"
                       >
-                        <span>{appliedField === 'desc' ? 'Đã áp dụng mô tả!' : 'Áp dụng vào form'}</span>
+                        <span>{appliedField === 'desc' ? 'Đã áp dụng' : 'Áp dụng vào form'}</span>
                       </button>
                     )}
                   </div>
@@ -818,7 +793,7 @@ export function SmartProductAiModal({
             onClick={onClose}
             className="px-4 py-2 text-xs font-bold text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition cursor-pointer"
           >
-            {mode === 'inline' ? 'Thu gọn trợ lý' : 'Đóng'}
+            {mode === 'inline' ? 'Thu gọn' : 'Đóng'}
           </button>
 
           <button
@@ -827,7 +802,7 @@ export function SmartProductAiModal({
             disabled={!data || loading}
             className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <span>Áp Dụng Tất Cả Vào Form</span>
+            <span>Áp dụng tất cả vào form</span>
           </button>
         </div>
 

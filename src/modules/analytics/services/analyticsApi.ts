@@ -96,9 +96,38 @@ export const analyticsApi = {
     const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
     return res.data?.data;
   },
+
+  /** Ảnh sản phẩm (tối đa 6 data URL đã thu nhỏ, cùng sản phẩm) → tên gợi ý, danh mục, chất liệu, các màu. */
+  async recognizeProductImage(imageDataUrls: string[]): Promise<ImageRecognitionResult> {
+    const res = await api.post(`${BASE}/product/recognize-image`, { images: imageDataUrls.slice(0, 6) }, { timeout: 50000 });
+    return res.data?.data;
+  },
 };
 
+export interface ImageRecognitionResult {
+  is_product: boolean;
+  product_name: string;
+  product_type: string;
+  category: string | null;
+  materials: string[];
+  colors: { name: string; hex: string }[];
+  brand: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  notes: string;
+}
+
 export interface SmartProductSuggestionResult {
+  /** Kết quả AI lọc tiêu đề seller nhập: tiêu đề sạch, thuộc tính đã tách, cụm quảng cáo đã bỏ, điều nên sửa */
+  input_analysis?: {
+    raw_title: string;
+    clean_title: string;
+    pricing_query: string;
+    quantity: number;
+    condition: 'new' | 'used';
+    attributes: Record<string, string>;
+    removed: string[];
+    issues: string[];
+  };
   category_detected: string;
   category?: {
     resolved_id?: string;
@@ -134,6 +163,7 @@ export interface SmartProductSuggestionResult {
       segment?: string;
     }>;
     market_signals?: string[];
+    demand_signal?: { keyword: string; momentum: number; direction: 'up' | 'down' | 'flat' } | null;
     evidence_stats?: {
       sample_size?: number;
       p25?: number;

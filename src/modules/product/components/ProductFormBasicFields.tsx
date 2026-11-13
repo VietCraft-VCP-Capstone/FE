@@ -171,20 +171,6 @@ export function ProductFormBasicFields({
         {errors.stock && <p className="text-xs text-rose-500">{errors.stock}</p>}
       </div>
 
-      {/* Material */}
-      <div className="space-y-1.5">
-        <label className={LABEL_CLASS}>
-          Chất liệu sản phẩm
-        </label>
-        <input
-          type="text"
-          placeholder="VD:Lụa tơ tằm, Gỗ hương..."
-          value={formData.material || ''}
-          onChange={(e) => onPatch({ material: e.target.value })}
-          className="w-full px-3.5 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700]"
-        />
-      </div>
-
       {/* Location */}
       <div className="space-y-1.5">
         <label className={LABEL_CLASS}>
