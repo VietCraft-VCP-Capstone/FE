@@ -109,10 +109,10 @@ function ListingDetail({ id }: { id: string }) {
   return (
     <HealthTheme>
       <InsightPage
-        title="Chất lượng tin đăng"
+        title="Tối ưu sản phẩm"
         question={QUESTION}
         actions={actions}
-        breadcrumb={[{ label: 'Sức khoẻ sản phẩm', to: `${INSIGHTS_ROOT}/listings` }, { label: productTitle }]}
+        breadcrumb={[{ label: 'Tối ưu sản phẩm', to: `${INSIGHTS_ROOT}/listings` }, { label: productTitle }]}
         header={
           <header className="mb-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-stone-200/80 pb-4">
@@ -300,7 +300,7 @@ function ListingDetail({ id }: { id: string }) {
                     <div className="flex items-center gap-2">
                       <Sparkles size={16} className="text-[#007700]" />
                       <span className="font-jakarta font-bold text-stone-900">
-                        Cách tính điểm sức khoẻ tin đăng
+                        Cách tính điểm tối ưu sản phẩm
                       </span>
                     </div>
                   }

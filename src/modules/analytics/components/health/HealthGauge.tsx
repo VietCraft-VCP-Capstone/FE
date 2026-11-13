@@ -38,10 +38,10 @@ export function HealthGauge({
     : 'bg-rose-50 text-[#BA1A1A] border border-rose-200';
 
   const statusTooltip = isGood
-    ? 'Tin đăng đạt từ 80 điểm trở lên: Đầy đủ ảnh, mô tả, từ khoá và giá hợp lý.'
+    ? 'Sản phẩm đạt từ 80 điểm trở lên: Đầy đủ ảnh, mô tả, từ khoá và giá hợp lý.'
     : isFair
-    ? 'Tin đăng đạt từ 50 đến 79 điểm: Cần bổ sung thêm một số thông tin để thu hút khách.'
-    : 'Tin đăng dưới 50 điểm: Còn thiếu nhiều thông tin cơ bản, nên ưu tiên sửa ngay.';
+    ? 'Sản phẩm đạt từ 50 đến 79 điểm: Cần bổ sung thêm một số thông tin để thu hút khách.'
+    : 'Sản phẩm dưới 50 điểm: Còn thiếu nhiều thông tin cơ bản, nên ưu tiên sửa ngay.';
 
   return (
     <div className="flex h-full flex-col justify-between">
@@ -57,9 +57,9 @@ export function HealthGauge({
               <AlertCircle size={14} className="text-[#BA1A1A]" />
             )}
             <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
-              Điểm chất lượng tin đăng
+              Điểm tối ưu sản phẩm
             </span>
-            <Tooltip title="Đo lường độ chỉn chu của bài đăng qua 6 tiêu chuẩn: ảnh, mô tả, từ khoá, chất liệu, đánh giá và giá cả. Điểm càng cao thì sản phẩm càng dễ tiếp cận khách hàng và tăng cơ hội bán được hàng.">
+            <Tooltip title="Đo lường độ tối ưu của sản phẩm qua 6 tiêu chuẩn: ảnh, mô tả, từ khoá, chất liệu, đánh giá và giá cả. Điểm càng cao thì sản phẩm càng dễ tiếp cận khách hàng và tăng cơ hội bán được hàng.">
               <Info size={11} className="text-stone-300 hover:text-stone-600 transition-colors cursor-help" />
             </Tooltip>
           </div>
@@ -147,7 +147,7 @@ export function HealthGauge({
               </Tooltip>
 
               {gain > 0 && (
-                <Tooltip title={`Hoàn thành các gợi ý bên cạnh có thể nâng điểm lên khoảng ${Math.min(100, Math.round(potential ?? 100))}/100, giúp bài đăng hoàn thiện và uy tín hơn.`}>
+                <Tooltip title={`Hoàn thành các gợi ý bên cạnh có thể nâng điểm lên khoảng ${Math.min(100, Math.round(potential ?? 100))}/100, giúp sản phẩm hoàn thiện và uy tín hơn.`}>
                   <span className="cursor-help rounded bg-[#EAF0E2] px-2 py-0.5 text-[11px] font-semibold text-[#007700] border border-[#BECAB6] transition-all duration-200 hover:scale-105 active:scale-95 animate-pulse-subtle">
                     Có thể đạt {Math.min(100, Math.round(potential ?? 100))}/100
                   </span>

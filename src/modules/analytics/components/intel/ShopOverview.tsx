@@ -48,7 +48,7 @@ export function ShopOverview({
                 <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
                   Điểm TB toàn shop
                 </span>
-                <Tooltip title="Điểm trung bình chất lượng tin đăng của tất cả các sản phẩm trong gian hàng.">
+                <Tooltip title="Điểm trung bình tối ưu sản phẩm của tất cả các sản phẩm trong gian hàng.">
                   <Info size={11} className="text-stone-300 hover:text-stone-600 cursor-help" />
                 </Tooltip>
               </div>

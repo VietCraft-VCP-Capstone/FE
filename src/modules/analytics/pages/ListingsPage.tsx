@@ -28,7 +28,7 @@ function summary(state: InsightState<ListingHealthList>): string {
 
 const ABOUT = (
   <>
-    <strong>Sức khoẻ sản phẩm cho biết sản phẩm nào đăng chưa tốt và nên sửa gì trước.</strong>
+    <strong>Điểm tối ưu sản phẩm cho biết sản phẩm nào chưa tối ưu tốt và nên sửa gì trước để hút khách.</strong>
     <ul className="m-0 mt-1.5 list-disc space-y-1 pl-4">
       <li>Mỗi sản phẩm có điểm 0 đến 100 từ 6 tiêu chuẩn: ảnh, mô tả, từ khoá, chất liệu, đánh giá và giá cả. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Cần chú ý.</li>
       <li>Yếu tố chưa có dữ liệu được 0 điểm; điểm tối đa của các yếu tố khác giữ nguyên.</li>
@@ -110,14 +110,14 @@ export function ListingsPage() {
   return (
     <HealthTheme>
       <InsightPage
-        title="Sức khoẻ sản phẩm"
+        title="Tối ưu sản phẩm"
         info={ABOUT}
         question={view === 'ranking' ? 'Xếp hạng giữa các sản phẩm trong shop bạn và gợi ý để có thêm khách. Cột Hạng toàn sàn chỉ cho biết vị trí so với sản phẩm cùng danh mục của mọi shop.' : summary(health.state)}
       >
         <Tabs
           activeKey={view}
           onChange={key => setParams(key === 'ranking' ? new URLSearchParams({ view: 'ranking' }) : new URLSearchParams(), { replace: true })}
-          items={[{ key: 'health', label: 'Điểm sức khoẻ & việc cần làm' }, { key: 'ranking', label: 'Bảng xếp hạng' }]}
+          items={[{ key: 'health', label: 'Điểm tối ưu & việc cần làm' }, { key: 'ranking', label: 'Bảng xếp hạng' }]}
           className="!-mb-1"
         />
         {view === 'ranking' ? (

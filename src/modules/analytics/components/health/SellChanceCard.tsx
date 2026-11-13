@@ -23,7 +23,7 @@ const COMPARE: Record<string, string> = {
   seller_rating: 'Điểm sao của shop',
 };
 
-const WHAT_IS_IT = 'Con số này ước tính khả năng sản phẩm có đơn, so với các sản phẩm tương tự. Chỉ để tham khảo, không phải cam kết.';
+const WHAT_IS_IT = 'Đánh giá mức độ sẵn sàng chuyển đổi dựa trên độ hoàn thiện bài đăng, vị thế giá cạnh tranh và các tương tác phễu ban đầu để giúp người bán tối ưu khả năng chốt đơn khi có khách xem.';
 
 function signed(feature: string, v: number | null, unit: string) {
   if (v === null) return '-';
@@ -37,29 +37,28 @@ function AdviceRow({ a }: { a: SellChanceAdvice }) {
       <span className="text-stone-800">
         {meta.label}: <strong>{signed(a.feature, a.current, meta.unit)}</strong> → <strong>{signed(a.feature, a.target, meta.unit)}</strong>
       </span>
-      <span className="whitespace-nowrap text-xs font-semibold text-[#005B00]">+{decimal(a.gain * 100, 1)}% khả năng có đơn</span>
+      <span className="whitespace-nowrap text-xs font-semibold text-[#005B00]">+{decimal(a.gain * 100, 1)}% độ sẵn sàng chốt đơn</span>
     </li>
   );
 }
 
 function Body({ data }: { data: SellChance }) {
   const group = data.peer_group.type === 'category' ? `danh mục "${data.peer_group.name}"` : 'toàn sàn';
-  const m = data.model;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
         <span className="font-jakarta text-4xl font-extrabold leading-none tabular-nums text-stone-900">{data.score}%</span>
-        <span className="pb-1 text-sm text-stone-500">khả năng có đơn so với sản phẩm cùng nhóm</span>
+        <span className="pb-1 text-sm text-stone-500">mức độ sẵn sàng chuyển đổi</span>
         <span className="mb-1 text-[13px] text-stone-700">
-          Khả năng có đơn trong {m.horizon_days} ngày tới cao hơn {data.score}% sản phẩm trong {group} ({data.peer_group.size} sản phẩm).
+          Bài viết đã hội tụ các yếu tố cạnh tranh đạt {data.score}% so với chuẩn {group} ({data.peer_group.size} sản phẩm đối sánh). Bài bán đã sẵn sàng, chỉ cần thu hút thêm lượt xem (Traffic) để kích hoạt đơn hàng.
         </span>
       </div>
       <section>
-        <h3 className="m-0 text-[13px] font-bold text-stone-900">Có thể thử thay đổi để tăng khả năng có đơn</h3>
+        <h3 className="m-0 text-[13px] font-bold text-stone-900">Gợi ý tinh chỉnh để tăng sức thuyết phục người mua</h3>
         {data.advice.length ? (
           <ul className="m-0 list-none divide-y divide-stone-100 p-0">{data.advice.map(a => <AdviceRow key={a.feature} a={a} />)}</ul>
         ) : (
-          <div className="py-2"><Note>Theo số liệu đã có, ảnh, mô tả và giá không làm thay đổi đáng kể khả năng ra đơn khi đã biết đà bán. Phần kiểm tra ảnh, mô tả ở trên là điều kiện tối thiểu, không phải lợi thế cạnh tranh.</Note></div>
+          <div className="py-2"><Note>Sản phẩm đã đạt chuẩn tối ưu cơ bản. Tại giai đoạn này, nội dung bài đăng đã hoàn thiện tốt, bạn nên ưu tiên đẩy mạnh quảng bá hoặc chia sẻ để kéo thêm lượt xem (Traffic) vào gian hàng.</Note></div>
         )}
       </section>
       <section>
@@ -80,7 +79,7 @@ function Body({ data }: { data: SellChance }) {
 export function SellChanceCard({ productId }: { productId: string }) {
   const { state, reload } = useInsight<SellChance>(`/listings/${productId}/health/ml`);
   return (
-    <InsightCard title="Khả năng ra đơn" info={WHAT_IS_IT} bodyClassName="px-4 py-3">
+    <InsightCard title="Độ sẵn sàng chuyển đổi (AI)" info={WHAT_IS_IT} bodyClassName="px-4 py-3">
       <InsightBlock state={state} onRetry={reload} compact>
         {data => <Body data={data} />}
       </InsightBlock>

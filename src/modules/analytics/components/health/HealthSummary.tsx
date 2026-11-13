@@ -10,7 +10,7 @@ export function HealthSummary({ data }: { data: ListingHealth }) {
   if (data.score === null) {
     return (
       <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs text-center text-sm text-stone-500">
-        Chưa đủ dữ liệu để chấm điểm sức khoẻ sản phẩm này.
+        Chưa đủ dữ liệu để tính điểm tối ưu cho sản phẩm này.
       </div>
     );
   }
@@ -81,10 +81,10 @@ export function HealthSummary({ data }: { data: ListingHealth }) {
               </span>
             </div>
             <h3 className="m-0 mt-2 font-jakarta text-lg font-bold text-stone-900">
-              Điểm sức khoẻ tin đăng
+              Điểm tối ưu sản phẩm
             </h3>
             <p className="m-0 mt-0.5 max-w-sm text-xs leading-relaxed text-stone-500">
-              Đánh giá chất lượng hình ảnh, nội dung, tag, đánh giá và giá cả so với tiêu chuẩn sàn.
+              Đánh giá mức độ tối ưu hình ảnh, nội dung, tag, đánh giá và giá cả so với tiêu chuẩn sàn.
             </p>
           </div>
         </div>

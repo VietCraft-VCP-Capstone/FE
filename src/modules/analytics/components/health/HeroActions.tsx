@@ -140,7 +140,6 @@ export function HeroActions({ data, productId }: HeroActionsProps) {
         setAuditData(res.data);
       }
     } catch {
-      // silently handle
     } finally {
       setAuditLoading(false);
     }
@@ -160,7 +159,6 @@ export function HeroActions({ data, productId }: HeroActionsProps) {
         setAuditData(res.data);
       }
     } catch {
-      // silently handle
     } finally {
       setRechecking(false);
     }

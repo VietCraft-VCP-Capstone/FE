@@ -98,7 +98,7 @@ function TodoItemRow({
                   +{decimal(item.impact, 1)} pts
                 </div>
                 <p className="m-0 mt-1 text-[11px] text-stone-500">
-                  Cộng trực tiếp vào điểm sức khoẻ sau khi cập nhật
+                  Cộng trực tiếp vào điểm tối ưu sau khi cập nhật
                 </p>
               </div>
 
