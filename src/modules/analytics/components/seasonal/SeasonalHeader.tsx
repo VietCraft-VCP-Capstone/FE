@@ -1,4 +1,4 @@
-import { CheckCircle2, Store } from 'lucide-react';
+import { CheckCircle2, RotateCw, Store } from 'lucide-react';
 import type { SeasonalCampaign } from '../../types';
 import { Chip } from '../ui';
 import { getCampaignLucideIcon } from './SeasonalMonthMatrix';
@@ -17,6 +17,7 @@ interface SeasonalHeaderProps {
   onSelectCategory: (slug: string) => void;
   activeCamp?: SeasonalCampaign;
   savedIdeasCount: number;
+  onReload?: () => void;
 }
 
 export function SeasonalHeader({
@@ -26,6 +27,7 @@ export function SeasonalHeader({
   onSelectCategory,
   activeCamp,
   savedIdeasCount,
+  onReload,
 }: SeasonalHeaderProps) {
   return (
     <div className="space-y-4">
@@ -45,13 +47,25 @@ export function SeasonalHeader({
               </span>
             </div>
             <p className="mt-0.5 text-xs text-stone-500">
-              Ngành hàng trọng tâm: {categoryName || 'Thời trang Nữ & Set may mặc'} · Kết hợp xu hướng tìm kiếm và doanh số thực tế
+              Ngành hàng: {categoryName || 'Thời trang Nữ & Set may mặc'}
             </p>
           </div>
         </div>
 
-        {/* Dropdown chọn ngành hàng */}
+        {/* Dropdown chọn ngành hàng & Nút đồng bộ */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          {onReload && (
+            <button
+              type="button"
+              onClick={onReload}
+              className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 hover:border-[#007700] hover:text-[#007700] transition shadow-xs cursor-pointer"
+              title="Đồng bộ ngay dữ liệu đơn hàng mới nhất từ database"
+            >
+              <RotateCw className="h-3.5 w-3.5 text-[#007700]" />
+              <span>Đồng bộ đơn mới</span>
+            </button>
+          )}
+
           <select
             aria-label="Chọn ngành hàng"
             value={categorySlug}

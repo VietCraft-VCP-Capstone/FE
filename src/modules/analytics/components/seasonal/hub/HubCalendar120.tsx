@@ -48,12 +48,7 @@ export const HubCalendar120: React.FC<Props> = ({
           <span className="p-1.5 rounded-lg bg-emerald-50 text-[#007700]">
             <Calendar size={16} />
           </span>
-          <div>
-            <h3 className="font-bold text-stone-900 text-sm">Lịch 120 ngày tới &amp; 4 giai đoạn chuẩn</h3>
-            <p className="text-xs text-stone-500">
-              Chuẩn bị hàng → Tăng tốc → Cao điểm → Hạn chốt đơn (suy từ đường đơn thực tế các kỳ trước)
-            </p>
-          </div>
+          <h3 className="font-bold text-stone-900 text-sm">Lịch sự kiện 120 ngày tới</h3>
         </div>
       </div>
 

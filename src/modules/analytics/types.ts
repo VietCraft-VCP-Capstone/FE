@@ -795,9 +795,87 @@ export interface SeasonalCampaign {
     advice: string;
     calculation_basis: string;
     cta_label: string;
-    target_tab: 'potential' | 'readiness' | 'traits' | 'timeline' | 'hub' | 'trial';
+    target_tab: 'potential' | 'readiness' | 'traits' | 'timeline' | 'hub' | 'trial' | 'act1' | 'act2' | 'act3';
     is_urgent: boolean;
   };
+}
+
+export interface OpportunityKeywordItem {
+  id: string;
+  tag: string;
+  volume: number;
+  volume_level: 'high' | 'medium' | 'low';
+  competition: number;
+  competition_level: 'high' | 'medium' | 'low';
+  keyword_score: number;
+  listing_type?: 'physical' | 'pod' | 'custom' | string;
+  customizable?: boolean;
+  when_made?: string;
+  avg_price_vnd?: number;
+  conversion_rate_pct?: number;
+  is_starred?: boolean;
+  is_in_shop?: boolean;
+  matched_product?: {
+    id: string;
+    title: string;
+    images?: any[];
+  };
+  evidence?: any;
+}
+
+export interface CampaignFunnel {
+  impressions: number;
+  clicks: number;
+  ctr_pct: number;
+  ctr_vs_baseline_pct?: number;
+  cart_adds: number;
+  cart_rate_pct: number;
+  orders: number;
+  conversion_rate_pct: number;
+  pv_uv_ratio?: number;
+  actual?: {
+    orders: number;
+    gmv_vnd?: number;
+    orders_progress_pct?: number;
+    remaining_orders?: number;
+    impressions?: number;
+    clicks?: number;
+    cart_adds?: number;
+  };
+}
+
+export interface ChannelSampleOrder {
+  order_code: string;
+  created_at?: string;
+  total_amount?: number;
+  item_summary?: string;
+  attribution_reason?: string;
+}
+
+export interface ChannelBreakdownItem {
+  channel_key: string;
+  name: string;
+  share_pct: number;
+  gmv_vnd: number;
+  orders_count: number;
+  sku_orders: number;
+  items_sold: number;
+  aov_vnd: number;
+  growth_pct?: number | null;
+  action_tip: string;
+  source_type?: 'shop_actual' | 'industry_benchmark';
+  criteria_rule?: string;
+  sample_orders?: ChannelSampleOrder[];
+  action_checklist?: string[];
+}
+
+export interface MotivationBreakdown {
+  gift_purchases_pct: number;
+  self_purchases_pct: number;
+  top_reasons: { reason: string; pct: number }[];
+  source_type?: 'shop_actual' | 'industry_benchmark';
+  sample_size?: number;
+  source_description?: string;
 }
 
 export interface SeasonalForecast {
@@ -811,6 +889,10 @@ export interface SeasonalForecast {
   measured_cycles?: number;
   route_risks?: any[];
   scorecard_metrics?: any[];
+  opportunity_keywords?: OpportunityKeywordItem[];
+  campaign_funnel?: CampaignFunnel;
+  channel_breakdown?: ChannelBreakdownItem[];
+  motivation_breakdown?: MotivationBreakdown;
   saved_ideas?: string[];
   checked_milestones?: Record<string, boolean>;
   events: SeasonalEvent[];

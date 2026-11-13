@@ -24,7 +24,7 @@ export const HubKpiStrip: React.FC<Props> = ({ kpis, onOpenEvidence, className =
             <span className="p-1.5 rounded-lg bg-emerald-50 text-[#007700]">
               <CalendarClock size={16} />
             </span>
-            <span className="font-semibold text-stone-700">Dịp cần làm 14 ngày tới</span>
+            <span className="font-semibold text-stone-700">Cần triển khai (14 ngày)</span>
           </div>
           <EvidenceTrigger evidence={kpis.actionsDue14d.evidence} onOpen={onOpenEvidence} />
         </div>
@@ -43,7 +43,7 @@ export const HubKpiStrip: React.FC<Props> = ({ kpis, onOpenEvidence, className =
           <span className="rounded bg-stone-100 px-1.5 py-0.5 text-stone-600 font-medium">
             {kpis.actionsDue14d.label === 'observed' ? 'Quan sát' : 'Quy tắc'}
           </span>
-          <span className="text-stone-400">Hạn chốt đơn sắp đến</span>
+          <span className="text-stone-400">Hạn chốt gần</span>
         </div>
       </div>
 
@@ -54,7 +54,7 @@ export const HubKpiStrip: React.FC<Props> = ({ kpis, onOpenEvidence, className =
             <span className="p-1.5 rounded-lg bg-sky-50 text-sky-700">
               <ShieldCheck size={16} />
             </span>
-            <span className="font-semibold text-stone-700">Dịp dự báo đáng tin</span>
+            <span className="font-semibold text-stone-700">Độ tin cậy cao</span>
           </div>
           <EvidenceTrigger evidence={kpis.reliableOccasionsCount.evidence} onOpen={onOpenEvidence} />
         </div>
@@ -71,18 +71,18 @@ export const HubKpiStrip: React.FC<Props> = ({ kpis, onOpenEvidence, className =
         </div>
         <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
           <span className="rounded bg-sky-50 text-sky-700 px-1.5 py-0.5 font-medium">Mức Cao / Khá</span>
-          <span className="text-stone-400">Đã kiểm chứng ≥2 kỳ</span>
+          <span className="text-stone-400">Kiểm chứng ≥2 kỳ</span>
         </div>
       </div>
 
-      {/* 3. Độ ổn định chu kỳ tìm kiếm (Trình bày lại dễ hiểu từ sai số phần dư STL) */}
+      {/* 3. Độ ổn định chu kỳ tìm kiếm */}
       <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm flex flex-col justify-between hover:border-stone-300 transition-colors">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2 text-stone-500 text-xs">
             <span className="p-1.5 rounded-lg bg-purple-50 text-purple-700">
               <Target size={16} />
             </span>
-            <span className="font-semibold text-stone-700">Độ ổn định chu kỳ tìm kiếm</span>
+            <span className="font-semibold text-stone-700">Độ ổn định chu kỳ</span>
           </div>
           <EvidenceTrigger evidence={kpis.previousErrorPct.evidence} onOpen={onOpenEvidence} />
         </div>
@@ -99,7 +99,7 @@ export const HubKpiStrip: React.FC<Props> = ({ kpis, onOpenEvidence, className =
         </div>
         <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
           <span className="rounded bg-purple-50 text-purple-700 px-1.5 py-0.5 font-medium">Ổn định cao</span>
-          <span className="text-stone-400">Theo chu kỳ Google Trends</span>
+          <span className="text-stone-400">Dữ liệu đa kỳ</span>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Compass, HelpCircle, ShoppingBag, TrendingUp, Users } from 'lucide-react';
+import { Compass, ShoppingBag, TrendingUp, Users } from 'lucide-react';
 import type { Evidence, OpportunityCluster } from '../../../types/evidence';
 import { EvidenceTrigger } from '../../evidence/EvidenceTrigger';
 import { OpportunityProductDetailModal } from './OpportunityProductDetailModal';
@@ -31,12 +31,9 @@ export const HubOpportunities: React.FC<Props> = ({
               <Compass size={16} />
             </span>
             <h3 className="font-bold text-stone-900 text-sm">
-              Nhóm sản phẩm nên cân nhắc (Ma trận Cơ hội &amp; Cạnh tranh)
+              Sản phẩm tiềm năng theo phân khúc
             </h3>
           </div>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Gom nhóm theo ảnh và tiêu đề sản phẩm trên sàn VietCraft · Đánh giá mức độ cạnh tranh
-          </p>
         </div>
 
         {/* Bộ lọc 4 ô */}
@@ -97,7 +94,7 @@ export const HubOpportunities: React.FC<Props> = ({
                     {cluster.platform && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
                         <ShoppingBag size={10} />
-                        {cluster.platform} · Đang bán
+                        {cluster.platform}
                       </span>
                     )}
                   </div>
@@ -179,12 +176,6 @@ export const HubOpportunities: React.FC<Props> = ({
                   </span>
                 </div>
               )}
-
-              {/* Chú thích phương pháp gom nhóm */}
-              <div className="text-[10px] text-stone-400 flex items-center gap-1 pt-1">
-                <HelpCircle size={11} />
-                <span>{cluster.clusteringMethod}</span>
-              </div>
             </div>
           );
         })}

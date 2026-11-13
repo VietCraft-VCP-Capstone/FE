@@ -44,19 +44,14 @@ export const HubRisksAndScorecard: React.FC<Props> = ({
             <span className="p-1 rounded-md bg-amber-50 text-amber-700">
               <Truck size={16} />
             </span>
-            <div>
-              <h3 className="font-bold text-stone-900 text-sm">Rủi ro giao hàng theo tuyến</h3>
-              <p className="text-xs text-stone-500">
-                Thống kê đơn trễ &amp; hủy ở các dịp trước (tối thiểu 50 đơn/tuyến)
-              </p>
-            </div>
+            <h3 className="font-bold text-stone-900 text-sm">Rủi ro giao hàng theo tuyến</h3>
           </div>
         </div>
 
         <div className="space-y-2.5">
           {risks.length === 0 ? (
             <div className="rounded-xl border border-dashed border-stone-200 p-4 text-center text-xs text-stone-500">
-              Chưa phát hiện rủi ro quá tải hoặc chậm trễ bất thường trên các tuyến vận chuyển chính trong dịp này.
+              Chưa ghi nhận rủi ro chậm trễ bất thường trên các tuyến chính.
             </div>
           ) : (
             risks.map((risk, i) => (
@@ -106,19 +101,14 @@ export const HubRisksAndScorecard: React.FC<Props> = ({
             <span className="p-1 rounded-md bg-purple-50 text-purple-700">
               <Award size={16} />
             </span>
-            <div>
-              <h3 className="font-bold text-stone-900 text-sm">Dự báo đúng đến đâu (Bảng chấm điểm)</h3>
-              <p className="text-xs text-stone-500">
-                Công khai kết quả thử nghiệm trên các dịp đã qua để seller tự kiểm chứng
-              </p>
-            </div>
+            <h3 className="font-bold text-stone-900 text-sm">Độ chính xác dự báo (Scorecard)</h3>
           </div>
         </div>
 
         <div className="space-y-3">
           {scorecard.length === 0 ? (
             <div className="rounded-xl border border-dashed border-stone-200 p-4 text-center text-xs text-stone-500">
-              Đang đối soát số liệu thực tế sau chu kỳ cao điểm để cập nhật bảng điểm dự báo.
+              Đang tổng hợp dữ liệu đối soát sau kỳ cao điểm.
             </div>
           ) : (
             scorecard.map((item, i) => (
@@ -130,7 +120,7 @@ export const HubRisksAndScorecard: React.FC<Props> = ({
                   <div>
                     <h4 className="font-bold text-stone-900 text-sm">{item.title}</h4>
                     <span className="text-[11px] text-stone-400">
-                      Đã kiểm nghiệm trên {item.totalEvaluatedCases} dịp mua sắm thực tế
+                      Đánh giá trên {item.totalEvaluatedCases} dịp mua sắm
                     </span>
                   </div>
                   <EvidenceTrigger evidence={item.evidence} onOpen={onOpenEvidence} />
@@ -141,7 +131,7 @@ export const HubRisksAndScorecard: React.FC<Props> = ({
                     {item.actualRatePct}%
                   </span>
                   <span className="text-stone-500 text-xs">
-                    (Mục tiêu cam kết: {item.targetRatePct}%)
+                    (Mục tiêu: {item.targetRatePct}%)
                   </span>
                 </div>
 

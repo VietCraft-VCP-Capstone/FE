@@ -25,9 +25,6 @@ interface Props {
 
 export const OccasionTraitChart: React.FC<Props> = ({
   occasionName,
-  categoryName = 'Thời trang & Thủ công',
-  measuredCycles = 2,
-  sampleSizeN = 1840,
   traits,
   onOpenEvidence,
   className = '',
@@ -72,25 +69,14 @@ export const OccasionTraitChart: React.FC<Props> = ({
     return [...traits].sort((a, b) => b.percentileRank - a.percentileRank)[0];
   }, [traits]);
 
-  const effectiveN = traits?.[0]?.evidence?.n ?? sampleSizeN ?? 1200;
-  const effectiveCycles = measuredCycles ?? 2;
-
   return (
     <div className={`rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-6 ${className}`}>
       {/* 1. Tiêu đề khối & Nguồn xác nhận */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-stone-100 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-stone-100 pb-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-stone-900 text-base">
-              Đặc điểm mua sắm của dịp {occasionName}
-            </h3>
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200">
-              Quan sát thực tế
-            </span>
-          </div>
-          <p className="text-xs text-stone-500 mt-0.5">
-            So với các dịp khác · Ngành {categoryName} · {effectiveCycles} kỳ gần nhất · n = {effectiveN.toLocaleString('vi-VN')} đơn
-          </p>
+          <h3 className="font-bold text-stone-900 text-base">
+            Đặc điểm mua sắm của dịp {occasionName}
+          </h3>
         </div>
       </div>
 
@@ -217,11 +203,6 @@ export const OccasionTraitChart: React.FC<Props> = ({
             })}
           </svg>
         </div>
-
-        {/* Dòng hướng dẫn chuẩn theo mục 9.2 */}
-        <p className="text-center text-xs text-stone-500 max-w-lg mt-3 bg-stone-50 border border-stone-200/60 rounded-xl px-4 py-2.5 leading-relaxed">
-          <strong className="text-stone-700">Cách đọc biểu đồ:</strong> Rê chuột vào từng trục để xem số liệu thật và gợi ý hành động. Vị trí 80 nghĩa là dịp này cao hơn 80% các dịp khác ở đặc điểm đó.
-        </p>
       </div>
 
       {/* 2.5 Khối giải thích chi tiết khi rê chuột vào trục biểu đồ */}
@@ -237,7 +218,7 @@ export const OccasionTraitChart: React.FC<Props> = ({
                 </span>
                 <div>
                   <span className="text-xs font-bold text-stone-900">
-                    {activeTrait.name} {hoveredIndex !== null ? '· Đang xem giải thích' : '· Đặc điểm nổi bật nhất'}
+                    {activeTrait.name} {hoveredIndex === null ? '· Nổi bật nhất' : ''}
                   </span>
                   <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-[#007700]">
                     Cao hơn {Math.round(activeTrait.percentileRank)}% các dịp khác
@@ -256,9 +237,9 @@ export const OccasionTraitChart: React.FC<Props> = ({
               <div className="flex items-start gap-2 text-stone-700">
                 <HelpCircle size={15} className="mt-0.5 shrink-0 text-stone-400" />
                 <div>
-                  <strong className="text-stone-900">Ý nghĩa chỉ số:</strong> {activeTrait.question}
+                  <strong className="text-stone-900">Ý nghĩa:</strong> {activeTrait.question}
                   <div className="text-[11px] text-stone-500 mt-0.5">
-                    Căn cứ: {activeTrait.evidence?.sources?.join(', ') || 'Đơn hàng thực tế trên sàn VietCraft'}
+                    Nguồn: {activeTrait.evidence?.sources?.join(', ') || 'Đơn hàng sàn VietCraft'}
                   </div>
                 </div>
               </div>
@@ -266,7 +247,7 @@ export const OccasionTraitChart: React.FC<Props> = ({
               <div className="flex items-start gap-2 text-emerald-950 bg-white/80 rounded-lg p-2.5 border border-emerald-200/60 shadow-2xs">
                 <Lightbulb size={15} className="mt-0.5 shrink-0 text-emerald-700" />
                 <div>
-                  <strong className="text-emerald-900">Gợi ý người bán nên làm:</strong>{' '}
+                  <strong className="text-emerald-900">Hành động gợi ý:</strong>{' '}
                   {activeTrait.actionableAdvice || TRAIT_ACTIONABLE_ADVICE[activeTrait.key] || 'Chuẩn bị sản phẩm và kế hoạch đăng bán sớm.'}
                 </div>
               </div>
@@ -275,14 +256,14 @@ export const OccasionTraitChart: React.FC<Props> = ({
         );
       })()}
 
-      {/* 3. Bảng số thật so với ngày thường (Mục 9.2 & 9.5) */}
+      {/* 3. Bảng số thật so với ngày thường */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider">
-            Chi tiết số thật &amp; So sánh với ngày thường
+            So sánh chi tiết với ngày thường
           </h4>
           <span className="text-[11px] text-stone-500">
-            Ngày thường = 8 tuần ngay trước dịp, không có sự kiện
+            Cơ sở: 8 tuần trước sự kiện
           </span>
         </div>
 
@@ -354,12 +335,12 @@ export const OccasionTraitChart: React.FC<Props> = ({
         {/* Tóm tắt tự động */}
         {topTrait && (
           <div className="rounded-xl bg-amber-50/70 border border-amber-200/80 p-3 text-xs text-amber-950 flex items-start gap-2">
-            <span className="font-bold shrink-0">Tóm tắt tự động:</span>
+            <span className="font-bold shrink-0">Kết luận:</span>
             <span>
               Dịp <strong>{occasionName}</strong> có đặc tính nổi bật nhất là{' '}
               <strong>{topTrait.name.toLowerCase()}</strong> ({topTrait.diffText}), cao hơn{' '}
               <strong>{Math.round(topTrait.percentileRank)}%</strong> các dịp mua sắm khác trong năm.
-              Khuyến nghị chuẩn bị nguồn hàng và kế hoạch đăng bán trước để tận dụng lợi thế này.
+              Khuyến nghị chuẩn bị hàng và đăng bán sớm để tận dụng lợi thế.
             </span>
           </div>
         )}

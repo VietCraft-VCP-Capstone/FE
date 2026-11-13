@@ -157,26 +157,26 @@ export function SeasonalTimelineTab({
             <div className="flex items-center gap-1.5 text-amber-700">
               <ShieldAlert size={16} />
               <span className="text-[11px] font-bold uppercase tracking-wider">
-                Kỷ luật hạn chót (Hard cut-off)
+                Hạn chót vận hành
               </span>
             </div>
             <h4 className="m-0 mt-1 text-base font-bold text-stone-900">
-              Thời hạn an toàn vận hành
+              Thời hạn an toàn giao hàng
             </h4>
             <p className="mt-2 text-xs text-stone-600 leading-relaxed">
-              Hàng thủ công &amp; may mặc cần thời gian chuẩn bị và vận chuyển nội địa (3 – 5 ngày). Nếu tiếp tục nhận đơn quá sát ngày lễ, tỷ lệ giao trễ hoặc khách hủy đơn bùng phát sẽ làm tụt chỉ số vận hành gian hàng.
+              Đơn hàng cần 3–5 ngày xử lý và giao nội địa. Cần dừng nhận đơn liên tỉnh đúng hạn để tránh phát sinh đơn trễ và giảm tỷ lệ hoàn hủy.
             </p>
 
             <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/70 p-4 text-xs">
               <div className="flex items-center gap-2 font-bold text-rose-800">
                 <Hourglass size={16} className="text-rose-600" />
-                Hạn chót dừng nhận đơn ship xa:
+                Hạn dừng nhận đơn liên tỉnh:
               </div>
               <div className="mt-1 font-bold text-base text-rose-900">
                 {activeCamp.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'Đang cập nhật'}
               </div>
               <p className="mb-0 mt-1.5 text-[11px] text-rose-700">
-                Sau mốc này chỉ nhận đơn giao hỏa tốc hoặc giao gần để đảm bảo hàng tới tay khách trước dịp lễ.
+                Sau mốc này ưu tiên đơn hỏa tốc hoặc giao nội tỉnh để kịp đến tay khách trước ngày lễ.
               </p>
             </div>
           </div>

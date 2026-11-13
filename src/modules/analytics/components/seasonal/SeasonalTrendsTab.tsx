@@ -43,14 +43,9 @@ export function SeasonalTrendsTab({
       {decomposition ? (
         <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between border-b border-stone-100 pb-2">
-            <div>
-              <h4 className="font-bold text-stone-900 text-sm">
-                Phân rã sóng tìm kiếm Google Trends VN (Thuật toán LOESS)
-              </h4>
-              <p className="text-xs text-stone-500">
-                Tách riêng sóng định kỳ (Seasonal) khỏi xu hướng tăng trưởng nền dài hạn (Trend) của từ khóa "{primaryKeyword || activeCamp.name}"
-              </p>
-            </div>
+            <h4 className="font-bold text-stone-900 text-sm">
+              Xu hướng tìm kiếm Google Trends
+            </h4>
             <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-700">
               52 tuần liên tục
             </span>
@@ -64,7 +59,7 @@ export function SeasonalTrendsTab({
           <div className="flex items-center gap-2 pt-2 text-[11px] text-stone-500 border-t border-stone-100">
             <Database size={13} className="text-[#007700] shrink-0" />
             <span>
-              <strong>Căn cứ:</strong> Dữ liệu từ khóa Google Trends Việt Nam. Chỉ hiển thị như thông tin phụ trợ để seller quan sát thời điểm nhu cầu bắt đầu nhen nhóm.
+              Dữ liệu chu kỳ tìm kiếm Google Trends theo tuần.
             </span>
           </div>
         </div>
@@ -75,7 +70,7 @@ export function SeasonalTrendsTab({
         <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm space-y-2">
           <div className="flex items-center gap-2 text-xs font-bold text-stone-900">
             <Search size={14} className="text-[#007700]" />
-            <span>Các từ khóa tìm kiếm tăng nhanh nhất của dịp này:</span>
+            <span>Từ khóa tìm kiếm tăng trưởng nhanh:</span>
           </div>
           <div className="flex flex-wrap gap-2 pt-1">
             {activeCamp.search_keywords.map((kw, i) => (

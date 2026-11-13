@@ -49,7 +49,7 @@ export function SeasonalPotentialTab({
             }`}
           >
             <Package size={13} />
-            Hàng sẵn / Nhập sỉ ({readyIdeas.length})
+            Hàng có sẵn ({readyIdeas.length})
           </button>
 
           <button
@@ -62,7 +62,7 @@ export function SeasonalPotentialTab({
             }`}
           >
             <Sparkles size={13} />
-            Phôi in POD theo đơn ({podBlanks.length})
+            Phôi in POD ({podBlanks.length})
           </button>
         </div>
 
@@ -74,17 +74,11 @@ export function SeasonalPotentialTab({
             onChange={e => setSortOption(e.target.value as any)}
             className="cursor-pointer rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 outline-none hover:border-stone-300"
           >
-            <option value="profit">Biên lãi cao nhất</option>
-            <option value="newest">Ý tưởng mới nhất</option>
+            <option value="profit">Lãi cao nhất</option>
+            <option value="newest">Mới nhất</option>
           </select>
         </div>
       </div>
-
-      <p className="text-xs text-stone-500 mb-0">
-        {activeTab === 'ready'
-          ? 'Hàng có sẵn: sản phẩm hoàn chỉnh đang có nhu cầu tìm kiếm cao, nhập sỉ hoặc đặt xưởng may sẵn.'
-          : 'Phôi in POD: thiết kế và in trực tiếp lên phôi áo, ly, túi... theo đơn đặt hàng, không cần ôm vốn tồn kho.'}
-      </p>
 
       {/* Lưới 4 thẻ gợi ý sản phẩm với hồ sơ 5 lớp */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -125,7 +119,7 @@ export function SeasonalPotentialTab({
                         {item.platform && (
                           <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
                             <ShoppingBag size={10} />
-                            {item.platform} · Đang bán
+                            {item.platform}
                           </span>
                         )}
                         {item.sold_count > 0 && (
@@ -151,7 +145,7 @@ export function SeasonalPotentialTab({
                       )}
                       {item.seller_name && (
                         <span className="block text-[11px] text-stone-400 mt-0.5">
-                          Gian hàng: {item.seller_name}
+                          Shop: {item.seller_name}
                         </span>
                       )}
                     </div>
@@ -177,13 +171,13 @@ export function SeasonalPotentialTab({
 
                   {item.why_it_sells && (
                     <p className="m-0 text-stone-600 pt-1">
-                      <strong className="font-semibold text-stone-800">Động cơ mua:</strong> {item.why_it_sells}
+                      <strong className="font-semibold text-stone-800">Lý do mua:</strong> {item.why_it_sells}
                     </p>
                   )}
 
                   {item.upsell_bundle_tip && (
                     <p className="m-0 text-stone-600">
-                      <strong className="font-semibold text-stone-800">Mẹo bán kèm:</strong>{' '}
+                      <strong className="font-semibold text-stone-800">Gợi ý bán kèm:</strong>{' '}
                       <span className="font-semibold text-emerald-800">{item.upsell_bundle_tip}</span>
                     </p>
                   )}

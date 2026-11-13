@@ -28,11 +28,11 @@ export function SeasonalTrialTab({
         <div className="flex items-center gap-2">
           <ShieldAlert size={16} className="text-[#007700]" />
           <h5 className="m-0 text-xs font-bold text-[#005B00] uppercase tracking-wider">
-            Triết lý vận hành: Không bao giờ đặt cược lớn khi chưa có bằng chứng thực tế
+            Nguyên tắc kiểm soát vốn &amp; Thử nghiệm an toàn
           </h5>
         </div>
         <p className="mb-0 text-stone-600">
-          Không có thuật toán AI nào dám khẳng định chắc chắn 100% một sản phẩm sẽ bán chạy. Vì vậy, hệ thống thiết kế thang 3 nấc: <strong>Nấc 1</strong> lắng nghe tín hiệu tương tác tự nhiên (ngân sách 0đ), <strong>Nấc 2</strong> thử nghiệm chi phí nhỏ (10–20 mẫu hoặc làm mẫu POD theo đơn với vốn phôi 0đ) kèm nguyên tắc dừng lỗ chặt chẽ khi chi phí chạm ngưỡng, và <strong>Nấc 3</strong> chỉ mở rộng quy mô khi tỷ lệ chuyển đổi và doanh thu thực tế chứng minh được nhu cầu thị trường.
+          Quy trình 3 nấc giúp giảm thiểu rủi ro tồn kho: <strong>Nấc 1</strong> Đo lường tương tác tự nhiên (0đ chi phí), <strong>Nấc 2</strong> Thử nghiệm số lượng nhỏ (10–20 phôi) kèm điểm dừng lỗ rõ ràng, và <strong>Nấc 3</strong> Mở rộng sản xuất khi tỷ lệ chốt đơn đạt chuẩn kỳ vọng.
         </p>
       </div>
     </div>

@@ -389,9 +389,6 @@ export function SeasonalMonthMatrix({
               Lộ trình 4 tháng tới &amp; 4 giai đoạn vận hành
             </h3>
           </div>
-          <p className="mb-0 mt-1 text-xs text-stone-500">
-            Cửa sổ trượt tự động 4 tháng tính từ hôm nay. Khi một dịp qua đi, dịp tiếp theo trong năm sẽ tự động nối tiếp vào lịch.
-          </p>
         </div>
 
         {/* Nút lọc chế độ xem */}
@@ -405,7 +402,7 @@ export function SeasonalMonthMatrix({
                 : 'text-stone-500 hover:text-stone-800'
             }`}
           >
-            4 tháng tới (Cửa sổ trượt)
+            4 tháng tới
           </button>
           <button
             type="button"
@@ -416,7 +413,7 @@ export function SeasonalMonthMatrix({
                 : 'text-stone-500 hover:text-stone-800'
             }`}
           >
-            Tất cả 12 dịp trong năm
+            Cả năm (12 dịp)
           </button>
         </div>
       </div>
@@ -906,7 +903,6 @@ export function SeasonalMonthMatrix({
                       </span>
                     ))}
                   </div>
-                  <p className="m-0 text-[11px] text-stone-500">Danh sách do hệ thống cấu hình sẵn cho dịp này, chưa phải số liệu bán chạy đo được.</p>
                 </div>
               )}
 
