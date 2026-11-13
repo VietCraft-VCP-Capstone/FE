@@ -134,9 +134,8 @@ export const CampaignFunnelCard: React.FC<Props> = ({
   const getShortMotivationLabel = (reason?: string) => {
     if (!reason) return 'Mục đích';
     const lower = reason.toLowerCase();
-    if (lower.includes('quà') || lower.includes('tặng') || lower.includes('biếu')) return 'Quà tặng';
-    if (lower.includes('bản thân') || lower.includes('tự mua') || lower.includes('sử dụng')) return 'Tự dùng';
-    if (lower.includes('gia đình') || lower.includes('nhà')) return 'Gia đình';
+    if (lower.includes('tặng') || lower.includes('quà')) return 'Mua tặng';
+    if (lower.includes('dùng') || lower.includes('tự')) return 'Tự dùng';
     return 'Chủ đạo';
   };
 
