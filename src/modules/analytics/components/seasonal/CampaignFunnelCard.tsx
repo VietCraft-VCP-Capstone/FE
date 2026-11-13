@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   BarChart2,
@@ -17,6 +17,13 @@ import {
 import type { CampaignFunnel, ChannelBreakdownItem, MotivationBreakdown } from '../../types';
 import type { Evidence } from '../../types/evidence';
 import { money } from '../../../../shared/utils/format';
+
+const MOTIVATION_PALETTE = [
+  { stroke: '#007700', bg: 'bg-[#007700]', text: 'text-[#007700]' }, // Xanh lá
+  { stroke: '#2563eb', bg: 'bg-blue-600', text: 'text-blue-600' },   // Xanh dương
+  { stroke: '#d97706', bg: 'bg-amber-600', text: 'text-amber-600' }, // Cam hổ phách
+  { stroke: '#9333ea', bg: 'bg-purple-600', text: 'text-purple-600' }, // Tím
+];
 
 interface Props {
   funnel?: CampaignFunnel;
@@ -98,6 +105,39 @@ export const CampaignFunnelCard: React.FC<Props> = ({
     confidenceReason: 'Bóc tách từ database đơn hàng thực tế của shop.',
     mayBeWrongBecause: ['Lưu lượng thực tế có thể cao hơn nếu gian hàng đẩy mạnh quảng cáo hoặc đăng thêm mẫu mới.'],
     updatedAt: '2026-11-11',
+  };
+
+  // Xử lý dữ liệu đa phân khúc cho biểu đồ tròn mục đích mua sắm
+  const motivationSlices = useMemo(() => {
+    if (!motivation?.top_reasons?.length) return [];
+    let cumulative = 0;
+    return motivation.top_reasons.map((r, i) => {
+      const pct = Math.max(0, Math.min(100, r.pct));
+      const color = MOTIVATION_PALETTE[i % MOTIVATION_PALETTE.length];
+      const slice = {
+        ...r,
+        pct,
+        color,
+        dashArray: `${pct} ${Math.max(0, 100 - pct)}`,
+        dashOffset: -cumulative,
+      };
+      cumulative += pct;
+      return slice;
+    });
+  }, [motivation]);
+
+  const topMotivation = useMemo(() => {
+    if (!motivationSlices.length) return null;
+    return [...motivationSlices].sort((a, b) => b.pct - a.pct)[0];
+  }, [motivationSlices]);
+
+  const getShortMotivationLabel = (reason?: string) => {
+    if (!reason) return 'Mục đích';
+    const lower = reason.toLowerCase();
+    if (lower.includes('quà') || lower.includes('tặng') || lower.includes('biếu')) return 'Quà tặng';
+    if (lower.includes('bản thân') || lower.includes('tự mua') || lower.includes('sử dụng')) return 'Tự dùng';
+    if (lower.includes('gia đình') || lower.includes('nhà')) return 'Gia đình';
+    return 'Chủ đạo';
   };
 
   return (
@@ -614,52 +654,71 @@ export const CampaignFunnelCard: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 6. Phân Bổ Động Lực Mua Sắm */}
-      {motivation && (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 rounded-xl bg-stone-50/50 p-4 border border-stone-200/70 items-center">
-          <div className="md:col-span-4 flex items-center gap-3">
+      {/* 6. Phân Bổ Mục Đích Mua Sắm */}
+      {motivation && motivationSlices.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl bg-stone-50/60 p-4 border border-stone-200/70">
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Biểu đồ tròn đa phân khúc hiển thị đầy đủ các tiêu chí */}
             <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
               <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                {/* Vòng tròn nền xám nhạt */}
                 <circle
                   cx="18"
                   cy="18"
                   r="15.915"
                   fill="transparent"
-                  stroke="#e2e8f0"
-                  strokeWidth="3.8"
+                  stroke="#e7e5e4"
+                  strokeWidth="3.6"
                 />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.915"
-                  fill="transparent"
-                  stroke="#007700"
-                  strokeWidth="3.8"
-                  strokeDasharray={`${motivation.gift_purchases_pct} ${100 - motivation.gift_purchases_pct}`}
-                  strokeDashoffset="0"
-                />
+                {/* Từng phân khúc với màu riêng biệt */}
+                {motivationSlices.map((slice, i) => {
+                  if (slice.pct <= 0) return null;
+                  return (
+                    <circle
+                      key={i}
+                      cx="18"
+                      cy="18"
+                      r="15.915"
+                      fill="transparent"
+                      stroke={slice.color.stroke}
+                      strokeWidth="3.6"
+                      strokeDasharray={slice.dashArray}
+                      strokeDashoffset={slice.dashOffset}
+                      className="transition-all duration-300"
+                    />
+                  );
+                })}
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-[11px] font-extrabold text-[#007700]">
-                  {motivation.gift_purchases_pct}%
+              {/* Nhãn trung tâm hiển thị tỷ trọng cao nhất và phân loại tương ứng */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+                <span className={`text-[11px] font-black ${topMotivation?.color.text || 'text-stone-900'}`}>
+                  {topMotivation ? `${topMotivation.pct}%` : '—'}
                 </span>
-                <span className="text-[8px] text-stone-400 leading-none">Quà tặng</span>
+                <span className="text-[7.5px] font-semibold text-stone-500 leading-none mt-0.5">
+                  {getShortMotivationLabel(topMotivation?.reason)}
+                </span>
               </div>
             </div>
             <div>
-              <span className="font-bold text-stone-900 text-xs">Mục đích mua sắm</span>
+              <span className="font-bold text-stone-900 text-xs block">Mục đích mua sắm</span>
+              <span className="text-[11px] text-stone-400">
+                {motivation.source_type === 'shop_actual'
+                  ? `Từ ${totalActualOrders} đơn thực tế của shop`
+                  : 'Mục tiêu chuẩn ngành'}
+              </span>
             </div>
           </div>
 
-          <div className="md:col-span-8 flex flex-wrap gap-2 justify-end">
-            {motivation.top_reasons?.map((r, i) => (
+          {/* Danh sách tiêu chí với từng màu riêng biệt đồng bộ với biểu đồ */}
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            {motivationSlices.map((slice, i) => (
               <div
                 key={i}
-                className="rounded-lg bg-white px-3 py-1.5 border border-stone-200 text-xs font-semibold text-stone-700 shadow-2xs"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 border border-stone-200 text-xs font-semibold text-stone-700 shadow-2xs hover:border-stone-300 transition-colors"
               >
-                <span className="text-stone-400 mr-1.5">#{i + 1}</span>
-                <span>{r.reason}:</span>
-                <strong className="text-[#007700] ml-1">{r.pct}%</strong>
+                <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${slice.color.bg}`} />
+                <span className="text-stone-600 font-medium">{slice.reason}:</span>
+                <strong className={`ml-0.5 font-bold ${slice.color.text}`}>{slice.pct}%</strong>
               </div>
             ))}
           </div>
