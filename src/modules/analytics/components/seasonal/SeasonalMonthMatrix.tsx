@@ -706,10 +706,6 @@ export function SeasonalMonthMatrix({
             <span className="font-semibold text-rose-600">Hôm nay {todayLabel}</span>
           </div>
         </div>
-
-        <span className="text-[11px] text-stone-500 font-medium flex items-center gap-1">
-          <span>💡 Rê chuột hoặc ấn vào hàng bất kỳ để xem form mô tả chi tiết nội dung dịp</span>
-        </span>
       </div>
 
       {/* 4. HOVER PREVIEW CARD: chỉ hiển thị dữ liệu có thật */}
