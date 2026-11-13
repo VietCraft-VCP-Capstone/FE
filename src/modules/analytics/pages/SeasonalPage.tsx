@@ -175,6 +175,28 @@ export function SeasonalPage() {
     <InsightPage
       title={GLOSSARY.featureTitle}
       question={GLOSSARY.featureSubtitle}
+      header={
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between pb-3 border-b border-stone-200/70">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-600/20 bg-emerald-50 px-3 py-1 text-[11px] font-bold tracking-wider text-[#007700] uppercase font-mono shadow-2xs mb-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#007700] animate-pulse" />
+              <span>Hệ thống Phân tích Nhu cầu &amp; Dự báo Chu kỳ Mua sắm</span>
+            </div>
+            <h1 className="m-0 font-jakarta text-2xl sm:text-3xl font-black tracking-tight text-stone-950">
+              {GLOSSARY.featureTitle}
+            </h1>
+            <p className="mb-0 mt-1.5 text-sm leading-relaxed text-stone-600 font-normal max-w-2xl">
+              {GLOSSARY.featureSubtitle}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+            <span className="inline-flex items-center gap-2 rounded-xl border border-stone-200/90 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 shadow-2xs">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+              <span>Dữ liệu thời gian thực (Tiki &amp; Trends)</span>
+            </span>
+          </div>
+        </div>
+      }
     >
       <InsightBlock state={effectiveState} onRetry={reload}>
         {(data: SeasonalForecast, _meta) => {
