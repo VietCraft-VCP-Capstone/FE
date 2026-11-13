@@ -23,6 +23,10 @@ export function NotificationSettingsTab({
 }: NotificationSettingsTabProps) {
   const [formData, setFormData] = useState<SellerNotificationSettings>(initialData);
 
+  React.useEffect(() => {
+    setFormData(initialData);
+  }, [initialData]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
