@@ -156,11 +156,7 @@ function WeeklyPlanCard({ state, reload }: { state: InsightState<CompetitorBrief
       title={viec.length ? `Kế hoạch hành động tuần này · ${count(viec.length)} việc` : 'Kế hoạch hành động tuần này'}
       info={GIAI_THICH.keHoach}
       footer={state.kind === 'ready' && (
-        <span className="text-xs text-stone-500">
-          {state.data.source === 'llm'
-            ? `Câu chữ do ${state.data.provider} viết, mọi con số đã đối chiếu với số liệu gốc.`
-            : 'Tự động lập từ dữ liệu phân tích, xếp theo mức ưu tiên.'}
-        </span>
+        <span className="text-xs text-stone-500">Tự động lập từ dữ liệu phân tích, xếp theo mức ưu tiên.</span>
       )}
     >
       {state.kind !== 'ready' ? (

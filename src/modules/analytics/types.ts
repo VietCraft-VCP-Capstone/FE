@@ -244,9 +244,6 @@ export interface CategoryRevenue {
 
 /** GET /competitor-brief: việc nên làm tuần này, gom từ F32–F36. Chỉ có cho gian hàng thật. */
 export interface CompetitorBrief {
-  /** rules = lập theo luật; llm = mô hình ngôn ngữ viết lại, số đã đối chiếu với số liệu gốc. */
-  source: 'rules' | 'llm';
-  provider: string | null;
   /** API xếp sẵn từ khẩn cấp tới duy trì; `priority` thiếu khi AI còn chạy bản cũ. */
   actions: { action: string; why: string; link: string | null; priority?: 'gap' | 'quan_trong' | 'nen_lam' | 'duy_tri' }[];
   facts_count: number;
