@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { CatalogOption } from '../types/product';
+import { ERROR_TEXT, HINT, LABEL, inputClass } from './form/formUi';
 
 interface ProductFormTagFieldProps {
   tags: CatalogOption[];
@@ -8,7 +9,6 @@ interface ProductFormTagFieldProps {
   newTagNames: string[];
   catalogLoading: boolean;
   error?: string;
-  labelClass: string;
   onToggleTag: (id: string) => void;
   onAddTag: (name: string) => void;
   onRemoveNewTag: (name: string) => void;
@@ -20,12 +20,14 @@ export function ProductFormTagField({
   newTagNames,
   catalogLoading,
   error,
-  labelClass,
   onToggleTag,
   onAddTag,
   onRemoveNewTag,
 }: ProductFormTagFieldProps) {
   const [input, setInput] = useState('');
+  const count = tagIds.length + newTagNames.length;
+  const query = input.trim().toLowerCase();
+  const shown = query ? tags.filter((t) => tagIds.includes(t._id) || t.name.toLowerCase().includes(query)) : tags;
   const add = () => {
     if (!input.trim()) return;
     onAddTag(input.trim());
@@ -33,13 +35,14 @@ export function ProductFormTagField({
   };
 
   return (
-    <div className="md:col-span-2 space-y-2" data-focus-target="tags">
-      <label className={labelClass}>
-        Thẻ sản phẩm <span className="text-rose-500">*</span>
-        <span className="ml-2 font-medium normal-case tracking-normal text-stone-400">
-          Đã chọn {tagIds.length + newTagNames.length}
-        </span>
-      </label>
+    <div className="space-y-2" data-focus-target="tags" data-invalid={error ? true : undefined}>
+      <div className="flex items-baseline justify-between gap-3">
+        <label className={LABEL}>
+          Thẻ sản phẩm <span className="text-rose-600" aria-hidden>*</span>
+        </label>
+        <span className="text-xs text-stone-500">Đã chọn {count}</span>
+      </div>
+
       <div className="flex items-center gap-2">
         <input
           type="text"
@@ -52,53 +55,55 @@ export function ProductFormTagField({
               add();
             }
           }}
-          className="flex-1 px-3.5 py-2 bg-stone-50/80 border border-stone-200 rounded-xl text-xs text-stone-800 focus:outline-none focus:ring-1 focus:ring-[#007700] focus:border-[#007700]"
+          className={inputClass(undefined, 'flex-1 min-w-0')}
         />
         <button
           type="button"
           onClick={add}
           disabled={!input.trim()}
-          className="px-3.5 py-2 bg-white hover:bg-stone-50 border border-stone-200 hover:border-stone-400 text-stone-700 text-xs font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 transition-all flex items-center gap-1 font-jakarta"
+          className="flex h-10 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-stone-300 bg-white px-3.5 text-[13px] font-semibold text-stone-800 transition-colors hover:border-stone-400 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Plus size={13} /> Thêm thẻ
+          <Plus size={14} /> Thêm thẻ
         </button>
       </div>
+
       <div
-        className={`flex flex-wrap gap-2 p-3 bg-stone-50/80 border rounded-xl min-h-[52px] ${
-          error ? 'border-rose-400 bg-rose-50/30' : 'border-stone-200'
+        className={`flex flex-wrap gap-2 rounded-lg border p-3 min-h-[52px] max-h-44 overflow-y-auto ${
+          error ? 'border-rose-500 bg-rose-50/40' : 'border-stone-200 bg-stone-50'
         }`}
       >
-        {catalogLoading && <span className="text-xs text-stone-400">Đang tải thẻ...</span>}
+        {catalogLoading && <span className="text-xs text-stone-500">Đang tải thẻ...</span>}
         {!catalogLoading && tags.length === 0 && newTagNames.length === 0 && (
-          <span className="text-xs text-stone-400">Sàn chưa duyệt thẻ nào.</span>
+          <span className="text-xs text-stone-500">Sàn chưa có thẻ nào. Hãy đề xuất thẻ mới ở ô bên trên.</span>
         )}
         {newTagNames.map((name) => (
           <span
             key={`new-${name}`}
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-amber-900 bg-amber-50 border border-amber-300 shadow-xs"
+            className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900"
           >
-            #{name} <span className="text-[10px] text-amber-700 font-normal">(Chờ duyệt)</span>
+            #{name} <span className="font-normal text-amber-700">(Chờ duyệt)</span>
             <button
               type="button"
               onClick={() => onRemoveNewTag(name)}
               aria-label={`Bỏ thẻ ${name}`}
-              className="ml-1 text-amber-600 hover:text-amber-900 cursor-pointer"
+              className="ml-0.5 cursor-pointer text-amber-700 hover:text-amber-950"
             >
               <X size={12} />
             </button>
           </span>
         ))}
-        {tags.map((tag) => {
+        {shown.map((tag) => {
           const picked = tagIds.includes(tag._id);
           return (
             <button
               key={tag._id}
               type="button"
+              aria-pressed={picked}
               onClick={() => onToggleTag(tag._id)}
-              className={`px-3 py-1.5 rounded-full text-xs border transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-full text-xs border transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007700] ${
                 picked
-                  ? 'font-bold text-white border-transparent shadow-xs'
-                  : 'font-medium text-stone-600 bg-white border-stone-200 hover:border-stone-400'
+                  ? 'font-semibold text-white border-transparent'
+                  : 'font-medium text-stone-700 bg-white border-stone-300 hover:border-stone-500'
               }`}
               style={picked ? { backgroundColor: tag.color || '#007700' } : undefined}
             >
@@ -107,7 +112,12 @@ export function ProductFormTagField({
           );
         })}
       </div>
-      {error && <p className="text-xs text-rose-500">{error}</p>}
+
+      {error ? (
+        <p role="alert" className={ERROR_TEXT}>{error}</p>
+      ) : (
+        <p className={HINT}>Gõ để lọc rồi bấm chọn thẻ có sẵn. Thẻ bạn tự đề xuất sẽ hiện sau khi sàn duyệt.</p>
+      )}
     </div>
   );
 }
