@@ -106,15 +106,15 @@ export const HubActionFeed: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* 2. Khuyến nghị AI có căn cứ từ Backend */}
+            {/* 2. Khuyến nghị hành động từ Backend */}
             <div className="rounded-xl bg-stone-50/70 border border-stone-200/80 p-3 space-y-1.5 min-w-0">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-stone-900 min-w-0">
-                <Sparkles size={13} className="text-[#007700] shrink-0" />
-                <h4 className="truncate min-w-0" title={item.recommendation.title}>
+              <div className="flex items-start gap-1.5 text-xs font-bold text-stone-900 min-w-0">
+                <Sparkles size={14} className="text-[#007700] shrink-0 mt-0.5" />
+                <h4 className="font-bold text-xs text-stone-900 leading-snug break-words flex-1 min-w-0" title={item.recommendation.title}>
                   {item.recommendation.title}
                 </h4>
               </div>
-              <p className="text-xs text-stone-600 leading-relaxed">
+              <p className="text-xs text-stone-600 leading-relaxed break-words">
                 {item.recommendation.advice}
               </p>
               {item.recommendation.ctaLabel && (
@@ -182,9 +182,9 @@ export const HubActionFeed: React.FC<Props> = ({
                   {item.daysLeft <= 3 ? 'Sắp đến hạn' : 'Đúng tiến độ'}
                 </span>
               </div>
-              <div className="flex items-center gap-1 text-[11px] text-stone-400 min-w-0 overflow-hidden">
-                <Calculator size={11} className="shrink-0 text-stone-400" />
-                <span className="truncate min-w-0" title={item.calculationBasis}>
+              <div className="flex items-start gap-1 text-[11px] text-stone-500 min-w-0 pt-0.5">
+                <Calculator size={12} className="shrink-0 text-stone-400 mt-0.5" />
+                <span className="break-words leading-relaxed flex-1 text-stone-500" title={item.calculationBasis}>
                   {item.calculationBasis}
                 </span>
               </div>

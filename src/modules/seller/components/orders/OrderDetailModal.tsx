@@ -171,10 +171,12 @@ export function OrderDetailModal({
                     <p className="m-0 mt-0.5 text-[11.5px] tabular-nums text-stone-500">
                       {money(it.price)} × {fmtCount(it.quantity)}
                     </p>
-                    {/* Giá vốn chỉ người bán thấy — đây là con số quyết định đơn này có lãi không. */}
-                    <p className="m-0 mt-0.5 text-[11px] tabular-nums text-stone-400">
-                      vốn {money(it.baseCost * it.quantity)}
-                    </p>
+                    {/* Giá vốn chỉ hiển thị cho sản phẩm in ấn (POD) có phôi xưởng in */}
+                    {isPodOrder && it.baseCost > 0 && (
+                      <p className="m-0 mt-0.5 text-[11px] tabular-nums text-stone-400">
+                        vốn phôi {money(it.baseCost * it.quantity)}
+                      </p>
+                    )}
                   </div>
                 </li>
               ))}
@@ -383,17 +385,20 @@ export function OrderDetailModal({
                 />
                 <div className="my-1 border-t border-stone-100" />
                 <DetailRow label="Phí sàn" value={`-${money(f.platformFee)}`} />
-                <DetailRow label="Giá vốn phôi" value={`-${money(f.baseCost)}`} />
+                {isPodOrder && f.baseCost > 0 && (
+                  <DetailRow label="Giá vốn phôi" value={`-${money(f.baseCost)}`} />
+                )}
                 <div className="flex items-baseline justify-between gap-4 border-t border-stone-100 pt-2">
                   <span className="text-[12px] font-semibold text-stone-700">Bạn thực nhận</span>
                   <span className="text-[15px] font-extrabold tabular-nums text-[#007700]">{money(f.payout)}</span>
                 </div>
-                {/* Phí sàn trừ vào tiền chuyển về ví, giá vốn thì đã chi trước đó cho
-                    xưởng — hai khoản khác bản chất nên nói rõ, tránh bị cộng nhầm. */}
-                <p className="mb-1 mt-1 text-[11px] leading-snug text-stone-400">
-                  "Thực nhận" là số sàn chuyển về ví sau khi trừ phí sàn; giá vốn phôi bạn đã trả riêng
-                  cho xưởng in.
-                </p>
+                {/* Chỉ giải thích tiền phôi với đơn hàng POD có liên kết xưởng in */}
+                {isPodOrder && f.baseCost > 0 && (
+                  <p className="mb-1 mt-1 text-[11px] leading-snug text-stone-400">
+                    "Thực nhận" là số sàn chuyển về ví sau khi trừ phí sàn; giá vốn phôi bạn đã trả riêng
+                    cho xưởng in.
+                  </p>
+                )}
               </div>
             </section>
           </div>

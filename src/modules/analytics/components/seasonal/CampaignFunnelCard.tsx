@@ -42,7 +42,6 @@ export const CampaignFunnelCard: React.FC<Props> = ({
   onOpenEvidence,
   className = '',
 }) => {
-  const [viewMode, setViewMode] = useState<'pv' | 'uv'>('pv');
   const [showTrends, setShowTrends] = useState<boolean>(true);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
@@ -60,12 +59,10 @@ export const CampaignFunnelCard: React.FC<Props> = ({
     pv_uv_ratio: 1.45,
   };
 
-  const pvMultiplier = viewMode === 'pv' ? 1.0 : 1.0 / (currentFunnel.pv_uv_ratio || 1.45);
-
-  const displayImpressions = Math.round(currentFunnel.impressions * pvMultiplier);
-  const displayClicks = Math.round(currentFunnel.clicks * pvMultiplier);
-  const displayCartAdds = Math.round(currentFunnel.cart_adds * pvMultiplier);
-  const displayOrders = Math.round(currentFunnel.orders * pvMultiplier);
+  const displayImpressions = typeof currentFunnel.impressions === 'number' ? currentFunnel.impressions : 48250;
+  const displayClicks = typeof currentFunnel.clicks === 'number' ? currentFunnel.clicks : 6180;
+  const displayCartAdds = typeof currentFunnel.cart_adds === 'number' ? currentFunnel.cart_adds : 2890;
+  const displayOrders = typeof currentFunnel.orders === 'number' ? currentFunnel.orders : 1420;
 
   // Tính AOV và doanh thu thực tế
   const totalActualGmv = channels.reduce((acc, c) => acc + (c.gmv_vnd || 0), 0);
@@ -73,19 +70,30 @@ export const CampaignFunnelCard: React.FC<Props> = ({
   const actualAov = totalActualOrders > 0 ? Math.round(totalActualGmv / totalActualOrders) : 4486000;
 
   // Dữ liệu thực tế đối soát từ gian hàng
-  const actualOrders = currentFunnel.actual?.orders ?? totalActualOrders ?? 2;
+  const actualOrders = typeof currentFunnel.actual?.orders === 'number' ? currentFunnel.actual.orders : totalActualOrders;
   const targetGmv = displayOrders * actualAov;
 
-  // Quy đổi số liệu thực tế theo chế độ xem (PV / UV)
-  const actualClicks = Math.round((currentFunnel.actual?.clicks ?? Math.round(actualOrders / ((currentFunnel.conversion_rate_pct || 24.2) / 100))) * pvMultiplier);
-  const actualImpressions = Math.round((currentFunnel.actual?.impressions ?? Math.round(actualClicks / ((currentFunnel.ctr_pct || 19.4) / 100))) * pvMultiplier);
-  const actualCartAdds = Math.round((currentFunnel.actual?.cart_adds ?? Math.round(actualClicks * ((currentFunnel.cart_rate_pct || 41.7) / 100))) * pvMultiplier);
+  // Số liệu thực tế đối soát theo từng tầng phễu
+  const actualClicks = typeof currentFunnel.actual?.clicks === 'number'
+    ? currentFunnel.actual.clicks
+    : Math.round(actualOrders / ((currentFunnel.conversion_rate_pct || 24.2) / 100));
+  const actualImpressions = typeof currentFunnel.actual?.impressions === 'number'
+    ? currentFunnel.actual.impressions
+    : Math.round(actualClicks / ((currentFunnel.ctr_pct || 19.4) / 100));
+  const actualCartAdds = typeof currentFunnel.actual?.cart_adds === 'number'
+    ? currentFunnel.actual.cart_adds
+    : Math.round(actualClicks * ((currentFunnel.cart_rate_pct || 41.7) / 100));
 
-  // Tiến độ % thực tế / mục tiêu của từng tầng
-  const p1Pct = Math.min(100, Math.round((actualImpressions / (displayImpressions || 1)) * 100));
-  const p2Pct = Math.min(100, Math.round((actualClicks / (displayClicks || 1)) * 100));
-  const p3Pct = Math.min(100, Math.round((actualCartAdds / (displayCartAdds || 1)) * 100));
-  const p4Pct = Math.min(100, Math.round((actualOrders / (displayOrders || 1)) * 100));
+  // Tiến độ % thực tế / mục tiêu của từng tầng (tính chính xác, không giới hạn cứng 100% để hiển thị đúng khi vượt chỉ tiêu)
+  const rawP1 = Math.round((actualImpressions / (displayImpressions || 1)) * 100);
+  const rawP2 = Math.round((actualClicks / (displayClicks || 1)) * 100);
+  const rawP3 = Math.round((actualCartAdds / (displayCartAdds || 1)) * 100);
+  const rawP4 = Math.round((actualOrders / (displayOrders || 1)) * 100);
+
+  const p1Pct = Math.min(100, rawP1);
+  const p2Pct = Math.min(100, rawP2);
+  const p3Pct = Math.min(100, rawP3);
+  const p4Pct = Math.min(100, rawP4);
 
   // Tỷ lệ rơi rụng tính động giữa các bước
   const dropoff1Pct = Math.max(0, Math.min(100, Math.round(((displayImpressions - displayClicks) / (displayImpressions || 1)) * 100)));
@@ -163,31 +171,6 @@ export const CampaignFunnelCard: React.FC<Props> = ({
 
         {/* Nút điều khiển tinh gọn */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="inline-flex rounded-lg border border-stone-200 bg-stone-50 p-0.5 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setViewMode('pv')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                viewMode === 'pv'
-                  ? 'bg-white text-stone-900 shadow-2xs font-bold'
-                  : 'text-stone-500 hover:text-stone-800'
-              }`}
-            >
-              Lượt xem (PV)
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('uv')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                viewMode === 'uv'
-                  ? 'bg-white text-stone-900 shadow-2xs font-bold'
-                  : 'text-stone-500 hover:text-stone-800'
-              }`}
-            >
-              Khách (UV)
-            </button>
-          </div>
-
           <button
             type="button"
             onClick={() => setShowTrends(!showTrends)}
@@ -240,17 +223,21 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-stone-700">1. Lượt hiển thị sản phẩm (Impressions)</span>
               <div className="flex items-center gap-2">
-                <span className="text-stone-400 font-medium">Thực tế: {actualImpressions.toLocaleString('vi-VN')}</span>
+                <span className="text-stone-500 font-medium">Thực tế: {(actualImpressions ?? 0).toLocaleString('vi-VN')}</span>
                 <span className="text-stone-300">|</span>
-                <span className="font-bold text-stone-900">{displayImpressions.toLocaleString('vi-VN')} {viewMode.toUpperCase()}</span>
+                <span className="font-bold text-stone-900">Mục tiêu: {(displayImpressions ?? 0).toLocaleString('vi-VN')} lượt hiển thị</span>
               </div>
             </div>
             <div className="h-6 w-full rounded-lg bg-stone-200/70 overflow-hidden relative">
               <div
-                className="h-full rounded-lg bg-[#2da874] flex items-center justify-end pr-2.5 transition-all duration-500"
-                style={{ width: `${Math.max(10, p1Pct)}%` }}
+                className={`h-full rounded-lg flex items-center justify-end pr-2.5 transition-all duration-500 ${
+                  rawP1 > 100 ? 'bg-gradient-to-r from-emerald-600 to-teal-500 shadow-xs' : 'bg-[#2da874]'
+                }`}
+                style={{ width: `${Math.max(12, p1Pct)}%` }}
               >
-                <span className="text-[10px] font-bold text-white">{p1Pct}%</span>
+                <span className="text-[10px] font-bold text-white">
+                  {rawP1 > 100 ? `${rawP1}% · Vượt chỉ tiêu` : `${p1Pct}%`}
+                </span>
               </div>
             </div>
           </div>
@@ -270,17 +257,21 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-stone-700">2. Lượt xem chi tiết (Product Clicks)</span>
               <div className="flex items-center gap-2">
-                <span className="text-stone-400 font-medium">Thực tế: {actualClicks.toLocaleString('vi-VN')}</span>
+                <span className="text-stone-500 font-medium">Thực tế: {(actualClicks ?? 0).toLocaleString('vi-VN')}</span>
                 <span className="text-stone-300">|</span>
-                <span className="font-bold text-stone-900">{displayClicks.toLocaleString('vi-VN')} {viewMode.toUpperCase()}</span>
+                <span className="font-bold text-stone-900">Mục tiêu: {(displayClicks ?? 0).toLocaleString('vi-VN')} click</span>
               </div>
             </div>
             <div className="h-6 w-full rounded-lg bg-stone-200/70 overflow-hidden relative">
               <div
-                className="h-full rounded-lg bg-[#008f5a] flex items-center justify-end pr-2.5 transition-all duration-500"
-                style={{ width: `${Math.max(10, p2Pct)}%` }}
+                className={`h-full rounded-lg flex items-center justify-end pr-2.5 transition-all duration-500 ${
+                  rawP2 > 100 ? 'bg-gradient-to-r from-emerald-700 to-emerald-500 shadow-xs' : 'bg-[#008f5a]'
+                }`}
+                style={{ width: `${Math.max(12, p2Pct)}%` }}
               >
-                <span className="text-[10px] font-bold text-white">{p2Pct}%</span>
+                <span className="text-[10px] font-bold text-white">
+                  {rawP2 > 100 ? `${rawP2}% · Vượt chỉ tiêu` : `${p2Pct}%`}
+                </span>
               </div>
             </div>
           </div>
@@ -295,17 +286,21 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-stone-700">3. Thêm vào giỏ hàng (Cart Adds)</span>
               <div className="flex items-center gap-2">
-                <span className="text-stone-400 font-medium">Thực tế: {actualCartAdds.toLocaleString('vi-VN')}</span>
+                <span className="text-stone-500 font-medium">Thực tế: {(actualCartAdds ?? 0).toLocaleString('vi-VN')}</span>
                 <span className="text-stone-300">|</span>
-                <span className="font-bold text-stone-900">{displayCartAdds.toLocaleString('vi-VN')} {viewMode.toUpperCase()}</span>
+                <span className="font-bold text-stone-900">Mục tiêu: {(displayCartAdds ?? 0).toLocaleString('vi-VN')} lượt thêm giỏ</span>
               </div>
             </div>
             <div className="h-6 w-full rounded-lg bg-stone-200/70 overflow-hidden relative">
               <div
-                className="h-full rounded-lg bg-[#007700] flex items-center justify-end pr-2.5 transition-all duration-500"
-                style={{ width: `${Math.max(10, p3Pct)}%` }}
+                className={`h-full rounded-lg flex items-center justify-end pr-2.5 transition-all duration-500 ${
+                  rawP3 > 100 ? 'bg-gradient-to-r from-emerald-800 to-teal-600 shadow-xs' : 'bg-[#007700]'
+                }`}
+                style={{ width: `${Math.max(12, p3Pct)}%` }}
               >
-                <span className="text-[10px] font-bold text-white">{p3Pct}%</span>
+                <span className="text-[10px] font-bold text-white">
+                  {rawP3 > 100 ? `${rawP3}% · Vượt chỉ tiêu` : `${p3Pct}%`}
+                </span>
               </div>
             </div>
           </div>
@@ -325,18 +320,20 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-stone-700">4. Đơn hàng hoàn tất (Orders)</span>
               <div className="flex items-center gap-2">
-                <span className="text-emerald-700 font-bold">Thực tế: {actualOrders} đơn</span>
+                <span className="text-emerald-700 font-bold">Thực tế: {(actualOrders ?? 0).toLocaleString('vi-VN')} đơn</span>
                 <span className="text-stone-300">|</span>
-                <span className="font-bold text-stone-900">Mục tiêu: {displayOrders} đơn</span>
+                <span className="font-bold text-stone-900">Mục tiêu: {(displayOrders ?? 0).toLocaleString('vi-VN')} đơn</span>
               </div>
             </div>
             <div className="h-6 w-full rounded-lg bg-stone-200/70 overflow-hidden relative">
               <div
-                className="h-full rounded-lg bg-[#005B00] flex items-center justify-end pr-2.5 transition-all duration-500"
-                style={{ width: `${Math.max(10, p4Pct)}%` }}
+                className={`h-full rounded-lg flex items-center justify-end pr-2.5 transition-all duration-500 ${
+                  rawP4 > 100 ? 'bg-gradient-to-r from-emerald-900 to-[#005B00] shadow-xs' : 'bg-[#005B00]'
+                }`}
+                style={{ width: `${Math.max(12, p4Pct)}%` }}
               >
                 <span className="text-[10px] font-bold text-white">
-                  {p4Pct >= 100 ? '100% · Đạt chỉ tiêu' : `${p4Pct}%`}
+                  {rawP4 > 100 ? `${rawP4}% · Vượt chỉ tiêu` : `${p4Pct}%`}
                 </span>
               </div>
             </div>

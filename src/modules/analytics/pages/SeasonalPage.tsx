@@ -175,28 +175,7 @@ export function SeasonalPage() {
     <InsightPage
       title={GLOSSARY.featureTitle}
       question={GLOSSARY.featureSubtitle}
-      header={
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between pb-3 border-b border-stone-200/70">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-600/20 bg-emerald-50 px-3 py-1 text-[11px] font-bold tracking-wider text-[#007700] uppercase font-mono shadow-2xs mb-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#007700] animate-pulse" />
-              <span>Hệ thống Phân tích Nhu cầu &amp; Dự báo Chu kỳ Mua sắm</span>
-            </div>
-            <h1 className="m-0 font-jakarta text-2xl sm:text-3xl font-black tracking-tight text-stone-950">
-              {GLOSSARY.featureTitle}
-            </h1>
-            <p className="mb-0 mt-1.5 text-sm leading-relaxed text-stone-600 font-normal max-w-2xl">
-              {GLOSSARY.featureSubtitle}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-            <span className="inline-flex items-center gap-2 rounded-xl border border-stone-200/90 bg-white px-3.5 py-2 text-xs font-semibold text-stone-700 shadow-2xs">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
-              <span>Dữ liệu thời gian thực (Tiki &amp; Trends)</span>
-            </span>
-          </div>
-        </div>
-      }
+      header={<></>}
     >
       <InsightBlock state={effectiveState} onRetry={reload}>
         {(data: SeasonalForecast, _meta) => {
@@ -253,20 +232,20 @@ export function SeasonalPage() {
               actionType: backendRec.action_type,
             } : {
               title: isOverduePrep
-                ? 'Chốt đơn & xử lý hàng sẵn có'
+                ? `Chốt đơn & Giao hàng ${c.name}`
                 : isTractionPhase
-                ? `Tối ưu listing & từ khóa "${kw}"`
-                : 'Chuẩn bị nguồn hàng & lên mẫu mới',
+                ? `Đẩy mạnh hiển thị "${kw}"`
+                : `Lên mẫu & Sẵn hàng ${c.name}`,
               advice: isOverduePrep
-                ? `Sắp đến hạn chốt nhận đơn (${fmtShortDate(cutoffIso)}, còn ${daysToCutoff} ngày). Đã qua thời điểm làm mẫu mới. Nên tập trung xử lý các đơn hàng sẵn phôi trong kho để bảo đảm giao kịp trước ngày ${fmtShortDate(evDateIso)}.`
+                ? `Hạn chốt còn ${daysToCutoff} ngày (${fmtShortDate(cutoffIso)}). Tập trung đóng gói hàng sẵn để kịp giao trước ${fmtShortDate(evDateIso)}.`
                 : isTractionPhase
-                ? `Nhu cầu tìm kiếm tăng tốc trước cao điểm (${fmtShortDate(peakIso)}). Khuyến nghị hoàn thiện ảnh thật, tối ưu tiêu đề gắn từ khóa "${kw}" để đón đơn sớm.`
-                : `Thời điểm phù hợp để duyệt mẫu thiết kế và liên hệ xưởng chuẩn bị phôi cho nhóm từ khóa "${kw}" trước khi mở bán (${fmtShortDate(tractionIso)}).`,
+                ? `Nhu cầu "${kw}" đang tăng tốc. Hoàn thiện ảnh thật và gắn tag ngách để đón đơn sớm.`
+                : `Chuẩn bị hàng mẫu nhóm "${kw}", sẵn sàng mở bán trước ngày (${fmtShortDate(tractionIso)}).`,
               calculationBasis: isOverduePrep
-                ? `Hạn chốt ${fmtShortDate(cutoffIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 10 ngày (sản xuất P90 & giao hàng an toàn).`
+                ? `Hạn chốt ${fmtShortDate(cutoffIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 10 ngày (giao hàng an toàn).`
                 : isTractionPhase
-                ? `Bắt đầu mở bán ${fmtShortDate(tractionIso)} = Trước cao điểm 10 ngày để kịp index từ khóa.`
-                : `Bắt đầu chuẩn bị ${fmtShortDate(rdIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 38 ngày (lead time xưởng & đón sóng).`,
+                ? `Bắt đầu mở bán ${fmtShortDate(tractionIso)} = Trước cao điểm để kịp index từ khóa.`
+                : `Bắt đầu chuẩn bị ${fmtShortDate(rdIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 38 ngày (đón sóng sớm).`,
               ctaLabel: isOverduePrep
                 ? 'Xem sản phẩm shop & tồn kho'
                 : isTractionPhase
