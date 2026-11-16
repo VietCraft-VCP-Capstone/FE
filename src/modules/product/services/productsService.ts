@@ -1,4 +1,4 @@
-import api from '../../../infrastructure/api/interceptors';
+import api, { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import {
   ProductItem,
   ProductFormData,
@@ -8,6 +8,7 @@ import {
   SuggestResult
 } from '../types/product';
 import { invalidateInsights } from '../../analytics/hooks/useInsight';
+import { getSessionId } from '../../buyer/services/eventService';
 
 export interface VideoAdQuota {
   enabled: boolean;
@@ -99,6 +100,18 @@ export const productsService = {
     try {
       const res = await api.get('/products/meta/trending-keywords', { params: { limit } });
       return Array.isArray(res.data) ? res.data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  getForYou: async (limit: number, recentSearches: string[] = []): Promise<any[]> => {
+    try {
+      const res = await api.get('/products/meta/for-you', {
+        params: { limit, sessionId: getSessionId(), q: isLoggedIn() ? [] : recentSearches.filter(Boolean).slice(0, 3) },
+        paramsSerializer: { indexes: null },
+      });
+      return Array.isArray(res.data) ? res.data.map(resolveImages) : [];
     } catch {
       return [];
     }

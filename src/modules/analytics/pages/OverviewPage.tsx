@@ -94,7 +94,11 @@ function generateSmartNotice(data: ShopOverview): string {
     const topDay = sortedDays[0];
     const topDayPct = Math.round((topDay.revenue_vnd / totalRev) * 100);
 
-    if (sortedDays.length >= 2 && (sortedDays[0].revenue_vnd + sortedDays[1].revenue_vnd) / totalRev >= 0.7) {
+    if (data.range === 'year') {
+      observations.push(
+        `Năm có doanh thu cao nhất là năm ${topDay.date} (${money(topDay.revenue_vnd)}), chiếm ${topDayPct}% tổng doanh thu các năm đang đối chiếu.`
+      );
+    } else if (sortedDays.length >= 2 && (sortedDays[0].revenue_vnd + sortedDays[1].revenue_vnd) / totalRev >= 0.7) {
       // 2 ngày gom phần lớn doanh thu
       const d1 = shortDate(sortedDays[1].date);
       const d2 = shortDate(sortedDays[0].date);
@@ -169,6 +173,14 @@ export function OverviewPage() {
   };
 
   const handlePrevPeriod = (currTo: string) => {
+    if (timeRange === 'year') {
+      const d = parseISO(currTo);
+      d.setFullYear(d.getFullYear() - 1);
+      const next = new URLSearchParams(params);
+      next.set('to', `${d.getFullYear()}-12-31`);
+      setParams(next, { replace: true });
+      return;
+    }
     const d = parseISO(currTo);
     d.setDate(d.getDate() - windowDays);
     const next = new URLSearchParams(params);
@@ -177,6 +189,19 @@ export function OverviewPage() {
   };
 
   const handleNextPeriod = (currTo: string) => {
+    if (timeRange === 'year') {
+      const d = parseISO(currTo);
+      d.setFullYear(d.getFullYear() + 1);
+      const next = new URLSearchParams(params);
+      const thisYear = new Date().getFullYear();
+      if (d.getFullYear() >= thisYear) {
+        next.delete('to');
+      } else {
+        next.set('to', `${d.getFullYear()}-12-31`);
+      }
+      setParams(next, { replace: true });
+      return;
+    }
     const d = parseISO(currTo);
     d.setDate(d.getDate() + windowDays);
     const today = new Date();
@@ -233,7 +258,7 @@ export function OverviewPage() {
           const aov = totalOrders > 0 ? Math.round(totalRev / totalOrders) : 0;
           const crValue = data.kpi.conversion_pct.value;
 
-          // Thống kê Doanh thu: Trung bình/ngày, Đỉnh cao nhất
+          // Thống kê Doanh thu: Trung bình/ngày hoặc đỉnh năm
           const daysCount = data.series.length || windowDays;
           const avgPerDay = Math.round(totalRev / daysCount);
           const sortedByRev = [...data.series].sort((a, b) => b.revenue_vnd - a.revenue_vnd);
@@ -242,13 +267,15 @@ export function OverviewPage() {
           const peakDate = peakPoint ? shortDate(peakPoint.date) : '';
           const revenueHint =
             totalRev > 0
-              ? `Trung bình ${money(avgPerDay)} / ngày · đỉnh ${compactMoney(peakRev)} · ${peakDate}`
+              ? timeRange === 'year'
+                ? `Đỉnh cao nhất: ${compactMoney(peakRev)} · Năm ${peakPoint?.date ?? ''}`
+                : `Trung bình ${money(avgPerDay)} / ngày · đỉnh ${compactMoney(peakRev)} · ${peakDate}`
               : 'Chưa có doanh thu trong kỳ';
 
           // Chuẩn bị dữ liệu biểu đồ
           const chartData = data.series.map(point => ({
             date: point.date,
-            label: shortDate(point.date),
+            label: timeRange === 'year' ? `Năm ${point.date}` : shortDate(point.date),
             revenue: point.revenue_vnd,
             orders: point.orders,
             views: point.views ?? 0,
@@ -258,20 +285,30 @@ export function OverviewPage() {
           const maxProductRev = data.top_products.length > 0 ? Math.max(...data.top_products.map(p => p.revenue_vnd)) : 1;
 
           // Tạo danh sách các khoảng thời gian cho select
-          // LƯU Ý QUAN TRỌNG: Bỏ hoàn toàn chữ "gần đây" / "gần nhất" trong hàm select
           const today = new Date();
-          const periodOptions = [0, 1, 2, 3, 4].map(idx => {
-            const endD = new Date(today);
-            endD.setDate(endD.getDate() - idx * windowDays);
-            const startD = new Date(endD);
-            startD.setDate(startD.getDate() - (windowDays - 1));
-            return {
-              value: idx === 0 ? '' : formatISO(endD),
-              label: `${fullDate(formatISO(startD))} – ${fullDate(formatISO(endD))}`,
-            };
-          });
+          const currYear = today.getFullYear();
+          const periodOptions =
+            timeRange === 'year'
+              ? [0, 1, 2, 3].map(idx => {
+                  const y = currYear - idx;
+                  return {
+                    value: idx === 0 ? '' : `${y}-12-31`,
+                    label: `Năm ${y}${idx === 0 ? ' (Mới nhất)' : ''}`,
+                  };
+                })
+              : [0, 1, 2, 3, 4].map(idx => {
+                  const endD = new Date(today);
+                  endD.setDate(endD.getDate() - idx * windowDays);
+                  const startD = new Date(endD);
+                  startD.setDate(startD.getDate() - (windowDays - 1));
+                  return {
+                    value: idx === 0 ? '' : formatISO(endD),
+                    label: `${fullDate(formatISO(startD))} – ${fullDate(formatISO(endD))}`,
+                  };
+                });
 
-          const isAtLatest = !toParam;
+          const isAtLatest =
+            !toParam || (timeRange === 'year' && parseISO(toParam).getFullYear() >= currYear);
 
           return (
             <div className="space-y-5">
@@ -374,7 +411,11 @@ export function OverviewPage() {
                       {data.kpi.views.value !== null ? count(data.kpi.views.value) : '—'}
                     </div>
                     <div className="mt-1 text-xs text-stone-400">
-                      {data.kpi.views.value === null ? 'Sàn chưa bật theo dõi' : 'Lượt xem sản phẩm trong kỳ'}
+                      {data.kpi.views.value === null
+                        ? 'Sàn chưa bật theo dõi'
+                        : timeRange === 'year'
+                          ? 'Lượt xem sản phẩm trong năm'
+                          : 'Lượt xem sản phẩm trong kỳ'}
                     </div>
                   </div>
                 </div>
@@ -391,7 +432,9 @@ export function OverviewPage() {
                     <div className="text-2xl font-black text-stone-900">
                       {data.kpi.orders.value !== null ? count(data.kpi.orders.value) : '—'}
                     </div>
-                    <div className="mt-1 text-xs text-stone-400">Số đơn trong kỳ đang xem</div>
+                    <div className="mt-1 text-xs text-stone-400">
+                      {timeRange === 'year' ? 'Số đơn trong năm đang xem' : 'Số đơn trong kỳ đang xem'}
+                    </div>
                   </div>
                 </div>
 
@@ -483,7 +526,9 @@ export function OverviewPage() {
                   </div>
 
                   <span className="text-xs text-stone-400 font-medium">
-                    {chartData.length} mốc dữ liệu · theo ngày
+                    {timeRange === 'year'
+                      ? `${chartData.length} năm · so sánh giữa các năm`
+                      : `${chartData.length} mốc dữ liệu · theo ngày`}
                   </span>
                 </div>
 
@@ -533,7 +578,7 @@ export function OverviewPage() {
                           return (
                             <div className="min-w-[210px] rounded-xl border border-stone-200 bg-white/95 p-3 shadow-lg backdrop-blur-sm">
                               <div className="mb-2 border-b border-stone-100 pb-1.5 text-xs font-bold text-stone-800">
-                                Ngày {label}
+                                {label}
                               </div>
                               <div className="space-y-1.5 text-xs">
                                 {showRevenue && (
@@ -581,33 +626,53 @@ export function OverviewPage() {
                           name="Doanh thu"
                           fill="#16a34a"
                           radius={[6, 6, 0, 0]}
-                          maxBarSize={38}
+                          maxBarSize={timeRange === 'year' ? 48 : 38}
                         />
                       )}
-                      {showOrders && (
-                        <Line
-                          yAxisId="right"
-                          type="monotone"
-                          dataKey="orders"
-                          name="Đơn hàng"
-                          stroke="#ea580c"
-                          strokeWidth={2.5}
-                          dot={{ r: 4, fill: '#ea580c', stroke: '#fff', strokeWidth: 2 }}
-                          activeDot={{ r: 6 }}
-                        />
-                      )}
-                      {showViews && (
-                        <Line
-                          yAxisId="right"
-                          type="monotone"
-                          dataKey="views"
-                          name="Lượt xem"
-                          stroke="#2563eb"
-                          strokeWidth={2.5}
-                          dot={{ r: 4, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }}
-                          activeDot={{ r: 6 }}
-                        />
-                      )}
+                      {showOrders &&
+                        (timeRange === 'year' ? (
+                          <Bar
+                            yAxisId="right"
+                            dataKey="orders"
+                            name="Đơn hàng"
+                            fill="#ea580c"
+                            radius={[6, 6, 0, 0]}
+                            maxBarSize={48}
+                          />
+                        ) : (
+                          <Line
+                            yAxisId="right"
+                            type="monotone"
+                            dataKey="orders"
+                            name="Đơn hàng"
+                            stroke="#ea580c"
+                            strokeWidth={2.5}
+                            dot={{ r: 4, fill: '#ea580c', stroke: '#fff', strokeWidth: 2 }}
+                            activeDot={{ r: 6 }}
+                          />
+                        ))}
+                      {showViews &&
+                        (timeRange === 'year' ? (
+                          <Bar
+                            yAxisId="right"
+                            dataKey="views"
+                            name="Lượt xem"
+                            fill="#2563eb"
+                            radius={[6, 6, 0, 0]}
+                            maxBarSize={48}
+                          />
+                        ) : (
+                          <Line
+                            yAxisId="right"
+                            type="monotone"
+                            dataKey="views"
+                            name="Lượt xem"
+                            stroke="#2563eb"
+                            strokeWidth={2.5}
+                            dot={{ r: 4, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }}
+                            activeDot={{ r: 6 }}
+                          />
+                        ))}
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>

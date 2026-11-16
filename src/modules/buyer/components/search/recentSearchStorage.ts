@@ -1,3 +1,5 @@
+import api, { isLoggedIn } from '../../../../infrastructure/api/interceptors';
+
 const KEY = 'vietcraft_recent_searches';
 const MAX = 8;
 
@@ -19,6 +21,34 @@ export function addRecentSearch(keyword: string): void {
 
 export function clearRecentSearches(): void {
   save([]);
+}
+
+export async function loadRecentSearches(): Promise<string[]> {
+  if (!isLoggedIn()) return getRecentSearches();
+  try {
+    const res = await api.get('/products/meta/recent-searches');
+    return Array.isArray(res.data) ? res.data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function rememberSearch(keyword: string): Promise<void> {
+  if (!isLoggedIn()) return addRecentSearch(keyword);
+  try {
+    await api.post('/products/meta/recent-searches', { keyword });
+  } catch {
+    // lỗi mạng thì bỏ qua, lịch sử không quan trọng bằng tìm kiếm
+  }
+}
+
+export async function forgetRecentSearches(): Promise<void> {
+  if (!isLoggedIn()) return clearRecentSearches();
+  try {
+    await api.delete('/products/meta/recent-searches');
+  } catch {
+    // lỗi mạng thì bỏ qua
+  }
 }
 
 function save(list: string[]): void {

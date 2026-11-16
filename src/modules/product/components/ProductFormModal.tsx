@@ -10,6 +10,7 @@ import { ProductFormColorManager } from './ProductFormColorManager';
 import { ProductFormSizeManager } from './ProductFormSizeManager';
 import { ProductFormDescriptionEditor } from './ProductFormDescriptionEditor';
 import { ProposeCategoryModal } from './ProposeCategoryModal';
+import SmartProductAiModal from '../../seller/components/SmartProductAiModal';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ export function ProductFormModal({
     buildSubmitData,
   } = useProductFormState(isOpen, product);
   const [showCatModal, setShowCatModal] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
 
   useFocusFormField(formRef, isOpen, focusField, catalogSettled);
 
@@ -113,6 +115,7 @@ export function ProductFormModal({
             onAddTag={addTag}
             onRemoveNewTag={removeNewTag}
             onProposeCategory={() => setShowCatModal(true)}
+            onOpenAiModal={() => setShowAiModal(true)}
           />
 
           <ProductFormColorManager
@@ -154,8 +157,45 @@ export function ProductFormModal({
           </button>
         </div>
       </div>
+
       {showCatModal && (
         <ProposeCategoryModal categories={categories} onClose={() => setShowCatModal(false)} onCreated={categoryCreated} />
+      )}
+
+      {showAiModal && (
+        <SmartProductAiModal
+          isOpen={showAiModal}
+          onClose={() => setShowAiModal(false)}
+          categories={categories}
+          initialCategory={formData.categoryId}
+          initialTitle={formData.title}
+          initialMaterial={formData.material}
+          blankCost={0}
+          isPod={false}
+          onApplyTitle={(t) => patch({ title: t })}
+          onApplyPrice={(p) => patch({ price: p })}
+          onApplyDescription={(d) => patch({ description: d })}
+          onApplyMaterial={(m) => patch({ material: m })}
+          onApplyTags={(tagList) => {
+            tagList.forEach(t => addTag(t));
+          }}
+          onApplyAll={(aiData) => {
+            const updates: Partial<ProductFormData> = {};
+            if (aiData.title) updates.title = aiData.title;
+            if (aiData.price > 0) updates.price = aiData.price;
+            if (aiData.description) updates.description = aiData.description;
+            if (aiData.material) updates.material = aiData.material;
+            if (aiData.categoryId) {
+              updates.categoryId = aiData.categoryId;
+              const matched = categories.find(c => c._id === aiData.categoryId);
+              if (matched) updates.category = matched.name;
+            }
+            patch(updates);
+            if (aiData.tags && aiData.tags.length > 0) {
+              aiData.tags.forEach(t => addTag(t));
+            }
+          }}
+        />
       )}
     </ModalOverlay>
   );

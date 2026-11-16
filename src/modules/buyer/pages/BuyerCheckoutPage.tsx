@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate, useNavigate, useOutletContext } from 'react-router-dom';
 import {
-    ArrowLeft, Tag, CreditCard, Wallet, Landmark, Truck, Check,
+    ArrowLeft, Tag, Wallet, Truck, Check,
     Ticket, X, Flame, Percent, Coins, Layers,
     ChevronRight, AlertCircle, RefreshCw, Package, Sparkles, Star
 } from 'lucide-react';
@@ -53,7 +53,7 @@ export function BuyerCheckoutPage() {
     });
     const authed = isLoggedIn();
 
-    const [paymentMethod, setPaymentMethod] = useState<'payos' | 'card' | 'bank' | 'cod'>('payos');
+    const [paymentMethod, setPaymentMethod] = useState<'payos' | 'cod'>('payos');
     const [couponCode, setCouponCode] = useState('');
     const [discount, setDiscount] = useState(0);
     const [couponApplied, setCouponApplied] = useState(false);
@@ -261,7 +261,7 @@ export function BuyerCheckoutPage() {
                     size: it.size || 'L',
                     image: it.image
                 })),
-                paymentGateway: paymentMethod === 'cod' ? 'cod' : paymentMethod === 'payos' ? 'payos' : 'vnpay',
+                paymentGateway: paymentMethod,
                 shippingProvider: 'ghn',
                 shopName: items[0]?.shopName || 'VietCraft Shop',
                 shippingAddress: {
@@ -489,38 +489,6 @@ export function BuyerCheckoutPage() {
                                 <div>
                                     <p className="text-xs font-bold">Chuyển khoản QR (payOS)</p>
                                     <p className="text-[11px] text-gray-400 mt-0.5">Quét mã VietQR bằng app ngân hàng</p>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setPaymentMethod('card')}
-                                className={`p-4 rounded-xl border text-left flex items-center gap-3 transition ${
-                                    paymentMethod === 'card'
-                                        ? 'border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500'
-                                        : 'border-gray-200 hover:border-gray-300'
-                                }`}
-                            >
-                                <CreditCard className={paymentMethod === 'card' ? 'text-blue-600' : 'text-gray-400'} size={20} />
-                                <div>
-                                    <p className="text-xs font-bold">Thẻ Quốc tế (Visa, Mastercard)</p>
-                                    <p className="text-[11px] text-gray-400 mt-0.5">Cổng VNPay an toàn</p>
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setPaymentMethod('bank')}
-                                className={`p-4 rounded-xl border text-left flex items-center gap-3 transition ${
-                                    paymentMethod === 'bank'
-                                        ? 'border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500'
-                                        : 'border-gray-200 hover:border-gray-300'
-                                }`}
-                            >
-                                <Landmark className={paymentMethod === 'bank' ? 'text-emerald-600' : 'text-gray-400'} size={20} />
-                                <div>
-                                    <p className="text-xs font-bold">Ngân hàng nội địa (VNPay)</p>
-                                    <p className="text-[11px] text-gray-400 mt-0.5">Thẻ ATM / Internet Banking</p>
                                 </div>
                             </button>
 

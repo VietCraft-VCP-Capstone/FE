@@ -77,20 +77,26 @@ export function SellerChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
+  const activeConvRef = useRef<ConversationItem | null>(null);
+  activeConvRef.current = activeConv;
+
   // Tải danh sách hội thoại từ Backend
   const fetchConversations = useCallback(async () => {
     try {
       const list = await chatService.getConversations();
       setConversations(list);
-      if (!activeConv && list.length > 0) {
-        setActiveConv(list[0]);
-      }
+      setActiveConv((prev) => {
+        if (!prev && list.length > 0) {
+          return list[0];
+        }
+        return prev;
+      });
     } catch (err) {
       console.error('Lỗi lấy danh sách hội thoại seller:', err);
     } finally {
       setLoadingConv(false);
     }
-  }, [activeConv]);
+  }, []);
 
   // Tải tin nhắn của hội thoại đang chọn
   const loadMessages = useCallback(async (convId: string) => {
@@ -122,9 +128,10 @@ export function SellerChatPage() {
 
     const onMessageReceived = (e: any) => {
       const msg: ChatMessage = e.detail;
-      if (activeConv && msg.conversation_id === activeConv.conversation_id) {
+      const current = activeConvRef.current;
+      if (current && msg.conversation_id === current.conversation_id) {
         setMessages((prev) => appendUniqueMessage(prev, msg));
-        markRead(activeConv.conversation_id);
+        markRead(current.conversation_id);
         setTimeout(() => scrollToBottom('smooth'), 50);
       }
       fetchConversations();
@@ -141,16 +148,17 @@ export function SellerChatPage() {
       window.removeEventListener('vietcraft-message-received', onMessageReceived);
       window.removeEventListener('vietcraft-chat-unread-updated', onUnreadUpdated);
     };
-  }, [activeConv, fetchConversations, markRead]);
+  }, [fetchConversations, markRead]);
 
   useEffect(() => {
-    if (activeConv) {
+    if (activeConv?.conversation_id) {
       loadMessages(activeConv.conversation_id);
     }
   }, [activeConv?.conversation_id, loadMessages]);
 
   const handleSelectConv = (conv: ConversationItem) => {
     setActiveConv(conv);
+    loadMessages(conv.conversation_id);
     setConversations((prev) =>
       prev.map((c) => (c.conversation_id === conv.conversation_id ? { ...c, unread_count: 0 } : c))
     );
