@@ -8,12 +8,12 @@ export interface ShopIssue {
 }
 
 const LABEL: Record<string, string> = {
-  image: 'Thêm ảnh rõ nét',
+  image: 'Thêm ảnh cho đủ các góc',
   description: 'Viết mô tả dài và chi tiết hơn',
   tags: 'Gắn thêm tag phù hợp',
   material: 'Ghi rõ chất liệu',
   review: 'Mời khách để lại đánh giá',
-  price: 'Xem lại giá so với sản phẩm tương tự',
+  price: 'Xem lại giá so với hàng cùng chất liệu',
 };
 
 export function commonIssues(items: ListingHealthItem[], limit = 3): ShopIssue[] {

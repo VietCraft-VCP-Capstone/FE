@@ -10,7 +10,7 @@ function priceSentence(pct: number | null) {
 
 function priceHint(pct: number | null, neighbors: number) {
   if (pct !== null && pct <= 10) return `Thuộc nhóm giá thấp nhất trong ${neighbors} sản phẩm gần giống, nên kiểm tra lại biên lợi nhuận`;
-  if (pct !== null && pct >= 90) return `Thuộc nhóm giá cao nhất trong ${neighbors} sản phẩm gần giống, nên nêu rõ điểm khác biệt`;
+  if (pct !== null && pct >= 90) return `Thuộc nhóm giá cao nhất trong ${neighbors} sản phẩm gần giống, nên nêu rõ chất liệu hay điểm khác biệt`;
   return `So với ${neighbors} sản phẩm gần giống nhất`;
 }
 

@@ -10,34 +10,33 @@ import {
   Users,
   Package,
   Eye,
+  ExternalLink,
 } from 'lucide-react';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { HealthTheme } from '../components/health/HealthTheme';
-import { HealthGauge } from '../components/health/HealthGauge';
-import { HeroActions } from '../components/health/HeroActions';
-import { FactorGrid } from '../components/health/FactorGrid';
-import { FactorBreakdownCard } from '../components/health/FactorBreakdownCard';
-import { PriceAdvice } from '../components/health/PriceAdvice';
+import { ScoreHero } from '../components/health/ScoreHero';
+import { ActionPlan } from '../components/health/ActionPlan';
+import { CriteriaTable } from '../components/health/CriteriaTable';
+import { PriceCompare } from '../components/health/PriceCompare';
+import { DateField } from '../components/health/DateField';
 import { WhyScore } from '../components/health/WhyScore';
 import { PartTabs } from '../components/intel/PartTabs';
 import { SeasonPanel } from '../components/intel/SeasonPanel';
 import { ListingTraffic } from '../components/ListingTraffic';
 import { SourceFooter } from '../components/SourceFooter';
-import { visibleTodos } from '../components/health/visibleTodos';
+import { cleanTitle, vnd } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import { INSIGHTS_ROOT } from '../nav';
 import type { ListingHealth } from '../healthTypes';
 import type { ListingIntel } from '../intelTypes';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const QUESTION = 'Chấm điểm chất lượng tin đăng và gợi ý những việc cần làm để tăng đơn hàng.';
 const MAX_DAYS = 730;
 const shiftDays = (days: number) =>
   new Date(Date.now() + days * 86_400_000).toLocaleDateString('sv-SE', {
     timeZone: 'Asia/Ho_Chi_Minh',
   });
-
 
 export function ListingDetailPage() {
   const { id = '' } = useParams();
@@ -49,16 +48,16 @@ function ListingDetail({ id }: { id: string }) {
   const date = ISO_DATE.test(params.get('date') ?? '') ? (params.get('date') as string) : '';
   const health = useInsight<ListingHealth>(id ? `/listings/${id}/health` : null);
   const intel = useInsight<ListingIntel>(id ? `/listings/${id}/intel` : null, { date });
-  const [selectedFactor, setSelectedFactor] = useState<string>('image');
   const [showWhyModal, setShowWhyModal] = useState<boolean>(false);
-  const [intelTab, setIntelTab] = useState<string>('parts');
+  const [intelTab, setIntelTab] = useState<string>('season');
 
   const last = useRef<{ title: string; thumbnail: string | null } | null>(null);
   if (health.state.kind === 'ready') {
     last.current = { title: health.state.data.title, thumbnail: health.state.data.thumbnail };
   }
   const ready = last.current;
-  const productTitle = ready?.title || 'Sản phẩm';
+  const rawTitle = ready?.title || 'Sản phẩm';
+  const productTitle = cleanTitle(rawTitle);
 
   const setDate = (value: string) => {
     const next = new URLSearchParams(params);
@@ -68,25 +67,17 @@ function ListingDetail({ id }: { id: string }) {
   };
 
   const datePicker = (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-1.5">
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-1.5 shadow-2xs">
       <div className="flex items-center gap-1.5 text-xs text-stone-600">
         <Calendar size={13} className="text-stone-400" />
         <span>Xem từ ngày:</span>
       </div>
-      <input
-        id="health-date"
-        type="date"
-        value={date}
-        min={shiftDays(-MAX_DAYS)}
-        max={shiftDays(MAX_DAYS)}
-        onChange={e => setDate(e.target.value)}
-        className="h-7 rounded border border-stone-200 bg-stone-50/50 px-2 text-xs font-medium text-stone-800 outline-none transition-colors focus:border-[#111111]"
-      />
+      <DateField value={date} min={shiftDays(-MAX_DAYS)} max={shiftDays(MAX_DAYS)} onChange={setDate} />
       {date && (
         <button
           type="button"
           onClick={() => setDate('')}
-          className="rounded border border-stone-200 bg-white px-2 py-0.5 text-xs font-medium text-stone-700 hover:bg-stone-50"
+          className="rounded-md border border-stone-200 bg-white px-2 py-0.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 cursor-pointer shadow-2xs"
         >
           Hôm nay
         </button>
@@ -94,67 +85,53 @@ function ListingDetail({ id }: { id: string }) {
     </div>
   );
 
-  const actions = (
-    <div className="flex items-center gap-2">
-      <Link
-        to={`${INSIGHTS_ROOT}/listings`}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:bg-stone-50"
-      >
-        <ArrowLeft size={13} />
-        <span>Tất cả sản phẩm</span>
-      </Link>
-    </div>
-  );
-
   return (
     <HealthTheme>
       <InsightPage
         title="Tối ưu sản phẩm"
-        question={QUESTION}
-        actions={actions}
         breadcrumb={[{ label: 'Tối ưu sản phẩm', to: `${INSIGHTS_ROOT}/listings` }, { label: productTitle }]}
         header={
           <header className="mb-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-stone-200/80 pb-4">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="relative h-14 w-14 shrink-0 rounded-lg border border-stone-200 bg-stone-100 overflow-hidden">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-2xs">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="relative h-16 w-16 sm:h-18 sm:w-18 shrink-0 rounded-2xl border border-stone-200/90 bg-stone-100 overflow-hidden shadow-2xs group">
                   {ready?.thumbnail ? (
                     <img
                       src={ready.thumbnail}
                       alt={productTitle}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-stone-50 text-stone-400">
-                      <Package size={22} strokeWidth={1.5} />
+                      <Package size={28} strokeWidth={1.5} />
                     </div>
                   )}
                 </div>
 
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span
-                      className="font-mono text-[11px] font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded cursor-help"
-                      title="Mã định danh tin đăng trên hệ thống VietCraft"
-                    >
-                      Mã tin: #{id ? id.slice(-8).toUpperCase() : 'N/A'}
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-md bg-stone-100 px-2 py-0.5 font-mono text-[11px] font-bold text-stone-600 border border-stone-200/60" title="Mã tin đăng">
+                      #{id ? id.slice(-8).toUpperCase() : 'N/A'}
                     </span>
-                    <span className="text-stone-300">·</span>
-                    <span className="text-[11px] font-medium text-stone-500">Tin đăng gian hàng</span>
-                    <span className="text-stone-300">·</span>
-                    <span className="text-[11px] font-medium text-stone-400">Đánh giá 6 tiêu chuẩn</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-[#007700] border border-emerald-200/60">
+                      ● Đang đăng bán
+                    </span>
+                    {health.state.kind === 'ready' && health.state.data.breakdown.find(r => r.key === 'price')?.value && (
+                      <span className="inline-flex items-center rounded-full bg-stone-900 text-white px-2.5 py-0.5 text-[11px] font-black">
+                        {vnd(health.state.data.breakdown.find(r => r.key === 'price')?.value)}
+                      </span>
+                    )}
                   </div>
-
-                  <h1 className="m-0 mt-1 truncate font-sans text-xl md:text-2xl font-bold tracking-tight text-[#111111]">
+                  <h1 className="m-0 truncate font-sans text-lg sm:text-xl font-black tracking-tight text-stone-900 leading-snug" title={productTitle}>
                     {productTitle}
                   </h1>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2.5 shrink-0">
                 <Link
                   to={`${INSIGHTS_ROOT}/listings`}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-all duration-150 hover:bg-stone-50 hover:border-stone-300 active:scale-95"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs font-bold text-stone-700 transition hover:bg-stone-50 hover:border-stone-300 shadow-2xs no-underline"
                 >
                   <ArrowLeft size={13} />
                   <span>Tất cả sản phẩm</span>
@@ -164,11 +141,12 @@ function ListingDetail({ id }: { id: string }) {
                   href={`/products/${id}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700 transition-all duration-150 hover:bg-stone-50 hover:border-stone-300 hover:text-[#111111] active:scale-95 no-underline"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#007700] hover:bg-[#005B00] px-4 py-2 text-xs font-bold text-white transition-all shadow-xs no-underline active:scale-95"
                   title="Mở trang sản phẩm hiển thị với người mua trong tab mới"
                 >
-                  <Eye size={13} className="text-stone-400" />
+                  <Eye size={13} />
                   <span>Xem trên sàn</span>
+                  <ExternalLink size={11} className="opacity-75" />
                 </a>
               </div>
             </div>
@@ -177,121 +155,98 @@ function ListingDetail({ id }: { id: string }) {
       >
         <InsightBlock state={health.state} onRetry={health.reload}>
           {(data, meta) => {
-            const todos = visibleTodos(data);
-            const totalImpact = Math.round(todos.reduce((sum, item) => sum + item.impact, 0));
-            const currentScore = Math.floor(data.score ?? 0);
-            const potential = todos.length ? Math.min(100, currentScore + totalImpact) : null;
-
             return (
-              <div className="space-y-5 pt-1 animate-slide-up">
-                <div className="border border-stone-200 bg-white rounded-lg overflow-hidden">
-                  <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-stone-100">
-                    {/* Left: Overall Health Score Gauge (5 cols) */}
-                    <div className="lg:col-span-5 p-5 md:p-6">
-                      <HealthGauge
-                        score={data.score}
-                        potential={potential}
-                        productId={id}
-                        onExplainClick={() => setShowWhyModal(true)}
-                      />
-                    </div>
+              <div className="space-y-6 animate-slide-up">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  {/* Left Column: Action Hub + Criteria + Deep Dive (8 cols) */}
+                  <div className="lg:col-span-8 space-y-6">
+                    {/* 1. Nhiệm vụ tối ưu */}
+                    <section className="rounded-2xl border border-stone-200/90 bg-white p-5 sm:p-6 shadow-2xs">
+                      <ActionPlan data={data} productId={id} />
+                    </section>
 
-                    {/* Right: Minimalist Unified Actions (7 cols) */}
-                    <div className="lg:col-span-7 p-5 md:p-6">
-                      <HeroActions data={data} productId={id} />
-                    </div>
-                  </div>
-                </div>
+                    {/* 2. Bảng 6 tiêu chuẩn chất lượng */}
+                    <section className="rounded-2xl border border-stone-200/90 bg-white p-5 sm:p-6 shadow-2xs">
+                      <CriteriaTable data={data} />
+                    </section>
 
-                {/* 2. Core 6 Performance Standards Grid + Selected Factor Advice */}
-                <div className="border border-stone-200 bg-white rounded-lg overflow-hidden">
-                  <div className="p-5 md:p-6">
-                    <FactorGrid
-                      data={data}
-                      selectedFactor={selectedFactor}
-                      onSelectFactor={setSelectedFactor}
-                    />
-                  </div>
+                    {/* 3. Phân tích chuyên sâu & Xu hướng */}
+                    <section className="rounded-2xl border border-stone-200/90 bg-white p-5 sm:p-6 shadow-2xs">
+                      <div className="mb-3 border-b border-stone-100 pb-2">
+                        <h2 className="m-0 text-base font-bold text-stone-900">Phân tích chuyên sâu</h2>
+                      </div>
 
-                  {/* Contextual guidance tray for selected factor */}
-                  <div className="border-t border-stone-100 bg-[#FBFBFA] p-5 md:p-6">
-                    <FactorBreakdownCard
-                      data={data}
-                      selectedFactor={selectedFactor}
-                    />
-                  </div>
-                </div>
-
-                {/* 3. Market Price Guidance (if available) */}
-                <PriceAdvice data={data} />
-
-                {/* 4. Deep-dive Intelligence Tabs */}
-                <div className="border border-stone-200 bg-white rounded-lg p-5 md:p-6">
-                  <div className="border-b border-stone-100 pb-3 mb-5">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                      Hiệu quả &amp; Xu hướng bán hàng
-                    </span>
-                    <h3 className="m-0 mt-0.5 font-jakarta text-base font-bold text-[#111111]">
-                      Lưu lượng truy cập &amp; Cơ hội tăng đơn
-                    </h3>
-                    <p className="m-0 mt-1 text-xs text-stone-500">
-                      Theo dõi lượt xem, tỷ lệ khách bấm mua và xu hướng theo mùa vụ để lên kế hoạch bán hàng tốt nhất.
-                    </p>
-                  </div>
-
-                  <Tabs
-                    activeKey={intelTab}
-                    onChange={setIntelTab}
-                    items={[
-                      {
-                        key: 'parts',
-                        label: (
-                          <span className="flex items-center gap-1.5 font-semibold text-xs">
-                            <Layers size={13} />
-                            <span>Chẩn đoán từng phần</span>
-                          </span>
-                        ),
-                        children: (
-                          <InsightBlock state={intel.state} onRetry={intel.reload}>
-                            {intelData => <PartTabs data={intelData} productId={id} bare />}
-                          </InsightBlock>
-                        ),
-                      },
-                      {
-                        key: 'season',
-                        label: (
-                          <span className="flex items-center gap-1.5 font-semibold text-xs">
-                            <TrendingUp size={13} />
-                            <span>Mùa vụ &amp; Xu hướng</span>
-                          </span>
-                        ),
-                        children: (
-                          <InsightBlock state={intel.state} onRetry={intel.reload}>
-                            {intelData => (
-                              <div className="space-y-4 pt-2">
-                                <SeasonPanel points={intelData.score_timeline}>{datePicker}</SeasonPanel>
+                      <Tabs
+                        activeKey={intelTab}
+                        onChange={setIntelTab}
+                        items={[
+                          {
+                            key: 'season',
+                            label: (
+                              <span className="flex items-center gap-1.5 font-semibold text-xs py-0.5">
+                                <TrendingUp size={13} />
+                                <span>Mùa vụ &amp; Xu hướng</span>
+                              </span>
+                            ),
+                            children: (
+                              <InsightBlock state={intel.state} onRetry={intel.reload}>
+                                {intelData => (
+                                  <div className="pt-1">
+                                    <SeasonPanel points={intelData.score_timeline} bare>{datePicker}</SeasonPanel>
+                                  </div>
+                                )}
+                              </InsightBlock>
+                            ),
+                          },
+                          {
+                            key: 'parts',
+                            label: (
+                              <span className="flex items-center gap-1.5 font-semibold text-xs py-0.5">
+                                <Layers size={13} />
+                                <span>Chẩn đoán từng phần</span>
+                              </span>
+                            ),
+                            children: (
+                              <InsightBlock state={intel.state} onRetry={intel.reload}>
+                                {intelData => <PartTabs data={intelData} productId={id} bare />}
+                              </InsightBlock>
+                            ),
+                          },
+                          {
+                            key: 'traffic',
+                            label: (
+                              <span className="flex items-center gap-1.5 font-semibold text-xs py-0.5">
+                                <Users size={13} />
+                                <span>Lượt xem &amp; Đơn hàng</span>
+                              </span>
+                            ),
+                            children: (
+                              <div className="pt-1">
+                                {id ? <ListingTraffic id={id} conversionDetail={null} /> : null}
                               </div>
-                            )}
-                          </InsightBlock>
-                        ),
-                      },
-                      {
-                        key: 'traffic',
-                        label: (
-                          <span className="flex items-center gap-1.5 font-semibold text-xs">
-                            <Users size={13} />
-                            <span>Lưu lượng &amp; Chuyển đổi</span>
-                          </span>
-                        ),
-                        children: id ? <ListingTraffic id={id} conversionDetail={null} /> : null,
-                      },
-                    ]}
-                  />
+                            ),
+                          },
+                        ]}
+                      />
+                    </section>
+                  </div>
+
+                  {/* Right Column: Score + Pricing + Snapshot (4 cols) */}
+                  <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-4">
+                    {/* Score Card */}
+                    <section className="rounded-2xl border border-stone-200/90 bg-white p-5 sm:p-6 shadow-2xs">
+                      <ScoreHero data={data} onExplain={() => setShowWhyModal(true)} />
+                    </section>
+
+                    {/* Market Pricing Card */}
+                    <section className="rounded-2xl border border-stone-200/90 bg-white p-5 sm:p-6 shadow-2xs">
+                      <PriceCompare data={data} />
+                    </section>
+                  </div>
                 </div>
 
                 <SourceFooter meta={meta} />
 
-                {/* Plain-Language Scoring Modal */}
                 <Modal
                   open={showWhyModal}
                   onCancel={() => setShowWhyModal(false)}
@@ -304,7 +259,7 @@ function ListingDetail({ id }: { id: string }) {
                       </span>
                     </div>
                   }
-                  width={720}
+                  width={520}
                 >
                   <WhyScore data={data} />
                 </Modal>

@@ -1,4 +1,5 @@
 import { Tabs } from 'antd';
+import { Sparkles, Trophy } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { HealthTheme } from '../components/health/HealthTheme';
 import { InsightBlock } from '../components/InsightBlock';
@@ -14,16 +15,14 @@ import { useInsight, type InsightState } from '../hooks/useInsight';
 import type { HealthRow, ListingHealthList } from '../healthTypes';
 
 function summary(state: InsightState<ListingHealthList>): string {
-  if (state.kind !== 'ready' || state.data.items.length === 0)
-    return 'Đánh giá độ chỉn chu của từng tin đăng từ 0 đến 100 điểm. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Cần chú ý.';
+  if (state.kind !== 'ready' || state.data.items.length === 0) return 'Điểm 0–100 cho từng sản phẩm và việc nên làm để tăng điểm.';
   const scored = state.data.items.filter(i => i.score !== null);
   if (scored.length === 0) return 'Chưa chấm được sản phẩm nào, thử tải lại sau.';
   const weak = scored.filter(i => healthTier(i.score).tone !== 'good').length;
-  const pending = state.data.items.length - scored.length;
-  const waiting = pending ? ` ${pending} sản phẩm đang chờ chấm.` : '';
-  return weak > 0
-    ? `Có ${weak}/${scored.length} sản phẩm cần hoàn thiện thêm để đạt chuẩn tốt (từ 80 điểm). Bắt đầu từ những sản phẩm cần chú ý ở đầu bảng.${waiting}`
-    : `${pending ? 'Các sản phẩm đã chấm đều đạt mức Tốt.' : 'Mọi sản phẩm trong gian hàng đều đã đạt mức Tốt.'}${waiting}`;
+  const urgent = state.data.items.filter(i => i.warnings.some(w => w.type === 'warning')).length;
+  const parts = [weak ? `${weak}/${scored.length} sản phẩm dưới 80 điểm` : 'Mọi sản phẩm đều từ 80 điểm'];
+  if (urgent) parts.push(`${urgent} sản phẩm có lỗi gấp`);
+  return parts.join(' · ');
 }
 
 const ABOUT = (
@@ -32,6 +31,8 @@ const ABOUT = (
     <ul className="m-0 mt-1.5 list-disc space-y-1 pl-4">
       <li>Mỗi sản phẩm có điểm 0 đến 100 từ 6 tiêu chuẩn: ảnh, mô tả, từ khoá, chất liệu, đánh giá và giá cả. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Cần chú ý.</li>
       <li>Yếu tố chưa có dữ liệu được 0 điểm; điểm tối đa của các yếu tố khác giữ nguyên.</li>
+      <li>Giá chỉ so với sản phẩm cùng loại, cùng chất liệu của shop khác; chưa đủ sản phẩm để so thì giá chưa được tính, điểm tính trên các tiêu chuẩn còn lại rồi quy về thang 100.</li>
+      <li>Còn lỗi cần sửa gấp (tên có chữ thừa, chất liệu khai không khớp, bị từ chối kiểm duyệt) thì điểm tạm giới hạn ở 79.</li>
       <li>Bấm tên sản phẩm để xem việc cần làm và phân tích chi tiết.</li>
       <li>Tab Bảng xếp hạng: sản phẩm nào bán chạy, được xem, được thích nhiều.</li>
     </ul>
@@ -82,6 +83,7 @@ function toRows(items: ListingHealthList['items']): HealthRow[] {
       top_todo: action.top_todo,
       top_impact: action.top_impact,
       top_field: action.top_field,
+      urgent: i.warnings.some(w => w.type === 'warning'),
       issue_fields: [
         ...new Set([
           ...i.todos.map(t => t.field).filter((f): f is string => Boolean(f)),
@@ -117,7 +119,26 @@ export function ListingsPage() {
         <Tabs
           activeKey={view}
           onChange={key => setParams(key === 'ranking' ? new URLSearchParams({ view: 'ranking' }) : new URLSearchParams(), { replace: true })}
-          items={[{ key: 'health', label: 'Điểm tối ưu & việc cần làm' }, { key: 'ranking', label: 'Bảng xếp hạng' }]}
+          items={[
+            {
+              key: 'health',
+              label: (
+                <span className="flex items-center gap-1.5 font-semibold text-xs py-0.5">
+                  <Sparkles size={13} className="text-[#007700]" />
+                  <span>Điểm &amp; việc cần làm</span>
+                </span>
+              ),
+            },
+            {
+              key: 'ranking',
+              label: (
+                <span className="flex items-center gap-1.5 font-semibold text-xs py-0.5">
+                  <Trophy size={13} />
+                  <span>Xếp hạng</span>
+                </span>
+              ),
+            },
+          ]}
           className="!-mb-1"
         />
         {view === 'ranking' ? (

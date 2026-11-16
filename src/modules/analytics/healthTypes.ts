@@ -93,6 +93,7 @@ export interface HealthRow {
   top_todo: string | null;
   top_impact: number | null;
   top_field: string | null;
+  urgent?: boolean;
   issue_fields?: string[];
 }
 
@@ -100,7 +101,8 @@ export interface HealthFactor {
   key: HealthFactorKey;
   label: string;
   weight: number;
-  sub_score: number;
+  sub_score: number | null;
+  scored?: boolean;
   points: number;
   value: number | null;
   target: number | null;
@@ -108,8 +110,17 @@ export interface HealthFactor {
   missing: boolean;
   pending?: number;
   n_good?: number;
-  reference?: { price: number | null; source: 'category' | 'group' | 'model' | 'tiki' | null; n: number };
-  suggestion?: { low: number; mid: number; high: number } | null;
+  reference?: {
+    price: number | null;
+    source: 'material' | 'category' | 'group' | 'model' | 'tiki' | null;
+    n: number;
+    comparable?: boolean;
+    materials?: string[];
+    prices?: number[];
+    same_n?: number;
+  };
+  suggestion?: { low: number; high: number } | null;
+  full?: { low: number; high: number } | null;
 }
 
 export interface HealthItem {
@@ -136,6 +147,7 @@ export interface ListingHealth {
   breakdown: HealthFactor[];
   todos: HealthItem[];
   warnings: HealthItem[];
+  cap?: { score: number; raw: number; fields: string[] } | null;
   basis: {
     weights: Record<HealthFactorKey, number>;
     trained_on: string;
@@ -165,6 +177,7 @@ export interface SellChanceAdvice {
 
 export interface SellChance {
   product_id: string;
+  method?: 'model' | 'cold_start';
   score: number;
   probability: number;
   peer_group: { type: 'category' | 'platform'; name: string | null; size: number };

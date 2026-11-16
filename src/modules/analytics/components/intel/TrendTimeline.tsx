@@ -29,7 +29,7 @@ function DemandBadge({ factor }: { factor: number | null }) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
         <TrendingUp size={12} className="text-emerald-700" />
-        <span>Tăng mạnh (+15%)</span>
+        <span>Cao</span>
       </span>
     );
   }
@@ -66,33 +66,24 @@ export function TrendTimeline({
         <Note>Chưa có dữ liệu theo tuần.</Note>
       ) : (
         <div className="space-y-5">
-          {/* Actionable E-commerce Campaign Calendar Box */}
-          <div className="p-3.5 rounded-lg border border-emerald-200 bg-emerald-50/40 text-xs">
-            <div className="flex items-center gap-1.5 font-bold text-emerald-950 mb-2">
-              <Sparkles size={14} className="text-emerald-700" />
-              <span>Kế hoạch chuẩn bị cho các đợt Siêu Sale trong 8 tuần tới:</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-              <div className="p-2.5 rounded bg-white border border-emerald-100 hover:border-emerald-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200">
-                <span className="font-bold text-stone-900 block">Siêu Sale 11/11 (09/11)</span>
-                <span className="text-[11px] text-stone-500 block mt-0.5">
-                  Đợt sale lớn đầu quý 4. Nên chuẩn bị đủ tồn kho và tạo mã giảm giá trước 05/11 để khách cho vào giỏ hàng.
-                </span>
+          {marked.length > 0 && (
+            <div className="p-3.5 rounded-lg border border-emerald-200 bg-emerald-50/40 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-950 mb-2">
+                <Sparkles size={14} className="text-emerald-700" />
+                <span>Dịp mua sắm trong {points.length} tuần tới:</span>
               </div>
-              <div className="p-2.5 rounded bg-white border border-emerald-100 hover:border-emerald-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200">
-                <span className="font-bold text-stone-900 block">Black Friday (23/11)</span>
-                <span className="text-[11px] text-stone-500 block mt-0.5">
-                  Cơ hội xả kho các mẫu cũ và chạy combo mua 2 giảm 10% để kéo doanh thu.
-                </span>
-              </div>
-              <div className="p-2.5 rounded bg-white border border-emerald-100 hover:border-emerald-300 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200">
-                <span className="font-bold text-stone-900 block">Siêu Sale 12/12 (07/12)</span>
-                <span className="text-[11px] text-stone-500 block mt-0.5">
-                  Đỉnh điểm mua sắm quà tặng và đồ diện Tết. Tỷ lệ khách chốt đơn cao nhất năm.
-                </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                {marked.slice(0, 3).map(p => (
+                  <div key={p.week_start} className="p-2.5 rounded bg-white border border-emerald-100">
+                    <span className="font-bold text-stone-900 block">{p.events.join(', ')}</span>
+                    <span className="text-[11px] text-stone-500 block mt-0.5">
+                      Tuần từ {shortDate(p.week_start)}. Chuẩn bị hàng và khuyến mãi trước 1–2 tuần.
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Adaptive Line Chart */}
           <div className="border border-stone-200 rounded-lg p-3 bg-white">

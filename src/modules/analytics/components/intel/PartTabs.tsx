@@ -30,8 +30,10 @@ function panel(part: Part, data: ListingIntel, productId?: string): ReactNode {
   return productId ? <SellChanceCard productId={productId} /> : null;
 }
 
-function weakest(data: ListingIntel): IntelAxisKey {
-  const scored = AXIS_KEYS.filter(k => data.axes[k].score !== null);
+const DETAIL_KEYS: IntelAxisKey[] = ['image', 'text', 'tags'];
+
+function weakest(data: ListingIntel, keys: IntelAxisKey[]): IntelAxisKey {
+  const scored = keys.filter(k => data.axes[k].score !== null);
   return scored.length ? scored.reduce((a, b) => ((data.axes[b].score as number) < (data.axes[a].score as number) ? b : a)) : 'image';
 }
 
@@ -44,8 +46,9 @@ export function PartTabs({
   productId?: string;
   bare?: boolean;
 }) {
-  const [active, setActive] = useState<Part>(() => weakest(data));
-  const parts: Part[] = productId ? [...AXIS_KEYS, 'sell'] : AXIS_KEYS;
+  const keys = productId ? DETAIL_KEYS : AXIS_KEYS;
+  const [active, setActive] = useState<Part>(() => weakest(data, keys));
+  const parts: Part[] = productId ? [...keys, 'sell'] : keys;
 
   const tabItems = parts.map(p => {
     const Icon = TAB_ICONS[p] ?? Layers;
@@ -54,7 +57,7 @@ export function PartTabs({
       label: (
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
           <Icon size={14} />
-          {p === 'sell' ? 'Độ sẵn sàng chuyển đổi' : AXIS_SIMPLE[p]}
+          {p === 'sell' ? 'Dự đoán đơn hàng' : AXIS_SIMPLE[p]}
         </span>
       ),
       children: (
@@ -80,7 +83,7 @@ export function PartTabs({
             Xem kỹ từng phần (Chẩn đoán chuyên sâu)
           </h2>
           <p className="m-0 mt-0.5 text-xs text-stone-500">
-            Phân tích chi tiết chất lượng ảnh chụp, bộ từ khoá SEO, tag phân loại và năng lực cạnh tranh
+            Phân tích chi tiết chất lượng ảnh chụp, từ khoá tìm kiếm, tag phân loại và giá so với hàng tương tự
           </p>
         </div>
       </div>

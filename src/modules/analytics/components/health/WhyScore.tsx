@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
-import { Database, ShieldCheck, Info } from 'lucide-react';
+import { Tooltip } from 'antd';
+import { Database, Info, Lock, Scale } from 'lucide-react';
+import { SERIES } from '../../../../shared/components/charts/chartTheme';
 import { decimal } from '../../format';
 import type { HealthFactorKey, ListingHealth } from '../../healthTypes';
 import { PART, SOURCE } from './whyText';
@@ -12,15 +14,13 @@ function liftText(markets: ListingHealth['basis']['markets']): string | null {
   return lo === hi ? `${lo} lần` : `${lo} đến ${hi} lần`;
 }
 
-function SectionCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+function Note({ icon, children, tip }: { icon: ReactNode; children: ReactNode; tip?: string }) {
+  const body = <span className={tip ? 'cursor-help border-b border-dotted border-stone-300' : ''}>{children}</span>;
   return (
-    <div className="rounded-lg border border-stone-200 bg-[#FBFBFA] p-3.5">
-      <div className="flex items-center gap-1.5 mb-2">
-        <span className="text-stone-600">{icon}</span>
-        <h4 className="m-0 font-jakarta text-xs font-bold text-[#111111]">{title}</h4>
-      </div>
-      <div className="text-xs leading-relaxed text-stone-600">{children}</div>
-    </div>
+    <li className="flex items-start gap-2 text-xs text-stone-700">
+      <span className="mt-px shrink-0 text-stone-400">{icon}</span>
+      {tip ? <Tooltip title={tip}>{body}</Tooltip> : body}
+    </li>
   );
 }
 
@@ -28,72 +28,42 @@ export function WhyScore({ data }: { data: ListingHealth }) {
   const { weights, markets, sources } = data.basis;
   const lift = liftText(markets);
   const parts = (Object.keys(weights) as HealthFactorKey[]).sort((a, b) => weights[b] - weights[a]);
-  const top = parts.slice(0, 3).map(k => PART[k].label.toLowerCase());
+  const max = Math.max(...parts.map(k => weights[k]));
 
   return (
     <div className="space-y-5 pt-1">
       <div>
-        <p className="m-0 mb-3 text-xs font-semibold text-stone-700">
-          Thang điểm 100 phân bổ theo mức độ ảnh hưởng đến quyết định mua của khách:
-        </p>
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        <p className="m-0 mb-2 text-xs text-stone-500">100 điểm chia cho 6 tiêu chí · rê chuột để xem lý do</p>
+        <ul className="m-0 list-none space-y-1.5 p-0">
           {parts.map(k => (
-            <div key={k} className="flex flex-col justify-between rounded-lg border border-stone-200 bg-white p-3 shadow-2xs">
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-jakarta text-xs font-bold text-stone-900">{PART[k].label}</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[#EAF0E2] text-[#007700] border border-[#BECAB6] font-mono">
-                    Tối đa {weights[k]}đ
-                  </span>
-                </div>
-                <p className="m-0 text-xs leading-relaxed text-stone-600">{PART[k].why}</p>
-              </div>
-              {sources?.[k] && (
-                <div className="mt-2.5 pt-2 border-t border-stone-100 text-[10px] text-stone-400">
-                  {SOURCE[sources[k]!]}
-                </div>
-              )}
-            </div>
+            <Tooltip key={k} title={[PART[k].why, sources?.[k] && SOURCE[sources[k]!]].filter(Boolean).join(' · ')} placement="right">
+              <li className="grid cursor-help grid-cols-[5.5rem_1fr_2.5rem] items-center gap-3 text-xs">
+                <span className="text-stone-700">{PART[k].label}</span>
+                <span className="block h-2.5 rounded-[4px] bg-stone-100">
+                  <span className="block h-2.5 rounded-[4px]" style={{ width: `${(weights[k] / max) * 100}%`, background: SERIES.green }} />
+                </span>
+                <span className="text-right font-semibold tabular-nums text-stone-800">{weights[k]}đ</span>
+              </li>
+            </Tooltip>
           ))}
-        </div>
+        </ul>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <SectionCard title="1. Dữ liệu thực nghiệm" icon={<Database size={14} />}>
-          <p className="m-0">
-            Trọng số được học từ hành vi mua hàng thực tế trên sàn, đo lường sự khác biệt giữa các sản phẩm bán chạy và bán chậm.
-          </p>
-          {lift && (
-            <p className="m-0 mt-2 font-semibold text-[#007700]">
-              Thực tế: Sản phẩm điểm cao có tỉ lệ bán chạy gấp {lift} sản phẩm điểm thấp.
-            </p>
-          )}
-        </SectionCard>
-
-        <SectionCard title="2. Thứ tự ưu tiên" icon={<ShieldCheck size={14} />}>
-          <p className="m-0">
-            Thứ tự ưu tiên quan trọng nhất luôn là:{' '}
-            <strong className="text-[#111111]">{top.join(' → ')}</strong>.
-          </p>
-          <p className="m-0 mt-2">
-            Hãy tập trung hoàn thiện ảnh và mô tả sản phẩm trước khi xét đến các yếu tố khác.
-          </p>
-        </SectionCard>
-
-        <SectionCard title="3. Mục đích sử dụng" icon={<Info size={14} />}>
-          <p className="m-0">
-            Điểm tối ưu sản phẩm là công cụ chẩn đoán giúp bạn tự phát hiện điểm còn thiếu để hoàn thiện thông tin sản phẩm.
-          </p>
-          <p className="m-0 mt-2 text-stone-500">
-            Sàn không tự động phạt hay hạ bậc tin đăng nếu điểm chưa cao.
-          </p>
-        </SectionCard>
-      </div>
-
-      <div className="rounded-lg border border-[#D5E6D4] bg-[#EDF3EC]/60 p-3.5 text-xs leading-relaxed text-[#254C28]">
-        <span className="font-bold">Lưu ý về định giá sản phẩm:</span>{' '}
-        Tiêu chuẩn Giá đo lường mức độ cạnh tranh của sản phẩm so với mặt bằng chung cùng ngành trên sàn. Sàn không ép bạn phải bán rẻ để lấy điểm cao. Nếu sản phẩm của bạn có chất lượng vượt trội hoặc có quà tặng kèm, hãy nêu rõ trong phần mô tả hoặc tạo thêm mã giảm giá (voucher) để thu hút khách hàng.
-      </div>
+      <ul className="m-0 list-none space-y-2 border-t border-stone-100 p-0 pt-4">
+        <Note
+          icon={<Database size={13} />}
+          tip={lift ? `Trên dữ liệu đối soát thực nghiệm, nhóm tin đăng tối ưu đầy đủ tiêu chuẩn có tỷ lệ tiếp cận và chuyển đổi đơn hàng gấp ${lift} so với nhóm chưa tối ưu.` : undefined}
+        >
+          Trọng số được học từ dữ liệu thương mại điện tử thực tế, kiểm định trên Tiki & Shopee, và đang được tinh chỉnh liên tục theo ngành hàng thủ công VietCraft.
+        </Note>
+        <Note icon={<Scale size={13} />} tip="Chưa đủ hàng như vậy để so thì giá chưa tính: điểm tính trên các tiêu chí còn lại rồi quy về thang 100.">
+          Giá chỉ tính khi so được với hàng cùng loại, cùng chất liệu của shop khác.
+        </Note>
+        <Note icon={<Lock size={13} />} tip="Tên có chữ thừa hoặc số điện thoại, chất liệu khai không khớp, bị từ chối kiểm duyệt.">
+          Còn lỗi cần sửa gấp thì điểm tạm dừng ở 79.
+        </Note>
+        <Note icon={<Info size={13} />}>Điểm chỉ để tự kiểm tra. Sàn không phạt hay hạ bậc tin đăng vì điểm thấp.</Note>
+      </ul>
     </div>
   );
 }
