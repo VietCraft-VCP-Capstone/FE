@@ -1035,6 +1035,25 @@ body:has(.seller-layout) {
     }
 }
 
+/* Điện thoại: logo + nút ở hàng trên, ô tìm kiếm xuống hàng riêng để không đẩy nút ra ngoài màn hình. */
+@media (max-width: 640px) {
+    .buyer-header-container {
+        flex-wrap: wrap;
+        row-gap: 10px;
+    }
+
+    .buyer-search-bar {
+        order: 3;
+        flex: 1 1 100%;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .buyer-actions {
+        gap: 8px;
+    }
+}
+
 .buyer-actions {
     display: flex;
     align-items: center;
@@ -1176,6 +1195,33 @@ body:has(.seller-layout) {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
+}
+
+/* Giảm số cột theo bề rộng: thẻ sản phẩm không hẹp hơn ~150px, tên và giá không bị cắt. */
+@media (max-width: 1024px) {
+    .buyer-grid-5 {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .buyer-grid-5,
+    .buyer-grid-4 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .buyer-grid-5,
+    .buyer-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .buyer-grid-3 {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
 }
 
 /* Card representations */
@@ -1508,6 +1554,18 @@ body:has(.seller-layout) {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+/* Màn hẹp: khối thương hiệu một hàng, các cột link chia 2 cột thay vì 4 cột bị bóp còn một chữ mỗi dòng. */
+@media (max-width: 768px) {
+    .footer-layout {
+        grid-template-columns: 1fr 1fr;
+        gap: 28px 20px;
+    }
+
+    .footer-layout .brand-col {
+        grid-column: 1 / -1;
+    }
 }
 
 .footer-col h3 {
