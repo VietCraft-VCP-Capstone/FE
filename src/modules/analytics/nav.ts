@@ -42,7 +42,7 @@ export const INSIGHTS_NAV: InsightNavGroup[] = [
       { to: `${INSIGHTS_ROOT}/overview`, label: 'Tổng quan shop', icon: LayoutGrid, feature: 'F26' },
       { to: `${INSIGHTS_ROOT}/money`, label: 'Thực nhận & Voucher', icon: Wallet, feature: 'F43' },
       { to: `${INSIGHTS_ROOT}/alerts`, label: 'Cảnh báo bất thường', icon: BellRing, feature: 'F30' },
-      { to: `${INSIGHTS_ROOT}/listings`, label: 'Sức khoẻ sản phẩm', icon: Eye, feature: 'F27 · F28 · F29' },
+      { to: `${INSIGHTS_ROOT}/listings`, label: 'Tối ưu sản phẩm', icon: Eye, feature: 'F27 · F28 · F29' },
     ],
   },
   {

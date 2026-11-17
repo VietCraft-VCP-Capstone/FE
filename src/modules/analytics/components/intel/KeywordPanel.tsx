@@ -1,181 +1,88 @@
-import { ArrowDownRight, ArrowUpRight, Minus, Lightbulb, Sparkles } from 'lucide-react';
+import { Tooltip } from 'antd';
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { SERIES } from '../../../../shared/components/charts/chartTheme';
+import { decimal } from '../../format';
 import type { IntelKeyword, IntelMaterial } from '../../intelTypes';
 import { InsightCard } from '../ui';
 
-function TrendBadge({ value }: { value: IntelKeyword['trend'] }) {
-  if (value === 'up') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-        <ArrowUpRight size={12} className="text-emerald-700" />
-        <span>Đang tăng tìm kiếm</span>
-      </span>
-    );
-  }
-  if (value === 'down') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-        <ArrowDownRight size={12} className="text-amber-700" />
-        <span>Đang hạ nhiệt</span>
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-stone-100 text-stone-600">
-      <Minus size={11} className="text-stone-400" />
-      <span>Ổn định quanh năm</span>
-    </span>
-  );
+const ABOUT = 'Lấy từ dữ liệu sản phẩm trên Tiki: so tần suất một từ xuất hiện trong tên hàng bán chạy (top 25% theo lượt bán) với tất cả sản phẩm cùng nhóm. ×1 là ngang mức chung.';
+
+function tip(term: string, lift: number) {
+  const r = Math.exp(lift);
+  return r >= 1
+    ? `Ở hàng bán chạy, "${term}" xuất hiện nhiều gấp ${decimal(r, 1)} lần mức chung.`
+    : `Ở hàng bán chạy, "${term}" xuất hiện ít hơn mức chung ${Math.round((1 - r) * 100)}%.`;
 }
 
-function LiftIndicator({ value }: { value: number | null }) {
-  if (value === null) {
-    return <span className="text-xs text-stone-400">Đang cập nhật</span>;
-  }
-
-  if (value >= 0.25) {
-    return (
-      <div className="flex flex-col items-start gap-0.5">
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-          Rất phổ biến (Top bán chạy)
-        </span>
-        <span className="text-[10px] text-stone-400">Khách gõ tìm kiếm nhiều nhất</span>
-      </div>
-    );
-  }
-
-  if (value > 0) {
-    return (
-      <div className="flex flex-col items-start gap-0.5">
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
-          Phổ biến
-        </span>
-        <span className="text-[10px] text-stone-400">Xuất hiện đều đặn trong tìm kiếm</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-start gap-0.5">
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-stone-100 text-stone-600">
-        Từ khoá phụ / ngách
-      </span>
-      <span className="text-[10px] text-stone-400">Ít cạnh tranh hơn</span>
-    </div>
-  );
-}
-
-function MaterialBanner({ material }: { material: IntelMaterial }) {
+function MaterialLine({ material }: { material: IntelMaterial }) {
   const found = material.declared.length ? material.declared : material.detected;
-
-  if (found.length > 0 && material.declared.length === 0) {
-    return (
-      <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/60 text-xs leading-relaxed text-amber-900 flex items-start gap-2.5">
-        <Lightbulb size={15} className="shrink-0 text-amber-700 mt-0.5" />
-        <div>
-          <span className="font-semibold block">Hệ thống phát hiện chất liệu: {found.join(', ')}</span>
-          <p className="m-0 mt-0.5 text-stone-600">
-            Bạn có nhắc đến chất liệu trong bài viết nhưng chưa điền vào ô "Chất liệu" ở trang sửa sản phẩm. Hãy điền vào để sản phẩm hiển thị khi người mua lọc tìm kiếm theo chất liệu vải.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (found.length > 0) {
-    return (
-      <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/50 text-xs leading-relaxed text-emerald-900 flex items-center gap-2">
-        <span className="font-semibold">✓ Đã xác nhận chất liệu:</span>
-        <span className="font-bold text-stone-800">{found.join(', ')}</span>
-      </div>
-    );
-  }
-
-  return null;
+  if (!found.length) return null;
+  const declared = material.declared.length > 0;
+  return (
+    <p className={`m-0 text-xs ${declared ? 'text-stone-600' : 'text-amber-800'}`}>
+      {declared ? 'Chất liệu đã khai: ' : 'Tên có nhắc chất liệu nhưng ô Chất liệu còn trống: '}
+      <b className="text-stone-800">{found.join(', ')}</b>
+    </p>
+  );
 }
 
-export function KeywordPanel({
-  keywords,
-  material,
-  bare = false,
-}: {
-  keywords: IntelKeyword[];
-  material: IntelMaterial;
-  bare?: boolean;
-}) {
-  const cleanKeywords = keywords.filter(k => {
-    const term = k.term.trim().toLowerCase();
-    if (/^\d+$/.test(term)) return false;
-    if (term.length <= 2) return false;
-    if (['cổ', 'áo', 'tròn'].includes(term)) return false;
-    return true;
-  });
+function Row({ k, max }: { k: IntelKeyword; max: number }) {
+  const lift = k.lift;
+  const half = lift === null ? 0 : (Math.abs(lift) / max) * 50;
+  return (
+    <li className="grid grid-cols-[8rem_1fr_3rem] items-center gap-3 text-xs sm:grid-cols-[10rem_1fr_3rem]">
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="truncate text-stone-800">{k.term}</span>
+        {!k.in_title && <span className="shrink-0 rounded bg-stone-100 px-1 text-[10px] text-stone-500">chưa có trong tên</span>}
+        {k.trend === 'up' && <ArrowUpRight size={12} className="shrink-0 text-[#1a6b1a]" aria-label="Đang được tìm nhiều hơn" />}
+        {k.trend === 'down' && <ArrowDownRight size={12} className="shrink-0 text-amber-700" aria-label="Đang được tìm ít đi" />}
+      </span>
+      <Tooltip title={lift === null ? 'Chưa đủ dữ liệu' : tip(k.term, lift)}>
+        <span className="relative block h-3 cursor-help">
+          <span className="absolute inset-y-0 left-1/2 w-px bg-stone-300" aria-hidden />
+          {lift !== null && (
+            <span
+              className="absolute top-0.5 h-2 rounded-[3px]"
+              style={lift >= 0
+                ? { left: '50%', width: `${Math.max(half, 1)}%`, background: SERIES.green }
+                : { right: '50%', width: `${Math.max(half, 1)}%`, background: '#d6a35c' }}
+            />
+          )}
+        </span>
+      </Tooltip>
+      <span className="text-right font-semibold tabular-nums text-stone-800">{lift === null ? '–' : `×${decimal(Math.exp(lift), 1)}`}</span>
+    </li>
+  );
+}
+
+export function KeywordPanel({ keywords, material, bare = false }: { keywords: IntelKeyword[]; material: IntelMaterial; bare?: boolean }) {
+  const materials = new Set([...material.declared, ...material.detected].map(m => m.toLowerCase()));
+  const shown = keywords
+    .filter(k => {
+      const term = k.term.trim().toLowerCase();
+      return !/^\d+$/.test(term) && (term.includes(' ') || materials.has(term));
+    })
+    .sort((a, b) => (b.lift ?? -9) - (a.lift ?? -9));
+  const max = Math.max(0.3, ...shown.map(k => Math.abs(k.lift ?? 0)));
 
   return (
-    <InsightCard
-      bare={bare}
-      title="Từ khoá trong Tên & Mô tả"
-      info="Phân tích các từ khoá trong bài đăng của bạn so với nhóm sản phẩm bán chạy nhất cùng ngành hàng."
-    >
-      <div className="space-y-4">
-        <MaterialBanner material={material} />
-
-        {/* Practical SEO Title Formula Box */}
-        <div className="p-3.5 rounded-lg border border-stone-200 bg-[#FBFBFA]">
-          <div className="flex items-center gap-2 text-xs font-bold text-stone-900">
-            <Sparkles size={14} className="text-emerald-700" />
-            <span>Công thức đặt Tên sản phẩm chuẩn SEO (Dễ lên top tìm kiếm):</span>
-          </div>
-          <p className="m-0 mt-1.5 font-mono text-xs text-stone-700 bg-white p-2 rounded border border-stone-200">
-            [Tên loại sản phẩm] + [Chất liệu nổi bật] + [Kiểu dáng / Đặc tính] + [Đối tượng / Dịp sử dụng]
-          </p>
-          <p className="m-0 mt-1.5 text-[11px] text-stone-500">
-            💡 Ví dụ: <span className="font-medium text-stone-700">Áo Thun Trơn Cổ Tròn Cotton 100% Form Rộng Unisex Nhiều Màu</span>
-          </p>
-        </div>
-
-        {/* Intuitive Keyword Table */}
-        {cleanKeywords.length === 0 ? (
-          <div className="py-6 text-center text-xs text-stone-500">
-            Chưa tìm thấy từ khoá nổi bật trong tiêu đề. Hãy bổ sung thêm các từ khoá như chất liệu, kiểu dáng vào tên sản phẩm.
-          </div>
+    <InsightCard bare={bare} title="Từ trong tên có hay gặp ở hàng bán chạy không?" info={ABOUT}>
+      <div className="max-w-3xl space-y-3">
+        <MaterialLine material={material} />
+        {shown.length === 0 ? (
+          <p className="m-0 py-4 text-center text-xs text-stone-500">Tên chưa có từ khoá nổi bật. Nên có loại hàng, chất liệu, kiểu dáng.</p>
         ) : (
-          <div className="border border-stone-200 rounded-lg overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-semibold">
-                <tr>
-                  <th className="py-2.5 px-3.5">Từ khoá nhận diện</th>
-                  <th className="py-2.5 px-3.5">Mức độ phổ biến khi tìm kiếm</th>
-                  <th className="py-2.5 px-3.5">Xu hướng thị trường</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100 bg-white">
-                {cleanKeywords.map((k) => (
-                  <tr key={k.term} className="hover:bg-stone-50/70 transition-colors duration-150">
-                    <td className="py-3 px-3.5 font-semibold text-stone-900">
-                      <div className="flex items-center gap-2">
-                        <span>{k.term}</span>
-                        {k.in_title ? (
-                          <span className="font-normal text-[10px] text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded">
-                            Có trong tên
-                          </span>
-                        ) : (
-                          <span className="font-normal text-[10px] text-stone-500 bg-stone-100 px-1.5 py-0.2 rounded">
-                            Chỉ có ở mô tả
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-3.5">
-                      <LiftIndicator value={k.lift} />
-                    </td>
-                    <td className="py-3 px-3.5">
-                      <TrendBadge value={k.trend} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="grid grid-cols-[8rem_1fr_3rem] gap-3 text-[11px] text-stone-400 sm:grid-cols-[10rem_1fr_3rem]">
+              <span>Từ</span>
+              <span className="flex justify-between"><span>← ít gặp hơn</span><span>×1</span><span>gặp nhiều hơn →</span></span>
+              <span className="text-right">Số lần</span>
+            </div>
+            <ul className="m-0 list-none space-y-2 p-0">
+              {shown.map(k => <Row key={k.term} k={k} max={max} />)}
+            </ul>
+            <p className="m-0 text-[11px] text-stone-400">So hàng bán chạy với mức chung của cùng nhóm hàng, dữ liệu Tiki.</p>
+          </>
         )}
       </div>
     </InsightCard>

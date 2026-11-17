@@ -28,8 +28,8 @@ function ImageTile({ img, index }: { img: IntelImage; index: number }) {
         {img.style && <Chip tone="info">{STYLE_LABEL[img.style] ?? img.style}</Chip>}
         {img.issues.map(i => (
           <Tooltip key={i.code} title={ISSUE_HINT[i.code] ?? issueText(i)}>
-            <span className="cursor-help inline-block">
-              <Chip tone="warn">{issueText(i)}</Chip>
+            <span className="cursor-help inline-block max-w-full">
+              <Chip tone="warn" wrap>{issueText(i)}</Chip>
             </span>
           </Tooltip>
         ))}

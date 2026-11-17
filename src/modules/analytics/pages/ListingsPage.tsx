@@ -1,37 +1,26 @@
 import { Tabs } from 'antd';
+import { Sparkles, Trophy } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { HealthTheme } from '../components/health/HealthTheme';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
-import { commonIssues } from '../components/health/commonIssues';
+import { commonIssues, URGENT } from '../components/health/commonIssues';
 import { HealthList, TIERS, type TierFilter } from '../components/intel/HealthList';
-import { healthTier } from '../components/intel/intelLabels';
 import { ShopOverview } from '../components/intel/ShopOverview';
 import { RankingView } from '../components/ranking/RankingView';
 import { SourceFooter } from '../components/SourceFooter';
 import { Note } from '../components/ui';
-import { useInsight, type InsightState } from '../hooks/useInsight';
+import { useInsight } from '../hooks/useInsight';
 import type { HealthRow, ListingHealthList } from '../healthTypes';
-
-function summary(state: InsightState<ListingHealthList>): string {
-  if (state.kind !== 'ready' || state.data.items.length === 0)
-    return 'Đánh giá độ chỉn chu của từng tin đăng từ 0 đến 100 điểm. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Cần chú ý.';
-  const scored = state.data.items.filter(i => i.score !== null);
-  if (scored.length === 0) return 'Chưa chấm được sản phẩm nào, thử tải lại sau.';
-  const weak = scored.filter(i => healthTier(i.score).tone !== 'good').length;
-  const pending = state.data.items.length - scored.length;
-  const waiting = pending ? ` ${pending} sản phẩm đang chờ chấm.` : '';
-  return weak > 0
-    ? `Có ${weak}/${scored.length} sản phẩm cần hoàn thiện thêm để đạt chuẩn tốt (từ 80 điểm). Bắt đầu từ những sản phẩm cần chú ý ở đầu bảng.${waiting}`
-    : `${pending ? 'Các sản phẩm đã chấm đều đạt mức Tốt.' : 'Mọi sản phẩm trong gian hàng đều đã đạt mức Tốt.'}${waiting}`;
-}
 
 const ABOUT = (
   <>
-    <strong>Sức khoẻ sản phẩm cho biết sản phẩm nào đăng chưa tốt và nên sửa gì trước.</strong>
+    <strong>Điểm tối ưu sản phẩm cho biết sản phẩm nào chưa tối ưu tốt và nên sửa gì trước để hút khách.</strong>
     <ul className="m-0 mt-1.5 list-disc space-y-1 pl-4">
-      <li>Mỗi sản phẩm có điểm 0 đến 100 từ 6 tiêu chuẩn: ảnh, mô tả, từ khoá, chất liệu, đánh giá và giá cả. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Cần chú ý.</li>
+      <li>Mỗi sản phẩm có điểm 0 đến 100 từ 6 tiêu chuẩn: ảnh, mô tả, từ khoá, chất liệu, đánh giá và giá cả. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Yếu.</li>
       <li>Yếu tố chưa có dữ liệu được 0 điểm; điểm tối đa của các yếu tố khác giữ nguyên.</li>
+      <li>Giá chỉ so với sản phẩm cùng loại, cùng chất liệu của shop khác; chưa đủ sản phẩm để so thì giá chưa được tính, điểm tính trên các tiêu chuẩn còn lại rồi quy về thang 100.</li>
+      <li>Còn lỗi cần sửa gấp (tên có chữ thừa, chất liệu khai không khớp, bị từ chối kiểm duyệt) thì điểm tạm giới hạn ở 79.</li>
       <li>Bấm tên sản phẩm để xem việc cần làm và phân tích chi tiết.</li>
       <li>Tab Bảng xếp hạng: sản phẩm nào bán chạy, được xem, được thích nhiều.</li>
     </ul>
@@ -82,6 +71,7 @@ function toRows(items: ListingHealthList['items']): HealthRow[] {
       top_todo: action.top_todo,
       top_impact: action.top_impact,
       top_field: action.top_field,
+      urgent: i.warnings.some(w => w.type === 'warning'),
       issue_fields: [
         ...new Set([
           ...i.todos.map(t => t.field).filter((f): f is string => Boolean(f)),
@@ -110,14 +100,33 @@ export function ListingsPage() {
   return (
     <HealthTheme>
       <InsightPage
-        title="Sức khoẻ sản phẩm"
+        title="Tối ưu sản phẩm"
         info={ABOUT}
-        question={view === 'ranking' ? 'Xếp hạng giữa các sản phẩm trong shop bạn và gợi ý để có thêm khách. Cột Hạng toàn sàn chỉ cho biết vị trí so với sản phẩm cùng danh mục của mọi shop.' : summary(health.state)}
+        question={view === 'ranking' ? 'Xếp hạng giữa các sản phẩm trong shop bạn và gợi ý để có thêm khách. Cột Hạng toàn sàn chỉ cho biết vị trí so với sản phẩm cùng danh mục của mọi shop.' : undefined}
       >
         <Tabs
           activeKey={view}
           onChange={key => setParams(key === 'ranking' ? new URLSearchParams({ view: 'ranking' }) : new URLSearchParams(), { replace: true })}
-          items={[{ key: 'health', label: 'Điểm sức khoẻ & việc cần làm' }, { key: 'ranking', label: 'Bảng xếp hạng' }]}
+          items={[
+            {
+              key: 'health',
+              label: (
+                <span className="flex items-center gap-1.5 font-semibold text-xs py-0.5">
+                  <Sparkles size={13} className="text-[#007700]" />
+                  <span>Điểm &amp; việc cần làm</span>
+                </span>
+              ),
+            },
+            {
+              key: 'ranking',
+              label: (
+                <span className="flex items-center gap-1.5 font-semibold text-xs py-0.5">
+                  <Trophy size={13} />
+                  <span>Xếp hạng</span>
+                </span>
+              ),
+            },
+          ]}
           className="!-mb-1"
         />
         {view === 'ranking' ? (
@@ -130,7 +139,7 @@ export function ListingsPage() {
               const activeIssueObj = issues.find(iss => iss.code === issueParam);
               const issueLabel = activeIssueObj?.message;
               const filteredRows = issueParam
-                ? rows.filter(r => r.issue_fields?.includes(issueParam) || r.top_field === issueParam)
+                ? rows.filter(r => (issueParam === URGENT ? r.urgent : r.issue_fields?.includes(issueParam) || r.top_field === issueParam))
                 : rows;
 
               return (

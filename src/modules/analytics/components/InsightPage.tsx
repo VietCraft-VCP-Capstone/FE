@@ -26,12 +26,12 @@ export function InsightPage({ title, info, question, actions, breadcrumb, header
       {breadcrumb && breadcrumb.length > 0 && (
         <nav aria-label="Vị trí trang" className="flex flex-wrap items-center gap-1 text-xs text-stone-500">
           {breadcrumb.map((item, i) => (
-            <span key={`${item.label}-${i}`} className="inline-flex items-center gap-1">
+            <span key={`${item.label}-${i}`} className="inline-flex min-w-0 max-w-full items-center gap-1">
               {i > 0 && <ChevronRight size={13} aria-hidden />}
               {item.to ? (
                 <Link to={item.to} className="font-semibold text-stone-600 no-underline hover:text-[#007700]">{item.label}</Link>
               ) : (
-                <span aria-current="page" className="max-w-[48ch] truncate text-stone-700">{item.label}</span>
+                <span aria-current="page" className="min-w-0 max-w-[48ch] truncate text-stone-700">{item.label}</span>
               )}
             </span>
           ))}
