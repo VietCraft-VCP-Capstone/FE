@@ -26,7 +26,7 @@ export function MoneyHero({ data }: { data: MoneyReport }) {
         <p className="m-0 mt-1 font-jakarta text-4xl font-extrabold tabular-nums" style={{ color: PART_COLOR.net }}>{money(flow.net_vnd)}</p>
         <p className="m-0 mt-2 text-sm text-stone-500">{count(data.orders)} đơn, từ {dateRange(data.from, data.to)}</p>
         <p className="m-0 mt-1 text-xs text-stone-500">
-          Tính theo ngày đặt đơn, gồm cả đơn chưa giao, nên chưa phải tiền đã về ví.{' '}
+          Chỉ tính đơn đã giao xong, xếp theo ngày đặt.{' '}
           <Link to="/seller/payouts" className="font-semibold text-[#005B00] hover:underline">Xem ví</Link>
         </p>
         {pod && (

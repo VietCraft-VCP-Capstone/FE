@@ -12,7 +12,7 @@ export function MoneyDaily({ data }: { data: MoneyReport }) {
   const stats = useMemo(() => dailyStats(data.by_day), [data]);
   const loss = data.by_day.filter(d => d.net_vnd < 0).length;
   const notes = [
-    'Tính theo ngày đặt đơn, đã trừ tiền hoàn.',
+    'Đơn đã giao xong, xếp theo ngày đặt, đã trừ tiền hoàn.',
     data.range === '90d' && 'Gộp theo tuần.',
     mode === 'cum'
       ? 'Đường đi lên dốc là lúc tiền về nhiều, đoạn phẳng là những ngày không có đơn.'
