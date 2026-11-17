@@ -1,31 +1,45 @@
 import type { ListingHealthItem } from '../../healthTypes';
 import { MIN_IMPACT } from './visibleTodos';
 
+export const URGENT = 'urgent';
+
 export interface ShopIssue {
   code: string;
   message: string;
   count: number;
+  gain: number | null;
 }
 
 const LABEL: Record<string, string> = {
   image: 'Thêm ảnh cho đủ các góc',
-  description: 'Viết mô tả dài và chi tiết hơn',
-  tags: 'Gắn thêm tag phù hợp',
+  description: 'Viết mô tả chi tiết hơn',
+  tags: 'Gắn thêm từ khoá',
   material: 'Ghi rõ chất liệu',
+  price: 'Xem lại giá bán',
   review: 'Mời khách để lại đánh giá',
-  price: 'Xem lại giá so với hàng cùng chất liệu',
 };
 
+const isUrgent = (item: ListingHealthItem) => item.warnings.some(w => w.type === 'warning');
+
 export function commonIssues(items: ListingHealthItem[], limit = 3): ShopIssue[] {
-  const count = new Map<string, number>();
+  const byField = new Map<string, { count: number; total: number }>();
   for (const item of items) {
-    const fields = item.todos.filter(t => (t.impact ?? 0) >= MIN_IMPACT).map(t => t.field);
-    for (const field of new Set(fields)) {
-      if (field && LABEL[field]) count.set(field, (count.get(field) ?? 0) + 1);
+    const perItem = new Map<string, number>();
+    for (const t of item.todos) {
+      const impact = t.impact ?? 0;
+      if (impact < MIN_IMPACT || !t.field || !LABEL[t.field]) continue;
+      perItem.set(t.field, (perItem.get(t.field) ?? 0) + impact);
+    }
+    for (const [field, impact] of perItem) {
+      const cur = byField.get(field) ?? { count: 0, total: 0 };
+      byField.set(field, { count: cur.count + 1, total: cur.total + impact });
     }
   }
-  return [...count]
-    .map(([code, n]) => ({ code, message: LABEL[code], count: n }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit);
+  const rank = (code: string, total: number) => (code === 'review' ? -1 : total);
+  const fixes = [...byField]
+    .sort((a, b) => rank(b[0], b[1].total) - rank(a[0], a[1].total))
+    .map(([code, v]) => ({ code, message: LABEL[code], count: v.count, gain: Math.round(v.total / v.count) }));
+  const urgent = items.filter(isUrgent).length;
+  const head: ShopIssue[] = urgent ? [{ code: URGENT, message: 'Sửa lỗi đang khoá điểm ở 79', count: urgent, gain: null }] : [];
+  return [...head, ...fixes].slice(0, limit);
 }

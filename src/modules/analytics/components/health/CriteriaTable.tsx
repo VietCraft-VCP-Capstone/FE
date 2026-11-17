@@ -1,183 +1,101 @@
-import { useState, useEffect } from 'react';
-import { Tooltip } from 'antd';
-import {
-  Check,
-  Image,
-  FileText,
-  Tag,
-  Layers,
-  Star,
-  DollarSign,
-  HelpCircle,
-  BarChart2,
-  Clock,
-  AlertCircle,
-} from 'lucide-react';
-import { scoreText, vnd } from '../../format';
-import type { HealthFactor, ListingHealth } from '../../healthTypes';
-import { earned } from './ScoreHero';
-
-const LABEL: Record<string, { name: string; icon: any; color: string; bg: string }> = {
-  price: { name: 'Định vị giá', icon: DollarSign, color: 'text-stone-700', bg: 'bg-stone-100' },
-  image: { name: 'Ảnh sản phẩm', icon: Image, color: 'text-sky-700', bg: 'bg-sky-50' },
-  description: { name: 'Mô tả chi tiết', icon: FileText, color: 'text-purple-700', bg: 'bg-purple-50' },
-  tags: { name: 'Thẻ từ khóa', icon: Tag, color: 'text-amber-700', bg: 'bg-amber-50' },
-  material: { name: 'Chất liệu chế tác', icon: Layers, color: 'text-teal-700', bg: 'bg-teal-50' },
-  review: { name: 'Đánh giá người mua', icon: Star, color: 'text-yellow-700', bg: 'bg-yellow-50' },
-};
-
-const ORIGIN = 'Tiêu chuẩn chất lượng TMĐT: tối thiểu 5 ảnh, mô tả từ 115 từ, đủ từ khóa phân loại và chất liệu. Giá được đối soát tự động với sản phẩm cùng loại trên sàn.';
+import { Link } from 'react-router-dom';
+import { AlertCircle, CheckCircle2, ChevronRight, Clock, HelpCircle } from 'lucide-react';
+import { editLink } from '../HealthParts';
+import { vnd } from '../../format';
+import type { HealthFactor, HealthItem, ListingHealth } from '../../healthTypes';
+import { cleanTodoText, partTodo } from './visibleTodos';
+import { PART } from './whyText';
 
 function metricText(r: HealthFactor): string {
   const v = r.value ?? 0;
+  if (r.scored === false) return 'Chưa đủ sản phẩm cùng loại để so';
   if (r.key === 'price') return r.value ? vnd(r.value) : 'Chưa có giá';
-  if (r.key === 'image') return `${v}/${r.target} ảnh chụp`;
-  if (r.key === 'description') return `${v} từ (chuẩn ≥ ${r.target})`;
-  if (r.key === 'tags') return `${v}/${r.target} thẻ tag`;
-  if (r.key === 'material') return v ? 'Đã khai báo rõ' : 'Chưa khai báo';
+  if (r.key === 'image') return `${v}/${r.target} ảnh`;
+  if (r.key === 'description') return `${v}/${r.target} từ`;
+  if (r.key === 'tags') return `${v}/${r.target} từ khoá`;
+  if (r.key === 'material') return v ? 'Đã ghi' : 'Chưa ghi';
   return v ? `${r.n_good ?? 0}/${v} đánh giá tốt` : 'Chưa có đánh giá';
 }
 
-function Row({ r, index, animateWidth }: { r: HealthFactor; index: number; animateWidth: boolean }) {
-  const off = r.scored === false;
-  const targetPct = off ? 100 : Math.min(100, r.sub_score ?? 0);
-  const pct = animateWidth ? targetPct : 0;
-  const meta = LABEL[r.key] ?? { name: r.key, icon: Layers, color: 'text-stone-700', bg: 'bg-stone-50' };
-  const Icon = meta.icon;
+const nameOf = (r: HealthFactor) => PART[r.key]?.label ?? r.label;
 
+function TodoRow({ r, todo, productId }: { r: HealthFactor; todo: HealthItem; productId: string }) {
+  const review = todo.code === 'review';
   return (
-    <li
-      className="list-none py-2.5 px-3 transition-all duration-200 hover:bg-stone-50/80 hover:-translate-y-px rounded-xl animate-cascade"
-      style={{ animationDelay: `${index * 45}ms` }}
-    >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        {/* Col 1: Icon & Criterion Name (40% width on desktop) */}
-        <div className="flex items-center gap-3 sm:w-5/12 min-w-0">
-          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${meta.bg} ${meta.color} transition-transform duration-200 group-hover:scale-105`}>
-            <Icon size={15} />
-          </div>
-          <div className="min-w-0">
-            <span className="font-bold text-xs text-stone-900 block truncate">{meta.name}</span>
-            <span className="text-[11px] text-stone-500 font-medium tabular-nums sm:hidden block mt-0.5">
-              {metricText(r)}
-            </span>
-          </div>
-        </div>
-
-        {/* Col 2: Current Actual Metric (Desktop only - 25% width) */}
-        <div className="hidden sm:block sm:w-3/12 min-w-0 text-left">
-          <span className="text-xs text-stone-600 font-medium tabular-nums">
-            {metricText(r)}
-          </span>
-        </div>
-
-        {/* Col 3: Compact Progress Mini-Track & Points (20% width) */}
-        <div className="flex items-center gap-2 sm:w-2/12 sm:justify-end shrink-0">
-          {off ? (
-            <span className="text-[11px] font-semibold text-stone-400">
-              Bảo lưu
-            </span>
-          ) : (
-            <>
-              {/* Compact 48px micro-track */}
-              <div className="h-1.5 w-12 rounded-full bg-stone-100 overflow-hidden shrink-0">
-                <div
-                  className="h-full rounded-full transition-all duration-700 ease-out"
-                  style={{
-                    width: `${Math.max(pct, 4)}%`,
-                    background: targetPct >= 100 ? '#007700' : targetPct > 0 ? '#d97706' : '#e11d48',
-                  }}
-                />
-              </div>
-              <span className="text-xs font-bold tabular-nums text-stone-800">
-                {Math.round(r.points)}<span className="text-[10px] text-stone-400 font-normal">/{r.weight}đ</span>
-              </span>
-            </>
-          )}
-        </div>
-
-        {/* Col 4: Status Pill (15% width - right aligned) */}
-        <div className="flex sm:w-2/12 justify-end shrink-0">
-          {off ? (
-            <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-600 border border-stone-200/60 inline-flex items-center gap-1 transition-transform duration-150 hover:scale-102">
-              <Clock size={10} /> Chờ gom mẫu
-            </span>
-          ) : targetPct >= 100 ? (
-            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200/70 inline-flex items-center gap-1 transition-transform duration-150 hover:scale-102">
-              <Check size={10} /> Đạt chuẩn
-            </span>
-          ) : targetPct > 0 ? (
-            <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200/70 inline-flex items-center gap-1 transition-transform duration-150 hover:scale-102">
-              Cần bổ sung
-            </span>
-          ) : (
-            <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200/70 inline-flex items-center gap-1 transition-transform duration-150 hover:scale-102">
-              <AlertCircle size={10} /> Chưa đạt
-            </span>
-          )}
-        </div>
-      </div>
+    <li>
+      <Link
+        to={review ? '/seller/orders' : editLink(productId, todo.field)}
+        className="group flex items-center gap-3 rounded-lg px-2 py-2.5 no-underline transition hover:bg-stone-50"
+      >
+        <span className="w-12 shrink-0 text-base font-extrabold tabular-nums text-[#007700]">+{Math.round(todo.impact)}đ</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-stone-900">{cleanTodoText(todo.message)}</span>
+          <span className="block text-xs tabular-nums text-stone-500">{nameOf(r)}: {metricText(r).toLowerCase()}</span>
+        </span>
+        <span className="inline-flex shrink-0 items-center gap-0.5 text-sm font-semibold text-[#007700]">
+          {review ? 'Xem đơn hàng' : 'Sửa'}
+          <ChevronRight size={14} aria-hidden />
+        </span>
+      </Link>
     </li>
   );
 }
 
-export function CriteriaTable({ data }: { data: ListingHealth }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 80);
-    return () => clearTimeout(t);
-  }, []);
+function StatusRow({ r }: { r: HealthFactor }) {
+  const off = r.scored === false;
+  const done = !off && (r.sub_score ?? 0) >= 100;
+  const Icon = off ? Clock : done ? CheckCircle2 : AlertCircle;
+  const tone = off ? 'text-stone-400' : done ? 'text-[#007700]' : 'text-amber-600';
+  return (
+    <li className="flex items-center gap-2.5 py-2">
+      <Icon size={16} className={`shrink-0 ${tone}`} aria-hidden />
+      <span className="w-20 shrink-0 text-sm font-semibold text-stone-900">{nameOf(r)}</span>
+      <span className="min-w-0 flex-1 truncate text-xs tabular-nums text-stone-500">{metricText(r)}</span>
+      <span className="shrink-0 text-sm tabular-nums text-stone-500">
+        {off ? 'Chưa tính' : <><b className="font-bold text-stone-900">{Math.round(r.points)}</b>/{r.weight}</>}
+      </span>
+    </li>
+  );
+}
 
-  const rows = [...data.breakdown].sort((a, b) => b.weight - a.weight);
-  const { points, of } = earned(data);
-  const raw = data.cap?.raw ?? data.score;
+const rank = (t: HealthItem) => (t.code === 'review' ? 0 : t.impact);
+
+export function CriteriaTable({ data, productId, onExplain }: { data: ListingHealth; productId: string; onExplain: () => void }) {
+  const rows = data.breakdown.map(r => ({ r, todo: partTodo(data, r.key) }));
+  const todo = rows.filter((x): x is { r: HealthFactor; todo: HealthItem } => Boolean(x.todo)).sort((a, b) => rank(b.todo) - rank(a.todo));
+  const rest = rows.filter(x => !x.todo).sort((a, b) => b.r.weight - a.r.weight);
 
   return (
-    <div className="space-y-3">
-      {/* Table Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2.5">
-        <div className="flex items-center gap-2">
-          <BarChart2 size={16} className="text-[#007700]" />
-          <h2 className="m-0 text-base font-bold text-stone-900">Tiêu chuẩn chất lượng tin đăng</h2>
-          <Tooltip title={ORIGIN} placement="top">
-            <span className="cursor-help inline-flex items-center gap-1 text-[11px] font-semibold text-stone-400 hover:text-stone-700">
-              <HelpCircle size={12} />
-            </span>
-          </Tooltip>
-        </div>
-        <span className="text-xs font-semibold text-stone-500 tabular-nums">
-          Thang điểm 100đ
-        </span>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+      <div className="lg:col-span-3">
+        <h2 className="m-0 text-base font-bold text-stone-900">Việc cần làm</h2>
+        {todo.length === 0 ? (
+          <p className="m-0 mt-2 text-sm text-stone-500">Không còn việc nào tăng thêm điểm.</p>
+        ) : (
+          <ul className="-mx-2 m-0 mt-1 list-none p-0">
+            {todo.map(x => <TodoRow key={x.r.key} r={x.r} todo={x.todo} productId={productId} />)}
+          </ul>
+        )}
       </div>
 
-      {/* Table Column Labels (Desktop) */}
-      <div className="hidden sm:flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-stone-400 px-3 pb-1 border-b border-stone-100">
-        <span className="w-5/12">Tiêu chuẩn đánh giá</span>
-        <span className="w-3/12">Hiện trạng</span>
-        <span className="w-2/12 text-right">Mức đạt &amp; Điểm</span>
-        <span className="w-2/12 text-right">Trạng thái</span>
-      </div>
-
-      {/* Rows */}
-      <ul className="m-0 list-none divide-y divide-stone-100 p-0 border border-stone-100 rounded-2xl bg-stone-50/20">
-        {rows.map((r, i) => <Row key={r.key} r={r} index={i} animateWidth={mounted} />)}
-      </ul>
-
-      {/* Footer Summary */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-stone-600">
-        <div className="flex items-center gap-1.5">
-          <span>Tổng điểm nội dung:</span>
-          <b className="text-stone-900 font-bold tabular-nums">{Math.round(points)}/{of}đ</b>
-          {of < 100 && (
-            <span className="text-stone-500 ml-1">
-              → Quy đổi chuẩn sàn: <b className="text-[#007700] font-black">{scoreText(raw)}/100</b>
-            </span>
-          )}
+      <div className="lg:col-span-2 lg:border-l lg:border-stone-100 lg:pl-6">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="m-0 text-base font-bold text-stone-900">Phần không cần sửa</h2>
+          <button
+            type="button"
+            onClick={onExplain}
+            className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-stone-500 transition-colors hover:text-[#007700]"
+          >
+            <HelpCircle size={13} aria-hidden />
+            <span>Cách tính điểm</span>
+          </button>
         </div>
-        {data.cap && (
-          <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-md border border-rose-200/70 inline-flex items-center gap-1">
-            <AlertCircle size={11} /> Tạm khóa tối đa {Math.floor(data.cap.score)}đ do có lỗi cần sửa gấp
-          </span>
+        {rest.length === 0 ? (
+          <p className="m-0 mt-2 text-sm text-stone-500">Phần nào cũng còn việc để làm.</p>
+        ) : (
+          <ul className="m-0 mt-1 list-none divide-y divide-stone-100 p-0">
+            {rest.map(x => <StatusRow key={x.r.key} r={x.r} />)}
+          </ul>
         )}
       </div>
     </div>

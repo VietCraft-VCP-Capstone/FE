@@ -4,32 +4,20 @@ import { useSearchParams } from 'react-router-dom';
 import { HealthTheme } from '../components/health/HealthTheme';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
-import { commonIssues } from '../components/health/commonIssues';
+import { commonIssues, URGENT } from '../components/health/commonIssues';
 import { HealthList, TIERS, type TierFilter } from '../components/intel/HealthList';
-import { healthTier } from '../components/intel/intelLabels';
 import { ShopOverview } from '../components/intel/ShopOverview';
 import { RankingView } from '../components/ranking/RankingView';
 import { SourceFooter } from '../components/SourceFooter';
 import { Note } from '../components/ui';
-import { useInsight, type InsightState } from '../hooks/useInsight';
+import { useInsight } from '../hooks/useInsight';
 import type { HealthRow, ListingHealthList } from '../healthTypes';
-
-function summary(state: InsightState<ListingHealthList>): string {
-  if (state.kind !== 'ready' || state.data.items.length === 0) return 'Điểm 0–100 cho từng sản phẩm và việc nên làm để tăng điểm.';
-  const scored = state.data.items.filter(i => i.score !== null);
-  if (scored.length === 0) return 'Chưa chấm được sản phẩm nào, thử tải lại sau.';
-  const weak = scored.filter(i => healthTier(i.score).tone !== 'good').length;
-  const urgent = state.data.items.filter(i => i.warnings.some(w => w.type === 'warning')).length;
-  const parts = [weak ? `${weak}/${scored.length} sản phẩm dưới 80 điểm` : 'Mọi sản phẩm đều từ 80 điểm'];
-  if (urgent) parts.push(`${urgent} sản phẩm có lỗi gấp`);
-  return parts.join(' · ');
-}
 
 const ABOUT = (
   <>
     <strong>Điểm tối ưu sản phẩm cho biết sản phẩm nào chưa tối ưu tốt và nên sửa gì trước để hút khách.</strong>
     <ul className="m-0 mt-1.5 list-disc space-y-1 pl-4">
-      <li>Mỗi sản phẩm có điểm 0 đến 100 từ 6 tiêu chuẩn: ảnh, mô tả, từ khoá, chất liệu, đánh giá và giá cả. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Cần chú ý.</li>
+      <li>Mỗi sản phẩm có điểm 0 đến 100 từ 6 tiêu chuẩn: ảnh, mô tả, từ khoá, chất liệu, đánh giá và giá cả. Từ 80 là Tốt, 50 đến 79 là Cần cải thiện, dưới 50 là Yếu.</li>
       <li>Yếu tố chưa có dữ liệu được 0 điểm; điểm tối đa của các yếu tố khác giữ nguyên.</li>
       <li>Giá chỉ so với sản phẩm cùng loại, cùng chất liệu của shop khác; chưa đủ sản phẩm để so thì giá chưa được tính, điểm tính trên các tiêu chuẩn còn lại rồi quy về thang 100.</li>
       <li>Còn lỗi cần sửa gấp (tên có chữ thừa, chất liệu khai không khớp, bị từ chối kiểm duyệt) thì điểm tạm giới hạn ở 79.</li>
@@ -114,7 +102,7 @@ export function ListingsPage() {
       <InsightPage
         title="Tối ưu sản phẩm"
         info={ABOUT}
-        question={view === 'ranking' ? 'Xếp hạng giữa các sản phẩm trong shop bạn và gợi ý để có thêm khách. Cột Hạng toàn sàn chỉ cho biết vị trí so với sản phẩm cùng danh mục của mọi shop.' : summary(health.state)}
+        question={view === 'ranking' ? 'Xếp hạng giữa các sản phẩm trong shop bạn và gợi ý để có thêm khách. Cột Hạng toàn sàn chỉ cho biết vị trí so với sản phẩm cùng danh mục của mọi shop.' : undefined}
       >
         <Tabs
           activeKey={view}
@@ -151,7 +139,7 @@ export function ListingsPage() {
               const activeIssueObj = issues.find(iss => iss.code === issueParam);
               const issueLabel = activeIssueObj?.message;
               const filteredRows = issueParam
-                ? rows.filter(r => r.issue_fields?.includes(issueParam) || r.top_field === issueParam)
+                ? rows.filter(r => (issueParam === URGENT ? r.urgent : r.issue_fields?.includes(issueParam) || r.top_field === issueParam))
                 : rows;
 
               return (

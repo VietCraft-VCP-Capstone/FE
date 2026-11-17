@@ -69,5 +69,5 @@ export function healthTier(score: number | null): { label: string; tone: Tone } 
   if (score === null) return { label: 'Thiếu dữ liệu', tone: 'neutral' };
   if (score >= 80) return { label: 'Tốt', tone: 'good' };
   if (score >= 50) return { label: 'Cần cải thiện', tone: 'warn' };
-  return { label: 'Cần chú ý', tone: 'bad' };
+  return { label: 'Yếu', tone: 'bad' };
 }
