@@ -11,6 +11,8 @@ import { userService } from '../../user/services/userService';
 import { cartService } from '../../order/services/cartService';
 import { productsService } from '../../product/services/productsService';
 import { promotionService, CouponDTO, ApplyCouponResponse } from '../../promotion/services/promotionService';
+
+type CouponSlot = 'PRODUCT' | 'SHIPPING';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 interface CheckoutItem {
@@ -55,9 +57,9 @@ export function BuyerCheckoutPage() {
 
     const [paymentMethod, setPaymentMethod] = useState<'payos' | 'cod'>('payos');
     const [couponCode, setCouponCode] = useState('');
-    const [discount, setDiscount] = useState(0);
-    const [couponApplied, setCouponApplied] = useState(false);
-    const [appliedCouponInfo, setAppliedCouponInfo] = useState<ApplyCouponResponse | null>(null);
+    // Mỗi ô 1 mã: PRODUCT = voucher giảm tiền hàng, SHIPPING = ưu đãi phí vận chuyển
+    const [applied, setApplied] = useState<Partial<Record<CouponSlot, ApplyCouponResponse>>>({});
+    const [couponSlot, setCouponSlot] = useState<CouponSlot>('PRODUCT');
     const [loading, setLoading] = useState(false);
     const [recipientAddress, setRecipientAddress] = useState<any>(null);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -152,9 +154,11 @@ export function BuyerCheckoutPage() {
     }, [currentShopId, recipientAddress]);
 
     const subtotal = items.reduce((acc, it) => acc + (it.price * it.quantity), 0);
-    const shippingDiscount = appliedCouponInfo?.target === 'SHIPPING' ? Math.min(discount, shippingFee) : 0;
-    const productDiscount = appliedCouponInfo?.target === 'PRODUCT' ? discount : 0;
+    const shippingDiscount = Math.min(applied.SHIPPING?.discount ?? 0, shippingFee);
+    const productDiscount = Math.min(applied.PRODUCT?.discount ?? 0, subtotal);
     const finalTotal = Math.max(0, subtotal - productDiscount + shippingFee - shippingDiscount);
+
+    const slotCoupons = availableCoupons.filter(c => (c.discount_type === 'FREE_SHIPPING') === (couponSlot === 'SHIPPING'));
 
     const hasPodItem = items.some(it => it.productType === 'POD_TEMPLATE');
     const codDisabled = hasPodItem;
@@ -182,7 +186,8 @@ export function BuyerCheckoutPage() {
         }
     }, [items, subtotal]);
 
-    const handleOpenCouponModal = () => {
+    const handleOpenCouponModal = (slot: CouponSlot) => {
+        setCouponSlot(slot);
         setShowCouponModal(true);
         if (items.length > 0 && !loadingCoupons && !couponsLoaded) loadAvailableCoupons();
     };
@@ -200,7 +205,8 @@ export function BuyerCheckoutPage() {
         return <Navigate to="/cart" replace />;
     }
 
-    const handleApplyCoupon = async (codeToUse?: string) => {
+    /** `slot` có = chọn từ kho voucher của ô đó; không có = mã gõ tay, tự vào đúng ô theo loại mã. */
+    const handleApplyCoupon = async (codeToUse?: string, slot?: CouponSlot) => {
         const targetCode = (typeof codeToUse === 'string' ? codeToUse : couponCode).trim();
         if (!targetCode) {
             showToast('Vui lòng nhập mã giảm giá', 'error');
@@ -218,10 +224,12 @@ export function BuyerCheckoutPage() {
                 items: items.map(it => ({ productId: it.productId, price: it.price, quantity: it.quantity }))
             });
 
-            setDiscount(res.discount);
-            setCouponApplied(true);
-            setAppliedCouponInfo(res);
-            setCouponCode(res.coupon?.code || targetCode.toUpperCase());
+            if (slot && res.target !== slot) {
+                showToast(slot === 'SHIPPING' ? 'Mã này không phải mã giảm phí vận chuyển.' : 'Đây là mã vận chuyển, hãy chọn ở ô Ưu đãi phí vận chuyển.', 'error');
+                return;
+            }
+            setApplied(prev => ({ ...prev, [res.target]: res }));
+            setCouponCode('');
             setShowCouponModal(false);
             showToast(res.message || `Đã áp dụng mã giảm ${res.discount.toLocaleString('vi-VN')}đ thành công!`, 'success');
         } catch (err: any) {
@@ -231,11 +239,8 @@ export function BuyerCheckoutPage() {
         }
     };
 
-    const handleRemoveCoupon = () => {
-        setDiscount(0);
-        setCouponApplied(false);
-        setAppliedCouponInfo(null);
-        setCouponCode('');
+    const handleRemoveCoupon = (slot: CouponSlot) => {
+        setApplied(prev => ({ ...prev, [slot]: undefined }));
         showToast('Đã hủy áp dụng mã giảm giá.', 'success');
     };
 
@@ -274,7 +279,8 @@ export function BuyerCheckoutPage() {
                 },
                 totalAmount: finalTotal,
                 shippingFee,
-                couponCode: couponApplied ? (appliedCouponInfo?.coupon?.code || couponCode.trim().toUpperCase()) : undefined
+                couponCode: applied.PRODUCT?.coupon?.code,
+                shippingCouponCode: applied.SHIPPING?.coupon?.code
             };
 
             const createdOrder = await ordersService.create(orderPayload);
@@ -520,94 +526,77 @@ export function BuyerCheckoutPage() {
 
                 {/* Right Column (Coupon & Checkout summary) */}
                 <div className="space-y-6">
-                    {/* Coupons Section */}
+                    {/* Coupons Section: 1 mã khuyến mãi + 1 mã vận chuyển, như Shopee */}
                     <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
-                                <Ticket className="text-[#008000]" size={16} />
-                                Mã giảm giá / Voucher
-                            </h3>
+                        <h3 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                            <Ticket className="text-[#008000]" size={16} />
+                            Mã giảm giá / Voucher
+                        </h3>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Tag className="absolute inset-y-0 left-3 my-auto text-gray-400" size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="Nhập mã giảm giá..."
+                                    value={couponCode}
+                                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                    className="w-full pl-9 pr-3 py-2 text-xs font-mono uppercase border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                />
+                            </div>
                             <button
-                                onClick={handleOpenCouponModal}
-                                className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-0.5"
+                                onClick={() => handleApplyCoupon()}
+                                disabled={applyingCoupon || !couponCode.trim()}
+                                className="bg-[#008000] hover:bg-emerald-700 text-white rounded-xl px-4 py-2 text-xs font-bold transition-all flex-shrink-0 disabled:opacity-50"
                             >
-                                Kho voucher <ChevronRight size={14} />
+                                {applyingCoupon ? 'Đang kiểm tra...' : 'Áp dụng'}
                             </button>
                         </div>
-
-                        {!couponApplied ? (
-                            <div className="space-y-2">
-                                <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <Tag className="absolute inset-y-0 left-3 my-auto text-gray-400" size={16} />
-                                        <input
-                                            type="text"
-                                            placeholder="Nhập mã giảm giá..."
-                                            value={couponCode}
-                                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                                            className="w-full pl-9 pr-3 py-2 text-xs font-mono uppercase border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={() => handleApplyCoupon()}
-                                        disabled={applyingCoupon || !couponCode.trim()}
-                                        className="bg-[#008000] hover:bg-emerald-700 text-white rounded-xl px-4 py-2 text-xs font-bold transition-all flex-shrink-0 disabled:opacity-50"
-                                    >
-                                        {applyingCoupon ? 'Đang kiểm tra...' : 'Áp dụng'}
-                                    </button>
-                                </div>
-
-                                <button
-                                    onClick={handleOpenCouponModal}
-                                    className="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100/70 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center justify-between transition"
-                                >
-                                    <span className="flex items-center gap-1.5">
-                                        <Ticket size={14} className="text-emerald-600" />
-                                        Chọn Voucher Sàn & Shop có sẵn
-                                    </span>
-                                    <ChevronRight size={14} />
+                        <div className="flex items-center justify-between gap-2 p-3 rounded-xl border ${applied.PRODUCT ? 'bg-emerald-50/70 border-emerald-200' : 'border-gray-200'}">
+                            <div className="min-w-0">
+                                <p className="text-xs font-bold text-gray-900 flex items-center gap-1.5"><Tag size={13} className="text-emerald-600" /> Voucher giảm giá</p>
+                                {applied.PRODUCT ? (
+                                    <p className="text-[11px] text-emerald-700 font-semibold mt-0.5 truncate">
+                                        <span className="font-mono font-black">{applied.PRODUCT.coupon?.code}</span>
+                                        {' '}— {applied.PRODUCT.coupon?.title} (-{productDiscount.toLocaleString('vi-VN')}đ)
+                                        {applied.PRODUCT.coupon?.is_platform ? ' • Voucher Sàn' : ' • Voucher Shop'}
+                                    </p>
+                                ) : (
+                                    <p className="text-[11px] text-gray-400 mt-0.5">Chưa chọn mã</p>
+                                )}
+                            </div>
+                            {applied.PRODUCT ? (
+                                <button onClick={() => handleRemoveCoupon('PRODUCT')} className="text-xs font-bold text-red-500 hover:text-red-700 underline flex-shrink-0">
+                                    Hủy dùng
                                 </button>
+                            ) : (
+                                <button onClick={() => handleOpenCouponModal('PRODUCT')} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-0.5 flex-shrink-0">
+                                    Chọn mã <ChevronRight size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex items-center justify-between gap-2 p-3 rounded-xl border ${applied.SHIPPING ? 'bg-emerald-50/70 border-emerald-200' : 'border-gray-200'}">
+                            <div className="min-w-0">
+                                <p className="text-xs font-bold text-gray-900 flex items-center gap-1.5"><Ticket size={13} className="text-sky-600" /> Ưu đãi phí vận chuyển</p>
+                                {applied.SHIPPING ? (
+                                    <p className="text-[11px] text-emerald-700 font-semibold mt-0.5 truncate">
+                                        <span className="font-mono font-black">{applied.SHIPPING.coupon?.code}</span>
+                                        {' '}— {applied.SHIPPING.coupon?.title} (-{shippingDiscount.toLocaleString('vi-VN')}đ)
+                                        {applied.SHIPPING.coupon?.is_platform ? ' • Voucher Sàn' : ' • Voucher Shop'}
+                                    </p>
+                                ) : (
+                                    <p className="text-[11px] text-gray-400 mt-0.5">Chưa chọn mã</p>
+                                )}
                             </div>
-                        ) : (
-                            <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2 animate-fade-in">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-mono font-black text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
-                                                {appliedCouponInfo?.coupon?.code || couponCode}
-                                            </span>
-                                            {appliedCouponInfo?.coupon?.is_platform ? (
-                                                <span className="text-[10px] font-bold text-emerald-700 bg-white px-1.5 py-0.5 rounded border border-emerald-200">
-                                                    Voucher Sàn
-                                                </span>
-                                            ) : (
-                                                <span className="text-[10px] font-bold text-stone-700 bg-white px-1.5 py-0.5 rounded border border-stone-200">
-                                                    Voucher Shop
-                                                </span>
-                                            )}
-                                            {appliedCouponInfo?.coupon?.applicable_scope === 'SPECIFIC_PRODUCTS' && (
-                                                <span className="text-[10px] font-bold text-amber-700 bg-white px-1.5 py-0.5 rounded border border-amber-200">
-                                                    SP chỉ định
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-xs font-bold text-emerald-900 mt-1">
-                                            {appliedCouponInfo?.coupon?.title || 'Đã áp dụng mã giảm giá'}
-                                        </p>
-                                        <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">
-                                            Tiết kiệm: -{discount.toLocaleString('vi-VN')}đ
-                                            {appliedCouponInfo?.target === 'SHIPPING' && ' (Trừ vào phí ship)'}
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={handleRemoveCoupon}
-                                        className="text-xs font-bold text-red-500 hover:text-red-700 underline"
-                                    >
-                                        Hủy dùng
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                            {applied.SHIPPING ? (
+                                <button onClick={() => handleRemoveCoupon('SHIPPING')} className="text-xs font-bold text-red-500 hover:text-red-700 underline flex-shrink-0">
+                                    Hủy dùng
+                                </button>
+                            ) : (
+                                <button onClick={() => handleOpenCouponModal('SHIPPING')} className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-0.5 flex-shrink-0">
+                                    Chọn mã <ChevronRight size={14} />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Pricing Summary */}
@@ -635,23 +624,16 @@ export function BuyerCheckoutPage() {
                                     )}
                                 </span>
                             </div>
-                            {couponApplied && discount > 0 && (
-                                <div className="flex justify-between items-center text-emerald-600 font-bold animate-fade-in bg-emerald-50/70 border border-emerald-100 px-2.5 py-1.5 rounded-xl">
-                                    <span className="flex items-center gap-1.5">
-                                        <Ticket size={13} className="text-emerald-600" />
-                                        <span>Giảm giá voucher</span>
-                                        <span className="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black uppercase">
-                                            {appliedCouponInfo?.coupon?.code || couponCode}
-                                        </span>
-                                        {appliedCouponInfo?.target === 'SHIPPING' && (
-                                            <span className="text-[9px] text-sky-700 bg-sky-50 border border-sky-200 px-1 py-0.2 rounded font-medium">
-                                                Freeship
-                                            </span>
-                                        )}
-                                    </span>
-                                    <span className="text-emerald-700 font-black">
-                                        -{discount.toLocaleString('vi-VN')}đ
-                                    </span>
+                            {shippingDiscount > 0 && (
+                                <div className="flex justify-between items-center text-emerald-600 font-bold">
+                                    <span>Ưu đãi phí vận chuyển</span>
+                                    <span className="text-emerald-700 font-black">-{shippingDiscount.toLocaleString('vi-VN')}đ</span>
+                                </div>
+                            )}
+                            {productDiscount > 0 && (
+                                <div className="flex justify-between items-center text-emerald-600 font-bold">
+                                    <span>{applied.PRODUCT?.coupon?.is_platform ? 'Voucher sàn VietCraft' : 'Voucher của Shop'}</span>
+                                    <span className="text-emerald-700 font-black">-{productDiscount.toLocaleString('vi-VN')}đ</span>
                                 </div>
                             )}
                         </div>
@@ -687,9 +669,9 @@ export function BuyerCheckoutPage() {
                             <div>
                                 <h3 className="text-base font-black text-stone-900 flex items-center gap-2">
                                     <Ticket className="text-[#008000]" size={20} />
-                                    Kho Voucher VietCraft & Gian Hàng
+                                    {couponSlot === 'SHIPPING' ? 'Mã ưu đãi phí vận chuyển' : 'Voucher giảm giá sàn & shop'}
                                 </h3>
-                                <p className="text-xs text-stone-500 mt-0.5">Chọn 1 voucher tối ưu nhất cho đơn hàng hiện tại</p>
+                                <p className="text-xs text-stone-500 mt-0.5">Mỗi đơn dùng được 1 mã giảm giá và 1 mã vận chuyển</p>
                             </div>
                             <button
                                 onClick={() => setShowCouponModal(false)}
@@ -709,7 +691,7 @@ export function BuyerCheckoutPage() {
                                 className="flex-1 px-3 py-2 text-xs font-mono uppercase border border-stone-200 rounded-xl focus:outline-none focus:border-emerald-500"
                             />
                             <button
-                                onClick={() => handleApplyCoupon()}
+                                onClick={() => handleApplyCoupon(undefined, couponSlot)}
                                 disabled={applyingCoupon || !couponCode.trim()}
                                 className="px-4 py-2 bg-[#008000] hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50"
                             >
@@ -724,7 +706,7 @@ export function BuyerCheckoutPage() {
                                     <RefreshCw className="animate-spin text-emerald-600" size={20} />
                                     Đang kiểm tra các mã giảm giá khả dụng...
                                 </div>
-                            ) : availableCoupons.length === 0 ? (
+                            ) : slotCoupons.length === 0 ? (
                                 <div className="py-10 text-center text-stone-400 text-xs">
                                     Hiện chưa có voucher nào phù hợp cho đơn hàng này.
                                 </div>
@@ -767,9 +749,9 @@ export function BuyerCheckoutPage() {
                                     return 0;
                                 };
 
-                                const eligibleCoupons = availableCoupons.filter(c => isEligible(c) && estimateDiscount(c) > 0);
-                                const ineligibleCoupons = availableCoupons.filter(c => !isEligible(c));
-                                const eligibleButNoDiscount = availableCoupons.filter(c =>
+                                const eligibleCoupons = slotCoupons.filter(c => isEligible(c) && estimateDiscount(c) > 0);
+                                const ineligibleCoupons = slotCoupons.filter(c => !isEligible(c));
+                                const eligibleButNoDiscount = slotCoupons.filter(c =>
                                     isEligible(c) && estimateDiscount(c) <= 0
                                 );
 
@@ -783,9 +765,9 @@ export function BuyerCheckoutPage() {
                                 return (
                                     <>
                                     {/* Gợi ý voucher tốt nhất */}
-                                    {bestCoupon && !couponApplied && (
+                                    {bestCoupon && !applied[couponSlot] && (
                                         <button
-                                            onClick={() => handleApplyCoupon(bestCoupon.code)}
+                                            onClick={() => handleApplyCoupon(bestCoupon.code, couponSlot)}
                                             disabled={applyingCoupon}
                                             className="w-full p-3 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 border-2 border-amber-300 border-dashed rounded-2xl flex items-center gap-3 text-left hover:shadow-md transition-all group"
                                         >
@@ -808,9 +790,9 @@ export function BuyerCheckoutPage() {
                                     )}
 
                                     {sortedCoupons.map((c) => {
-                                    const isSelected = couponApplied && (appliedCouponInfo?.coupon?.code === c.code || couponCode.toUpperCase() === c.code);
+                                    const isSelected = applied[couponSlot]?.coupon?.code === c.code;
                                     const couponIsEligible = isEligible(c) && estimateDiscount(c) > 0;
-                                    const isBest = bestCoupon?.id === c.id && couponIsEligible && !couponApplied;
+                                    const isBest = bestCoupon?.id === c.id && couponIsEligible && !applied[couponSlot];
 
                                     return (
                                         <div
@@ -886,7 +868,7 @@ export function BuyerCheckoutPage() {
                                                     </span>
                                                 ) : couponIsEligible ? (
                                                     <button
-                                                        onClick={() => handleApplyCoupon(c.code)}
+                                                        onClick={() => handleApplyCoupon(c.code, couponSlot)}
                                                         disabled={applyingCoupon}
                                                         className={`px-4 py-1.5 text-white text-xs font-bold rounded-xl transition shadow-sm ${
                                                             isBest

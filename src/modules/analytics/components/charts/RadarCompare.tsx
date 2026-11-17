@@ -34,17 +34,17 @@ function isNumber(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-export function RadarCompare({ axes, series, height = 320, unitHint, bangSoThat = false, anBanDau = [] }: {
+export function RadarCompare({ axes, series, height = 320, unitHint, bangSoThat = false }: {
   axes: string[];
   series: RadarSeries[];
   height?: number;
   unitHint?: string;
-  /** Bảng dưới radar ghi số thật (`raw`) thay cho điểm 0–100, thu vào "Xem số thật của từng shop". */
+  /** Bảng dưới radar ghi số thật (`raw`) thay cho điểm 0–100, thu vào "Xem số liệu chi tiết". */
   bangSoThat?: boolean;
-  /** Tên các đường ẩn lúc đầu; người dùng bấm chú thích để vẽ thêm. */
-  anBanDau?: string[];
 }) {
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set(anBanDau));
+  // Đường thiếu số ở một trục thì ẩn lúc đầu để radar giữ đủ trục; bấm chú thích vẫn hiện được.
+  const thieuSo = (s: RadarSeries) => !s.primary && s.values.some(v => !isNumber(v));
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set(series.filter(thieuSo).map(s => s.name)));
   const shown = series.filter(s => !hidden.has(s.name));
   const toggle = (name: string) => setHidden(prev => {
     const next = new Set(prev);
@@ -63,6 +63,8 @@ export function RadarCompare({ axes, series, height = 320, unitHint, bangSoThat 
   const complete = axes.map((_, i) => shown.every(s => isNumber(s.values[i])));
   const chartRows = rows.filter((_, i) => complete[i]);
   const hiddenAxes = axes.filter((_, i) => !complete[i]);
+  // shortcut: đọc cỡ màn một lần lúc vẽ, xoay máy thì chờ lần vẽ sau; cần thì đổi sang đo bề rộng khung.
+  const hep = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
 
   return (
     <div className="space-y-4">
@@ -72,12 +74,13 @@ export function RadarCompare({ axes, series, height = 320, unitHint, bangSoThat 
         </p>
       )}
       {chartRows.length >= 3 ? (
-        <div role="img" aria-label={`Biểu đồ radar so sánh ${chartRows.length} tiêu chí`} style={{ height }}>
+        <div role="img" aria-label={`Biểu đồ radar so sánh ${chartRows.length} tiêu chí`} style={{ height: hep ? Math.min(height, 260) : height }}>
           <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={chartRows} outerRadius="72%">
+            <RadarChart data={chartRows} outerRadius={hep ? '50%' : '72%'}>
               <PolarGrid stroke={CHART_INK.grid} />
               <PolarAngleAxis dataKey="axis" tick={{ fill: CHART_INK.axis, fontSize: 11 }} />
-              <PolarRadiusAxis domain={[0, 100]} tick={{ fill: CHART_INK.axis, fontSize: 10 }} tickCount={3} />
+              {/* Đã có số thật ở tooltip và bảng thì vạch 0/50/100 xoay dọc chỉ làm rối. */}
+              <PolarRadiusAxis domain={[0, 100]} tick={hep || bangSoThat ? false : { fill: CHART_INK.axis, fontSize: 10 }} axisLine={!bangSoThat} tickCount={3} />
               <Tooltip
                 contentStyle={{ borderRadius: 10, border: '1px solid #e3e6e3', fontSize: 12 }}
                 formatter={(v: any, name: any, item: any) => {
@@ -94,6 +97,7 @@ export function RadarCompare({ axes, series, height = 320, unitHint, bangSoThat 
                   fill={s.color}
                   fillOpacity={s.primary ? 0.22 : 0.04}
                   strokeWidth={s.primary ? 2.5 : 1.25}
+                  strokeOpacity={s.primary ? 1 : 0.7}
                   isAnimationActive={false}
                 />
               ))}
@@ -111,8 +115,8 @@ export function RadarCompare({ axes, series, height = 320, unitHint, bangSoThat 
               type="button"
               aria-pressed={!hidden.has(s.name)}
               onClick={() => toggle(s.name)}
-              title={hidden.has(s.name) ? 'Hiện trên biểu đồ' : 'Ẩn khỏi biểu đồ'}
-              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border-none bg-transparent px-1.5 py-1 text-xs transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007700] motion-reduce:transition-none ${hidden.has(s.name) ? 'text-stone-400 line-through' : 'text-stone-600'}`}
+              title={hidden.has(s.name) ? (thieuSo(s) ? 'Shop này thiếu số ở một trục; hiện lên thì radar bỏ trục đó' : 'Hiện trên biểu đồ') : 'Ẩn khỏi biểu đồ'}
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border-none bg-transparent px-1.5 py-1 text-xs transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007700] motion-reduce:transition-none ${hidden.has(s.name) ? 'text-stone-400' : 'text-stone-600'}`}
             >
               <span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color, opacity: hidden.has(s.name) ? 0.35 : 1 }} aria-hidden />
               <span className={s.primary ? 'font-bold text-stone-800' : ''}>{s.name}</span>
@@ -153,7 +157,7 @@ export function RadarCompare({ axes, series, height = 320, unitHint, bangSoThat 
 function BangGon({ thuGon, children }: { thuGon: boolean; children: React.ReactNode }) {
   return thuGon ? (
     <details className="rounded-md border border-stone-200 px-3 py-2">
-      <summary className="cursor-pointer text-xs font-semibold text-stone-600">Xem số thật của từng shop</summary>
+      <summary className="cursor-pointer text-xs font-semibold text-stone-600">Xem số liệu chi tiết từng shop</summary>
       <div className="mt-2">{children}</div>
     </details>
   ) : <>{children}</>;

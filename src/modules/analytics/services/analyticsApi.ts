@@ -79,9 +79,15 @@ export const analyticsApi = {
     return res.data;
   },
 
-  /** F36 · tìm shop trên sàn theo tên để theo dõi (shop mẫu luôn nhận danh sách rỗng). */
-  async searchShops(q: string, signal?: AbortSignal): Promise<ShopSearchResult[]> {
-    const res = await api.get(`${BASE}/competitor-tracking/search`, { params: { q }, signal });
+  /** F36 · tìm shop trên sàn theo tên và/hoặc danh mục cấp 1 để theo dõi (shop mẫu luôn nhận danh sách rỗng). */
+  async searchShops(params: { q?: string; categoryId?: string }, signal?: AbortSignal): Promise<ShopSearchResult[]> {
+    const res = await api.get(`${BASE}/competitor-tracking/search`, { params, signal });
+    return res.data.data;
+  },
+
+  /** Danh mục cấp 1 đang hoạt động của sàn, cho ô chọn khi tìm shop theo danh mục. */
+  async trackingCategories(): Promise<{ id: string; name: string }[]> {
+    const res = await api.get(`${BASE}/competitor-tracking/categories`);
     return res.data.data;
   },
 
@@ -135,11 +141,45 @@ export const analyticsApi = {
   async attachSeasonalTag(tag: string, productIds: string[]): Promise<{ success: boolean; modified_count: number }> {
     const res = await api.post(`${BASE}/forecast/seasonal/attach-tag`, { tag, product_ids: productIds });
     return res.data;
+  /** Ảnh sản phẩm (tối đa 6 data URL đã thu nhỏ, cùng sản phẩm) → tên gợi ý, danh mục, chất liệu, các màu. */
+  async recognizeProductImage(imageDataUrls: string[]): Promise<ImageRecognitionResult> {
+    const res = await api.post(`${BASE}/product/recognize-image`, { images: imageDataUrls.slice(0, 6) }, { timeout: 50000 });
+    return res.data?.data;
   },
 };
 
+export interface ImageRecognitionResult {
+  is_product: boolean;
+  product_name: string;
+  product_type: string;
+  category: string | null;
+  materials: string[];
+  colors: { name: string; hex: string }[];
+  brand: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  notes: string;
+}
+
 export interface SmartProductSuggestionResult {
+  /** Kết quả AI lọc tiêu đề seller nhập: tiêu đề sạch, thuộc tính đã tách, cụm quảng cáo đã bỏ, điều nên sửa */
+  input_analysis?: {
+    raw_title: string;
+    clean_title: string;
+    pricing_query: string;
+    quantity: number;
+    condition: 'new' | 'used';
+    attributes: Record<string, string>;
+    removed: string[];
+    issues: string[];
+  };
   category_detected: string;
+  category?: {
+    resolved_id?: string;
+    resolved_name?: string;
+    source?: string;
+    needs_confirmation?: boolean;
+  };
+  detected_material?: string;
   product_type: string;
   noun: string;
   suggested_titles: string[];
@@ -154,6 +194,48 @@ export interface SmartProductSuggestionResult {
     };
     market_sample_count: number;
     summary: string;
+    method?: string;
+    source_label?: string;
+    confidence?: string;
+    warnings?: string[];
+    value_factors?: string[];
+    comparables?: Array<{
+      title: string;
+      price: number;
+      similarity?: number;
+      source?: string;
+      segment?: string;
+    }>;
+    market_signals?: string[];
+    demand_signal?: { keyword: string; momentum: number; direction: 'up' | 'down' | 'flat' } | null;
+    evidence_stats?: {
+      sample_size?: number;
+      p25?: number;
+      p50?: number;
+      p75?: number;
+      p90?: number;
+      blank_cost?: number;
+      profit?: number;
+      profit_margin_pct?: number;
+    };
+    ai_engine_status?: {
+      is_ai_live: boolean;
+      engine: string;
+      engine_label: string;
+      pricing_method: string;
+      source_label: string;
+      market_sample_count: number;
+      notice?: string;
+    };
+  };
+  ai_engine_status?: {
+    is_ai_live: boolean;
+    engine: string;
+    engine_label: string;
+    pricing_method: string;
+    source_label: string;
+    market_sample_count: number;
+    notice?: string;
   };
   trending_keywords: Array<{
     keyword: string;
@@ -162,18 +244,34 @@ export interface SmartProductSuggestionResult {
     gap_score: number;
     is_hot: boolean;
     tag_id?: string;
+    source?: string;
+    frequency?: number;
   }>;
   suggested_tags: string[];
   seo_description: string;
 }
+
+/** Câu thông báo theo đúng bảng MSG của SRS mục 3.9; khoá là số MSG. */
+export const MSG = {
+  136: 'Không thể tải dữ liệu đối thủ cạnh tranh. Vui lòng thử lại.',
+  137: 'Bạn chưa có sản phẩm đăng bán trong danh mục này.',
+  138: 'Không thể tải dữ liệu so sánh shop. Vui lòng thử lại.',
+  140: 'Không thể tải dữ liệu phân tích từ khóa. Vui lòng thử lại.',
+  142: 'Không thể tải dữ liệu phân tích giá cạnh tranh. Vui lòng thử lại.',
+  143: 'Bạn chỉ được theo dõi tối đa 10 shop đối thủ.',
+  144: 'Shop đối thủ này đã có trong danh sách theo dõi của bạn.',
+  145: 'Thêm shop đối thủ thất bại. Vui lòng thử lại.',
+  146: 'Xóa shop đối thủ thất bại. Vui lòng thử lại.',
+  147: 'Không thể tải danh sách shop đối thủ đang theo dõi.',
+} as const;
 
 /** Câu thông báo cho các mã lỗi riêng của khu phân tích (400 do AI trả về theo hợp đồng). */
 export function analyticsErrorMessage(err: any, fallback = 'Không thực hiện được, vui lòng thử lại.'): string {
   const code = err?.response?.data?.error;
   const field = err?.response?.data?.field;
   const expected = err?.response?.data?.expected;
-  if (code === 'tracking_limit_reached') return `Đã theo dõi tối đa ${err.response.data.limit ?? 10} shop. Bỏ bớt một shop để thêm shop mới.`;
-  if (code === 'invalid_param' && expected === 'already_tracked') return 'Shop này đã có trong danh sách theo dõi.';
+  if (code === 'tracking_limit_reached') return MSG[143];
+  if (code === 'invalid_param' && expected === 'already_tracked') return MSG[144];
   if (code === 'invalid_param' && field === 'shop_id') return expected ? `Mã shop không hợp lệ: ${expected}.` : 'Mã shop không hợp lệ.';
   if (code === 'not_found') return 'Không tìm thấy shop này trong dữ liệu phân tích.';
   if (typeof code === 'string' && code) return fallback;

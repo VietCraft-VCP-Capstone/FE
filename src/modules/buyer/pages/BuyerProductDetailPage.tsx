@@ -19,6 +19,8 @@ interface Product {
   id: string; title: string; description: string; category: string;
   tags: string[]; allowCustomization: boolean; customizationType: string;
   price: number; originalPrice?: number; images?: string[]; variants: Variant[];
+  /** 'SKU' = phân loại theo mẫu (set/lẻ/combo): nhóm `color` hiện thành "Mẫu" có ảnh nhỏ. */
+  variantMode?: 'SKU';
   colors?: Array<{ name: string; hex: string }>;
   shopInfo?: { id: string; name: string; logo?: string; rating: number };
   rating?: number;
@@ -312,6 +314,9 @@ export function BuyerProductDetailPage() {
   const materials = [...new Set((product?.variants || []).map(v => v.material).filter(Boolean))] as string[];
 
   const hasColors = colors.length > 0;
+  // Hết hàng theo lựa chọn hiện tại: mẫu hết ở size đang chọn, size hết ở mẫu đang chọn
+  const isSoldOut = (color?: string, size?: string) => !(product?.variants || []).some(v =>
+    (!color || v.color === color) && (!size || v.size === size) && v.stock > 0);
   const hasSizes = sizes.length > 0;
   const hasMaterials = materials.length > 0;
 
@@ -336,7 +341,8 @@ export function BuyerProductDetailPage() {
     ) || product?.variants?.find(v => v.color === c);
     if (match) {
       setSelectedVariant(match);
-      if (match.size && !selectedSize) setSelectedSize(match.size);
+      // Mẫu mới không có size đang chọn thì chuyển theo SKU thật, để giá/kho/giỏ hàng khớp đúng SKU
+      if (match.size && match.size !== selectedSize) setSelectedSize(match.size);
       if (match.material && !selectedMaterial) setSelectedMaterial(match.material);
     }
   };
@@ -350,7 +356,7 @@ export function BuyerProductDetailPage() {
     ) || product?.variants?.find(v => v.size === sz);
     if (match) {
       setSelectedVariant(match);
-      if (match.color && !selectedColor) setSelectedColor(match.color);
+      if (match.color && match.color !== selectedColor) setSelectedColor(match.color);
       if (match.material && !selectedMaterial) setSelectedMaterial(match.material);
     }
   };
@@ -846,8 +852,35 @@ export function BuyerProductDetailPage() {
               </>
             )}
 
+            {/* Mẫu (set / lẻ / combo) có ảnh nhỏ */}
+            {product.variantMode === 'SKU' && colors.length > 0 && (
+              <>
+                <p style={S.sectionLabel}>
+                  Mẫu: <span style={{ fontWeight: 600, color: selectedColor ? '#008000' : '#dc2626' }}>{selectedColor || '(Chưa chọn)'}</span>
+                </p>
+                <div style={S.optionGroup}>
+                  {colors.map(c => {
+                    const img = product.variants.find(v => v.color === c && v.mockupImage)?.mockupImage;
+                    const soldOut = isSoldOut(c, selectedSize || undefined);
+                    return (
+                      <button
+                        key={c}
+                        disabled={soldOut}
+                        title={soldOut ? `${c} (hết hàng)` : c}
+                        style={{ ...S.optionBtn(selectedColor === c), display: 'inline-flex', alignItems: 'center', gap: 6, padding: img ? '4px 12px 4px 4px' : undefined, opacity: soldOut ? 0.4 : 1, cursor: soldOut ? 'not-allowed' : 'pointer' }}
+                        onClick={() => handleSelectColor(c)}
+                      >
+                        {img && <img src={img} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 4 }} />}
+                        {c}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
             {/* Color swatches */}
-            {colors.length > 0 && (
+            {product.variantMode !== 'SKU' && colors.length > 0 && (
               <>
                 <p style={S.sectionLabel}>
                   Màu sắc: <span style={{ fontWeight: 600, color: selectedColor ? '#008000' : '#dc2626' }}>{selectedColor || '(Chưa chọn)'}</span>
@@ -870,9 +903,12 @@ export function BuyerProductDetailPage() {
                   Kích cỡ: <span style={{ fontWeight: 600, color: selectedSize ? '#008000' : '#dc2626' }}>{selectedSize || '(Chưa chọn)'}</span>
                 </p>
                 <div style={S.optionGroup}>
-                  {sizes.map(sz => (
-                    <button key={sz} style={S.optionBtn(selectedSize === sz)} onClick={() => handleSelectSize(sz)}>{sz}</button>
-                  ))}
+                  {sizes.map(sz => {
+                    const soldOut = isSoldOut(selectedColor || undefined, sz);
+                    return (
+                      <button key={sz} disabled={soldOut} title={soldOut ? 'Hết hàng' : undefined} style={{ ...S.optionBtn(selectedSize === sz), opacity: soldOut ? 0.4 : 1, cursor: soldOut ? 'not-allowed' : 'pointer' }} onClick={() => handleSelectSize(sz)}>{sz}</button>
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -903,7 +939,7 @@ export function BuyerProductDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #ddd', borderRadius: 8, overflow: 'hidden' }}>
                 <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>−</button>
                 <span style={{ width: 36, textAlign: 'center', fontWeight: 700 }}>{qty}</span>
-                <button onClick={() => setQty(q => Math.min(99, q + 1))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>+</button>
+                <button onClick={() => setQty(q => Math.max(1, Math.min(99, activeVariant?.stock ?? 99, q + 1)))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>+</button>
               </div>
               <span style={{ fontSize: 12, color: '#888' }}>Còn {activeVariant?.stock ?? 100} sản phẩm</span>
             </div>
