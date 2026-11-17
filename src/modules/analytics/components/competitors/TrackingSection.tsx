@@ -22,9 +22,9 @@ import { decimal } from '../../format';
 import { invalidateInsights, type InsightState } from '../../hooks/useInsight';
 import { MSG, analyticsApi, analyticsErrorMessage } from '../../services/analyticsApi';
 import { categoryLabel, tagLabel } from '../../labels';
-import { PhanTrang, catTrang } from './dieuKhien';
-import { GIAI_THICH, NhanTinCay } from './giaiThich';
-import { Sparkline } from './BangSoSanh';
+import { PhanTrang, catTrang } from './controls';
+import { GIAI_THICH, NhanTinCay } from './explanations';
+import { Sparkline } from './CompetitorComparison';
 import type { CompetitorTracking, Competitors, ShopSearchResult, Threat } from '../../types';
 
 export const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> = {
@@ -374,7 +374,7 @@ function HangMoiTooltip({ active, payload }: { active?: boolean; payload?: { pay
 
 /** Cùng kiểu với bản đồ Vị thế: mỗi chấm một sản phẩm mới, ngang là ngày đăng, dọc là mức cạnh tranh; số cạnh chấm khớp với danh sách bên dưới. */
 function BieuDoHangMoi({ ds, batDau, goc }: { ds: HangMoi[]; batDau: number; goc: number }) {
-  // shortcut: đọc cỡ màn một lần lúc vẽ như ViTheCanhTranh; xoay máy thì chờ lần vẽ sau.
+  // shortcut: đọc cỡ màn một lần lúc vẽ như WeeklySalesChart; xoay máy thì chờ lần vẽ sau.
   const hep = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
   const buoc = (hep ? 14 : 7) * NGAY;
   const ticks = Array.from({ length: Math.floor((goc - batDau) / buoc) + 1 }, (_, k) => batDau + k * buoc);

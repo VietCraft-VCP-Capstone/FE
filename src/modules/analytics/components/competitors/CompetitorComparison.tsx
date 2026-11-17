@@ -16,8 +16,8 @@ import { MSG } from '../../services/analyticsApi';
 import type { CompetitorShop, ShopComparison } from '../../types';
 import { InsightCard, Note, SelectField } from '../ui';
 import { RadarSRS } from './BenchmarkSection';
-import { CongTac } from './dieuKhien';
-import { ViTheCanhTranh } from './ViTheCanhTranh';
+import { CongTac } from './controls';
+import { WeeklySalesChart } from './WeeklySalesChart';
 
 export type KieuXem = 'bang' | 'tuan' | 'radar';
 type Tong = 'ho' | 'ban' | null;
@@ -407,7 +407,7 @@ function BangSoSanh({ me, ds, chon, onChon, canTrack, trackedIds, pendingShop, k
 }
 
 /** Thanh công cụ (tập shop đang so + kiểu xem) và nội dung theo kiểu xem. Tập shop do trang giữ, vì dòng Phạm vi cũng đọc nó. */
-export function PhanDoiThu({
+export function CompetitorComparison({
   shops, xep, ds, laMacDinh, onDoiTap, xem, onXem, chon, onChon, tenDm, comparison, canTrack, trackedIds, pendingShop, khoa, full, onTrack,
 }: {
   shops: CompetitorShop[];
@@ -468,7 +468,7 @@ export function PhanDoiThu({
         ) : ds.length === 0 ? (
           <Note>Danh mục này chưa có shop nào khác để so sánh.</Note>
         ) : xem === 'tuan' ? (
-          <ViTheCanhTranh shops={shops} ds={ds} chon={chon} onChon={onChon} />
+          <WeeklySalesChart shops={shops} ds={ds} chon={chon} onChon={onChon} />
         ) : (
           <BangSoSanh me={me} ds={ds} chon={chon} onChon={onChon} canTrack={canTrack} trackedIds={trackedIds} pendingShop={pendingShop} khoa={khoa} full={full} onTrack={onTrack} />
         )}

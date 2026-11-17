@@ -13,8 +13,8 @@ import { count, money } from '../../../../shared/utils/format';
 import { MSG } from '../../services/analyticsApi';
 import type { Competitors } from '../../types';
 import { Chip, InsightCard, Note } from '../ui';
-import { CongTac, PhanTrang, catTrang } from './dieuKhien';
-import { GIAI_THICH, NhanTinCay } from './giaiThich';
+import { CongTac, PhanTrang, catTrang } from './controls';
+import { GIAI_THICH, NhanTinCay } from './explanations';
 
 const NUT_THEO_DOI =
   'inline-flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-[#007700] bg-white px-2.5 py-0.5 text-xs font-semibold text-[#005B00] transition-colors duration-150 hover:bg-[#EAF0E2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007700] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none';

@@ -10,9 +10,9 @@ import { CHART_INK, SERIES } from '../../../../shared/components/charts/chartThe
 import { count, money } from '../../../../shared/utils/format';
 import type { PricePoint } from '../../types';
 import { InsightCard, Note, SelectField } from '../ui';
-import { NutAnHien } from './dieuKhien';
-import { GIAI_THICH } from './giaiThich';
-import { buocDep, vachChia } from './ViTheCanhTranh';
+import { NutAnHien } from './controls';
+import { GIAI_THICH } from './explanations';
+import { buocDep, vachChia } from './WeeklySalesChart';
 
 const KHONG_GHI = '__chua_ghi';
 const TAT_CA = '__tat_ca';
@@ -71,7 +71,7 @@ function GiaTooltip({ active, payload }: { active?: boolean; payload?: { payload
   );
 }
 
-export function PhanTichGia({ points, loaiBanDau, moSan = false }: {
+export function PriceDistribution({ points, loaiBanDau, moSan = false }: {
   points: PricePoint[];
   /** Loại hàng chọn sẵn, lấy từ link của kế hoạch (?loai=). */
   loaiBanDau?: string;

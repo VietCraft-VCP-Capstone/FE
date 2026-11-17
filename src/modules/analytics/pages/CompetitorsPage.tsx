@@ -20,12 +20,12 @@ import { InsightBlock, InsightStatusView } from '../components/InsightBlock';
 import { SourceChip } from '../components/SourceFooter';
 import { Chip, InfoTip, InsightCard, Note, SelectField, type Tone } from '../components/ui';
 import { RadarSRS } from '../components/competitors/BenchmarkSection';
-import { PhanDoiThu, SO_COT, xepDoiThu, type KieuXem } from '../components/competitors/BangSoSanh';
-import { PhanTichGia } from '../components/competitors/PhanTichGia';
+import { CompetitorComparison, SO_COT, xepDoiThu, type KieuXem } from '../components/competitors/CompetitorComparison';
+import { PriceDistribution } from '../components/competitors/PriceDistribution';
 import { Top20 } from '../components/competitors/Top20';
 import { TrackingSection } from '../components/competitors/TrackingSection';
-import { PhanTrang, catTrang } from '../components/competitors/dieuKhien';
-import { GIAI_THICH } from '../components/competitors/giaiThich';
+import { PhanTrang, catTrang } from '../components/competitors/controls';
+import { GIAI_THICH } from '../components/competitors/explanations';
 import { decimal } from '../format';
 import { categoryLabel } from '../labels';
 import { count, dateTime } from '../../../shared/utils/format';
@@ -447,7 +447,7 @@ export function CompetitorsPage() {
                 <Top20 key={`top-${data.category_id}`} data={data} canTrack={canTrack} trackedIds={trackedIds} pendingShop={pendingShop} khoa={khoa} full={full} onTrack={track} />
                 {(data.price_points?.length ?? 0) > 0 && (
                   // Có ?loai= thì mỗi lần bấm "Xem" (key điều hướng mới) chọn lại loại hàng và mở sẵn biểu đồ.
-                  <PhanTichGia key={`gia-${data.category_id}-${loaiUrl ? key : ''}`} points={data.price_points!} loaiBanDau={loaiUrl} moSan={Boolean(loaiUrl)} />
+                  <PriceDistribution key={`gia-${data.category_id}-${loaiUrl ? key : ''}`} points={data.price_points!} loaiBanDau={loaiUrl} moSan={Boolean(loaiUrl)} />
                 )}
               </div>
             )}
@@ -462,7 +462,7 @@ export function CompetitorsPage() {
             <RadarSRS state={comparison.state} reload={comparison.reload} />
           </InsightCard>
         ) : (
-          <PhanDoiThu
+          <CompetitorComparison
             shops={shops}
             xep={xep}
             ds={ds}

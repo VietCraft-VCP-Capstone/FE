@@ -71,7 +71,7 @@ function TuanTooltip({ active, payload, tenDoi, tenDau }: {
   );
 }
 
-export function ViTheCanhTranh({ shops, ds, chon, onChon }: {
+export function WeeklySalesChart({ shops, ds, chon, onChon }: {
   /** Mọi shop trong danh mục, để tìm shop bán chạy nhất làm mốc. */
   shops: CompetitorShop[];
   /** Các shop đang so; chưa chọn thì đặt shop đầu tiên cạnh bạn. */
