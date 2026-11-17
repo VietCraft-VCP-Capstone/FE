@@ -39,7 +39,7 @@ export function OrderDetailModal({
   const hasDesign = order.items.some(it => it.designFileUrl);
   const isPodOrder = Boolean(order.isPod || order.orderType === 'POD' || hasDesign || order.supplierOrderId || order.printerInfo?.supplierOrderId);
   const isPendingApproval = order.approvalStatus === 'PENDING_APPROVAL' || (isPodOrder && order.fulfillmentStatus === 'PENDING_APPROVAL');
-  // Đơn trả trước (payOS/VNPay) chưa nhận tiền: chưa được duyệt, BE cũng chặn.
+  // Đơn trả trước (payOS) chưa nhận tiền: chưa được duyệt, BE cũng chặn.
   const awaitingBuyerPayment = order.paymentMethod !== 'COD' && order.paymentStatus === 'PENDING';
 
   const handleDispatchPrinter = async () => {
