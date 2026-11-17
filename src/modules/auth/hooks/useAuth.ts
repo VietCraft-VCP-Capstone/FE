@@ -68,6 +68,8 @@ export function useAuth() {
         setUser(normalizedUser);
 
         try {
+            localStorage.removeItem('vietcraft_seller_settings_cache');
+            localStorage.removeItem('vietcraft_seller_onboarding_mock');
             await cartService.mergeGuestCart();
         } catch (err) {
             console.error('Không gộp được giỏ hàng khách vào tài khoản', err);
@@ -93,6 +95,27 @@ export function useAuth() {
     const logout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+
+        // Xóa sạch toàn bộ cache dữ liệu gian hàng và session của tài khoản cũ
+        // để khi đăng nhập tài khoản khác không bao giờ bị dính thông tin tài khoản trước
+        try {
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (
+                    key.startsWith('vietcraft_seller_') ||
+                    key.startsWith('vietcraft_checkout') ||
+                    key.startsWith('vietcraft_favorites') ||
+                    key.startsWith('vietcraft_saved_vouchers') ||
+                    key === 'vietcraft_seller_settings_cache' ||
+                    key === 'vietcraft_seller_onboarding_mock'
+                )) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+        } catch {}
+
         setUser(null);
     };
 

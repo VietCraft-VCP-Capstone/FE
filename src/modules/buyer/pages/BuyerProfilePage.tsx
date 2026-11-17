@@ -231,10 +231,28 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
         setIsAddressModalOpen(true);
     };
 
-    if (loading || !profile) {
+    if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-4 py-16 text-center">
                 <p className="text-gray-500 font-semibold">Đang tải thông tin cá nhân...</p>
+            </div>
+        );
+    }
+
+    if (!profile) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-16 text-center space-y-4">
+                <p className="text-gray-600 font-medium">Không thể tải thông tin cá nhân hoặc phiên đăng nhập không hợp lệ.</p>
+                <button
+                    onClick={() => {
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        window.location.href = '/login';
+                    }}
+                    className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition shadow-sm"
+                >
+                    Đăng nhập lại
+                </button>
             </div>
         );
     }

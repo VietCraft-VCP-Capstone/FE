@@ -79,9 +79,15 @@ export const analyticsApi = {
     return res.data;
   },
 
-  /** F36 · tìm shop trên sàn theo tên để theo dõi (shop mẫu luôn nhận danh sách rỗng). */
-  async searchShops(q: string, signal?: AbortSignal): Promise<ShopSearchResult[]> {
-    const res = await api.get(`${BASE}/competitor-tracking/search`, { params: { q }, signal });
+  /** F36 · tìm shop trên sàn theo tên và/hoặc danh mục cấp 1 để theo dõi (shop mẫu luôn nhận danh sách rỗng). */
+  async searchShops(params: { q?: string; categoryId?: string }, signal?: AbortSignal): Promise<ShopSearchResult[]> {
+    const res = await api.get(`${BASE}/competitor-tracking/search`, { params, signal });
+    return res.data.data;
+  },
+
+  /** Danh mục cấp 1 đang hoạt động của sàn, cho ô chọn khi tìm shop theo danh mục. */
+  async trackingCategories(): Promise<{ id: string; name: string }[]> {
+    const res = await api.get(`${BASE}/competitor-tracking/categories`);
     return res.data.data;
   },
 
@@ -96,10 +102,84 @@ export const analyticsApi = {
     const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
     return res.data?.data;
   },
+
+  /** Lưu hoặc bỏ lưu ý tưởng sản phẩm theo dịp vào database gian hàng */
+  async saveSeasonalIdea(ideaId: string): Promise<{ success: boolean; saved_ideas: string[] }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/save-idea`, { idea_id: ideaId });
+    return res.data;
+  },
+
+  /** Lưu bản chỉnh sửa trực tiếp của seller cho ý tưởng mùa vụ */
+  async saveSeasonalIdeaDraft(payload: {
+    idea_id: string;
+    title: string;
+    concept: string;
+    price_vnd?: number;
+    tags: string[];
+  }): Promise<{ success: boolean; idea_drafts: Record<string, any>; saved_ideas?: string[] }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/idea-draft`, payload);
+    return res.data;
+  },
+
+  /** Lưu đánh giá thành quả sau dịp của seller */
+  async saveSeasonalReview(payload: {
+    camp_id: string;
+    rating: 'good' | 'neutral' | 'poor';
+    note: string;
+  }): Promise<{ success: boolean; occasion_reviews: Record<string, any> }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/review`, payload);
+    return res.data;
+  },
+
+  /** Cập nhật tiến độ checklist mốc thời gian vào database gian hàng */
+  async toggleSeasonalMilestone(milestoneIdx: number, isDone: boolean, campId?: string): Promise<{ success: boolean; checked_milestones: Record<string, boolean> }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/milestone`, { milestone_idx: milestoneIdx, is_done: isDone, camp_id: campId });
+    return res.data;
+  },
+
+  /** Gắn thẻ từ khóa cơ hội trực tiếp vào các sản phẩm của shop */
+  async attachSeasonalTag(tag: string, productIds: string[]): Promise<{ success: boolean; modified_count: number }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/attach-tag`, { tag, product_ids: productIds });
+    return res.data;
+  /** Ảnh sản phẩm (tối đa 6 data URL đã thu nhỏ, cùng sản phẩm) → tên gợi ý, danh mục, chất liệu, các màu. */
+  async recognizeProductImage(imageDataUrls: string[]): Promise<ImageRecognitionResult> {
+    const res = await api.post(`${BASE}/product/recognize-image`, { images: imageDataUrls.slice(0, 6) }, { timeout: 50000 });
+    return res.data?.data;
+  },
 };
 
+export interface ImageRecognitionResult {
+  is_product: boolean;
+  product_name: string;
+  product_type: string;
+  category: string | null;
+  materials: string[];
+  colors: { name: string; hex: string }[];
+  brand: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  notes: string;
+}
+
 export interface SmartProductSuggestionResult {
+  /** Kết quả AI lọc tiêu đề seller nhập: tiêu đề sạch, thuộc tính đã tách, cụm quảng cáo đã bỏ, điều nên sửa */
+  input_analysis?: {
+    raw_title: string;
+    clean_title: string;
+    pricing_query: string;
+    quantity: number;
+    condition: 'new' | 'used';
+    attributes: Record<string, string>;
+    removed: string[];
+    issues: string[];
+  };
   category_detected: string;
+  category?: {
+    resolved_id?: string;
+    resolved_name?: string;
+    source?: string;
+    needs_confirmation?: boolean;
+  };
+  detected_material?: string;
   product_type: string;
   noun: string;
   suggested_titles: string[];
@@ -114,6 +194,48 @@ export interface SmartProductSuggestionResult {
     };
     market_sample_count: number;
     summary: string;
+    method?: string;
+    source_label?: string;
+    confidence?: string;
+    warnings?: string[];
+    value_factors?: string[];
+    comparables?: Array<{
+      title: string;
+      price: number;
+      similarity?: number;
+      source?: string;
+      segment?: string;
+    }>;
+    market_signals?: string[];
+    demand_signal?: { keyword: string; momentum: number; direction: 'up' | 'down' | 'flat' } | null;
+    evidence_stats?: {
+      sample_size?: number;
+      p25?: number;
+      p50?: number;
+      p75?: number;
+      p90?: number;
+      blank_cost?: number;
+      profit?: number;
+      profit_margin_pct?: number;
+    };
+    ai_engine_status?: {
+      is_ai_live: boolean;
+      engine: string;
+      engine_label: string;
+      pricing_method: string;
+      source_label: string;
+      market_sample_count: number;
+      notice?: string;
+    };
+  };
+  ai_engine_status?: {
+    is_ai_live: boolean;
+    engine: string;
+    engine_label: string;
+    pricing_method: string;
+    source_label: string;
+    market_sample_count: number;
+    notice?: string;
   };
   trending_keywords: Array<{
     keyword: string;
@@ -122,6 +244,8 @@ export interface SmartProductSuggestionResult {
     gap_score: number;
     is_hot: boolean;
     tag_id?: string;
+    source?: string;
+    frequency?: number;
   }>;
   suggested_tags: string[];
   seo_description: string;

@@ -3,20 +3,35 @@ import { X } from 'lucide-react';
 import { ModalOverlay } from '../../../shared/components/ModalOverlay';
 import { ProductItem, ProductFormData } from '../types/product';
 import { useProductFormState } from '../hooks/useProductFormState';
+import type { ProductPrefillDraft } from '../hooks/useProductFormDeepLink';
 import { useFocusFormField } from '../hooks/useFocusFormField';
 import { ProductFormImageManager } from './ProductFormImageManager';
 import { ProductFormBasicFields } from './ProductFormBasicFields';
 import { ProductFormColorManager } from './ProductFormColorManager';
 import { ProductFormSizeManager } from './ProductFormSizeManager';
+import { ProductFormSkuTable } from './ProductFormSkuTable';
 import { ProductFormDescriptionEditor } from './ProductFormDescriptionEditor';
 import { ProposeCategoryModal } from './ProposeCategoryModal';
+import { ImageRecognitionPanel } from './ImageRecognitionPanel';
+
 import SmartProductAiModal from '../../seller/components/SmartProductAiModal';
+
+/** Gộp chất liệu AI gợi ý ("Lụa tơ tằm, Gỗ") vào ô chất liệu: bỏ trùng (không phân biệt hoa thường), tối đa 5 như MaterialInput. */
+function mergeMaterials(current: string[] = [], suggested: string): string[] {
+  const out = [...current];
+  for (const raw of suggested.split(/[,;]/)) {
+    const name = raw.trim().slice(0, 40);
+    if (name && out.length < 5 && !out.some(x => x.toLowerCase() === name.toLowerCase())) out.push(name);
+  }
+  return out;
+}
 
 interface ProductFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (formData: ProductFormData) => void;
   product?: ProductItem | null;
+  prefill?: ProductPrefillDraft | null;
   loading?: boolean;
   /** Khoá `field` của việc cần sửa F29 (vd. `stock_quantity`) — modal cuộn tới và nháy ô đó. */
   focusField?: string | null;
@@ -27,6 +42,7 @@ export function ProductFormModal({
   onClose,
   onSubmit,
   product,
+  prefill,
   loading = false,
   focusField,
 }: ProductFormModalProps) {
@@ -49,7 +65,7 @@ export function ProductFormModal({
     categoryCreated,
     validate,
     buildSubmitData,
-  } = useProductFormState(isOpen, product);
+  } = useProductFormState(isOpen, product, prefill);
   const [showCatModal, setShowCatModal] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
 
@@ -69,18 +85,20 @@ export function ProductFormModal({
     <ModalOverlay>
       <div className="bg-white rounded-2xl border border-stone-200 shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-stone-200 bg-stone-50/90">
-          <div>
+        <div className="relative flex items-center justify-center px-6 py-4.5 border-b border-stone-200 bg-stone-50/90">
+          <div className="text-center">
             <h3 className="text-lg font-extrabold text-stone-900 font-jakarta">
               {isEdit ? 'Chỉnh sửa thông tin sản phẩm' : 'Thêm sản phẩm mới'}
             </h3>
-            <p className="text-xs text-stone-500 mt-0.5">
-              {isEdit ? `Mã SKU: ${product?.sku}` : 'Điền đầy đủ thông tin mẫu áo, hình in và bảng size'}
-            </p>
+            {isEdit && product?.sku && (
+              <p className="text-xs text-stone-500 mt-0.5">
+                Mã SKU: {product.sku}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
-            className="text-stone-400 hover:text-stone-700 p-1.5 rounded-lg hover:bg-stone-200 transition-colors cursor-pointer"
+            className="absolute right-6 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1.5 rounded-lg hover:bg-stone-200 transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -102,6 +120,17 @@ export function ProductFormModal({
             />
           </div>
 
+          {/* Seller tải ảnh mà chưa nhập tên → AI đọc ảnh và điền tên sản phẩm */}
+          <ImageRecognitionPanel
+            imageUrls={[...new Set([formData.thumbnail, ...formData.images].filter(Boolean))]}
+            colors={formData.colors}
+            title={formData.title}
+            categoryId={formData.categoryId}
+            categories={categories}
+            materials={formData.materials || []}
+            onApply={(p) => patch(p)}
+          />
+
           <ProductFormBasicFields
             formData={formData}
             errors={errors}
@@ -118,10 +147,12 @@ export function ProductFormModal({
             onOpenAiModal={() => setShowAiModal(true)}
           />
 
-          <ProductFormColorManager
-            colors={formData.colors}
-            onChangeColors={(colors) => patch({ colors })}
-          />
+          {!formData.skus && (
+            <ProductFormColorManager
+              colors={formData.colors}
+              onChangeColors={(colors) => patch({ colors })}
+            />
+          )}
 
           {/* Section 3.5: Thanh chuyển đổi Tab & Quản lý Quy cách / Kích thước sản phẩm */}
           <ProductFormSizeManager
@@ -129,6 +160,14 @@ export function ProductFormModal({
             onChangeSizes={(sizes) => patch({ sizes })}
             categoryName={formData.category}
             productTitle={formData.title}
+          />
+
+          <ProductFormSkuTable
+            skus={formData.skus}
+            sizes={formData.sizes || []}
+            defaultPrice={formData.price}
+            error={errors.skus}
+            onChange={(skus) => patch({ skus })}
           />
 
           <ProductFormDescriptionEditor
@@ -169,13 +208,13 @@ export function ProductFormModal({
           categories={categories}
           initialCategory={formData.categoryId}
           initialTitle={formData.title}
-          initialMaterial={formData.material}
+          initialMaterial={(formData.materials || []).join(', ')}
           blankCost={0}
           isPod={false}
           onApplyTitle={(t) => patch({ title: t })}
           onApplyPrice={(p) => patch({ price: p })}
           onApplyDescription={(d) => patch({ description: d })}
-          onApplyMaterial={(m) => patch({ material: m })}
+          onApplyMaterial={(m) => patch({ materials: mergeMaterials(formData.materials, m) })}
           onApplyTags={(tagList) => {
             tagList.forEach(t => addTag(t));
           }}
@@ -184,7 +223,7 @@ export function ProductFormModal({
             if (aiData.title) updates.title = aiData.title;
             if (aiData.price > 0) updates.price = aiData.price;
             if (aiData.description) updates.description = aiData.description;
-            if (aiData.material) updates.material = aiData.material;
+            if (aiData.material) updates.materials = mergeMaterials(formData.materials, aiData.material);
             if (aiData.categoryId) {
               updates.categoryId = aiData.categoryId;
               const matched = categories.find(c => c._id === aiData.categoryId);

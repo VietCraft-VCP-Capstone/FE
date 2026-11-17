@@ -14,16 +14,24 @@ export function useInsightContext() {
 
   useEffect(() => {
     let alive = true;
-    analyticsApi.context()
-      .then(ctx => {
-        cached = ctx;
-        if (alive) setContext(ctx);
-      })
-      .catch(() => {
-        if (alive && !cached) setFailed(true);
-      });
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const load = () => {
+      analyticsApi.context()
+        .then(ctx => {
+          cached = ctx;
+          if (alive) setContext(ctx);
+          if (alive && !ctx.ai_reachable) {
+            retryTimer = setTimeout(load, 3500);
+          }
+        })
+        .catch(() => {
+          if (alive && !cached) setFailed(true);
+        });
+    };
+    load();
     return () => {
       alive = false;
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, []);
 

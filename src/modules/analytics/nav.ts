@@ -3,8 +3,6 @@ import {
   CalendarClock,
   Eye,
   LayoutGrid,
-  Tags,
-  Target,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -48,20 +46,18 @@ export const INSIGHTS_NAV: InsightNavGroup[] = [
     ],
   },
   {
-    // Xem tổng thể đối thủ trước (F32, F36, F33 gộp một trang), rồi mới sửa giá, từ khoá.
+    // F32, F33, F36 gộp một trang. F35 (giá), F34 (từ khoá) bỏ tab riêng, chỉ mở từ link "Xem".
     label: 'Đối thủ cạnh tranh',
     hint: 'So sánh với shop cùng ngành',
     items: [
       { to: `${INSIGHTS_ROOT}/competitors`, label: 'Phân tích đối thủ', icon: Users, feature: 'F32 · F33 · F36' },
-      { to: `${INSIGHTS_ROOT}/pricing`, label: 'So sánh giá', icon: Target, feature: 'F35' },
-      { to: `${INSIGHTS_ROOT}/tag-gap`, label: 'Gợi ý từ khoá', icon: Tags, feature: 'F34' },
     ],
   },
   {
     label: 'Nhìn về trước',
     hint: 'Tháng sau nên chuẩn bị gì',
     items: [
-      { to: `${INSIGHTS_ROOT}/seasonal`, label: 'Mùa vụ và lịch ra hàng', icon: CalendarClock, feature: 'F38' },
+      { to: `${INSIGHTS_ROOT}/seasonal`, label: 'Kế hoạch Cao điểm', icon: CalendarClock, feature: 'F38' },
     ],
   },
 ];

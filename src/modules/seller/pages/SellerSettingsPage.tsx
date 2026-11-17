@@ -48,6 +48,10 @@ export function SellerSettingsPage() {
     return () => { isMounted = false; };
   }, []);
 
+  const getErrorMessage = (err: any, defaultMsg: string): string => {
+    return err?.response?.data?.error || err?.response?.data?.message || err?.message || defaultMsg;
+  };
+
   const handleSaveGeneral = async (brandData: SellerBrandSettings) => {
     setLoading(true);
     try {
@@ -55,7 +59,7 @@ export function SellerSettingsPage() {
       setSettings(updated);
       showToast('Đã lưu thông tin nhận diện thương hiệu thành công!', 'success');
     } catch (err: any) {
-      showToast('Lỗi khi lưu thông tin thương hiệu: ' + (err.message || err), 'error');
+      showToast('Lỗi khi lưu thông tin thương hiệu: ' + getErrorMessage(err, 'Lưu thất bại.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -68,7 +72,7 @@ export function SellerSettingsPage() {
       setSettings(updated);
       showToast('Đã cập nhật cấu hình vận chuyển thành công!', 'success');
     } catch (err: any) {
-      showToast('Lỗi khi lưu cấu hình vận chuyển: ' + (err.message || err), 'error');
+      showToast('Lỗi khi lưu cấu hình vận chuyển: ' + getErrorMessage(err, 'Lưu thất bại.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -81,7 +85,7 @@ export function SellerSettingsPage() {
       setSettings(updated);
       showToast('Đã lưu cấu hình rút tiền và thanh toán thành công!', 'success');
     } catch (err: any) {
-      showToast('Lỗi khi lưu cấu hình thanh toán: ' + (err.message || err), 'error');
+      showToast('Lỗi khi lưu cấu hình thanh toán: ' + getErrorMessage(err, 'Lưu thất bại.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -94,7 +98,7 @@ export function SellerSettingsPage() {
       setSettings(updated);
       showToast(`Đã thêm tài khoản ${newBank.bankName} thành công!`, 'success');
     } catch (err: any) {
-      showToast('Lỗi khi thêm tài khoản ngân hàng: ' + (err.message || err), 'error');
+      showToast('Lỗi khi thêm tài khoản ngân hàng: ' + getErrorMessage(err, 'Thêm thất bại.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -107,7 +111,7 @@ export function SellerSettingsPage() {
       setSettings(updated);
       showToast('Đã xóa tài khoản ngân hàng.', 'info');
     } catch (err: any) {
-      showToast('Lỗi khi xóa tài khoản ngân hàng: ' + (err.message || err), 'error');
+      showToast('Lỗi khi xóa tài khoản ngân hàng: ' + getErrorMessage(err, 'Xóa thất bại.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -120,7 +124,7 @@ export function SellerSettingsPage() {
       setSettings(updated);
       showToast('Đã đặt làm tài khoản thụ hưởng mặc định.', 'success');
     } catch (err: any) {
-      showToast('Lỗi khi đặt tài khoản mặc định: ' + (err.message || err), 'error');
+      showToast('Lỗi khi đặt tài khoản mặc định: ' + getErrorMessage(err, 'Thao tác thất bại.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -133,7 +137,7 @@ export function SellerSettingsPage() {
       setSettings(updated);
       showToast('Đã cập nhật cài đặt nhận thông báo thành công!', 'success');
     } catch (err: any) {
-      showToast('Lỗi khi lưu cài đặt thông báo: ' + (err.message || err), 'error');
+      showToast('Lỗi khi lưu cài đặt thông báo: ' + getErrorMessage(err, 'Lưu thất bại.'), 'error');
     } finally {
       setLoading(false);
     }

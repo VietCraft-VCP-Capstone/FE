@@ -14,6 +14,20 @@ import {
     Alert, EmptyState, Pagination, Modal, ConfirmDialog
 } from '../components/AdminPrimitives';
 
+type OcrStatus = 'MATCH' | 'MISMATCH' | 'LOW_QUALITY' | 'NOT_SCANNED';
+const OCR_STATUS_TEXT: Record<OcrStatus, string> = {
+    MATCH: '✓ Thông tin nộp khớp kết quả quét OCR CCCD',
+    MISMATCH: '⚠ Lệch so với OCR CCCD',
+    LOW_QUALITY: '⚠ Ảnh CCCD chưa đạt kiểm tra OCR',
+    NOT_SCANNED: '⚠ Chưa quét OCR CCCD',
+};
+const OCR_FIELD_TEXT: Record<string, string> = {
+    id_number: 'số CCCD',
+    full_name: 'họ tên',
+    date_of_birth: 'ngày sinh',
+    mrz_id_number: 'số CCCD trên MRZ',
+};
+
 export function AdminSellers() {
     const [items, setItems] = useState<AdminSellerApplicationItem[]>([]);
     const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
@@ -226,6 +240,15 @@ export function AdminSellers() {
                                         <td>
                                             <div className="font-semibold text-admin-ink">{app.full_name}</div>
                                             <div className="text-[11.5px] text-admin-muted">{app.phone} • CCCD: {app.id_card_masked}</div>
+                                            {app.ocr_check && app.ocr_check.status !== 'MATCH' && (
+                                                <div className={cx(
+                                                    'mt-0.5 text-[11px] font-bold',
+                                                    app.ocr_check.status === 'MISMATCH' ? 'text-[#b91c1c]' : 'text-amber-700'
+                                                )}>
+                                                    {OCR_STATUS_TEXT[app.ocr_check.status]}
+                                                    {app.ocr_check.mismatches.length > 0 && `: ${app.ocr_check.mismatches.map(m => OCR_FIELD_TEXT[m] || m).join(', ')}`}
+                                                </div>
+                                            )}
                                         </td>
                                         <td>
                                             <StatusPill tone={app.seller_type === 'BUSINESS' ? 'brand' : 'neutral'}>
@@ -442,6 +465,25 @@ export function AdminSellers() {
                                         <>⚠ Tên chủ tài khoản không khớp với tên trên giấy tờ định danh</>
                                     )}
                                 </div>
+
+                                {detailData.ocr_check && (
+                                    <div className={cx(
+                                        'rounded-admin border p-2.5 text-xs font-bold',
+                                        detailData.ocr_check.status === 'MATCH'
+                                            ? 'border-[#b7e0b7] bg-admin-brand-050 text-admin-brand-700'
+                                            : detailData.ocr_check.status === 'MISMATCH'
+                                                ? 'border-[#f6caca] bg-admin-danger-050 text-[#b91c1c]'
+                                                : 'border-amber-200 bg-amber-50 text-amber-800'
+                                    )}>
+                                        {OCR_STATUS_TEXT[detailData.ocr_check.status as OcrStatus]}
+                                        {detailData.ocr_check.mismatches?.length > 0 && (
+                                            <>: {detailData.ocr_check.mismatches.map((m: string) => OCR_FIELD_TEXT[m] || m).join(', ')}</>
+                                        )}
+                                        <div className="mt-1 font-normal text-[11px] opacity-80">
+                                            OCR chỉ hỗ trợ đối soát, có thể đọc sai — hãy so trực tiếp với ảnh CCCD.
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="rounded-admin border border-admin-line bg-admin-canvas p-3.5 text-admin-muted space-y-1 text-[12px]">
