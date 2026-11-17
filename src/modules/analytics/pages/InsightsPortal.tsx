@@ -2,17 +2,13 @@ import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { SellerLayout } from '../../seller/pages/SellerLayout';
 import { DemoBanner } from '../components/DemoBanner';
 import { INSIGHTS_NAV } from '../nav';
-import { ActionsPage } from './ActionsPage';
 import { AlertsPage } from './AlertsPage';
-import { CategoriesPage } from './CategoriesPage';
 import { CompetitorsPage } from './CompetitorsPage';
-import { ForecastPage } from './ForecastPage';
 import { ListingDetailPage } from './ListingDetailPage';
 import { ListingsPage } from './ListingsPage';
-import { NichesPage } from './NichesPage';
+import { MoneyPage } from './MoneyPage';
 import { OverviewPage } from './OverviewPage';
 import { PricingPage } from './PricingPage';
-import { RadarPage } from './RadarPage';
 import { SeasonalPage } from './SeasonalPage';
 import { TagGapPage } from './TagGapPage';
 
@@ -34,10 +30,9 @@ export function InsightsPortal({ user, onLogout }: { user: any; onLogout: () => 
       <DemoBanner />
       <Routes>
         <Route index element={<Navigate to="overview" replace />} />
-        <Route path="actions" element={<ActionsPage />} />
 
         <Route path="overview" element={<OverviewPage />} />
-        <Route path="categories" element={<CategoriesPage />} />
+        <Route path="money" element={<MoneyPage />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="listings" element={<ListingsPage />} />
         <Route path="listings/:id" element={<ListingDetailPage />} />
@@ -51,11 +46,8 @@ export function InsightsPortal({ user, onLogout }: { user: any; onLogout: () => 
         {/* Không còn trên thanh bên; vẫn mở từ link "Xem" của kế hoạch và Sức khoẻ sản phẩm. */}
         <Route path="tag-gap" element={<TagGapPage />} />
         <Route path="pricing" element={<PricingPage />} />
-
-        <Route path="forecast" element={<ForecastPage />} />
+        <Route path="tracking" element={<Navigate to="/seller/insights/competitors#theo-doi" replace />} />
         <Route path="seasonal" element={<SeasonalPage />} />
-        <Route path="niches" element={<NichesPage />} />
-        <Route path="radar" element={<RadarPage />} />
 
         <Route path="*" element={<Navigate to="/seller/insights/overview" replace />} />
       </Routes>

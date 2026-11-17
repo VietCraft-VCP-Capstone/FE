@@ -60,7 +60,6 @@ export interface InsightEnvelope<T> {
 
 export type TimeRange = '7d' | '30d' | '90d' | '180d' | '365d' | 'year';
 export type AlertPeriod = TimeRange | 'all';
-export type ForecastWindow = '30' | '60' | '90';
 
 /* ------------------------------------------------------------ F26 -------- */
 
@@ -215,29 +214,6 @@ export interface AnomalyAlerts {
     min_expected: { views: number; revenue: number };
     weekly_cap: number;
   };
-}
-
-/* ------------------------------------------------------------ F31 -------- */
-
-export interface CategoryRevenue {
-  range: TimeRange;
-  from: string;
-  to: string;
-  by_product_type: {
-    product_type_id: string;
-    name_vi: string;
-    revenue_vnd: number;
-    orders: number;
-    units: number;
-    share_pct: number;
-  }[];
-  total_revenue_vnd: number;
-  /** dow: 1 = Thứ Hai … 7 = Chủ Nhật, giờ Việt Nam (BR-185). */
-  heatmap: { dow: number; hour: number; orders: number; revenue_vnd: number }[];
-  heatmap_tz: string;
-  peak_window: { dow: number; dow_vi: string; hour: number; orders: number; note: string } | null;
-  heatmap_window: string;
-  limitation: string | null;
 }
 
 /* ------------------------------------------------------------ F32 -------- */
@@ -627,36 +603,6 @@ export interface ShopSearchResult {
   is_tracked: boolean;
   /** Chỉ có khi tìm theo danh mục: số sản phẩm shop đang bán trong danh mục đó. */
   products_in_category?: number;
-}
-
-/* ------------------------------------------------------------ F37 -------- */
-
-export interface RevenueForecast {
-  scope: 'shop' | string;
-  target_id: string;
-  horizon_days: number;
-  model: string;
-  history?: { date: string; y: number }[];
-  points: { date: string; yhat: number; lo95: number; hi95: number }[];
-  orders_hat?: { date: string; yhat: number; lo95: number; hi95: number }[];
-  views_hat?: { date: string; yhat: number; lo95: number; hi95: number }[];
-  total_forecast_vnd: number;
-  validation: {
-    metric: string;
-    value: number | null;
-    baseline: number | null;
-    beats_baseline: boolean | null;
-    holdout_days: number;
-    note: string;
-  };
-  model_selection: {
-    chosen: string;
-    seasonal_naive_mase: number | null;
-    arima_mase: number | null;
-    lstm_mase: number | null;
-    why: string;
-  };
-  limitation: string | null;
 }
 
 /* ------------------------------------------------------------ F38 -------- */
@@ -1083,82 +1029,6 @@ export interface SeasonalForecast {
     base_cost: number;
     printer_name?: string;
   }[];
-}
-
-/* ------------------------------------------------------------ F39 -------- */
-
-export type NicheQuadrant = 'opportunity' | 'crowded' | 'niche_quiet' | string;
-
-export interface Niches {
-  niches: {
-    rank: number;
-    keyword: string;
-    tag_id: string;
-    demand_pct: number;
-    /** null ở shop thật: sàn chưa đủ listing thật gắn tag để so cung — xem meta.unlock. */
-    supply_pct: number | null;
-    gap_score: number | null;
-    n_listings: number | null;
-    demand_index: number;
-    trend: TrendDirection | 'rising' | 'falling' | string;
-    growth_pct: number | null;
-    quadrant: NicheQuadrant;
-    sparkline_7d: number[];
-    /** true khi phần CUNG bị che vì chưa đủ listing thật (shop thật, xem meta.unlock). */
-    supply_insufficient?: boolean;
-  }[];
-  total_niches: number;
-  banned_filtered: number;
-  banned_list_size: number;
-  limitation: string | null;
-}
-
-/* ------------------------------------------------------------ F40 -------- */
-
-export interface TrendRadar {
-  week: string;
-  top_tags: {
-    rank: number;
-    tag_id: string;
-    name_vi: string;
-    growth_pct: number;
-    momentum: number;
-    momentum_pct?: number;
-    demand_index: number;
-    acceleration?: number;
-    low_base?: boolean;
-    axis?: string;
-    supply_n_listings?: number;
-    trend: string;
-    sparkline?: number[];
-    searches_per_week: number | null;
-  }[];
-  radar: { axes: string[]; values: number[]; values_raw?: number[]; scale: string };
-  limitation: string | null;
-}
-
-/* ------------------------------------------------------------ F41 -------- */
-
-export interface Recommendations {
-  shop_id: string;
-  scope: 'shop' | 'platform';
-  personalised: boolean;
-  recommendations: {
-    priority: number;
-    /** scale: đẩy mạnh loại đang bán tốt · expand: mở rộng sang tag · explore: shop mới, gợi ý chung. */
-    action: 'scale' | 'expand' | 'explore' | string;
-    target: { type: 'product_type' | 'tag' | 'keyword' | string; id: string; name_vi?: string; keyword?: string; tag_id?: string };
-    why: string[];
-    expected: string;
-    confidence: 'low' | 'medium' | 'high' | string;
-  }[];
-  /* Ba trường dưới chỉ có khi shop đã có lịch sử (scope 'shop'). Shop mới nhận gợi ý
-     chung toàn sàn (scope 'platform') và service không trả chúng. */
-  excluded_product_types?: string[];
-  exclusion_reason?: string;
-  my_listings_analysed?: number;
-  validated: boolean;
-  validation_note: string;
 }
 
 /* ---------- Seasonal v2: câu chuyện, kế hoạch áp dụng, thành quả (căn cứ dữ liệu) ---------- */
