@@ -83,7 +83,7 @@ export function TagGapPage() {
                 action={
                   trusted && goi
                     ? <Link to="/seller/products" className={ACTION_CLASS}>Thêm từ khoá cho sản phẩm</Link>
-                    : <Link to="/seller/insights/competitors#manh-yeu" className={ACTION_CLASS}>Xem điểm mạnh & điểm yếu</Link>
+                    : <Link to="/seller/insights/competitors#so-sanh" className={ACTION_CLASS}>So sánh với đối thủ</Link>
                 }
               >
                 {trusted && goi ? (

@@ -126,7 +126,7 @@ function ListingDetail({ id }: { id: string }) {
                     },
                     {
                       key: 'season',
-                      label: 'Mùa vụ',
+                      label: 'Dịp cao điểm',
                       children: (
                         <InsightBlock state={intel.state} onRetry={intel.reload}>
                           {intelData => <div className={CARD}><SeasonPanel points={intelData.score_timeline} bare>{datePicker}</SeasonPanel></div>}
