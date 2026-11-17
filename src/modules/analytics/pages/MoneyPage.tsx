@@ -1,7 +1,7 @@
 /**
  * F43 — Thực nhận & Voucher. Trả lời: "Tôi thực nhận bao nhiêu sau phí sàn, voucher và hoàn tiền?"
  *
- * Đọc GET /seller/analytics/money (tham số timeRange = 7d · 30d · 90d · thisMonth · lastMonth; mặc định 30d).
+ * Đọc GET /seller/analytics/money (timeRange = 7d · 30d · 90d · thisMonth · lastMonth · custom + from_date/to_date; mặc định 30d).
  */
 
 import { useEffect, useRef } from 'react';
@@ -10,6 +10,7 @@ import { RangeTabs } from '../../seller/components/dashboard/SellerDashboardUi';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { SourceFooter } from '../components/SourceFooter';
+import { CustomRange, rangeProblem } from '../components/money/CustomRange';
 import { MoneyDaily } from '../components/money/MoneyDaily';
 import { MoneyHero } from '../components/money/MoneyHero';
 import { MoneyProducts } from '../components/money/MoneyProducts';
@@ -25,11 +26,16 @@ const OPTIONS = MONEY_RANGES.map(({ value, label }) => ({ value, label }));
 export function MoneyPage() {
   const [params, setParams] = useSearchParams();
   const raw = params.get('range');
-  const timeRange: MoneyRange = OPTIONS.find(o => o.value === raw)?.value ?? '30d';
+  const from = params.get('from') ?? '';
+  const to = params.get('to') ?? '';
+  const picked: MoneyRange = OPTIONS.find(o => o.value === raw)?.value ?? '30d';
+  const timeRange: MoneyRange = picked === 'custom' && rangeProblem(from, to) ? '30d' : picked;
+  const query = timeRange === 'custom' ? { timeRange, from_date: from, to_date: to } : { timeRange };
+  const rangeKey = `${timeRange}:${from}:${to}`;
 
-  const { state, reload, refreshing } = useInsight<MoneyReport>('/money', { timeRange }, { keepPrevious: true });
+  const { state, reload, refreshing } = useInsight<MoneyReport>('/money', query, { keepPrevious: true });
   // Gợi ý AI gọi LLM nên chậm hơn: tải riêng, số liệu hiện trước.
-  const advice = useInsight<MoneyAdvice>('/money/advice', { timeRange });
+  const advice = useInsight<MoneyAdvice>('/money/advice', query);
   const tips = advice.state.kind === 'ready' ? advice.state.data.tips : {};
   const aiLoading = advice.state.kind === 'loading';
 
@@ -38,22 +44,33 @@ export function MoneyPage() {
   const adviceMissing = state.kind === 'ready' && advice.state.kind !== 'ready' && advice.state.kind !== 'loading';
   const reloadAdvice = advice.reload;
   useEffect(() => {
-    if (!adviceMissing || retried.current === timeRange) return;
-    const timer = setTimeout(() => { retried.current = timeRange; reloadAdvice(); }, 3000);
+    if (!adviceMissing || retried.current === rangeKey) return;
+    const timer = setTimeout(() => { retried.current = rangeKey; reloadAdvice(); }, 3000);
     return () => clearTimeout(timer);
-  }, [adviceMissing, timeRange, reloadAdvice]);
+  }, [adviceMissing, rangeKey, reloadAdvice]);
 
-  const setRange = (value: MoneyRange) => {
+  const setRange = (value: MoneyRange, f?: string, t?: string) => {
     const next = new URLSearchParams(params);
     next.set('range', value);
+    // bấm "Tuỳ chọn" lần đầu: lấy luôn khoảng đang xem làm mặc định
+    const cur = state.kind === 'ready' ? state.data : null;
+    const nf = f ?? (value === 'custom' ? from || cur?.from : undefined);
+    const nt = t ?? (value === 'custom' ? to || cur?.to : undefined);
+    if (nf && nt) { next.set('from', nf); next.set('to', nt); } else { next.delete('from'); next.delete('to'); }
     setParams(next, { replace: true });
   };
+  const pick = (f: string, t: string) => setRange('custom', f, t);
 
   return (
     <InsightPage
       title="Thực nhận & Voucher"
       question="Tôi thực nhận bao nhiêu sau phí sàn, voucher và hoàn tiền?"
-      actions={<RangeTabs<MoneyRange> value={timeRange} onChange={setRange} options={OPTIONS} label="Khoảng thời gian" />}
+      actions={
+        <div className="flex flex-col items-end gap-2">
+          <RangeTabs<MoneyRange> value={timeRange} onChange={v => setRange(v)} options={OPTIONS} label="Khoảng thời gian" />
+          {timeRange === 'custom' && <CustomRange from={from} to={to} onApply={pick} />}
+        </div>
+      }
     >
       <InsightBlock state={state} onRetry={reload} skeleton={<MoneySkeleton />}>
         {(data, meta) => (
@@ -67,7 +84,7 @@ export function MoneyPage() {
               <div className="min-w-0 lg:col-span-7"><MoneyProducts data={data} /></div>
               <div className="min-w-0 lg:col-span-5"><VoucherTable data={data} /></div>
             </div>
-            <MoneyDaily data={data} />
+            <MoneyDaily data={data} onPick={pick} />
             <SourceFooter meta={meta} />
             <p className="m-0 text-xs text-stone-500">
               Xem thêm:{' '}

@@ -22,7 +22,7 @@ export function MoneyHero({ data }: { data: MoneyReport }) {
   return (
     <section aria-label="Thực nhận" className="grid gap-6 rounded-md border border-stone-200 bg-white p-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-center">
       <div className="min-w-0">
-        <p className="m-0 text-sm font-semibold text-stone-600"><Term tip={NET_TIP}>Thực nhận {rangeText(data.range)}</Term></p>
+        <p className="m-0 text-sm font-semibold text-stone-600"><Term tip={NET_TIP}>Thực nhận {rangeText(data)}</Term></p>
         <p className="m-0 mt-1 font-jakarta text-4xl font-extrabold tabular-nums" style={{ color: PART_COLOR.net }}>{money(flow.net_vnd)}</p>
         <p className="m-0 mt-2 text-sm text-stone-500">{count(data.orders)} đơn, từ {dateRange(data.from, data.to)}</p>
         <p className="m-0 mt-1 text-xs text-stone-500">

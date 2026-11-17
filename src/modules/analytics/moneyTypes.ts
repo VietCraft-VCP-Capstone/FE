@@ -1,5 +1,7 @@
 /** Kiểu của GET /seller/analytics/money (F43 · Tiền về & Voucher). Trường `| null` hiện "chưa có", không hiện 0. */
-export type MoneyRange = '7d' | '30d' | '90d' | 'thisMonth' | 'lastMonth';
+import { dateRange } from './format';
+
+export type MoneyRange = '7d' | '30d' | '90d' | 'thisMonth' | 'lastMonth' | 'custom';
 
 export const MONEY_RANGES: { value: MoneyRange; label: string; text: string }[] = [
   { value: '7d', label: '7 ngày', text: '7 ngày qua' },
@@ -7,9 +9,11 @@ export const MONEY_RANGES: { value: MoneyRange; label: string; text: string }[] 
   { value: '90d', label: '90 ngày', text: '90 ngày qua' },
   { value: 'thisMonth', label: 'Tháng này', text: 'tháng này' },
   { value: 'lastMonth', label: 'Tháng trước', text: 'tháng trước' },
+  { value: 'custom', label: 'Tuỳ chọn', text: '' },
 ];
 
-export const rangeText = (r: MoneyRange) => MONEY_RANGES.find(o => o.value === r)?.text ?? '';
+export const rangeText = (r: Pick<MoneyReport, 'range' | 'from' | 'to'>) =>
+  r.range === 'custom' ? `từ ${dateRange(r.from, r.to)}` : MONEY_RANGES.find(o => o.value === r.range)?.text ?? '';
 
 export interface MoneyReport {
   range: MoneyRange;

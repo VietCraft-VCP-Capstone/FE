@@ -6,6 +6,7 @@ import { useWheelZoom } from '../../hooks/useWheelZoom';
 import { useSmoothWindow } from '../../hooks/useSmoothWindow';
 import { DailyHoverTip } from './DailyTooltip';
 import { DailyMiniMap } from './DailyMiniMap';
+import { PickBar } from './PickBar';
 import { cumSeries, daySeries } from './dailySeries';
 import { panBy, signedAxis, tickIndices, zoomAt, type ChartMode, type DayPoint } from './dailyData';
 
@@ -13,7 +14,9 @@ const PAD_L = 40;
 const PAD_R = 8;
 const TICK = { fill: CHART_INK.axis, fontSize: 11 };
 
-export function MoneyDailyChart({ points, avg, mode }: { points: DayPoint[]; avg: number; mode: ChartMode }) {
+interface Props { points: DayPoint[]; avg: number; mode: ChartMode; onPick: (from: string, to: string) => void }
+
+export function MoneyDailyChart({ points, avg, mode, onPick }: Props) {
   const n = points.length;
   const zoomable = n > 7;
   const minSpan = Math.min(4, n - 1);
@@ -22,6 +25,7 @@ export function MoneyDailyChart({ points, avg, mode }: { points: DayPoint[]; avg
   const zoomed = span < n - 1 - 0.01;
   const [hover, setHover] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [brush, setBrush] = useState<{ a: number; b: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const lastX = useRef<number | null>(null);
 
@@ -55,22 +59,30 @@ export function MoneyDailyChart({ points, avg, mode }: { points: DayPoint[]; avg
   };
 
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (!zoomed || e.button !== 0 || e.detail > 1) return;
+    if (!zoomable || e.button !== 0 || e.detail > 1) return;
     e.currentTarget.setPointerCapture(e.pointerId);
+    // chưa phóng to: kéo để khoanh một đoạn; đã phóng to: kéo để di chuyển
+    if (!zoomed) { const i = hoverAt(e.clientX); setBrush({ a: i, b: i }); return; }
     lastX.current = e.clientX;
     setDragging(true);
   };
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (brush) { setBrush({ ...brush, b: hoverAt(e.clientX) }); return; }
     if (lastX.current === null) { setHover(hoverAt(e.clientX)); return; }
     const t = target.current;
     const dx = e.clientX - lastX.current;
     lastX.current = e.clientX;
     setTarget(panBy(t, n, minSpan, (-dx / plotW()) * (t.e - t.s)), true);
   };
-  const onUp = () => { lastX.current = null; setDragging(false); };
+  const onUp = () => {
+    if (brush && Math.abs(brush.b - brush.a) >= 1) setTarget({ s: Math.min(brush.a, brush.b), e: Math.max(brush.a, brush.b) });
+    setBrush(null);
+    lastX.current = null;
+    setDragging(false);
+  };
 
   const axis = signedAxis(points.map(p => (mode === 'cum' ? p.cum : p.net)));
-  const cursor = zoomed ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : '';
+  const cursor = zoomed ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : zoomable ? 'cursor-crosshair' : '';
 
   return (
     <div>
@@ -101,6 +113,7 @@ export function MoneyDailyChart({ points, avg, mode }: { points: DayPoint[]; avg
               domain={axis?.domain} ticks={axis?.ticks} tick={TICK}
               tickFormatter={v => (Number(v) === 0 ? '0' : compactMoney(Number(v)))}
             />
+            {brush && <ReferenceArea x1={Math.min(brush.a, brush.b) - 0.5} x2={Math.max(brush.a, brush.b) + 0.5} fill="#007700" fillOpacity={0.15} stroke="#007700" strokeOpacity={0.4} ifOverflow="hidden" />}
             {hover !== null && <ReferenceArea x1={hover - 0.5} x2={hover + 0.5} fill="#007700" fillOpacity={0.06} stroke="none" ifOverflow="hidden" />}
             {mode === 'cum'
               ? cumSeries({ points, hover })
@@ -116,14 +129,7 @@ export function MoneyDailyChart({ points, avg, mode }: { points: DayPoint[]; avg
             onPan={d => setTarget(panBy(target.current, n, minSpan, d), true)}
             onJump={c => setTarget({ s: c - span / 2, e: c + span / 2 })}
           />
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <p className="text-xs text-stone-500">Lăn chuột để phóng to / thu nhỏ, kéo biểu đồ hoặc thanh bên dưới để xem ngày khác, bấm đúp để xem toàn bộ.</p>
-            {zoomed && (
-              <button type="button" onClick={reset} className="shrink-0 text-xs font-semibold text-[#005B00] hover:underline">
-                Xem toàn bộ
-              </button>
-            )}
-          </div>
+          <PickBar points={points} view={view} zoomed={zoomed} onReset={reset} onPick={onPick} />
         </>
       )}
     </div>

@@ -3,23 +3,27 @@ import { InsightCard } from '../ui';
 import { compactMoney } from '../../../../shared/utils/format';
 import { NA, shortDate } from '../../format';
 import type { MoneyReport } from '../../moneyTypes';
-import { dailyStats, toPoints, type ChartMode } from './dailyData';
+import { bucketOf, dailyStats, toPoints, type ChartMode } from './dailyData';
 import { MoneyDailyChart } from './MoneyDailyChart';
 
-export function MoneyDaily({ data }: { data: MoneyReport }) {
+const GROUP_NOTE = { day: false, week: 'Gộp theo tuần.', month: 'Gộp theo tháng.' } as const;
+const DAY_LABEL = { day: 'Theo ngày', week: 'Theo tuần', month: 'Theo tháng' } as const;
+
+export function MoneyDaily({ data, onPick }: { data: MoneyReport; onPick: (from: string, to: string) => void }) {
   const [mode, setMode] = useState<ChartMode>('day');
-  const points = useMemo(() => toPoints(data.by_day, data.range), [data]);
+  const bucket = bucketOf(data.by_day.length);
+  const points = useMemo(() => toPoints(data.by_day, bucket), [data, bucket]);
   const stats = useMemo(() => dailyStats(data.by_day), [data]);
   const loss = data.by_day.filter(d => d.net_vnd < 0).length;
   const notes = [
     'Đơn đã giao xong, xếp theo ngày đặt, đã trừ tiền hoàn.',
-    data.range === '90d' && 'Gộp theo tuần.',
+    GROUP_NOTE[bucket],
     mode === 'cum'
       ? 'Đường đi lên dốc là lúc tiền về nhiều, đoạn phẳng là những ngày không có đơn.'
       : loss > 0 && `${loss} ngày bị âm do hoàn tiền (cột đỏ).`,
   ];
   const modes: [ChartMode, string][] = [
-    ['day', data.range === '90d' ? 'Theo tuần' : 'Theo ngày'],
+    ['day', DAY_LABEL[bucket]],
     ['cum', 'Cộng dồn'],
   ];
   const cells: [string, string][] = [
@@ -55,7 +59,7 @@ export function MoneyDaily({ data }: { data: MoneyReport }) {
           ))}
         </div>
       </div>
-      <MoneyDailyChart points={points} avg={data.range === '90d' ? 0 : stats.avg} mode={mode} />
+      <MoneyDailyChart points={points} avg={bucket === 'day' ? stats.avg : 0} mode={mode} onPick={onPick} />
     </InsightCard>
   );
 }

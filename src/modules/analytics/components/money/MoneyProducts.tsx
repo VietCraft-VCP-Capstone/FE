@@ -57,7 +57,7 @@ export function MoneyProducts({ data }: { data: MoneyReport }) {
           })}
         </DataTable>
       )}
-      <MoneyProductsModal open={open} onClose={() => setOpen(false)} products={data.by_product} total={total} period={rangeText(data.range)} />
+      <MoneyProductsModal open={open} onClose={() => setOpen(false)} products={data.by_product} total={total} period={rangeText(data)} />
     </InsightCard>
   );
 }

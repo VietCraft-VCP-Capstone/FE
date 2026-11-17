@@ -3,16 +3,31 @@ import type { MoneyReport } from '../../moneyTypes';
 
 type Day = MoneyReport['by_day'][number];
 
-export interface DayPoint { i: number; key: string; label: string; full: string; net: number; cum: number; orders: number; empty: number | null }
+export interface DayPoint { i: number; key: string; end: string; label: string; full: string; net: number; cum: number; orders: number; empty: number | null }
 
 export type Win = { s: number; e: number };
 export type ChartMode = 'day' | 'cum';
+export type Bucket = 'day' | 'week' | 'month';
 
-export function toPoints(byDay: Day[], range: MoneyReport['range']): DayPoint[] {
-  const weekly = range === '90d';
-  const groups = weekly
-    ? Array.from({ length: Math.ceil(byDay.length / 7) }, (_, i) => byDay.slice(i * 7, i * 7 + 7))
-    : byDay.map(d => [d]);
+export const bucketOf = (days: number): Bucket => (days <= 45 ? 'day' : days <= 180 ? 'week' : 'month');
+
+function groupBy(byDay: Day[], bucket: Bucket): Day[][] {
+  if (bucket === 'day') return byDay.map(d => [d]);
+  if (bucket === 'week') return Array.from({ length: Math.ceil(byDay.length / 7) }, (_, i) => byDay.slice(i * 7, i * 7 + 7));
+  const months = new Map<string, Day[]>();
+  for (const d of byDay) months.set(d.date.slice(0, 7), [...(months.get(d.date.slice(0, 7)) ?? []), d]);
+  return [...months.values()];
+}
+
+function labels(first: string, last: string, bucket: Bucket) {
+  if (bucket === 'day') return { label: shortDate(first), full: fullDate(first) };
+  if (bucket === 'week') return { label: shortDate(first), full: `Tuần ${shortDate(first)} – ${shortDate(last)}` };
+  const [y, m] = first.split('-');
+  return { label: `T${Number(m)}/${y.slice(2)}`, full: `Tháng ${Number(m)}/${y}` };
+}
+
+export function toPoints(byDay: Day[], bucket: Bucket): DayPoint[] {
+  const groups = groupBy(byDay, bucket);
   let cum = 0;
   return groups.map((g, i) => {
     const first = g[0].date;
@@ -23,8 +38,8 @@ export function toPoints(byDay: Day[], range: MoneyReport['range']): DayPoint[] 
     return {
       i,
       key: first,
-      label: shortDate(first),
-      full: weekly ? `Tuần ${shortDate(first)} – ${shortDate(last)}` : fullDate(first),
+      end: last,
+      ...labels(first, last, bucket),
       net,
       cum,
       orders,
