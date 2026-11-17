@@ -141,6 +141,8 @@ export const analyticsApi = {
   async attachSeasonalTag(tag: string, productIds: string[]): Promise<{ success: boolean; modified_count: number }> {
     const res = await api.post(`${BASE}/forecast/seasonal/attach-tag`, { tag, product_ids: productIds });
     return res.data;
+  },
+
   /** Ảnh sản phẩm (tối đa 6 data URL đã thu nhỏ, cùng sản phẩm) → tên gợi ý, danh mục, chất liệu, các màu. */
   async recognizeProductImage(imageDataUrls: string[]): Promise<ImageRecognitionResult> {
     const res = await api.post(`${BASE}/product/recognize-image`, { images: imageDataUrls.slice(0, 6) }, { timeout: 50000 });
