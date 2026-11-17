@@ -31,20 +31,35 @@ export function StlDecompositionChart({
   const id = useId();
   const [activeTab, setActiveTab] = useState<'seasonal' | 'trend'>('seasonal');
 
-  const { trend, seasonal, window: winLabel } = decomposition;
+  const { trend, seasonal } = decomposition;
   const n = Math.min(trend?.length || 0, seasonal?.length || 0);
 
-  // Chuẩn hóa dữ liệu theo tuần (T-52 đến Tuần này)
+  // Quy đổi 52 tuần gần nhất sang mốc Tháng/Năm thực tế để seller dễ đọc thay vì -51w, -34w
+  const today = new Date();
   const rows = Array.from({ length: n }).map((_, i) => {
     const weekAgo = n - 1 - i;
-    const label = weekAgo === 0 ? 'Hiện tại' : `-${weekAgo}w`;
+    const d = new Date(today);
+    d.setDate(d.getDate() - weekAgo * 7);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    const dd = String(d.getDate()).padStart(2, '0');
+    const label = weekAgo === 0 ? 'Hiện tại' : `T${mm}/${yy}`;
+    const fullDate = `${dd}/${mm}/${d.getFullYear()}`;
     return {
       label,
+      fullDate,
       weekIndex: i + 1,
       seasonal: seasonal[i] != null ? Math.round(seasonal[i] * 10) / 10 : 0,
       trend: trend[i] != null ? Math.round(trend[i] * 10) / 10 : 0,
     };
   });
+
+  const peakRow = rows.length > 0
+    ? [...rows].sort((a, b) => b.seasonal - a.seasonal)[0]
+    : null;
+  const trendDelta = rows.length >= 2
+    ? Math.round((rows[rows.length - 1].trend - rows[0].trend) * 10) / 10
+    : 0;
 
   return (
     <div className="rounded-md border border-stone-200 bg-white p-4">
@@ -52,15 +67,21 @@ export function StlDecompositionChart({
         <div>
           <div className="flex items-center gap-1.5">
             <h4 className="m-0 text-xs font-bold uppercase tracking-wider text-stone-900">
-              Phân Rã Chuỗi Thời Gian Google Trends (STL Decomposition)
+              Nhịp Tìm Kiếm 52 Tuần Qua Trên Google Trends
             </h4>
             <InfoTip
-              text="Thuật toán STL (Seasonal and Trend decomposition using Loess) phân tích chuỗi tìm kiếm thực tế thành 3 thành phần: Sóng chu kỳ lặp lại hàng năm, Xu hướng tăng trưởng nền, và Nhiễu ngẫu nhiên. Giúp phân biệt nhu cầu theo dịp thật với đột biến nhất thời."
-              label="Giải thích STL Decomposition"
+              text="Biểu đồ tách dữ liệu tìm kiếm Google Trends 5 năm thành 2 lớp: Sóng mùa vụ (tháng nào nhu cầu tăng vọt hằng năm) và Xu hướng dài hạn (tổng thể từ khóa đang tăng hay giảm)."
+              label="Giải thích biểu đồ xu hướng"
             />
           </div>
           <span className="block mt-0.5 text-[11.5px] text-stone-500">
-            Từ khóa: <strong className="text-stone-800 font-semibold">{keyword}</strong> · Cửa sổ: {winLabel || '52 tuần gần nhất'}
+            Từ khóa: <strong className="text-stone-800 font-semibold">{keyword}</strong>
+            {peakRow && (
+              <>
+                {' · '}Đỉnh nhu cầu quanh <strong className="text-[#007700]">{peakRow.label}</strong>
+              </>
+            )}
+            {' · '}Xu hướng nền: <strong className="text-stone-800">{trendDelta > 1 ? 'Đang tăng' : trendDelta < -1 ? 'Đang giảm' : 'Ổn định'}</strong>
           </span>
         </div>
 
@@ -75,7 +96,7 @@ export function StlDecompositionChart({
                 : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            Chu kỳ lặp lại (Seasonal)
+            Sóng mùa vụ theo tháng
           </button>
           <button
             type="button"
@@ -86,7 +107,7 @@ export function StlDecompositionChart({
                 : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            Xu hướng nền (Trend)
+            Xu hướng dài hạn
           </button>
         </div>
       </div>
@@ -119,14 +140,14 @@ export function StlDecompositionChart({
                 const d = payload[0]?.payload;
                 return (
                   <div className="rounded border border-stone-200 bg-white p-2 text-xs shadow-sm">
-                    <span className="font-bold text-stone-900 block mb-1">Mốc {d.label}</span>
+                    <span className="font-bold text-stone-900 block mb-1">Tuần {d.fullDate} ({d.label})</span>
                     {activeTab === 'seasonal' ? (
                       <span className="text-emerald-700 font-semibold">
-                        Chu kỳ lặp lại: {d.seasonal > 0 ? `+${d.seasonal}` : d.seasonal} điểm
+                        Độ lệch mùa vụ: {d.seasonal > 0 ? `+${d.seasonal}` : d.seasonal} điểm so với trung bình
                       </span>
                     ) : (
                       <span className="text-sky-700 font-semibold">
-                        Mức nền tăng trưởng: {d.trend} điểm
+                        Mức nền dài hạn: {d.trend} điểm
                       </span>
                     )}
                   </div>

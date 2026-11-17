@@ -746,7 +746,7 @@ export function BuyerProductDetailPage() {
             {/* Tags (category) */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
               <span style={S.tag('#fff', '#008000')}>{product.category}</span>
-              {product.tags.slice(0, 3).map((t, i) => (
+              {product.tags.map((t, i) => (
                 <span key={i} style={S.tag('#555', '#f0f0f0')}>{t}</span>
               ))}
             </div>

@@ -457,7 +457,7 @@ export function SeasonalMonthMatrix({
               <Info size={12} className="text-stone-400 cursor-help" />
               <div className="absolute left-0 top-6 hidden group-hover/th:block z-30 w-60 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
                 <strong className="text-emerald-400 block mb-1">Dự kiến số đơn:</strong>
-                • Chưa có mô hình dự báo từ dữ liệu đơn hàng thật nên chưa hiển thị con số.
+                • Tính từ nhịp đơn 90 ngày gần nhất của shop × hệ số nhu cầu dịp (khoảng 80% P10–P90). Nếu shop chưa đủ 5 đơn hoàn tất gần đây sẽ hiện "Chưa có dữ liệu".
               </div>
             </div>
 

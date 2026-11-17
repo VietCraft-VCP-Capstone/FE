@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { ModalOverlay } from '../../../shared/components/ModalOverlay';
 import { ProductItem, ProductFormData } from '../types/product';
 import { useProductFormState } from '../hooks/useProductFormState';
+import type { ProductPrefillDraft } from '../hooks/useProductFormDeepLink';
 import { useFocusFormField } from '../hooks/useFocusFormField';
 import { ProductFormImageManager } from './ProductFormImageManager';
 import { ProductFormBasicFields } from './ProductFormBasicFields';
@@ -17,6 +18,7 @@ interface ProductFormModalProps {
   onClose: () => void;
   onSubmit: (formData: ProductFormData) => void;
   product?: ProductItem | null;
+  prefill?: ProductPrefillDraft | null;
   loading?: boolean;
   /** Khoá `field` của việc cần sửa F29 (vd. `stock_quantity`) — modal cuộn tới và nháy ô đó. */
   focusField?: string | null;
@@ -27,6 +29,7 @@ export function ProductFormModal({
   onClose,
   onSubmit,
   product,
+  prefill,
   loading = false,
   focusField,
 }: ProductFormModalProps) {
@@ -49,7 +52,7 @@ export function ProductFormModal({
     categoryCreated,
     validate,
     buildSubmitData,
-  } = useProductFormState(isOpen, product);
+  } = useProductFormState(isOpen, product, prefill);
   const [showCatModal, setShowCatModal] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
 

@@ -70,15 +70,15 @@ export function PotentialProfileDrawer({ profile, open, onClose }: PotentialProf
     setExpandedLayers(prev => ({ ...prev, [layerKey]: !prev[layerKey] }));
   };
 
-  const getStatusBadge = (status: 'dat' | 'chua_chac' | 'khong_dat') => {
-    if (status === 'dat') {
+  const getStatusBadge = (status: 'dat' | 'chua_chac' | 'khong_dat' | 'pass' | 'uncertain' | 'fail') => {
+    if (status === 'dat' || status === 'pass') {
       return (
         <span className="inline-flex items-center gap-1 rounded bg-[#EAF0E2] px-2 py-0.5 text-xs font-semibold text-[#005B00]">
           <CheckCircle2 size={13} /> Đạt
         </span>
       );
     }
-    if (status === 'chua_chac') {
+    if (status === 'chua_chac' || status === 'uncertain') {
       return (
         <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
           <HelpCircle size={13} /> Chưa chắc
@@ -170,6 +170,11 @@ export function PotentialProfileDrawer({ profile, open, onClose }: PotentialProf
                       <p className="mb-0 text-stone-600 leading-relaxed text-[11.5px]">
                         {layer.evidence}
                       </p>
+                      {layer.model && (
+                        <div className="mt-1.5 text-[11px] text-emerald-800 font-medium">
+                          Thuật toán / Mô hình: {layer.model}
+                        </div>
+                      )}
                     </div>
                     {(layer.metric_value != null || layer.target_value != null) && (
                       <div className="flex items-center gap-4 text-[11px] text-stone-500 pt-1">

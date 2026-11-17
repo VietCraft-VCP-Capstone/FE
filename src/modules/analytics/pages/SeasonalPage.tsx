@@ -9,13 +9,12 @@ import { EvidenceDrawer } from '../components/evidence/EvidenceDrawer';
 import { SeasonalHeader } from '../components/seasonal/SeasonalHeader';
 import { SeasonalMonthMatrix } from '../components/seasonal/SeasonalMonthMatrix';
 import { SeasonalPotentialTab } from '../components/seasonal/SeasonalPotentialTab';
-import { SeasonalTimelineTab } from '../components/seasonal/SeasonalTimelineTab';
-import { SeasonalTrendsTab } from '../components/seasonal/SeasonalTrendsTab';
 import { SeasonalReadinessTab } from '../components/seasonal/SeasonalReadinessTab';
-import { SeasonalTrialTab } from '../components/seasonal/SeasonalTrialTab';
 import { OccasionTraitChart } from '../components/seasonal/OccasionTraitChart';
 import { OpportunityKeywordTable } from '../components/seasonal/OpportunityKeywordTable';
 import { CampaignFunnelCard } from '../components/seasonal/CampaignFunnelCard';
+import { ApplyPlaybookCard } from '../components/seasonal/ApplyPlaybookCard';
+import { SeasonalImpactCard } from '../components/seasonal/SeasonalImpactCard';
 import { analyticsApi } from '../services/analyticsApi';
 
 // Hub components (Khối A-H)
@@ -63,6 +62,7 @@ export function SeasonalPage() {
   // Quản lý mở Drawer hồ sơ tiềm năng 5 lớp & tính hòa vốn
   const [selectedProfile, setSelectedProfile] = useState<PotentialProfile | null>(null);
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [focusIdeaId, setFocusIdeaId] = useState<string | null>(null);
 
   // Quản lý mở Drawer Bằng chứng minh bạch "Con số này từ đâu ra?" (11 mục)
   const [inspectedEvidence, setInspectedEvidence] = useState<Evidence | null>(null);
@@ -460,9 +460,56 @@ export function SeasonalPage() {
           // Dữ liệu Khối H: Bảng chấm điểm dự báo đúng đến đâu - Đọc trực tiếp từ API backend
           const scorecardMetrics: ScorecardMetric[] = (data.scorecard_metrics as ScorecardMetric[]) || [];
 
+          const activeStoryStep: 1 | 2 | 3 | 4 =
+            activeDetailTab === 'act1' || activeDetailTab === 'traits' || activeDetailTab === 'potential'
+              ? 2
+              : activeDetailTab === 'act2' || activeDetailTab === 'readiness' || activeDetailTab === 'trial' || activeDetailTab === 'timeline'
+              ? 3
+              : activeDetailTab === 'act3' || activeDetailTab === 'performance'
+              ? 4
+              : 1;
+          const activeStoryChapter =
+            activeStoryStep === 2
+              ? data.story?.ideas
+              : activeStoryStep === 3
+              ? data.story?.apply
+              : activeStoryStep === 4
+              ? data.story?.results
+              : data.story?.overview;
+
+          const aiIdeas: any[] = Array.isArray((data as any).ai_ideas) ? (data as any).ai_ideas : [];
+          const shopDna = (data as any).shop_dna;
+          const savedIdeaDrafts: Record<string, any> = (data as any).saved_idea_drafts || {};
+          const occasionReviews: Record<string, any> = (data as any).occasion_reviews || {};
+
+          const savedIdeaItems = Object.entries(savedIdeas)
+            .filter(([, v]) => Boolean(v))
+            .map(([id]) => {
+              const draft = savedIdeaDrafts[id];
+              if (draft?.title) {
+                return { id, title: draft.title, subtitle: 'Bản đã chỉnh sửa' };
+              }
+              const aiMatch = aiIdeas.find((a: any) => a.id === id);
+              if (aiMatch) {
+                return { id, title: aiMatch.title, subtitle: 'Ý tưởng AI cho shop' };
+              }
+              if (id.startsWith('kw_')) {
+                return { id, title: `Từ khóa: ${id.slice(3)}`, subtitle: 'Từ khóa cơ hội' };
+              }
+              const readyParts = id.match(/^ready-(\d+)-(.*)$/);
+              if (readyParts) {
+                return { id, title: readyParts[2], subtitle: 'Mẫu thị trường' };
+              }
+              const podParts = id.match(/^pod-(\d+)-(.*)$/);
+              if (podParts) {
+                return { id, title: podParts[2], subtitle: 'Phôi POD' };
+              }
+              return { id, title: id, subtitle: 'Ý tưởng đã chọn' };
+            });
+
           return (
             <div className="space-y-6">
-              {/* 1. THANH THÔNG TIN GIAN HÀNG & HEADER CHIẾN DỊCH */}
+              {/* 1. THANH THÔNG TIN GIAN HÀNG & HEADER CHIẾN DỊCH (GỘP CÙNG TIẾN TRÌNH 4 BƯỚC) */}
               <SeasonalHeader
                 shopName={data.seller_shop_name}
                 categoryName={data.seller_category?.name}
@@ -470,7 +517,16 @@ export function SeasonalPage() {
                 onSelectCategory={handleSelectCategory}
                 activeCamp={activeCamp}
                 savedIdeasCount={savedIdeasCount}
+                savedIdeaItems={savedIdeaItems}
+                onRemoveSavedIdea={id => toggleSaveIdea(id)}
+                onEditSavedIdea={id => {
+                  setFocusIdeaId(id);
+                  handleSelectTab('act1');
+                }}
                 onReload={reload}
+                storyChapter={activeStoryChapter}
+                storyStep={activeStoryStep}
+                onNavigateTab={handleSelectTab}
               />
 
               {/* 2. THANH ĐIỀU HƯỚNG NAVBAR TRÊN ĐẦU TRANG (STICKY, KHÔNG BỊ CẮT BA CHẤM) */}
@@ -480,7 +536,7 @@ export function SeasonalPage() {
                 ideasCount={readyIdeas.length + podBlanks.length}
               />
 
-              {/* 3. NỘI DUNG CHI TIẾT THEO CỐT TRUYỆN 3 HỒI */}
+              {/* 3. NỘI DUNG CHI TIẾT THEO CỐT TRUYỆN 4 CHƯƠNG */}
               {activeDetailTab === 'hub' && (
                 <div className="space-y-6">
                   {/* Vòng quay các dịp cao điểm 12 tháng */}
@@ -516,7 +572,11 @@ export function SeasonalPage() {
                   {/* Phễu Chuyển Đổi & Kênh Bán Hàng */}
                   {activeCamp && (
                     <CampaignFunnelCard
-                      funnel={data.campaign_funnel}
+                      funnel={
+                        data.campaign_funnel
+                          ? { ...data.campaign_funnel, forecast_method_info: (data as any).forecast_method_info }
+                          : undefined
+                      }
                       channels={data.channel_breakdown}
                       motivation={data.motivation_breakdown}
                       occasionName={activeCamp.name}
@@ -530,6 +590,8 @@ export function SeasonalPage() {
                       keywords={data.opportunity_keywords || []}
                       occasionName={activeCamp.name}
                       onOpenEvidence={handleOpenEvidence}
+                      savedIdeas={savedIdeas}
+                      onToggleStar={tag => toggleSaveIdea(`kw_${tag}`)}
                     />
                   )}
 
@@ -556,6 +618,9 @@ export function SeasonalPage() {
                         measuredCycles={data.measured_cycles ?? 2}
                         sampleSizeN={data.sample_size_n ?? traits[0]?.evidence?.n ?? 1200}
                         traits={traits}
+                        activeCamp={activeCamp}
+                        traitActions={(data as any).trait_actions}
+                        onPlanAction={() => setActiveDetailTab('act2')}
                         onOpenEvidence={handleOpenEvidence}
                       />
                     </div>
@@ -575,66 +640,20 @@ export function SeasonalPage() {
                 </div>
               )}
 
-              {/* TAB 1: Ý TƯỞNG */}
+              {/* TAB 1: Ý TƯỞNG (Sắp xếp theo mức độ ưu tiên hành động: Từ khóa cơ hội -> Sản phẩm tiềm năng -> Hành vi & Lịch chuẩn bị) */}
               {(activeDetailTab === 'act1' || activeDetailTab === 'traits' || activeDetailTab === 'potential') && activeCamp && (
                 <div className="space-y-6">
-                  {/* Banner dẫn Tab 1 */}
-                  <div className="rounded-2xl bg-gradient-to-r from-emerald-900 via-[#005B00] to-[#007700] p-4 text-white shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      <div className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold text-white mb-1.5">
-                        <span>BƯỚC 1: Ý TƯỞNG</span>
-                      </div>
-                      <h3 className="text-sm sm:text-base font-bold text-white">
-                        Sức mua thị trường &amp; Từ khóa ngách dịp {activeCamp.name}
-                      </h3>
-                      <p className="text-xs text-emerald-100 mt-0.5 max-w-2xl">
-                        Nắm bắt nhu cầu quà tặng, khai thác từ khóa tiềm năng và chọn lọc sản phẩm phù hợp.
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleSelectTab('act2')}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-[#005B00] hover:bg-emerald-50 transition-colors shadow-xs"
-                      >
-                        <span>Sang Áp dụng</span>
-                        <span>→</span>
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* 1. Đặc điểm mua sắm 6 trục */}
-                  <OccasionTraitChart
-                    occasionName={activeCamp.name}
-                    categoryName={data.seller_category?.name}
-                    measuredCycles={data.measured_cycles ?? 2}
-                    sampleSizeN={data.sample_size_n ?? traits[0]?.evidence?.n ?? 1200}
-                    traits={traits}
-                    onOpenEvidence={handleOpenEvidence}
-                  />
-
-                  {/* 2. Ma trận từ khóa cơ hội */}
+                  {/* 1. Ma trận từ khóa cơ hội (Ưu tiên cao nhất: chọn ngách & gắn thẻ / tạo sản phẩm ngay) */}
                   <OpportunityKeywordTable
                     keywords={data.opportunity_keywords || []}
                     occasionName={activeCamp.name}
                     onOpenEvidence={handleOpenEvidence}
+                    savedIdeas={savedIdeas}
+                    onToggleStar={tag => toggleSaveIdea(`kw_${tag}`)}
                   />
 
-                  {/* 3. Phân rã sóng tìm kiếm Google Trends STL */}
-                  <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
-                    <SeasonalTrendsTab
-                      decomposition={data.decomposition}
-                      primaryKeyword={data.primary_keyword}
-                      activeCamp={activeCamp}
-                      traits={traits}
-                      sampleSizeN={data.sample_size_n ?? traits[0]?.evidence?.n ?? 1200}
-                      measuredCycles={data.measured_cycles ?? 2}
-                      onOpenEvidence={handleOpenEvidence}
-                      categoryName={data.seller_category?.name}
-                    />
-                  </div>
-
-                  {/* 4. Hồ sơ sản phẩm tiềm năng */}
+                  {/* 2. Hồ sơ sản phẩm tiềm năng (Hàng sẵn & Phôi POD kèm phân tích hòa vốn) */}
                   <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
                     <div className="mb-4">
                       <h4 className="text-base font-bold text-stone-900">
@@ -644,6 +663,11 @@ export function SeasonalPage() {
                     <SeasonalPotentialTab
                       readyIdeas={readyIdeas}
                       podBlanks={podBlanks}
+                      aiIdeas={aiIdeas}
+                      shopDna={shopDna}
+                      savedIdeaDrafts={savedIdeaDrafts}
+                      focusIdeaId={focusIdeaId}
+                      onClearFocusIdea={() => setFocusIdeaId(null)}
                       potentialProfiles={data.potential_profiles}
                       savedIdeas={savedIdeas}
                       onToggleSaveIdea={toggleSaveIdea}
@@ -651,47 +675,61 @@ export function SeasonalPage() {
                         setSelectedProfile(profile);
                         setProfileDrawerOpen(true);
                       }}
+                      onApplyIdea={() => handleSelectTab('act2')}
                     />
                   </div>
+
+                  {/* 3. Đặc điểm hành vi khách mua & Lịch chuẩn bị theo giai đoạn */}
+                  <OccasionTraitChart
+                    occasionName={activeCamp.name}
+                    categoryName={data.seller_category?.name}
+                    measuredCycles={data.measured_cycles ?? 2}
+                    sampleSizeN={data.sample_size_n ?? traits[0]?.evidence?.n ?? 1200}
+                    traits={traits}
+                    activeCamp={activeCamp}
+                    traitActions={(data as any).trait_actions}
+                    onPlanAction={() => setActiveDetailTab('act2')}
+                    onOpenEvidence={handleOpenEvidence}
+                  />
                 </div>
               )}
 
-              {/* TAB 2: ÁP DỤNG */}
+              {/* TAB 2: ÁP DỤNG (Gọn, không lặp lại timeline hay số liệu thử nghiệm fix cứng) */}
               {(activeDetailTab === 'act2' || activeDetailTab === 'readiness' || activeDetailTab === 'trial' || activeDetailTab === 'timeline') && activeCamp && (
                 <div className="space-y-6">
-                  {/* Banner dẫn Tab 2 */}
-                  <div className="rounded-2xl bg-gradient-to-r from-stone-900 via-stone-800 to-stone-700 p-4 text-white shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      <div className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold text-white mb-1.5">
-                        <span>BƯỚC 2: ÁP DỤNG</span>
-                      </div>
-                      <h3 className="text-sm sm:text-base font-bold text-white">
-                        Rà soát listing, thử nghiệm mẫu &amp; Lịch trình triển khai
-                      </h3>
-                      <p className="text-xs text-stone-300 mt-0.5 max-w-2xl">
-                        Tối ưu sản phẩm hiện có, thử nghiệm đơn nhỏ an toàn vốn và chốt mốc giao hàng.
-                      </p>
-                    </div>
-                    <div className="shrink-0 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSelectTab('act1')}
-                        className="rounded-xl border border-white/30 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10 transition-colors"
-                      >
-                        ← Ý tưởng
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectTab('act3')}
-                        className="rounded-xl bg-[#007700] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#005B00] transition-colors shadow-xs"
-                      >
-                        <span>Sang Thành quả</span>
-                        <span>→</span>
-                      </button>
-                    </div>
-                  </div>
+                  {(() => {
+                    const activeMilestones: Record<number, boolean> = {};
+                    const campPrefix = activeCamp.id ? `${activeCamp.id}_` : '';
+                    for (let i = 0; i < 15; i++) {
+                      if (checkedMilestones[`${campPrefix}${i}`] !== undefined) {
+                        activeMilestones[i] = checkedMilestones[`${campPrefix}${i}`];
+                      } else if (checkedMilestones[String(i)] !== undefined) {
+                        activeMilestones[i] = checkedMilestones[String(i)];
+                      } else {
+                        activeMilestones[i] = false;
+                      }
+                    }
+                    return (
+                      <ApplyPlaybookCard
+                        playbooks={data.apply_playbooks}
+                        savedIdeas={savedIdeas}
+                        savedIdeaItems={savedIdeaItems}
+                        aiIdeas={aiIdeas}
+                        matchingProductsCount={matchingProducts.length}
+                        inStockMatchingCount={matchingProducts.filter((p: any) => (p.stock ?? 1) > 0).length}
+                        actualOrdersCount={data.impact?.actual_orders ?? 0}
+                        checkedMilestones={activeMilestones}
+                        onToggleMilestone={toggleMilestone}
+                        onEditSavedIdea={id => {
+                          setFocusIdeaId(id);
+                          handleSelectTab('act1');
+                        }}
+                        occasionName={activeCamp.name}
+                      />
+                    );
+                  })()}
 
-                  {/* 1. Trợ lý Tăng tốc Doanh số & Rà soát sản phẩm shop */}
+                  {/* Rà soát sản phẩm hiện có của shop cho dịp */}
                   <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
                     <SeasonalReadinessTab
                       matchingProducts={matchingProducts}
@@ -700,105 +738,40 @@ export function SeasonalPage() {
                       onOpenEvidence={handleOpenEvidence}
                     />
                   </div>
-
-                  {/* 2. Thang thử nhỏ 3 nấc & Dừng lỗ */}
-                  <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
-                    <div className="mb-4">
-                      <h4 className="text-base font-bold text-stone-900">
-                        Thử nghiệm kiểm soát vốn
-                      </h4>
-                    </div>
-                    <SeasonalTrialTab
-                      potentialProfiles={data.potential_profiles}
-                    />
-                  </div>
-
-                  {/* 3. Lộ trình 4 mốc thời gian & Hạn chốt nhận đơn */}
-                  <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
-                    <div className="mb-4">
-                      <h4 className="text-base font-bold text-stone-900">
-                        Lịch triển khai &amp; Hạn chốt đơn
-                      </h4>
-                    </div>
-                    {(() => {
-                      const activeMilestones: Record<number, boolean> = {};
-                      const campPrefix = activeCamp.id ? `${activeCamp.id}_` : '';
-                      for (let i = 0; i < 15; i++) {
-                        if (checkedMilestones[`${campPrefix}${i}`] !== undefined) {
-                          activeMilestones[i] = checkedMilestones[`${campPrefix}${i}`];
-                        } else if (checkedMilestones[String(i)] !== undefined) {
-                          activeMilestones[i] = checkedMilestones[String(i)];
-                        } else {
-                          activeMilestones[i] = false;
-                        }
-                      }
-                      return (
-                        <SeasonalTimelineTab
-                          activeCamp={activeCamp}
-                          categoryName={data.seller_category?.name}
-                          checkedMilestones={activeMilestones}
-                          onToggleMilestone={toggleMilestone}
-                        />
-                      );
-                    })()}
-                  </div>
                 </div>
               )}
 
-              {/* TAB 3: THÀNH QUẢ */}
+              {/* TAB 3: THÀNH QUẢ (Tập trung kết quả đơn/GMV, phễu chuyển đổi & đánh giá sau dịp) */}
               {(activeDetailTab === 'act3' || activeDetailTab === 'performance') && activeCamp && (
                 <div className="space-y-6">
-                  {/* Banner dẫn Tab 3 */}
-                  <div className="rounded-2xl bg-gradient-to-r from-emerald-950 via-stone-900 to-stone-800 p-4 text-white shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      <div className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold text-white mb-1.5">
-                        <span>BƯỚC 3: THÀNH QUẢ</span>
-                      </div>
-                      <h3 className="text-sm sm:text-base font-bold text-white">
-                        Phễu chuyển đổi chiến dịch &amp; Quản trị rủi ro giao hàng
-                      </h3>
-                      <p className="text-xs text-stone-300 mt-0.5 max-w-2xl">
-                        Theo dõi tiến độ từ hiển thị đến chốt đơn và cảnh báo các tuyến vận chuyển tắc nghẽn.
-                      </p>
-                    </div>
-                    <div className="shrink-0 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSelectTab('act2')}
-                        className="rounded-xl border border-white/30 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10 transition-colors"
-                      >
-                        ← Áp dụng
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectTab('hub')}
-                        className="rounded-xl bg-white px-3.5 py-1.5 text-xs font-bold text-stone-900 hover:bg-stone-100 transition-colors shadow-xs"
-                      >
-                        Về Tổng quan
-                      </button>
-                    </div>
-                  </div>
+                  <SeasonalImpactCard
+                    impact={data.impact}
+                    occasionName={activeCamp.name}
+                    campId={activeCamp.id}
+                    savedIdeaTitles={savedIdeaItems.map(x => x.title)}
+                    appliedSummary={{
+                      selectedIdeasCount: savedIdeaItems.length,
+                      completedMilestonesCount: Object.entries(checkedMilestones).filter(
+                        ([k, v]) => v && (activeCamp.id ? k.startsWith(`${activeCamp.id}_`) : true)
+                      ).length,
+                      totalMilestonesCount: 4,
+                      matchingProductsCount: matchingProducts.length,
+                    }}
+                    initialReview={occasionReviews[activeCamp.id]}
+                  />
 
-                  {/* 1. Phễu chuyển đổi ngang 4 bước & Bảng kênh bán */}
+                  {/* Phễu chuyển đổi & đóng góp kênh bán thực tế */}
                   <CampaignFunnelCard
-                    funnel={data.campaign_funnel}
+                    funnel={
+                      data.campaign_funnel
+                        ? { ...data.campaign_funnel, forecast_method_info: (data as any).forecast_method_info }
+                        : undefined
+                    }
                     channels={data.channel_breakdown}
                     motivation={data.motivation_breakdown}
                     occasionName={activeCamp.name}
                     onOpenEvidence={handleOpenEvidence}
                   />
-
-                  {/* 2. Quản trị rủi ro tuyến vận chuyển & Bảng điểm dự báo */}
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
-                      Quản trị rủi ro giao hàng &amp; Bảng chấm điểm độ tin cậy
-                    </h4>
-                    <HubRisksAndScorecard
-                      risks={routeRisks}
-                      scorecard={scorecardMetrics}
-                      onOpenEvidence={handleOpenEvidence}
-                    />
-                  </div>
                 </div>
               )}
             </div>

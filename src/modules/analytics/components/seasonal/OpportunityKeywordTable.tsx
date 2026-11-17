@@ -10,15 +10,19 @@ import {
   Tag,
   ChevronDown,
   ChevronUp,
+  X,
 } from 'lucide-react';
 import type { OpportunityKeywordItem } from '../../types';
 import type { Evidence } from '../../types/evidence';
 import { money } from '../../../../shared/utils/format';
+import { analyticsApi } from '../../services/analyticsApi';
 
 interface Props {
   keywords: OpportunityKeywordItem[];
   occasionName: string;
   onOpenEvidence: (evidence: Evidence) => void;
+  savedIdeas?: Record<string, boolean>;
+  onToggleStar?: (tag: string) => void;
   className?: string;
 }
 
@@ -26,10 +30,12 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
   keywords = [],
   occasionName,
   onOpenEvidence,
+  savedIdeas = {},
+  onToggleStar,
   className = '',
 }) => {
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
-  const [starredIds, setStarredIds] = useState<Record<string, boolean>>(() => {
+  const [localStarred, setLocalStarred] = useState<Record<string, boolean>>(() => {
     const map: Record<string, boolean> = {};
     keywords.forEach(k => {
       if (k.is_starred) map[k.id] = true;
@@ -39,6 +45,9 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
+  const [attachingId, setAttachingId] = useState<string | null>(null);
+  const [attachedTags, setAttachedTags] = useState<Record<string, boolean>>({});
+  const [openProductsKwId, setOpenProductsKwId] = useState<string | null>(null);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => ({ ...prev, [id]: !prev[id] }));
@@ -55,15 +64,55 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
     setSelectedIds(next);
   };
 
-  const toggleStar = (id: string) => {
-    setStarredIds(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleStar = (kw: OpportunityKeywordItem) => {
+    if (onToggleStar) {
+      onToggleStar(kw.tag);
+    } else {
+      setLocalStarred(prev => ({ ...prev, [kw.id]: !prev[kw.id] }));
+    }
   };
 
   const copyTags = (tagsToCopy: string[]) => {
     const text = tagsToCopy.join(', ');
     navigator.clipboard?.writeText(text);
-    setCopyNotice(`Đã copy ${tagsToCopy.length} thẻ tag!`);
+    setCopyNotice(`Đã sao chép ${tagsToCopy.length} thẻ tag!`);
     setTimeout(() => setCopyNotice(null), 2500);
+  };
+
+  const getTargetProducts = (kw: OpportunityKeywordItem): Array<{ id: string; title: string }> => {
+    const covProds = (kw.shop_coverage as any)?.products;
+    if (Array.isArray(covProds) && covProds.length > 0) return covProds;
+    if (kw.matched_product?.id && kw.matched_product?.title) {
+      return [{ id: kw.matched_product.id, title: kw.matched_product.title }];
+    }
+    return [];
+  };
+
+  const handleAttachTag = async (kw: OpportunityKeywordItem) => {
+    const ids = kw.shop_coverage?.product_ids || [];
+    if (ids.length === 0) {
+      copyTags([kw.tag]);
+      return;
+    }
+    const targetTitles = getTargetProducts(kw).map(p => p.title).filter(Boolean);
+    const targetSummary = targetTitles.length > 0 ? `: ${targetTitles.slice(0, 2).join(', ')}${targetTitles.length > 2 ? ` (+${targetTitles.length - 2})` : ''}` : '';
+    setAttachingId(kw.id);
+    try {
+      const res = await analyticsApi.attachSeasonalTag(kw.tag, ids);
+      setAttachedTags(prev => ({ ...prev, [kw.id]: true }));
+      setCopyNotice(
+        res.modified_count > 0
+          ? `Đã gắn thẻ «${kw.tag}» vào ${res.modified_count} sản phẩm${targetSummary}`
+          : `Thẻ «${kw.tag}» đã có sẵn trên sản phẩm${targetSummary}`
+      );
+      setTimeout(() => setCopyNotice(null), 4000);
+    } catch {
+      setCopyNotice(`Không thể gắn thẻ «${kw.tag}» tự động (kiểm tra backend đã restart chưa). Đã sao chép thẻ vào bộ nhớ tạm.`);
+      navigator.clipboard?.writeText(kw.tag);
+      setTimeout(() => setCopyNotice(null), 4000);
+    } finally {
+      setAttachingId(null);
+    }
   };
 
   const selectedList = keywords.filter(k => selectedIds[k.id]);
@@ -143,17 +192,17 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                 />
               </th>
               <th className="py-2.5 px-3">Từ khóa / Thẻ Tag</th>
-              <th className="py-2.5 px-3">Lượt tìm kiếm (Volume)</th>
-              <th className="py-2.5 px-3">Đối thủ (Competition)</th>
-              <th className="py-2.5 px-3 text-center">Điểm cơ hội (Score)</th>
+              <th className="py-2.5 px-3">Nhu cầu toàn ngành</th>
+              <th className="py-2.5 px-3">Đối thủ toàn ngành</th>
+              <th className="py-2.5 px-3 text-center">Điểm cơ hội</th>
               <th className="py-2.5 px-3 text-center">Trạng thái shop</th>
-              <th className="py-2.5 px-3 w-20 text-center">Thao tác</th>
+              <th className="py-2.5 px-3 w-40 text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100 text-xs">
             {displayKeywords.map(kw => {
               const isSelected = Boolean(selectedIds[kw.id]);
-              const isStarred = Boolean(starredIds[kw.id]);
+              const isStarred = onToggleStar ? Boolean(savedIdeas[`kw_${kw.tag}`]) : Boolean(localStarred[kw.id]);
               const isRowExpanded = expandedRowId === kw.id;
 
               // Chấm màu Volume
@@ -226,14 +275,27 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                       </div>
                     </td>
 
-                    {/* Volume */}
+                    {/* Volume / Nhu cầu đo được */}
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2">
                         <span className={`h-2 w-2 rounded-full ring-4 ${volDotColor}`} />
-                        <span className="font-bold text-stone-900">
-                          {kw.volume.toLocaleString('vi-VN')}
-                        </span>
-                        <span className="text-[10px] text-stone-400">lượt/th</span>
+                        {(kw as any).sold_count_real > 0 ? (
+                          <>
+                            <span className="font-bold text-stone-900">
+                              {Number((kw as any).sold_count_real).toLocaleString('vi-VN')}
+                            </span>
+                            <span className="text-[10px] text-stone-400">lượt bán</span>
+                          </>
+                        ) : (kw as any).trend_index != null ? (
+                          <>
+                            <span className="font-bold text-stone-900">
+                              {(kw as any).trend_index}/100
+                            </span>
+                            <span className="text-[10px] text-stone-400">chỉ số tìm kiếm</span>
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-stone-400">Chưa có dữ liệu</span>
+                        )}
                       </div>
                     </td>
 
@@ -241,10 +303,16 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2">
                         <span className={`h-2 w-2 rounded-full ring-4 ${compDotColor}`} />
-                        <span className="font-medium text-stone-700">
-                          {kw.competition.toLocaleString('vi-VN')}
-                        </span>
-                        <span className="text-[10px] text-stone-400">shop</span>
+                        {kw.competition > 0 ? (
+                          <>
+                            <span className="font-medium text-stone-700">
+                              {kw.competition.toLocaleString('vi-VN')}
+                            </span>
+                            <span className="text-[10px] text-stone-400">gian hàng</span>
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-stone-400">Chưa đo được</span>
+                        )}
                       </div>
                     </td>
 
@@ -257,23 +325,119 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
 
                     {/* Shop Match */}
                     <td className="py-3 px-3 text-center">
-                      {kw.is_in_shop ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                          <Check size={11} /> Đã có trong shop
+                      {kw.shop_coverage ? (
+                        kw.shop_coverage.matching > 0 ? (() => {
+                          const targetProds = getTargetProducts(kw);
+                          const isProdsOpen = openProductsKwId === kw.id;
+                          return (
+                            <div className="relative inline-flex flex-col items-center">
+                              <button
+                                type="button"
+                                onClick={() => setOpenProductsKwId(prev => (prev === kw.id ? null : kw.id))}
+                                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
+                              >
+                                <Check size={11} />
+                                <span>Đã có ({kw.shop_coverage.matching} mẫu)</span>
+                                {targetProds.length > 0 && (
+                                  isProdsOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />
+                                )}
+                              </button>
+                              {isProdsOpen && targetProds.length > 0 && (
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 w-64 rounded-xl border border-stone-200 bg-white p-2.5 text-left shadow-lg">
+                                  <div className="flex items-center justify-between border-b border-stone-100 pb-1.5 mb-1.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-stone-500">
+                                      Sản phẩm gắn thẻ ({targetProds.length})
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setOpenProductsKwId(null)}
+                                      className="rounded p-0.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                                      aria-label="Đóng"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                  <ul className="space-y-1 max-h-40 overflow-y-auto">
+                                    {targetProds.map((p) => (
+                                      <li
+                                        key={p.id}
+                                        className="text-[11px] leading-snug text-stone-700 bg-stone-50 rounded-md px-2 py-1 border border-stone-100"
+                                      >
+                                        {p.title}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })() : (
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
+                            Chưa kinh doanh
+                          </span>
+                        )
+                      ) : kw.is_in_shop ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                          <Check size={11} /> Đã kinh doanh
                         </span>
                       ) : (
                         <span className="text-[11px] text-stone-400">Chưa khai thác</span>
+                      )}
+                      {kw.search_wow_pct != null && (
+                        <div className="mt-0.5 text-[10px] font-medium text-stone-500">
+                          Xu hướng 4 tuần: {kw.search_wow_pct > 0 ? '+' : ''}{kw.search_wow_pct}%
+                        </div>
                       )}
                     </td>
 
                     {/* Action */}
                     <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                        {kw.action && (() => {
+                          const isDoneAttached = Boolean(attachedTags[kw.id] || (kw.shop_coverage as any)?.already_tagged);
+                          return (
+                          <button
+                            type="button"
+                            disabled={attachingId === kw.id}
+                            onClick={() => {
+                              if (kw.action?.type === 'create_listing') {
+                                window.location.assign(`/seller/products?keyword=${encodeURIComponent(kw.tag)}`);
+                              } else if (kw.action?.type === 'optimize_tags') {
+                                handleAttachTag(kw);
+                              } else {
+                                copyTags([kw.tag]);
+                              }
+                            }}
+                            title={
+                              kw.action?.type === 'optimize_tags' && getTargetProducts(kw).length > 0
+                                ? `Gắn thẻ «${kw.tag}» vào: ${getTargetProducts(kw).map(p => p.title).join(', ')}`
+                                : kw.action.label
+                            }
+                            className={`inline-flex h-7 w-[104px] items-center justify-center whitespace-nowrap rounded-md px-2.5 text-[11px] font-bold transition-colors ${
+                              kw.action.type === 'create_listing'
+                                ? 'bg-[#007700] text-white hover:bg-[#005B00]'
+                                : isDoneAttached
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                            }`}
+                          >
+                            {kw.action.type === 'create_listing'
+                              ? 'Tạo sản phẩm'
+                              : kw.action.type === 'optimize_tags'
+                              ? attachingId === kw.id
+                                ? 'Đang gắn...'
+                                : isDoneAttached
+                                ? 'Đã gắn'
+                                : 'Gắn thẻ'
+                              : 'Sao chép'}
+                          </button>
+                          );
+                        })()}
                         <button
                           type="button"
-                          onClick={() => toggleStar(kw.id)}
-                          title={isStarred ? 'Bỏ lưu ý tưởng' : 'Lưu vào kế hoạch'}
-                          className={`p-1 rounded transition-colors ${
+                          onClick={() => toggleStar(kw)}
+                          title={isStarred ? 'Bỏ lưu khỏi sổ tay' : 'Lưu vào sổ tay kế hoạch'}
+                          className={`inline-flex h-7 w-7 items-center justify-center rounded transition-colors ${
                             isStarred ? 'text-amber-500' : 'text-stone-300 hover:text-amber-400'
                           }`}
                         >
@@ -283,21 +447,23 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => copyTags([kw.tag])}
-                          title="Copy thẻ tag này"
-                          className="p-1 rounded text-stone-400 hover:text-stone-700 transition-colors"
+                          title="Sao chép thẻ này"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded text-stone-400 hover:text-stone-700 transition-colors"
                         >
                           <Copy size={13} />
                         </button>
 
-                        {kw.evidence && (
+                        {kw.evidence ? (
                           <button
                             type="button"
                             onClick={() => onOpenEvidence(kw.evidence)}
                             title="Xem công thức & minh chứng"
-                            className="p-1 rounded text-stone-400 hover:text-[#007700] transition-colors"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded text-stone-400 hover:text-[#007700] transition-colors"
                           >
                             <HelpCircle size={13} />
                           </button>
+                        ) : (
+                          <span className="inline-block h-7 w-7" />
                         )}
                       </div>
                     </td>
@@ -343,6 +509,13 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                             </span>
                           </div>
                         </div>
+
+                        {getTargetProducts(kw).length > 0 && (
+                          <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-lg px-3 py-2 text-[11px] text-emerald-900">
+                            <span className="font-bold">Sản phẩm sẽ được gắn thẻ ({getTargetProducts(kw).length}): </span>
+                            <span>{getTargetProducts(kw).map(p => p.title).join(' · ')}</span>
+                          </div>
+                        )}
 
                         {kw.evidence && (
                           <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1">

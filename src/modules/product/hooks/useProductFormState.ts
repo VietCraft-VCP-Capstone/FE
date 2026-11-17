@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ProductItem, ProductFormData, CatalogOption } from '../types/product';
 import { productsService } from '../services/productsService';
 import { netFromGross } from '../../../shared/utils/commission';
+import type { ProductPrefillDraft } from './useProductFormDeepLink';
 
 const EMPTY_FORM: ProductFormData = {
   title: '',
@@ -81,7 +82,7 @@ function newProductForm(): ProductFormData {
   };
 }
 
-export function useProductFormState(isOpen: boolean, product?: ProductItem | null) {
+export function useProductFormState(isOpen: boolean, product?: ProductItem | null, prefill?: ProductPrefillDraft | null) {
   const [categories, setCategories] = useState<CatalogOption[]>([]);
   const [tags, setTags] = useState<CatalogOption[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -119,10 +120,35 @@ export function useProductFormState(isOpen: boolean, product?: ProductItem | nul
   }, [isOpen]);
 
   useEffect(() => {
-    setFormData(product ? formFromProduct(product) : newProductForm());
-    setNewTagNames([]);
+    if (product) {
+      setFormData(formFromProduct(product));
+      setNewTagNames([]);
+    } else {
+      const base = newProductForm();
+      if (prefill) {
+        if (prefill.title) base.title = prefill.title;
+        if (prefill.price && prefill.price > 0) base.price = prefill.price;
+        if (prefill.description) base.description = prefill.description;
+      }
+      setFormData(base);
+      setNewTagNames(prefill?.tags ? [...prefill.tags] : []);
+    }
     setErrors({});
-  }, [product, isOpen]);
+  }, [product, prefill, isOpen]);
+
+  useEffect(() => {
+    if (product || !prefill?.tags?.length || tags.length === 0) return;
+    const key = (x?: string) => (x || '').trim().toLowerCase();
+    const matchedIds: string[] = [];
+    const unmatched: string[] = [];
+    for (const raw of prefill.tags) {
+      const found = tags.find(t => key(t.name) === key(raw));
+      if (found) matchedIds.push(found._id);
+      else unmatched.push(raw);
+    }
+    setFormData(prev => ({ ...prev, tagIds: matchedIds }));
+    setNewTagNames(unmatched);
+  }, [product, prefill, tags]);
 
   useEffect(() => {
     if (!product || categories.length === 0) return;

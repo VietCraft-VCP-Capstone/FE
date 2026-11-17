@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Kiểu dữ liệu của 16 tính năng Product Analytics (F26–F41).
  *
  * Dựng theo JSON THẬT mà service AI trả qua cổng BE /api/seller/analytics, không theo
@@ -581,7 +581,10 @@ export interface OccasionWindow {
 
 export interface EvidenceLayer {
   name: string;
-  status: 'dat' | 'chua_chac' | 'khong_dat';
+  status: 'dat' | 'chua_chac' | 'khong_dat' | 'pass' | 'uncertain' | 'fail';
+  text?: string;
+  model?: string;
+  metrics?: Record<string, any>;
   question: string;
   claim: string;
   evidence: string;
@@ -646,6 +649,13 @@ export interface PotentialProfile {
 
 export interface ReadyToShipIdea {
   title: string;
+  keyword?: string;
+  evidence_level?: 'market_listing' | 'hybrid_mining' | 'template';
+  is_template?: boolean;
+  cost_basis?: string;
+  search_trend_pct?: number | null;
+  verdict?: string;
+  shop_coverage?: { matching: number; total: number; gap: boolean; product_ids: string[] };
   category: string;
   market_price_range?: string;
   suggested_price?: string;
@@ -666,7 +676,6 @@ export interface ReadyToShipIdea {
   sold_count?: number;
   rating_average?: number;
   review_count?: number;
-  search_trend_pct?: number;
 }
 
 export interface PodBlankSuggestion {
@@ -821,6 +830,34 @@ export interface OpportunityKeywordItem {
     images?: any[];
   };
   evidence?: any;
+  search_wow_pct?: number | null;
+  trend_match?: 'exact' | 'partial' | 'proxy' | 'none';
+  trend_series_used?: string | null;
+  volume_basis?: 'listing_sales+trends' | 'trends_only';
+  shop_coverage?: { matching: number; total: number; gap: boolean; product_ids: string[] };
+  action?: { type: 'create_listing' | 'optimize_tags' | 'copy_tag'; label: string; priority: 'high' | 'normal' };
+}
+
+export interface FunnelDiagnosticStage {
+  stage: number;
+  title: string;
+  dropoff_rate_pct: number;
+  target_rate_pct?: number;
+  badge_label?: string;
+  metric_label: string;
+  status: 'healthy' | 'warning' | 'critical';
+  ai_recommendation: string;
+  abandoned_carts_count?: number;
+}
+
+export interface RevenueScenarioItem {
+  key: 'baseline' | 'breakthrough' | 'peak' | string;
+  name: string;
+  orders: number;
+  growth_pct?: number;
+  projected_gmv: number;
+  formula_basis: string;
+  condition_note: string;
 }
 
 export interface CampaignFunnel {
@@ -832,6 +869,10 @@ export interface CampaignFunnel {
   cart_rate_pct: number;
   orders: number;
   conversion_rate_pct: number;
+  cvr_multiplier?: number;
+  real_ctr_pct?: number;
+  real_cart_rate_pct?: number;
+  real_order_rate_pct?: number;
   pv_uv_ratio?: number;
   actual?: {
     orders: number;
@@ -844,6 +885,20 @@ export interface CampaignFunnel {
     window_label?: string;
     window_start?: string;
     window_end?: string;
+  };
+  diagnostics?: FunnelDiagnosticStage[];
+  scenarios?: RevenueScenarioItem[];
+  aov?: number;
+  target_gmv?: number;
+  forecast_method_info?: {
+    method: string;
+    method_display_name?: string;
+    validated_deep_model?: boolean;
+    empirical_coverage_pct?: number;
+    improvement_pct?: number;
+    uplift_p10?: number;
+    uplift_p50?: number;
+    uplift_p90?: number;
   };
 }
 
@@ -867,6 +922,7 @@ export interface ChannelBreakdownItem {
   growth_pct?: number | null;
   action_tip: string;
   source_type?: 'shop_actual' | 'industry_benchmark';
+  is_target_plan?: boolean;
   criteria_rule?: string;
   sample_orders?: ChannelSampleOrder[];
   action_checklist?: string[];
@@ -898,6 +954,10 @@ export interface SeasonalForecast {
   motivation_breakdown?: MotivationBreakdown;
   saved_ideas?: string[];
   checked_milestones?: Record<string, boolean>;
+  story?: SeasonalStory;
+  apply_playbooks?: ApplyPlaybook[];
+  impact?: SeasonalImpact;
+  industry_compare?: { shop_orders: number; industry_orders: number; past_cycles_shop: number; past_cycles_industry: number; min_window_orders: number };
   events: SeasonalEvent[];
   all_campaigns?: SeasonalCampaign[];
   active_campaign?: SeasonalCampaign;
@@ -1000,4 +1060,68 @@ export interface Recommendations {
   my_listings_analysed?: number;
   validated: boolean;
   validation_note: string;
+}
+
+/* ---------- Seasonal v2: câu chuyện, kế hoạch áp dụng, thành quả (căn cứ dữ liệu) ---------- */
+
+export interface SeasonalStoryChapter {
+  title: string;
+  headline: string;
+  bullets: string[];
+  next_step: string;
+  cta_tab: 'hub' | 'act1' | 'act2' | 'act3';
+}
+
+export interface SeasonalStory {
+  overview: SeasonalStoryChapter;
+  ideas: SeasonalStoryChapter;
+  apply: SeasonalStoryChapter;
+  results: SeasonalStoryChapter;
+}
+
+export interface PlaybookStep {
+  date: string;
+  days_from_today: number;
+  task: string;
+  kpi: string;
+  why: string;
+  overdue: boolean;
+}
+
+export interface ApplyPlaybook {
+  idea: string;
+  steps: PlaybookStep[];
+  expected_orders_next_30d: { p10: number; p50: number; p90: number } | null;
+  feasible: boolean;
+  days_left_to_cut_off: number;
+  evidence_level?: string;
+  signal_label?: string;
+  shop_coverage?: { matching: number; total: number; gap: boolean; product_ids: string[] };
+}
+
+export interface SeasonalImpact {
+  phase: 'upcoming' | 'running' | 'ended';
+  status: 'measured' | 'projected' | 'insufficient';
+  window: [string, string];
+  elapsed_days: number;
+  adopted_keywords: string[];
+  baseline_orders_per_day: number | null;
+  baseline_n: number;
+  shop_orders_total?: number;
+  uplift_basis?: string;
+  expected_orders_p10?: number;
+  expected_orders_p50?: number;
+  expected_orders_p90?: number;
+  expected_gmv_p50?: number;
+  actual_orders?: number;
+  counterfactual_orders?: { p10: number; p50: number; p90: number };
+  lift_vs_counterfactual_pct?: number | null;
+  beats_p90?: boolean;
+  below_p10?: boolean;
+  adopted_orders?: number;
+  adopted_gmv?: number;
+  adopted_share_pct?: number;
+  gmv?: number;
+  aov_vs_baseline_pct?: number | null;
+  previous_season?: { orders_same_period: number; orders_total: number; yoy_pct: number | null };
 }

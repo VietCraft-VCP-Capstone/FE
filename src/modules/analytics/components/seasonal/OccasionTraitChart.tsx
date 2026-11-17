@@ -1,17 +1,33 @@
-import React, { useMemo, useState } from 'react';
-import { HelpCircle, Lightbulb, Sparkles } from 'lucide-react';
+import React from 'react';
+import { Calendar, CheckCircle2, Info, Sparkles } from 'lucide-react';
 import type { OccasionTraitItem } from '../../types/evidence';
 import { ConfidenceBadge } from '../evidence/ConfidenceBadge';
 import { EvidenceTrigger } from '../evidence/EvidenceTrigger';
 
-const TRAIT_ACTIONABLE_ADVICE: Record<string, string> = {
-  ordersGrowth: 'Lượng đơn mỗi ngày tăng mạnh. Cần chủ động tăng tồn kho sản phẩm chủ lực và bố trí người đóng gói để tránh trễ hạn giao.',
-  higherSpending: 'Giá trị trung bình mỗi đơn tăng so với ngày thường. Hãy tạo combo đóng gói đẹp mắt hoặc bán kèm phụ kiện để tối ưu giỏ hàng.',
-  earlyOrder: 'Khách có thói quen mua sớm trước dịp. Cần đăng bài, chụp ảnh và thu thập 3-5 đánh giá đầu tiên từ trước ngày lễ 3-4 tuần.',
-  peakClustering: 'Đơn hàng tập trung dồn vào 3 ngày cao điểm nhất. Cần in sẵn tem vận chuyển và chuẩn bị sẵn thùng hộp trước để tránh nghẽn giao hàng.',
-  comboPurchase: 'Khách mua nhiều món trong một đơn tăng vọt. Nên kích hoạt tính năng "Mua kèm deal sốc" hoặc combo giảm 5-10% để chốt đơn.',
-  voucherSensitivity: 'Khách hàng chủ động săn mã giảm giá trước khi mua. Hãy thiết lập voucher riêng của shop (5k - 20k) để tăng tỷ lệ chuyển đổi.',
-};
+interface LaunchWindowLike {
+  start?: string;
+  rd_start?: string;
+  traction_start?: string;
+  peak_start?: string;
+  peak_date?: string;
+  end?: string;
+  cut_off_date?: string;
+}
+
+interface ActiveCampLike {
+  id?: string;
+  name: string;
+  event_date?: string;
+  timing?: { days_to_event?: number; days_diff?: number };
+  launch_window?: LaunchWindowLike;
+}
+
+interface TraitActionInput {
+  priority: string;
+  title: string;
+  desc: string;
+  traitKey?: string;
+}
 
 interface Props {
   occasionName: string;
@@ -19,331 +35,525 @@ interface Props {
   measuredCycles?: number;
   sampleSizeN?: number;
   traits: OccasionTraitItem[];
+  activeCamp?: ActiveCampLike;
+  traitActions?: TraitActionInput[];
+  onPlanAction?: () => void;
   onOpenEvidence: (evidence: any) => void;
   className?: string;
+}
+
+function parseIso(iso?: string): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function fmtDayMonth(d: Date | null): string {
+  if (!d) return '—';
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function addDays(d: Date, days: number): Date {
+  const next = new Date(d);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function fmtNum(v: number | null | undefined, unit = '%'): string {
+  if (v == null || Number.isNaN(v)) return '—';
+  const rounded = Math.round(v * 10) / 10;
+  const formatted = rounded.toLocaleString('vi-VN');
+  return unit === 'ngày' ? `${formatted} ngày` : `${formatted}${unit}`;
 }
 
 export const OccasionTraitChart: React.FC<Props> = ({
   occasionName,
   traits,
+  activeCamp,
+  traitActions,
+  onPlanAction,
   onOpenEvidence,
   className = '',
 }) => {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const traitMap: Record<string, any> = {};
+  for (const t of traits || []) {
+    traitMap[t.key] = t;
+  }
 
-  const numAxes = 6;
-  const size = 380;
-  const center = size / 2;
-  const radius = 135;
+  const ordersT = traitMap.ordersGrowth;
+  const spendingT = traitMap.higherSpending;
+  const earlyT = traitMap.earlyOrder;
+  const peakT = traitMap.peakClustering;
+  const comboT = traitMap.comboPurchase;
+  const voucherT = traitMap.voucherSensitivity;
 
-  // Tính tọa độ các đỉnh của đa giác 6 trục (hình lục giác đều)
-  const angleStep = (2 * Math.PI) / numAxes;
-  // Bắt đầu từ góc -90 độ (đỉnh trên cùng)
-  const startAngle = -Math.PI / 2;
+  const industryScale = (traits?.[0] as any)?.industryScale as
+    | { productsCount?: number; sellersCount?: number; totalSold?: number; platforms?: string[] }
+    | undefined;
 
-  // Tọa độ các mốc lưới (25, 50, 75, 100)
-  const gridLevels = [25, 50, 75, 100];
+  // Mốc thời gian động từ launch_window
+  const lw = activeCamp?.launch_window;
+  const peakDate = parseIso(lw?.peak_date || activeCamp?.event_date);
+  const earlyDays = typeof (earlyT?.industryValue ?? earlyT?.baselineValue) === 'number'
+    ? Math.round(earlyT.industryValue ?? earlyT.baselineValue)
+    : null;
+  const earlyStartDate = peakDate && earlyDays != null ? addDays(peakDate, -earlyDays) : parseIso(lw?.traction_start);
+  const rdStart = parseIso(lw?.rd_start || lw?.start) || (earlyStartDate ? addDays(earlyStartDate, -20) : null);
+  const tractionStart = parseIso(lw?.traction_start) || earlyStartDate;
+  const peakStart = peakDate ? addDays(peakDate, -2) : parseIso(lw?.peak_start);
+  const postEnd = peakDate ? addDays(peakDate, 7) : null;
 
-  const getCoordinates = (index: number, valuePct: number, rOffset = 0) => {
-    const angle = startAngle + index * angleStep;
-    const r = (valuePct / 100) * radius + rOffset;
-    return {
-      x: center + r * Math.cos(angle),
-      y: center + r * Math.sin(angle),
-    };
-  };
+  const today = new Date();
+  const daysToEvent =
+    typeof activeCamp?.timing?.days_to_event === 'number'
+      ? activeCamp.timing.days_to_event
+      : peakDate
+      ? Math.max(0, Math.ceil((peakDate.getTime() - today.getTime()) / 86400000))
+      : null;
 
-  // Tọa độ các điểm dữ liệu của dịp hiện tại
-  const dataPoints = useMemo(() => {
-    return traits.map((trait, i) => getCoordinates(i, Math.max(10, Math.min(100, trait.percentileRank))));
-  }, [traits]);
+  // Xác định giai đoạn hiện tại (0..3) khớp với 4 mốc trên
+  const currentStageIdx = (() => {
+    if (!peakDate) return 0;
+    const t = today.getTime();
+    if (t > peakDate.getTime()) return 3;
+    if (earlyStartDate && t >= earlyStartDate.getTime()) return 2;
+    if (!earlyStartDate && peakStart && t >= peakStart.getTime()) return 2;
+    if (tractionStart && t >= tractionStart.getTime()) return 1;
+    return 0;
+  })();
 
-  const polygonPath = useMemo(() => {
-    if (dataPoints.length === 0) return '';
-    return dataPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z';
-  }, [dataPoints]);
+  const peakShopOrInd = peakT?.shopValue ?? peakT?.industryValue ?? peakT?.baselineValue;
 
-  // Tóm tắt tự động dựa trên số liệu thực tế cao nhất
-  const topTrait = useMemo(() => {
-    if (!traits || traits.length === 0) return null;
-    return [...traits].sort((a, b) => b.percentileRank - a.percentileRank)[0];
-  }, [traits]);
+  const stages = [
+    {
+      label: 'Làm nóng',
+      range: rdStart && tractionStart ? `${fmtDayMonth(rdStart)} – ${fmtDayMonth(addDays(tractionStart, -1))}` : 'Trước mở bán',
+      note: 'Tối ưu ảnh, tiêu đề, nhập hàng',
+    },
+    {
+      label: 'Mở bán sớm',
+      range:
+        tractionStart && earlyStartDate && tractionStart < earlyStartDate
+          ? `${fmtDayMonth(tractionStart)} – ${fmtDayMonth(addDays(earlyStartDate, -1))}`
+          : tractionStart && peakStart
+          ? `${fmtDayMonth(tractionStart)} – ${fmtDayMonth(addDays(peakStart, -1))}`
+          : 'Đón khách sớm',
+      note: earlyStartDate ? `Gom đánh giá trước khi khách đặt rộ từ ${fmtDayMonth(earlyStartDate)}` : 'Khách ngành bắt đầu mua từ đây',
+    },
+    {
+      label: 'Đặt rộ & Cao điểm',
+      range:
+        earlyStartDate && peakDate && earlyStartDate < peakStart!
+          ? `${fmtDayMonth(earlyStartDate)} – ${fmtDayMonth(peakDate)}`
+          : peakStart && peakDate
+          ? `${fmtDayMonth(peakStart)} – ${fmtDayMonth(peakDate)}`
+          : 'Cao điểm',
+      note:
+        peakStart && peakDate
+          ? `Khách đặt rộ từ ${fmtDayMonth(earlyStartDate || peakStart)}; 3 ngày đỉnh ${fmtDayMonth(peakStart)}–${fmtDayMonth(peakDate)}`
+          : 'Tập trung tồn kho & xử lý đơn',
+    },
+    {
+      label: 'Sau sự kiện',
+      range: peakDate && postEnd ? `${fmtDayMonth(addDays(peakDate, 1))} – ${fmtDayMonth(postEnd)}` : 'Hậu sự kiện',
+      note: 'Giao hàng, đánh giá, chăm sóc khách',
+    },
+  ];
+
+  // Tóm tắt 1 câu mở đầu (Kết luận trước)
+  const behaviorList = [
+    { key: 'peakClustering', short: 'mua dồn 3 ngày cao điểm', t: peakT },
+    { key: 'voucherSensitivity', short: 'dùng mã giảm giá', t: voucherT },
+    { key: 'comboPurchase', short: 'bán theo bộ (combo)', t: comboT },
+  ].filter(item => item.t && item.t.shopValue != null && (item.t.industryValue ?? item.t.baselineValue) != null);
+
+  const stronger = behaviorList.filter(x => x.t.shopValue >= (x.t.industryValue ?? x.t.baselineValue));
+  const weaker = behaviorList.filter(x => x.t.shopValue < (x.t.industryValue ?? x.t.baselineValue));
+
+  const summaryText = (() => {
+    const parts: string[] = [];
+    if (earlyDays != null) {
+      parts.push(
+        `Khách bắt đầu mua sớm khoảng ${earlyDays} ngày trước sự kiện${earlyStartDate ? ` (từ ${fmtDayMonth(earlyStartDate)})` : ''}.`
+      );
+    }
+    if (stronger.length > 0) {
+      const strongStr = stronger
+        .map(x => `${x.short} (${fmtNum(x.t.shopValue)} so với ${fmtNum(x.t.industryValue ?? x.t.baselineValue)} toàn ngành)`)
+        .join(' và ');
+      parts.push(`Shop bạn mạnh ở ${strongStr}`);
+    }
+    if (weaker.length > 0) {
+      const weakStr = weaker
+        .map(x => `${x.short} (${fmtNum(x.t.shopValue)} so với ${fmtNum(x.t.industryValue ?? x.t.baselineValue)})`)
+        .join(', ');
+      parts.push(stronger.length > 0 ? `, nhưng còn yếu ở ${weakStr}.` : `Shop bạn cần cải thiện ${weakStr}.`);
+    } else if (stronger.length > 0) {
+      parts.push('.');
+    } else {
+      parts.push('Shop chưa có đủ đơn cùng kỳ để đối chiếu trực tiếp; đang dùng số liệu toàn ngành làm mốc chuẩn bị.');
+    }
+    return parts.join(' ').replace(' .', '.');
+  })();
+
+  // 4 thẻ KPI hàng đầu
+  const ordersIndVal = ordersT?.industryValue ?? ordersT?.baselineValue;
+  const spendingIndVal = spendingT?.industryValue ?? spendingT?.baselineValue;
+
+  const kpiCards = [
+    {
+      title: 'Đơn hàng mỗi ngày cao điểm',
+      value: ordersIndVal != null ? `${ordersIndVal > 0 ? '+' : ''}${fmtNum(ordersIndVal)}` : '—',
+      sub: ordersIndVal != null ? 'so với ngày thường, toàn ngành' : 'Chưa đủ dữ liệu toàn ngành',
+      confidence: ordersT?.confidence || 'preliminary',
+      highlight: false,
+    },
+    {
+      title: 'Giá trị mỗi đơn',
+      value: spendingIndVal != null ? `${spendingIndVal > 0 ? '+' : ''}${fmtNum(spendingIndVal)}` : '—',
+      sub: spendingIndVal != null ? 'so với ngày thường, toàn ngành' : 'Chưa đủ dữ liệu toàn ngành',
+      confidence: spendingT?.confidence || 'preliminary',
+      highlight: false,
+    },
+    {
+      title: 'Khách đặt trước sự kiện',
+      value: earlyDays != null ? `${earlyDays} ngày` : '—',
+      sub: earlyStartDate ? `tức từ ${fmtDayMonth(earlyStartDate)}, toàn ngành` : 'Toàn ngành',
+      confidence: earlyT?.confidence || 'preliminary',
+      highlight: false,
+    },
+    {
+      title: 'Đơn rơi vào 3 ngày cao điểm',
+      value: peakT?.shopValue != null ? fmtNum(peakT.shopValue) : (peakShopOrInd != null ? fmtNum(peakShopOrInd) : '—'),
+      sub:
+        peakT?.shopValue != null
+          ? `Shop bạn · toàn ngành ${fmtNum(peakT.industryValue ?? peakT.baselineValue)}`
+          : `Shop chưa đủ đơn · toàn ngành ${fmtNum(peakShopOrInd)}`,
+      confidence: peakT?.confidence || 'preliminary',
+      highlight: peakT?.shopValue != null,
+    },
+  ];
+
+  // Dữ liệu thanh ngang cặp đôi (Shop bạn vs Toàn ngành)
+  const barTraits = [
+    { key: 'peakClustering', title: 'Mua dồn vào 3 ngày cao điểm', t: peakT },
+    { key: 'voucherSensitivity', title: 'Đơn có dùng mã giảm giá', t: voucherT },
+    { key: 'comboPurchase', title: 'Đơn mua theo bộ (combo)', t: comboT },
+  ].filter(b => b.t);
+
+  // Việc nên làm xếp theo ưu tiên (ưu tiên dùng gợi ý từ Gemini LLM theo đúng dịp nếu có)
+  const actionItems = (() => {
+    if (Array.isArray(traitActions) && traitActions.length > 0) {
+      return traitActions.map(a => {
+        const pLow = (a.priority || '').toLowerCase();
+        const badgeClass = pLow.includes('cao')
+          ? 'bg-amber-50 text-amber-800 border-amber-200'
+          : pLow.includes('vận hành')
+          ? 'bg-sky-50 text-sky-800 border-sky-200'
+          : 'bg-amber-50/70 text-amber-800 border-amber-200';
+        const matchedEv = (a.traitKey && traitMap[a.traitKey]?.evidence) || ordersT?.evidence || earlyT?.evidence;
+        return {
+          priority: a.priority,
+          badgeClass,
+          title: a.title,
+          desc: a.desc,
+          evidence: matchedEv,
+        };
+      });
+    }
+
+    const list: Array<{
+      priority: string;
+      badgeClass: string;
+      title: string;
+      desc: string;
+      evidence: any;
+    }> = [];
+
+    const comboShop = comboT?.shopValue;
+    const comboInd = comboT?.industryValue ?? comboT?.baselineValue;
+    if (comboInd != null && (comboShop == null || comboShop < comboInd)) {
+      list.push({
+        priority: 'Ưu tiên cao',
+        badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+        title: 'Tạo combo quà tặng 2–3 món',
+        desc:
+          comboShop != null
+            ? `Ngành tăng ${fmtNum(spendingIndVal)} giá trị mỗi đơn, còn tỷ lệ combo của shop (${fmtNum(comboShop)}) đang thấp hơn toàn ngành (${fmtNum(comboInd)}).`
+            : `Ngành có ${fmtNum(comboInd)} đơn mua theo bộ và tăng ${fmtNum(spendingIndVal)} giá trị mỗi đơn dịp này.`,
+        evidence: comboT?.evidence || spendingT?.evidence,
+      });
+    } else if (voucherT && voucherT.shopValue != null && (voucherT.industryValue ?? voucherT.baselineValue) != null) {
+      const vShop = voucherT.shopValue;
+      const vInd = voucherT.industryValue ?? voucherT.baselineValue;
+      list.push({
+        priority: 'Ưu tiên cao',
+        badgeClass: 'bg-emerald-50 text-[#007700] border-emerald-200',
+        title: vShop >= vInd ? 'Giữ voucher theo ngưỡng đơn để tối ưu biên lãi' : 'Tạo voucher theo ngưỡng đơn tối thiểu',
+        desc: `Tỷ lệ đơn dùng mã của shop đang là ${fmtNum(vShop)} so với ${fmtNum(vInd)} toàn ngành.`,
+        evidence: voucherT.evidence,
+      });
+    }
+
+    if (earlyDays != null) {
+      list.push({
+        priority: 'Nên làm',
+        badgeClass: 'bg-amber-50/70 text-amber-800 border-amber-200',
+        title: earlyStartDate ? `Mở đặt trước từ ${fmtDayMonth(earlyStartDate)}` : `Mở đặt trước ${earlyDays} ngày`,
+        desc: `Khách toàn ngành đặt sớm khoảng ${earlyDays} ngày trước sự kiện. Cần hoàn thiện ảnh và thẻ từ khóa trước mốc này.`,
+        evidence: earlyT?.evidence,
+      });
+    }
+
+    const peakRangeStr = peakStart && peakDate ? `${fmtDayMonth(peakStart)}–${fmtDayMonth(peakDate)}` : '3 ngày cao điểm';
+    const peakInd = peakT?.industryValue ?? peakT?.baselineValue;
+    list.push({
+      priority: 'Vận hành',
+      badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
+      title: `Chuẩn bị tồn kho và nhân lực cho ${peakRangeStr}`,
+      desc:
+        peakT?.shopValue != null
+          ? `${fmtNum(peakT.shopValue)} đơn của shop dồn vào 3 ngày cao điểm, cao hơn mức ${fmtNum(peakInd)} của toàn ngành.`
+          : `Toàn ngành ghi nhận ${fmtNum(peakInd)} đơn tập trung vào 3 ngày cao điểm; cần chốt tồn kho trước hạn giao.`,
+      evidence: peakT?.evidence,
+    });
+
+    return list;
+  })();
+
+  const timelineEvidence = earlyT?.evidence || ordersT?.evidence;
 
   return (
-    <div className={`rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-6 ${className}`}>
-      {/* 1. Tiêu đề khối & Nguồn xác nhận */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-stone-100 pb-3">
-        <div>
-          <h3 className="font-bold text-stone-900 text-base">
-            Đặc điểm mua sắm của dịp {occasionName}
-          </h3>
+    <div className={`rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-5 ${className}`}>
+      {/* 1. Banner Tóm tắt cho shop của bạn (Kết luận trước) */}
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-[#007700]">
+              <Sparkles size={13} /> Tóm tắt cho shop của bạn
+            </span>
+            {industryScale && (industryScale.productsCount ?? 0) > 0 && (
+              <span className="text-[11px] text-stone-500">
+                · Mẫu toàn ngành: {industryScale.productsCount?.toLocaleString('vi-VN')} sản phẩm ·{' '}
+                {industryScale.sellersCount?.toLocaleString('vi-VN')} gian hàng ({(industryScale.platforms || ['Tiki', 'Printify', 'VietCraft']).join(', ')})
+              </span>
+            )}
+          </div>
+          <p className="text-xs sm:text-[13px] text-stone-800 leading-relaxed font-medium">
+            {summaryText}
+          </p>
         </div>
+
+        {onPlanAction && (
+          <button
+            type="button"
+            onClick={onPlanAction}
+            className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#007700] hover:bg-[#005b00] px-4 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+          >
+            Lập kế hoạch cho {occasionName}
+          </button>
+        )}
       </div>
 
-      {/* 2. Biểu đồ 6 trục cân đối */}
-      <div className="flex flex-col items-center justify-center">
-        <div className="relative w-full max-w-[420px] aspect-square flex items-center justify-center">
-          <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full overflow-visible select-none">
-            <defs>
-              <linearGradient id="traitFillGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#007700" stopOpacity="0.30" />
-                <stop offset="100%" stopColor="#059669" stopOpacity="0.10" />
-              </linearGradient>
-            </defs>
-
-            {/* Các vòng lưới đa giác (25, 50, 75, 100) */}
-            {gridLevels.map(level => {
-              const points = Array.from({ length: numAxes }, (_, i) => getCoordinates(i, level));
-              const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + ' Z';
-              return (
-                <g key={level}>
-                  <path
-                    d={path}
-                    fill={level === 100 ? '#fcfbf9' : 'none'}
-                    stroke="#e7e5e4"
-                    strokeWidth={level === 50 ? '1.5' : '1'}
-                    strokeDasharray={level === 50 ? '3 3' : undefined}
-                  />
-                  {/* Nhãn mốc lưới 50% */}
-                  {level === 50 && (
-                    <text
-                      x={center + 4}
-                      y={center - (50 / 100) * radius + 11}
-                      className="text-[9px] fill-stone-400 font-mono"
-                    >
-                      50%
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-
-            {/* Các nan hoa trục từ tâm */}
-            {traits.map((_, i) => {
-              const tip = getCoordinates(i, 100);
-              return (
-                <line
-                  key={i}
-                  x1={center}
-                  y1={center}
-                  x2={tip.x}
-                  y2={tip.y}
-                  stroke="#e7e5e4"
-                  strokeWidth="1"
-                />
-              );
-            })}
-
-            {/* Vùng dữ liệu của dịp */}
-            <path
-              d={polygonPath}
-              fill="url(#traitFillGradient)"
-              stroke="#007700"
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-              className="transition-all duration-300"
-            />
-
-            {/* Các điểm nút và nhãn trục */}
-            {traits.map((trait, i) => {
-              const pt = dataPoints[i];
-              const labelPt = getCoordinates(i, 100, 24);
-              const isHovered = hoveredIndex === i;
-
-              return (
-                <g
-                  key={trait.key}
-                  onMouseEnter={() => setHoveredIndex(i)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                  className="cursor-pointer"
-                >
-                  {/* Hào quang phát sáng khi hover */}
-                  {isHovered && (
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={14}
-                      fill="#007700"
-                      fillOpacity="0.2"
-                      className="pointer-events-none"
-                    />
-                  )}
-
-                  {/* Điểm nút */}
-                  <circle
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={isHovered ? 7 : 4.5}
-                    fill={isHovered ? '#007700' : '#16a34a'}
-                    stroke="#ffffff"
-                    strokeWidth="2"
-                    className="transition-all duration-150"
-                  />
-
-                  {/* Tên trục xung quanh */}
-                  <text
-                    x={labelPt.x}
-                    y={labelPt.y}
-                    textAnchor={
-                      Math.abs(labelPt.x - center) < 15
-                        ? 'middle'
-                        : labelPt.x > center
-                        ? 'start'
-                        : 'end'
-                    }
-                    dominantBaseline="central"
-                    className={`text-[11px] font-semibold transition-colors ${
-                      isHovered ? 'fill-[#007700] font-bold underline' : 'fill-stone-800'
-                    }`}
-                  >
-                    {trait.name}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
-        </div>
-      </div>
-
-      {/* 2.5 Khối giải thích chi tiết khi rê chuột vào trục biểu đồ */}
-      {(() => {
-        const activeTrait = traits[hoveredIndex !== null ? hoveredIndex : (topTrait ? traits.indexOf(topTrait) : 0)] || traits[0];
-        if (!activeTrait) return null;
-        return (
-          <div className="rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50/80 to-stone-50 p-4 transition-all shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-emerald-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <span className="p-1 rounded-md bg-[#007700] text-white">
-                  <Sparkles size={14} />
-                </span>
-                <div>
-                  <span className="text-xs font-bold text-stone-900">
-                    {activeTrait.name} {hoveredIndex === null ? '· Nổi bật nhất' : ''}
-                  </span>
-                  <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-[#007700]">
-                    Cao hơn {Math.round(activeTrait.percentileRank)}% các dịp khác
-                  </span>
-                </div>
+      {/* 2. Hàng 4 thẻ KPI chính */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {kpiCards.map(card => (
+          <div
+            key={card.title}
+            className="rounded-xl border border-stone-200/90 bg-stone-50/40 p-3.5 flex flex-col justify-between gap-2"
+          >
+            <div>
+              <div className="text-[11px] font-medium text-stone-500">{card.title}</div>
+              <div className={`mt-1 text-2xl font-black tracking-tight ${card.highlight ? 'text-[#007700]' : 'text-stone-900'}`}>
+                {card.value}
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-stone-600">
-                <span>Dịp {occasionName}:</span>
-                <strong className="text-[#007700] font-black">{activeTrait.occasionValue} {activeTrait.unit}</strong>
-                <span className="text-stone-300">|</span>
-                <span className="text-stone-400">Ngày thường: {activeTrait.baselineValue} {activeTrait.unit}</span>
+              <div className="mt-0.5 text-[11px] text-stone-500">{card.sub}</div>
+            </div>
+            <div>
+              <ConfidenceBadge level={card.confidence} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 3. Trục thời gian 4 giai đoạn theo ngày thực */}
+      <div className="rounded-xl border border-stone-200/90 bg-white p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <Calendar size={15} className="text-[#007700]" />
+              <h4 className="font-bold text-stone-900 text-xs sm:text-sm">
+                Lịch chuẩn bị theo giai đoạn
+              </h4>
+              {daysToEvent != null && (
+                <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-[#007700]">
+                  Còn {daysToEvent} ngày
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-stone-500 mt-0.5">
+              Hôm nay {fmtDayMonth(today)} · Mốc thời gian tính từ cửa sổ mùa vụ {occasionName}
+            </p>
+          </div>
+          {timelineEvidence && (
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-[11px] font-semibold text-[#007700]">Xem căn cứ</span>
+              <EvidenceTrigger evidence={timelineEvidence} onOpen={onOpenEvidence} />
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+          {stages.map((st, idx) => {
+            const isCurrent = idx === currentStageIdx;
+            const isPast = idx < currentStageIdx;
+            return (
+              <div
+                key={st.label}
+                className={`rounded-lg border p-2.5 transition-colors ${
+                  isCurrent
+                    ? 'border-[#007700] bg-emerald-50/40'
+                    : isPast
+                    ? 'border-stone-200 bg-stone-50/70'
+                    : 'border-stone-200 bg-white'
+                }`}
+              >
+                <div className={`h-1 w-full rounded-full mb-2 ${isCurrent || isPast ? 'bg-[#007700]' : 'bg-stone-200'}`} />
+                <div className="flex items-center justify-between gap-1 text-[11px]">
+                  <span className="font-mono text-stone-500">{st.range}</span>
+                  {isCurrent && (
+                    <span className="rounded bg-[#007700] px-1.5 py-0.5 text-[9px] font-bold text-white">
+                      Hiện tại
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-xs font-bold text-stone-900">{st.label}</div>
+                <div className="mt-0.5 text-[11px] text-stone-500 leading-snug">{st.note}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 4. Thanh ngang cặp đôi (Shop vs Toàn ngành) + Việc nên làm trước dịp */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Cột trái: Thanh ngang cặp đôi */}
+        <div className="rounded-xl border border-stone-200/90 bg-white p-4 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h4 className="font-bold text-stone-900 text-sm">
+                Hành vi mua: shop bạn so với toàn ngành
+              </h4>
+              <div className="mt-1 flex items-center gap-4 text-[11px] text-stone-600">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-xs bg-[#007700]" />
+                  Shop bạn
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-xs bg-slate-400" />
+                  Toàn ngành
+                </span>
               </div>
             </div>
+          </div>
 
-            <div className="mt-2.5 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div className="flex items-start gap-2 text-stone-700">
-                <HelpCircle size={15} className="mt-0.5 shrink-0 text-stone-400" />
-                <div>
-                  <strong className="text-stone-900">Ý nghĩa:</strong> {activeTrait.question}
-                  <div className="text-[11px] text-stone-500 mt-0.5">
-                    Nguồn: {activeTrait.evidence?.sources?.join(', ') || 'Đơn hàng sàn VietCraft'}
+          <div className="space-y-4">
+            {barTraits.map(({ key, title, t }) => {
+              const sVal = typeof t.shopValue === 'number' ? t.shopValue : null;
+              const iVal = typeof (t.industryValue ?? t.baselineValue) === 'number'
+                ? (t.industryValue ?? t.baselineValue)
+                : null;
+              const gap = sVal != null && iVal != null ? Math.round((sVal - iVal) * 10) / 10 : null;
+              const pctRank = typeof t.percentileRank === 'number' && sVal != null ? Math.round(t.percentileRank) : null;
+
+              return (
+                <div key={key} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-bold text-stone-800">{title}</span>
+                    {gap != null ? (
+                      <span className={`font-bold ${gap >= 0 ? 'text-[#007700]' : 'text-rose-700'}`}>
+                        {gap > 0 ? '+' : ''}{gap.toLocaleString('vi-VN')} điểm %
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-stone-400">Shop chưa đủ đơn</span>
+                    )}
+                  </div>
+
+                  {/* Thanh Shop bạn */}
+                  <div className="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#007700] transition-all duration-300"
+                      style={{ width: `${sVal != null ? Math.max(4, Math.min(100, sVal)) : 0}%` }}
+                    />
+                  </div>
+                  {/* Thanh Toàn ngành */}
+                  <div className="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-slate-400 transition-all duration-300"
+                      style={{ width: `${iVal != null ? Math.max(4, Math.min(100, iVal)) : 0}%` }}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-stone-500">
+                    <span>
+                      {sVal != null ? `${fmtNum(sVal)} so với ${fmtNum(iVal)}` : `Chưa đủ đơn cùng kỳ · toàn ngành ${fmtNum(iVal)}`}
+                      {pctRank != null ? ` · cao hơn ${pctRank}% shop cùng ngành` : ''}
+                    </span>
+                    <EvidenceTrigger evidence={t.evidence} onOpen={onOpenEvidence} />
                   </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        </div>
 
-              <div className="flex items-start gap-2 text-emerald-950 bg-white/80 rounded-lg p-2.5 border border-emerald-200/60 shadow-2xs">
-                <Lightbulb size={15} className="mt-0.5 shrink-0 text-emerald-700" />
-                <div>
-                  <strong className="text-emerald-900">Hành động gợi ý:</strong>{' '}
-                  {activeTrait.actionableAdvice || TRAIT_ACTIONABLE_ADVICE[activeTrait.key] || 'Chuẩn bị sản phẩm và kế hoạch đăng bán sớm.'}
+        {/* Cột phải: Việc nên làm xếp theo ưu tiên */}
+        <div className="rounded-xl border border-stone-200/90 bg-white p-4 space-y-3">
+          <div>
+            <h4 className="font-bold text-stone-900 text-sm">
+              Việc nên làm trước {occasionName}
+            </h4>
+            <p className="text-[11px] text-stone-500 mt-0.5">
+              Xếp theo mức ưu tiên, mỗi gợi ý kèm căn cứ đối chiếu
+            </p>
+          </div>
+
+          <div className="space-y-2.5">
+            {actionItems.map((act, idx) => (
+              <div
+                key={act.title}
+                className="rounded-xl border border-stone-200/90 bg-stone-50/40 p-3 space-y-1.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-stone-900">
+                    <CheckCircle2 size={14} className="text-[#007700] shrink-0" />
+                    <span>{idx + 1}. {act.title}</span>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${act.badgeClass}`}>
+                    {act.priority}
+                  </span>
                 </div>
+                <p className="text-[11px] text-stone-600 leading-relaxed pl-5">
+                  {act.desc}
+                </p>
+                {act.evidence && (
+                  <div className="pl-5 flex items-center gap-1 text-[11px] font-semibold text-[#007700]">
+                    <span>Xem căn cứ</span>
+                    <EvidenceTrigger evidence={act.evidence} onOpen={onOpenEvidence} />
+                  </div>
+                )}
               </div>
-            </div>
+            ))}
           </div>
-        );
-      })()}
-
-      {/* 3. Bảng số thật so với ngày thường */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider">
-            So sánh chi tiết với ngày thường
-          </h4>
-          <span className="text-[11px] text-stone-500">
-            Cơ sở: 8 tuần trước sự kiện
-          </span>
         </div>
+      </div>
 
-        <div className="overflow-x-auto rounded-xl border border-stone-200">
-          <table className="w-full text-left text-xs text-stone-700">
-            <thead className="bg-stone-50 border-b border-stone-200 text-[11px] font-semibold text-stone-600">
-              <tr>
-                <th className="py-2.5 px-3">Đặc điểm</th>
-                <th className="py-2.5 px-3">Ngày thường</th>
-                <th className="py-2.5 px-3">Dịp {occasionName}</th>
-                <th className="py-2.5 px-3">Chênh lệch</th>
-                <th className="py-2.5 px-3">Vị trí giữa các dịp</th>
-                <th className="py-2.5 px-3">Độ tin cậy</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {traits.map((t, idx) => {
-                const isHovered = hoveredIndex === idx;
-                return (
-                  <tr
-                    key={t.key}
-                    onMouseEnter={() => setHoveredIndex(idx)}
-                    onMouseLeave={() => setHoveredIndex(null)}
-                    className={`transition-colors ${isHovered ? 'bg-emerald-50/50' : 'hover:bg-stone-50/50'}`}
-                  >
-                    <td className="py-2.5 px-3 font-semibold text-stone-900">
-                      <div>{t.name}</div>
-                      <div className="text-[10px] text-stone-400 font-normal">{t.question}</div>
-                    </td>
-                    <td className="py-2.5 px-3 text-stone-600">
-                      {typeof t.baselineValue === 'number'
-                        ? t.baselineValue.toLocaleString('vi-VN')
-                        : t.baselineValue}{' '}
-                      <span className="text-stone-400">{t.unit}</span>
-                    </td>
-                    <td className="py-2.5 px-3 font-bold text-stone-900">
-                      {typeof t.occasionValue === 'number'
-                        ? t.occasionValue.toLocaleString('vi-VN')
-                        : t.occasionValue}{' '}
-                      <span className="text-stone-500 font-normal">{t.unit}</span>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <div className="inline-flex items-center gap-1">
-                        <span className="font-semibold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">
-                          {t.diffText}
-                        </span>
-                        <EvidenceTrigger
-                          evidence={t.evidence}
-                          onOpen={onOpenEvidence}
-                        />
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-3 text-stone-700">
-                      <span className="font-bold text-stone-900">
-                        Cao hơn {Math.round(t.percentileRank)}%
-                      </span>{' '}
-                      các dịp khác
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <ConfidenceBadge level={t.confidence} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Tóm tắt tự động */}
-        {topTrait && (
-          <div className="rounded-xl bg-amber-50/70 border border-amber-200/80 p-3 text-xs text-amber-950 flex items-start gap-2">
-            <span className="font-bold shrink-0">Kết luận:</span>
-            <span>
-              Dịp <strong>{occasionName}</strong> có đặc tính nổi bật nhất là{' '}
-              <strong>{topTrait.name.toLowerCase()}</strong> ({topTrait.diffText}), cao hơn{' '}
-              <strong>{Math.round(topTrait.percentileRank)}%</strong> các dịp mua sắm khác trong năm.
-              Khuyến nghị chuẩn bị hàng và đăng bán sớm để tận dụng lợi thế.
-            </span>
-          </div>
-        )}
+      {/* 5. Chú thích độ tin cậy & cỡ mẫu */}
+      <div className="flex items-start gap-2 text-[11px] text-stone-500 pt-1 border-t border-stone-100">
+        <Info size={13} className="mt-0.5 shrink-0 text-stone-400" />
+        <span>
+          Độ tin cậy (Sơ bộ / Khá / Cao) được xác định dựa trên cỡ mẫu đơn hàng thực tế và số chu kỳ đã quan sát; các chỉ số hiển thị «—» do shop chưa phát sinh đủ đơn hàng trong kỳ để đo lường.
+        </span>
       </div>
     </div>
   );

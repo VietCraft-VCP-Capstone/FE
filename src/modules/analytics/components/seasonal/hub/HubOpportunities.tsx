@@ -18,9 +18,13 @@ export const HubOpportunities: React.FC<Props> = ({
   const [selectedQuadrant, setSelectedQuadrant] = useState<string>('all');
   const [selectedCluster, setSelectedCluster] = useState<OpportunityCluster | null>(null);
 
-  const filtered = selectedQuadrant === 'all'
+  const rawFiltered = selectedQuadrant === 'all'
     ? clusters
     : clusters.filter(c => c.quadrant === selectedQuadrant);
+  // Đảm bảo số lượng thẻ mỗi hàng (3 cột trên desktop) luôn cân bằng khi có > 3 sản phẩm
+  const filtered = rawFiltered.length > 3 && rawFiltered.length % 3 !== 0
+    ? rawFiltered.slice(0, Math.floor(rawFiltered.length / 3) * 3)
+    : rawFiltered;
 
   return (
     <div className={`rounded-2xl border border-stone-200 bg-white p-5 shadow-sm space-y-5 ${className}`}>
@@ -69,7 +73,7 @@ export const HubOpportunities: React.FC<Props> = ({
           return (
             <div
               key={cluster.id}
-              className={`rounded-xl border p-4 space-y-3 transition-shadow hover:shadow-md ${
+              className={`h-full flex flex-col justify-between rounded-xl border p-4 space-y-3 transition-shadow hover:shadow-md ${
                 isGood
                   ? 'border-emerald-200 bg-emerald-50/20'
                   : isNiche
@@ -124,7 +128,9 @@ export const HubOpportunities: React.FC<Props> = ({
                   <span className="text-[10px] text-stone-400 block">
                     {cluster.soldCount && cluster.soldCount > 0
                       ? `Đã bán: ${cluster.soldCount.toLocaleString('vi-VN')} sp`
-                      : `(+${cluster.newSellersLast30Days} shop mới trong 30 ngày)`}
+                      : cluster.newSellersLast30Days != null
+                      ? `(+${cluster.newSellersLast30Days} shop mới trong 30 ngày)`
+                      : 'Chưa có lượt bán đối soát'}
                   </span>
                 </div>
                 <div>
@@ -132,7 +138,9 @@ export const HubOpportunities: React.FC<Props> = ({
                   <strong className="text-stone-800">{cluster.priceRange}</strong>
                   <span className="text-[10px] text-emerald-700 flex items-center gap-0.5 mt-0.5">
                     <TrendingUp size={10} />
-                    Tìm kiếm: +{cluster.searchTrendPct}%
+                    {cluster.searchTrendPct != null
+                      ? `Tìm kiếm: ${cluster.searchTrendPct > 0 ? '+' : ''}${cluster.searchTrendPct}%`
+                      : 'Chưa có chuỗi tìm kiếm'}
                   </span>
                 </div>
               </div>

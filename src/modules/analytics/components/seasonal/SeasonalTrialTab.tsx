@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import type { PotentialProfile } from '../../types';
 import { TrialPlanCard } from '../product/TrialPlanCard';
@@ -9,12 +10,33 @@ interface SeasonalTrialTabProps {
 export function SeasonalTrialTab({
   potentialProfiles = [],
 }: SeasonalTrialTabProps) {
-  const leadProfile = potentialProfiles[0];
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const safeIdx = Math.min(selectedIdx, Math.max(0, potentialProfiles.length - 1));
+  const leadProfile = potentialProfiles[safeIdx];
   const trialPlan = leadProfile?.trial_plan;
 
   return (
     <div className="space-y-4 pt-2">
-      {/* TrialPlanCard cho sản phẩm hàng đầu */}
+      {potentialProfiles.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {potentialProfiles.map((prof, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setSelectedIdx(idx)}
+              className={`rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
+                idx === safeIdx
+                  ? 'border-[#007700] bg-[#EAF0E2]/70 text-[#005B00]'
+                  : 'border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100'
+              }`}
+            >
+              {prof.product_name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* TrialPlanCard cho sản phẩm đang chọn */}
       {trialPlan ? (
         <TrialPlanCard trialPlan={trialPlan} />
       ) : (
