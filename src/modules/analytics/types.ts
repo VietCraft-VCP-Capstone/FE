@@ -269,6 +269,17 @@ export interface DirectRival {
   reasons: string[];
 }
 
+export interface RivalShop {
+  shop_id: string;
+  shop_name: string | null;
+  /** Số sản phẩm của bạn mà shop này có hàng giống. */
+  overlap: number;
+  best_similarity: number;
+  my_product_ids?: string[];
+  /** Danh mục của bạn có sản phẩm bị trùng. */
+  categories?: string[];
+}
+
 export interface Competitors {
   category_id: string;
   available_categories: string[];
@@ -290,8 +301,10 @@ export interface Competitors {
     /** Chỉ có ở shop thật. */
     direct_rivals?: DirectRival[];
   }[];
-  /** Shop trùng nhiều sản phẩm với bạn nhất (chỉ có ở shop thật). */
-  direct_rival_shops?: { shop_id: string; shop_name: string | null; overlap: number; best_similarity: number }[];
+  /** Shop trùng nhiều sản phẩm với bạn nhất trong danh mục đang xem (chỉ có ở shop thật). */
+  direct_rival_shops?: RivalShop[];
+  /** Shop nên theo dõi trên mọi danh mục của bạn và theo từng danh mục, không phụ thuộc danh mục đang xem (chỉ shop thật). */
+  rival_shops_by_category?: { all: RivalShop[]; by_category: Record<string, RivalShop[]> };
   competitors: {
     rank: number;
     listing_id: string;

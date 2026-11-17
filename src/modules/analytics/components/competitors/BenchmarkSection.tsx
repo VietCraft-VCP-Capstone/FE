@@ -22,6 +22,7 @@ import { BangManhYeu, type TieuChi } from './BangManhYeu';
 import { decimal } from '../../format';
 import type { InsightState } from '../../hooks/useInsight';
 import { categoryLabel } from '../../labels';
+import { MSG } from '../../services/analyticsApi';
 import type { ShopComparison, StrategicGroups } from '../../types';
 import { GIAI_THICH, NhanTinCay } from './giaiThich';
 
@@ -239,7 +240,7 @@ function NhomChienLuoc({ g }: { g: StrategicGroups }) {
 
 export function BenchmarkSection({ state, reload }: { state: InsightState<ShopComparison>; reload: () => void }) {
   return (
-    <InsightBlock state={state} onRetry={reload}>
+    <InsightBlock state={state} onRetry={reload} errorText={MSG[138]}>
       {(data, meta) => {
         const { rows, weakest, catName } = soVoiDanDau(data);
         const chonTheo = data.ranked_by === 'reviews'

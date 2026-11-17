@@ -18,6 +18,7 @@ import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, SelectField, Takeaway
 import { NA, pct } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import { productTypeLabel } from '../labels';
+import { MSG } from '../services/analyticsApi';
 import type { AiPrice, PriceBand, PricingAnalysis } from '../types';
 
 const NHOM_SO: Record<string, string> = {
@@ -124,7 +125,7 @@ export function PricingPage() {
 
   return (
     <InsightPage title="So sánh giá" question="Giá sản phẩm của tôi đứng ở đâu so với các sản phẩm cùng loại đang bán chạy?">
-      <InsightBlock state={state} onRetry={reload}>
+      <InsightBlock state={state} onRetry={reload} errorText={MSG[142]}>
         {(data, meta) => {
           const d = data.distribution;
           const band = data.band ? BAND[data.band] : null;

@@ -11,13 +11,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConfirmModal } from '../../../../shared/components/ConfirmModal';
+import { useToast } from '../../../../shared/components/Toast';
 import { count, timeAgo } from '../../../../shared/utils/format';
 import { InsightBlock } from '../InsightBlock';
 import { SourceFooter } from '../SourceFooter';
 import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, type Tone } from '../ui';
 import { fullDate } from '../../format';
 import { invalidateInsights, type InsightState } from '../../hooks/useInsight';
-import { analyticsApi, analyticsErrorMessage } from '../../services/analyticsApi';
+import { MSG, analyticsApi, analyticsErrorMessage } from '../../services/analyticsApi';
 import { categoryLabel, tagLabel } from '../../labels';
 import { GIAI_THICH, NhanTinCay } from './giaiThich';
 import type { CompetitorTracking, Competitors, ShopSearchResult, Threat } from '../../types';
@@ -53,7 +54,7 @@ export function TrackingSection({ state, reload, rivals }: {
   const live = state.kind === 'ready' && state.meta.source.mode === 'live';
   const [shopId, setShopId] = useState('');
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
+  const { showToast } = useToast();
   const [removing, setRemoving] = useState<{ id: string; name: string | null } | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ShopSearchResult[] | null>(null);
@@ -100,15 +101,14 @@ export function TrackingSection({ state, reload, rivals }: {
 
   const trackShop = async (target: string, name: string) => {
     setBusy(true);
-    setMessage(null);
     try {
       await analyticsApi.trackCompetitor(target);
       setShopId('');
       setResults(rs => rs?.map(r => (r.shop_id === target ? { ...r, is_tracked: true } : r)) ?? null);
-      setMessage({ tone: 'good', text: `Đã theo dõi ${name}.` });
+      showToast(`Đã theo dõi ${name}.`, 'success');
       refresh();
     } catch (err) {
-      setMessage({ tone: 'bad', text: analyticsErrorMessage(err, 'Không thêm được shop này.') });
+      showToast(analyticsErrorMessage(err, MSG[145]), 'error');
     } finally {
       setBusy(false);
     }
@@ -125,10 +125,10 @@ export function TrackingSection({ state, reload, rivals }: {
     setBusy(true);
     try {
       await analyticsApi.untrackCompetitor(removing.id);
-      setMessage({ tone: 'good', text: `Đã bỏ theo dõi ${removing.name || removing.id}.` });
+      showToast(`Đã bỏ theo dõi ${removing.name || removing.id}.`, 'success');
       refresh();
     } catch (err) {
-      setMessage({ tone: 'bad', text: analyticsErrorMessage(err, 'Không bỏ theo dõi được.') });
+      showToast(analyticsErrorMessage(err, MSG[146]), 'error');
     } finally {
       setBusy(false);
       setRemoving(null);
@@ -137,7 +137,7 @@ export function TrackingSection({ state, reload, rivals }: {
 
   return (
     <>
-      <InsightBlock state={state} onRetry={reload}>
+      <InsightBlock state={state} onRetry={reload} errorText={MSG[147]}>
         {(data, meta) => {
           const full = data.slots_used >= data.slots_limit;
           const tagName = (tag: string) => tagLabel(data.tag_names?.[tag] ?? null, tag);
@@ -358,12 +358,7 @@ export function TrackingSection({ state, reload, rivals }: {
                     </span>
                   )}
                 </form>
-                {full && <p className="mb-3 mt-0 text-xs text-stone-500">Đã đủ chỗ. Bỏ bớt một shop để thêm shop mới.</p>}
-                {message && (
-                  <p aria-live="polite" className={`mb-3 mt-0 text-[13px] font-medium ${message.tone === 'good' ? 'text-[#005B00]' : 'text-red-700'}`}>
-                    {message.text}
-                  </p>
-                )}
+                {full && <p className="mb-3 mt-0 text-xs text-stone-500">{MSG[143]} Bỏ bớt một shop để thêm shop mới.</p>}
 
                 {data.tracked.length === 0 ? (
                   <div className="flex items-start gap-3">

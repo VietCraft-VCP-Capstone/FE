@@ -101,6 +101,8 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
       })
       .catch(err => {
         if (controller.signal.aborted || err?.code === 'ERR_CANCELED') return;
+        // SRS 3.9: lỗi tải phải được ghi ra console.
+        console.error(`[analytics] ${path}`, err);
         setState(toState<T>(err));
       });
     return () => controller.abort();
