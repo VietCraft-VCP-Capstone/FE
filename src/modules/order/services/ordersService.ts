@@ -31,7 +31,7 @@ export interface OrderResponse {
   discount?: number;
   couponCode?: string | null;
   status: 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled';
-  paymentGateway: 'vnpay' | 'payos' | 'cod';
+  paymentGateway: 'payos' | 'cod';
   paymentMethod?: string;
   shippingProvider: 'ghn' | 'ghtk';
   shippingCode?: string;

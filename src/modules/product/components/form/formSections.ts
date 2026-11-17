@@ -37,13 +37,13 @@ export function buildFormNav(f: ProductFormData, newTagCount: number, errors: Re
       id: 'pf-variants',
       label: 'Phân loại',
       meta: variantCount ? `${variantCount} lựa chọn` : 'Không bắt buộc',
-      state: state(false, variantCount > 0),
+      state: state(Boolean(errors.skus), variantCount > 0 && !errors.skus),
     },
     {
       id: 'pf-details',
       label: 'Chi tiết',
       meta: 'Chất liệu, xuất xứ, SKU',
-      state: state(false, Boolean((f.materials?.length || 0) > 0 || f.material?.trim() || f.location.trim())),
+      state: state(false, Boolean((f.materials?.length || 0) > 0 || f.location.trim())),
     },
     {
       id: 'pf-description',

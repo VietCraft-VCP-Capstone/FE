@@ -27,7 +27,13 @@ export function ProductFormTagField({
   const [input, setInput] = useState('');
   const count = tagIds.length + newTagNames.length;
   const query = input.trim().toLowerCase();
-  const shown = query ? tags.filter((t) => tagIds.includes(t._id) || t.name.toLowerCase().includes(query)) : tags;
+  const [showAll, setShowAll] = useState(false);
+  // Thẻ hợp danh mục xếp trước; thẻ ngành khác ẩn sau nút, trừ thẻ đã chọn. Đang gõ thì lọc trên toàn bộ.
+  const related = tags.filter(t => (t.related_count ?? 0) > 0).sort((a, b) => (b.related_count ?? 0) - (a.related_count ?? 0));
+  const others = tags.filter(t => !((t.related_count ?? 0) > 0));
+  const visible = showAll ? [...related, ...others] : [...related, ...others.filter(t => tagIds.includes(t._id))];
+  const hiddenCount = tags.length - visible.length;
+  const shown = query ? tags.filter((t) => tagIds.includes(t._id) || t.name.toLowerCase().includes(query)) : visible;
   const add = () => {
     if (!input.trim()) return;
     onAddTag(input.trim());
@@ -76,6 +82,9 @@ export function ProductFormTagField({
         {!catalogLoading && tags.length === 0 && newTagNames.length === 0 && (
           <span className="text-xs text-stone-500">Sàn chưa có thẻ nào. Hãy đề xuất thẻ mới ở ô bên trên.</span>
         )}
+        {!catalogLoading && !query && tags.length > 0 && visible.length === 0 && newTagNames.length === 0 && (
+          <span className="text-xs text-stone-400">Chọn danh mục để xem thẻ gợi ý phù hợp, hoặc gõ thẻ mới phía trên.</span>
+        )}
         {newTagNames.map((name) => (
           <span
             key={`new-${name}`}
@@ -112,6 +121,15 @@ export function ProductFormTagField({
           );
         })}
       </div>
+      {!query && (hiddenCount > 0 || showAll) && (
+        <button
+          type="button"
+          onClick={() => setShowAll(v => !v)}
+          className="text-xs font-semibold text-[#007700] hover:underline cursor-pointer"
+        >
+          {showAll ? 'Chỉ hiện thẻ hợp danh mục' : `Xem thêm ${hiddenCount} thẻ thuộc ngành hàng khác`}
+        </button>
+      )}
 
       {error ? (
         <p role="alert" className={ERROR_TEXT}>{error}</p>

@@ -131,69 +131,6 @@ export function ScoreBars({ rows }: {
   );
 }
 
-/* ------------------------------------------------------- bốn góc ngách ---- */
-
-export interface QuadrantPoint {
-  id: string;
-  label: string;
-  /** Trục hoành: nguồn cung, 0–100. */
-  supply: number;
-  /** Trục tung: nhu cầu, 0–100. */
-  demand: number;
-  highlight?: boolean;
-}
-
-/**
- * Bốn góc cung–cầu: cầu cao + cung thấp (góc trên trái) là ngách đáng vào.
- * Cắt ở 30 và 70 theo đúng cách service AI phân loại quadrant.
- */
-export function QuadrantScatter({ points, onSelect, selectedId }: {
-  points: QuadrantPoint[];
-  onSelect?: (id: string) => void;
-  selectedId?: string | null;
-}) {
-  const CUT_LOW = 30;
-  const CUT_HIGH = 70;
-  return (
-    <div className="relative aspect-[4/3] w-full rounded-md border border-stone-200 bg-white">
-      {/* Vùng cơ hội: cầu cao, cung thấp. */}
-      <div className="pointer-events-none absolute left-0 top-0 rounded-tl-xl bg-[#EAF0E2]/70" style={{ width: `${CUT_LOW}%`, height: `${100 - CUT_HIGH}%` }} aria-hidden />
-      <span className="pointer-events-none absolute left-2 top-2 text-[10.5px] font-bold uppercase tracking-wide text-[#005B00]">Cơ hội</span>
-      <span className="pointer-events-none absolute right-2 top-2 text-[10.5px] font-semibold text-stone-400">Đông đúc</span>
-      <span className="pointer-events-none absolute bottom-6 right-2 text-[10.5px] font-semibold text-stone-400">Thừa cung</span>
-      <span className="pointer-events-none absolute bottom-6 left-2 text-[10.5px] font-semibold text-stone-400">Ngách nhỏ</span>
-
-      <div className="pointer-events-none absolute inset-y-0 border-l border-dashed border-stone-200" style={{ left: `${CUT_LOW}%` }} aria-hidden />
-      <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-stone-200" style={{ top: `${100 - CUT_HIGH}%` }} aria-hidden />
-
-      {points.map(p => {
-        const selected = selectedId === p.id;
-        return (
-          <button
-            type="button"
-            key={p.id}
-            onClick={() => onSelect?.(p.id)}
-            title={`${p.label}: cầu ${Math.round(p.demand)}%, cung ${Math.round(p.supply)}%`}
-            aria-label={`${p.label}, nhu cầu ${Math.round(p.demand)} phần trăm, nguồn cung ${Math.round(p.supply)} phần trăm`}
-            className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border-2 border-white transition-transform duration-150 hover:z-10 hover:scale-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007700] motion-reduce:transition-none ${selected ? 'z-10 scale-125' : ''}`}
-            style={{
-              left: `${Math.min(97, Math.max(3, p.supply))}%`,
-              top: `${Math.min(97, Math.max(3, 100 - p.demand))}%`,
-              width: p.highlight || selected ? 15 : 11,
-              height: p.highlight || selected ? 15 : 11,
-              background: p.highlight ? SERIES.green : SERIES.blue,
-              opacity: p.highlight || selected ? 1 : 0.62,
-            }}
-          />
-        );
-      })}
-
-      <span className="pointer-events-none absolute -bottom-5 left-1/2 -translate-x-1/2 text-[11px] text-stone-500">Nguồn cung (số listing đang có)</span>
-      <span className="pointer-events-none absolute -left-1 top-1/2 origin-left -translate-y-1/2 -rotate-90 text-[11px] text-stone-500">Nhu cầu tìm kiếm</span>
-    </div>
-  );
-}
-
 /* ------------------------------------------------------------- tiện ích --- */
 
 /** Hai dòng số liệu nhỏ đặt cạnh nhau trong thẻ. */

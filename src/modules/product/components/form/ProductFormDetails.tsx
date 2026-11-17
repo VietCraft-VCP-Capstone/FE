@@ -14,16 +14,6 @@ export function ProductFormDetails({ formData, onPatch }: ProductFormDetailsProp
         <MaterialInput value={formData.materials || []} onChange={(materials) => onPatch({ materials })} labelClass={LABEL} inputClass={inputClass()} />
       </div>
 
-      <Field label="Mô tả chất liệu" hint="Một câu ngắn hiển thị cho người mua.">
-        <input
-          type="text"
-          placeholder="VD: Gốm Bát Tràng men rạn, Lụa tơ tằm, Gỗ hương..."
-          value={formData.material || ''}
-          onChange={(e) => onPatch({ material: e.target.value })}
-          className={inputClass()}
-        />
-      </Field>
-
       <Field label="Xuất xứ / Xưởng sản xuất">
         <input
           type="text"
