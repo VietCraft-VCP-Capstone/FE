@@ -230,7 +230,7 @@ export function ProductFormSizeManager({
   const currentTabDef = TABS.find((t) => t.id === activeTab) || TABS[0];
 
   return (
-    <div className="space-y-3 pt-3 border-t border-stone-100 bg-stone-50/60 -mx-2 px-3 py-3 rounded-2xl border border-stone-200 shadow-xs">
+    <div className="space-y-3 rounded-lg border border-stone-200 bg-stone-50 p-4">
       {/* Header & Count */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
