@@ -28,11 +28,9 @@ export function ProductFormTagField({
   const [input, setInput] = useState('');
   const [showAll, setShowAll] = useState(false);
   // Thẻ hợp danh mục (SP cùng ngành đang dùng) xếp trước; thẻ ngành khác ẩn sau nút, trừ thẻ đã chọn.
-  // Danh mục mới chưa có SP nào dùng thẻ thì không có gì để lọc → hiện tất cả.
-  const hasRelated = tags.some(t => (t.related_count ?? 0) > 0);
   const related = [...tags.filter(t => (t.related_count ?? 0) > 0)].sort((a, b) => (b.related_count ?? 0) - (a.related_count ?? 0));
   const others = tags.filter(t => !((t.related_count ?? 0) > 0));
-  const visible = !hasRelated || showAll ? [...related, ...others] : [...related, ...others.filter(t => tagIds.includes(t._id))];
+  const visible = showAll ? [...related, ...others] : [...related, ...others.filter(t => tagIds.includes(t._id))];
   const hiddenCount = tags.length - visible.length;
   const add = () => {
     if (!input.trim()) return;
@@ -80,6 +78,9 @@ export function ProductFormTagField({
         {!catalogLoading && tags.length === 0 && newTagNames.length === 0 && (
           <span className="text-xs text-stone-400">Sàn chưa duyệt thẻ nào.</span>
         )}
+        {!catalogLoading && tags.length > 0 && visible.length === 0 && newTagNames.length === 0 && (
+          <span className="text-xs text-stone-400">Chọn danh mục để xem thẻ gợi ý phù hợp, hoặc gõ thẻ mới phía trên.</span>
+        )}
         {newTagNames.map((name) => (
           <span
             key={`new-${name}`}
@@ -115,7 +116,7 @@ export function ProductFormTagField({
           );
         })}
       </div>
-      {hasRelated && (hiddenCount > 0 || showAll) && (
+      {(hiddenCount > 0 || showAll) && (
         <button
           type="button"
           onClick={() => setShowAll(v => !v)}
