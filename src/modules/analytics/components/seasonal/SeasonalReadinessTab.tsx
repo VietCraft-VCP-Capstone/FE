@@ -51,6 +51,7 @@ export function SeasonalReadinessTab({
   const [filterTier, setFilterTier] = useState<'all' | 'zero' | 'low' | 'high'>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [expandedProdId, setExpandedProdId] = useState<string | null>(null);
+  const [expandedDoneTasks, setExpandedDoneTasks] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Danh sách sản phẩm được xem xét: ưu tiên sản phẩm matching, nếu rỗng thì dùng allShopProducts
@@ -356,47 +357,117 @@ export function SeasonalReadinessTab({
                     </div>
                   </div>
 
-                  {/* Chi tiết 4 nhiệm vụ của sản phẩm khi bung ra */}
+                  {/* Chi tiết 4 nhiệm vụ: highlight việc cần làm, thu gọn việc đã xong */}
                   {isExpanded && (
                     <div className="pt-3 border-t border-stone-100 space-y-2.5">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-stone-500">
-                        Checklist chuẩn bị cho dịp {campName}
+                      <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-stone-500">
+                        <span>Checklist cho dịp {campName}</span>
+                        <span className="font-semibold normal-case text-amber-700">
+                          {prod.checklist.filter((t: any) => !t.is_done).length > 0
+                            ? `${prod.checklist.filter((t: any) => !t.is_done).length} việc cần làm`
+                            : 'Đã hoàn tất'}
+                        </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {prod.checklist.map((task: any) => (
-                          <div
-                            key={task.id}
-                            className={`p-3 rounded-xl border transition-all text-xs space-y-1.5 ${
-                              task.is_done
-                                ? 'bg-emerald-50/40 border-emerald-200 text-stone-700'
-                                : 'bg-stone-50 border-stone-200 text-stone-800'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-1.5 font-bold">
-                                {task.is_done ? (
-                                  <CheckCircle2 size={14} className="text-emerald-700 shrink-0" />
-                                ) : (
-                                  <AlertCircle size={14} className="text-amber-600 shrink-0" />
-                                )}
-                                <span>{task.label}</span>
+                      {(() => {
+                        const pendingTasks = prod.checklist.filter((t: any) => !t.is_done);
+                        const doneTasks = prod.checklist.filter((t: any) => t.is_done);
+
+                        return (
+                          <div className="space-y-2.5">
+                            {/* Việc cần làm: ưu tiên hiển thị đầy chiều ngang, không kéo giãn ô bên cạnh */}
+                            {pendingTasks.length > 0 && (
+                              <div className="space-y-2">
+                                {pendingTasks.map((task: any) => (
+                                  <div
+                                    key={task.id}
+                                    className="p-3 rounded-xl border bg-amber-50/80 border-amber-300 ring-1 ring-amber-200/60 text-stone-900 text-xs space-y-1.5"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 font-bold min-w-0">
+                                        <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                                        <span>{task.label}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="rounded bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-bold text-amber-950">
+                                          Cần làm
+                                        </span>
+                                        {task.market_data && (
+                                          <span
+                                            title={task.market_data}
+                                            className="text-stone-400 hover:text-[#007700] cursor-help p-0.5"
+                                          >
+                                            <HelpCircle size={12} />
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <p className="text-[11px] text-stone-700 leading-snug m-0 pl-5">
+                                      {task.action_detail}
+                                    </p>
+                                    <div className="pl-5">
+                                      <Link
+                                        to={`/seller/products/${prod._id}/edit`}
+                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#007700] hover:underline"
+                                      >
+                                        <span>Sửa sản phẩm ngay</span>
+                                        <ExternalLink size={11} />
+                                      </Link>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                              <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-extrabold text-[#007700] border border-stone-200 shrink-0">
-                                {task.impact}
-                              </span>
-                            </div>
+                            )}
 
-                            <p className="text-[11px] text-stone-600 leading-snug">
-                              {task.action_detail}
-                            </p>
+                            {/* Việc đã xong: xếp lưới đều nhau, bấm để xổ chi tiết */}
+                            {doneTasks.length > 0 && (
+                              <div className={`grid grid-cols-1 ${doneTasks.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2 items-start`}>
+                                {doneTasks.map((task: any) => {
+                                  const taskKey = `${prod._id}:${task.id}`;
+                                  const isTaskOpen = !!expandedDoneTasks[taskKey];
+                                  return (
+                                    <div
+                                      key={task.id}
+                                      className="p-2.5 rounded-xl border bg-stone-50/70 border-stone-200/80 text-stone-600 text-xs space-y-1.5"
+                                    >
+                                      <div className="flex items-center justify-between gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setExpandedDoneTasks(prev => ({ ...prev, [taskKey]: !prev[taskKey] }))
+                                          }
+                                          className="flex items-center gap-1.5 text-left font-semibold text-stone-700 min-w-0 flex-1 cursor-pointer"
+                                        >
+                                          <CheckCircle2 size={13} className="text-[#007700] shrink-0" />
+                                          <span className="truncate">{task.label}</span>
+                                          <ChevronDown
+                                            size={12}
+                                            className={`text-stone-400 shrink-0 transition-transform ${isTaskOpen ? 'rotate-180' : ''}`}
+                                          />
+                                        </button>
+                                        {task.market_data && (
+                                          <span
+                                            title={task.market_data}
+                                            className="text-stone-400 hover:text-[#007700] cursor-help shrink-0"
+                                          >
+                                            <HelpCircle size={12} />
+                                          </span>
+                                        )}
+                                      </div>
 
-                            <div className="text-[10px] text-stone-400 pt-1 border-t border-stone-200/50">
-                              <strong>Căn cứ:</strong> {task.market_data}
-                            </div>
+                                      {isTaskOpen && (
+                                        <p className="text-[11px] text-stone-500 leading-snug m-0 pt-1 border-t border-stone-200/60">
+                                          {task.action_detail}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -407,76 +478,72 @@ export function SeasonalReadinessTab({
 
         {/* 4 Cột: Panel Gợi ý Vận hành Mùa Vụ */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 border-b border-stone-100 pb-3">
-              <div className="p-1.5 rounded-lg bg-[#EAF0E2] text-[#007700]">
-                <Sparkles size={16} />
-              </div>
-              <div>
-                <h4 className="font-bold text-stone-900 text-xs sm:text-sm">
-                  Gợi Ý Vận Hành Cho Xưởng
+          <div className="rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-[#EAF0E2] text-[#007700]">
+                  <Sparkles size={15} />
+                </div>
+                <h4 className="m-0 font-bold text-stone-900 text-xs sm:text-sm">
+                  Lưu ý vận hành
                 </h4>
-                <span className="text-[10px] text-stone-400">Kinh nghiệm đón sóng mùa cao điểm</span>
               </div>
+              {onOpenEvidence && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenEvidence({
+                      id: 'ev_readiness_logic',
+                      definition: 'Bộ tiêu chuẩn sẵn sàng đón dịp cho sản phẩm thủ công & thời trang.',
+                      sources: ['Phân tích hành vi mua sắm sàn TMĐT Việt Nam'],
+                      howObtained: 'Kiểm toán 1.200 listing trước và trong các kỳ cao điểm.',
+                      period: ['2026-01-01', '2026-11-01'],
+                      n: 1200,
+                      formula: 'Sản phẩm hoàn thiện 4/4 tiêu chí đạt doanh số gấp 2.8 lần sản phẩm thông thường.',
+                      confidence: 'high',
+                      confidenceReason: 'Đối chứng trực tiếp từ kết quả đối soát doanh thu.',
+                      mayBeWrongBecause: ['Chất lượng sản phẩm thực tế không tương xứng với ảnh chụp concept.'],
+                      updatedAt: '2026-11-05',
+                    })
+                  }
+                  className="p-1 rounded-lg text-stone-400 hover:text-[#007700] hover:bg-stone-100 transition-colors cursor-pointer"
+                  title="Căn cứ thuật toán"
+                  aria-label="Căn cứ thuật toán"
+                >
+                  <HelpCircle size={15} />
+                </button>
+              )}
             </div>
 
-            <div className="rounded-xl bg-stone-50 p-3.5 border border-stone-200/80 text-xs text-stone-700 space-y-2">
-              <ul className="list-disc pl-4 space-y-1.5 text-stone-600 text-[11px]">
-                <li>
-                  <strong>Tận dụng hàng sẵn có:</strong> Ưu tiên tạo thêm phân loại kèm hộp quà nơ và thiệp viết tay (+35.000đ) để tăng giá trị đơn hàng (AOV) mà không cần ôm thêm mã hàng mới.
-                </li>
-                <li>
-                  <strong>Lập chỉ mục tìm kiếm:</strong> Sàn cần 5–7 ngày để ghi nhận từ khóa mới. Hãy tối ưu tiêu đề và thẻ tag trước khi bước vào giai đoạn mở bán.
-                </li>
-                <li>
-                  <strong>Khóa nhận đơn an toàn:</strong> Dừng nhận đơn đúng ngày hạn chốt {activeCamp.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'trước ngày lễ 10 ngày'} để bảo đảm giao tới tay khách trước ngày lễ, tránh bị hủy đơn và đánh giá 1 sao.
-                </li>
-              </ul>
+            <div className="space-y-2 text-[11px] leading-relaxed">
+              <div className="rounded-xl bg-amber-50/80 border border-amber-200/80 p-2.5 text-amber-950">
+                <strong className="block text-amber-900">1. Chốt đơn đúng hạn {activeCamp.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'trước lễ 10 ngày'}</strong>
+                <span className="text-amber-800">Ngừng nhận đơn sau mốc này để giao kịp lễ, tránh hủy đơn.</span>
+              </div>
+              <div className="rounded-xl bg-emerald-50/60 border border-emerald-200/70 p-2.5 text-stone-800">
+                <strong className="block text-[#007700]">2. Thêm phân loại hộp quà (+35.000đ)</strong>
+                <span className="text-stone-600">Tăng giá trị đơn (AOV) từ hàng sẵn có, không cần ôm mã mới.</span>
+              </div>
+              <div className="rounded-xl bg-stone-50 border border-stone-200/80 p-2.5 text-stone-700">
+                <strong className="block text-stone-900">3. Đổi tiêu đề &amp; tag trước 5–7 ngày</strong>
+                <span className="text-stone-600">Giúp sàn kịp lập chỉ mục tìm kiếm trước khi mở bán.</span>
+              </div>
             </div>
 
             {/* Quick Action Pills */}
-            <div className="space-y-2 pt-1">
-              <span className="text-[10px] uppercase font-bold text-stone-400 block">
-                Truy cập nhanh
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                <Link
-                  to="/seller/products"
-                  className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-200 transition-colors"
-                >
-                  Quản lý kho hàng
-                </Link>
-                <Link
-                  to="/seller/products/new"
-                  className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-200 transition-colors"
-                >
-                  Tạo phân loại quà tặng
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onOpenEvidence) {
-                      onOpenEvidence({
-                        id: 'ev_readiness_logic',
-                        definition: 'Bộ tiêu chuẩn sẵn sàng đón dịp cho sản phẩm thủ công & thời trang.',
-                        sources: ['Phân tích hành vi mua sắm sàn TMĐT Việt Nam'],
-                        howObtained: 'Kiểm toán 1.200 listing trước và trong các kỳ cao điểm.',
-                        period: ['2026-01-01', '2026-11-01'],
-                        n: 1200,
-                        formula: 'Sản phẩm hoàn thiện 4/4 tiêu chí đạt doanh số gấp 2.8 lần sản phẩm thông thường.',
-                        confidence: 'high',
-                        confidenceReason: 'Đối chứng trực tiếp từ kết quả đối soát doanh thu.',
-                        mayBeWrongBecause: ['Chất lượng sản phẩm thực tế không tương xứng với ảnh chụp concept.'],
-                        updatedAt: '2026-11-05',
-                      });
-                    }
-                  }}
-                  className="rounded-lg bg-emerald-50 text-[#007700] border border-emerald-200 px-2.5 py-1 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1"
-                >
-                  <HelpCircle size={12} />
-                  <span>Căn cứ thuật toán</span>
-                </button>
-              </div>
+            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-stone-100">
+              <Link
+                to="/seller/products"
+                className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-200 transition-colors"
+              >
+                Quản lý kho
+              </Link>
+              <Link
+                to="/seller/products/new"
+                className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-[#007700] hover:bg-emerald-100 transition-colors"
+              >
+                + Tạo mẫu quà tặng
+              </Link>
             </div>
           </div>
         </div>

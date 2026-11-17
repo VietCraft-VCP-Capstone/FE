@@ -1,8 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  Bar,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import {
   AlertTriangle,
   BookOpen,
-  Calendar,
   Clock,
   Flame,
   Gift,
@@ -204,17 +214,11 @@ export function SeasonalMonthMatrix({
   // State cho Form Popup / Modal khi click
   const [activeModalId, setActiveModalId] = useState<string | null>(null);
 
-  // State cho Hover Tooltip Card khi rê chuột
-  const [hoveredOccasion, setHoveredOccasion] = useState<CalendarTimelineRow | null>(null);
-  const [hoverPos, setHoverPos] = useState<{ top: number; left: number } | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   // Đóng modal khi nhấn Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setActiveModalId(null);
-        setHoveredOccasion(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -312,93 +316,131 @@ export function SeasonalMonthMatrix({
     return activeRows;
   }, [activeRows, viewMode]);
 
-  // Tính ngày hiện tại và mảng header 4 tháng động tính từ tháng này
-  const now = useMemo(() => new Date(), []);
-  const todayLabel = useMemo(() => {
-    const d = String(now.getDate()).padStart(2, '0');
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    return `${d}/${m}`;
-  }, [now]);
+  const parseExpectedOrders = (raw: string): { value: number; hasData: boolean } => {
+    if (!raw || raw.toLowerCase().includes('chưa')) return { value: 0, hasData: false };
+    const nums = raw.match(/\d+/g)?.map(Number).filter(n => !Number.isNaN(n)) || [];
+    if (nums.length === 0) return { value: 0, hasData: false };
+    const avg = nums.length >= 2 ? (nums[0] + nums[nums.length - 1]) / 2 : nums[0];
+    return { value: Math.round(avg), hasData: avg > 0 };
+  };
 
-  const monthHeaders = useMemo(() => {
-    return [0, 1, 2, 3].map(offset => {
-      const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-      const m = d.getMonth() + 1;
-      const y = d.getFullYear();
-      const showYear = offset === 0 || m === 1;
+  const getShortOccasionLabel = (row: CalendarTimelineRow): string => {
+    const dateMatch = row.weekdayText.match(/(\d{1,2}\/\d{1,2})/);
+    const datePart = dateMatch ? dateMatch[1] : '';
+    const lower = row.name.toLowerCase();
+    if (lower.includes('tết nguyên đán')) return datePart ? `Tết ${datePart}` : 'Tết';
+    if (lower.includes('giáng sinh')) return datePart ? `Noel ${datePart}` : 'Noel';
+    if (lower.includes('valentine')) return datePart ? `Val ${datePart}` : 'Valentine';
+    if (lower.includes('quốc tế phụ nữ') || lower.includes('8/3')) return datePart ? `8/3` : '8/3';
+    if (lower.includes('siêu sale')) return datePart || row.name.replace(/Siêu sale\s*/i, '');
+    if (datePart && !row.name.includes(datePart)) {
+      const words = row.name.split(' ').slice(0, 2).join(' ');
+      return `${words} ${datePart}`;
+    }
+    return row.name.length > 14 ? `${row.name.slice(0, 13)}…` : row.name;
+  };
+
+  const chartMeta = useMemo(() => {
+    const hasAnyForecast = displayRows.some(r => parseExpectedOrders(r.expectedOrders).hasData);
+    const items = displayRows.map(row => {
+      const parsed = parseExpectedOrders(row.expectedOrders);
+      const metricValue = hasAnyForecast
+        ? parsed.value
+        : Math.max(1, row.nextDeadline.daysLeft);
       return {
-        label: showYear ? `T${m}/${y}` : `T${m}`,
-        isFirst: offset === 0,
+        row,
+        metricValue,
+        hasForecastData: parsed.hasData,
+        shortLabel: getShortOccasionLabel(row),
+        warning: getPrepWarning(row),
       };
     });
-  }, [now]);
 
-  // Tổng số ngày trong khung nhìn 120 ngày
-  const totalDays = 120;
+    const rawMax = Math.max(1, ...items.map(i => i.metricValue));
+    const step = rawMax <= 12 ? 3 : rawMax <= 40 ? 10 : rawMax <= 120 ? 30 : Math.ceil(rawMax / 4 / 10) * 10;
+    const axisMax = step * 4;
+    const ticks = [axisMax, step * 3, step * 2, step, 0];
 
-  // Tính tọa độ phần trăm theo ngày trong khung nhìn 120 ngày
-  const getPct = (days: number) => {
-    return Math.max(0, Math.min(100, (days / totalDays) * 100));
-  };
+    const nearest = [...displayRows].sort((a, b) => a.nextDeadline.daysLeft - b.nextDeadline.daysLeft)[0] || null;
+    const peak = items
+      .filter(i => i.hasForecastData)
+      .sort((a, b) => b.metricValue - a.metricValue)[0]?.row || null;
+    const upcomingFocus = items
+      .filter(
+        i =>
+          i.row.id !== nearest?.id &&
+          i.row.id !== peak?.id &&
+          (i.row.nextDeadline.isUrgent || i.warning !== null || i.row.nextDeadline.daysLeft <= 30)
+      )
+      .sort((a, b) => b.metricValue - a.metricValue || a.row.nextDeadline.daysLeft - b.row.nextDeadline.daysLeft)[0]?.row || null;
 
-  // Xử lý sự kiện rê chuột vào hàng
-  const handleRowMouseEnter = (row: CalendarTimelineRow, e: React.MouseEvent<HTMLDivElement>) => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    return {
+      hasAnyForecast,
+      items,
+      axisMax,
+      ticks,
+      nearest,
+      upcomingFocus,
+      peak,
+    };
+  }, [displayRows]);
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const cardWidth = 400;
-    const cardHeight = 200;
+  const selectedRow = useMemo(() => {
+    return displayRows.find(r => r.id === activeCampId) || displayRows[0] || null;
+  }, [displayRows, activeCampId]);
 
-    // Tính toán tọa độ hiển thị để không tràn màn hình
-    let top = rect.bottom + 6;
-    if (top + cardHeight > window.innerHeight) {
-      top = Math.max(10, rect.top - cardHeight - 6);
-    }
-    const left = Math.max(16, Math.min(window.innerWidth - cardWidth - 16, rect.left + 24));
-
-    hoverTimeoutRef.current = setTimeout(() => {
-      setHoverPos({ top, left });
-      setHoveredOccasion(row);
-    }, 120);
-  };
-
-  const handleRowMouseLeave = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    setHoveredOccasion(null);
-    setHoverPos(null);
-  };
+  const rechartsData = useMemo(() => {
+    return chartMeta.items.map(({ row, shortLabel, warning }) => {
+      const parsed = parseExpectedOrders(row.expectedOrders);
+      return {
+        id: row.id,
+        shortLabel,
+        name: row.name,
+        weekdayText: row.weekdayText,
+        expectedOrdersAvg: parsed.value,
+        expectedOrdersDisplay: row.expectedOrders || 'Chưa có dữ liệu',
+        hasForecastData: parsed.hasData,
+        daysLeft: Math.max(0, row.nextDeadline.daysLeft),
+        deadlineTitle: row.nextDeadline.title,
+        confidenceText: row.confidenceText,
+        warningShort: warning?.short || null,
+        warningLevel: warning?.level || null,
+      };
+    });
+  }, [chartMeta.items]);
 
   const activeModalOccasion = useMemo(() => {
     if (!activeModalId) return null;
     return mappedCampaignRows.find(r => r.id === activeModalId) || null;
   }, [mappedCampaignRows, activeModalId]);
 
-  const hoveredDetails = hoveredOccasion ? getOccasionDetails(hoveredOccasion) : null;
   const modalDetails = activeModalOccasion ? getOccasionDetails(activeModalOccasion) : null;
 
   return (
     <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6 space-y-4 relative">
-      {/* 1. Header & Điều khiển xem */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-stone-100 pb-3.5">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-50 text-[#007700]">
-              <Calendar size={18} />
-            </span>
-            <h3 className="m-0 text-base font-bold text-stone-900">
-              Lộ trình 4 tháng tới &amp; 4 giai đoạn vận hành
-            </h3>
+      {/* 1. Header tối giản phong cách Hình 1 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 relative group/info">
+          <h3 className="m-0 text-lg sm:text-xl font-bold tracking-tight text-stone-950">
+            Lộ trình theo dịp mua sắm
+          </h3>
+          <Info size={14} className="text-stone-400 cursor-help" />
+          <div className="absolute left-0 top-6 hidden group-hover/info:block z-30 w-72 rounded-xl bg-stone-900 p-3 text-[11px] text-white shadow-xl pointer-events-none leading-relaxed">
+            <strong className="text-emerald-400 block mb-1">Cách đọc biểu đồ cột kết hợp đường:</strong>
+            • <strong>Cột xanh</strong> (trục trái): số đơn dự kiến của từng dịp.<br />
+            • <strong>Đường hổ phách</strong> (trục phải): số ngày còn lại đến hạn chuẩn bị tiếp theo.<br />
+            • Bấm vào bất kỳ cột nào để chọn dịp và mở chi tiết các mốc thời gian.
           </div>
         </div>
 
-        {/* Nút lọc chế độ xem */}
-        <div className="flex items-center gap-1.5 bg-stone-100/90 p-1 rounded-xl text-xs shrink-0 self-start sm:self-center">
+        {/* Segmented pill toggle */}
+        <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl text-xs shrink-0">
           <button
             type="button"
             onClick={() => setViewMode('120d')}
             className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
               viewMode === '120d'
-                ? 'bg-white text-stone-900 shadow-2xs'
+                ? 'bg-emerald-50 text-[#007700] shadow-2xs'
                 : 'text-stone-500 hover:text-stone-800'
             }`}
           >
@@ -409,7 +451,7 @@ export function SeasonalMonthMatrix({
             onClick={() => setViewMode('12m')}
             className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
               viewMode === '12m'
-                ? 'bg-white text-emerald-800 shadow-2xs'
+                ? 'bg-emerald-50 text-[#007700] shadow-2xs'
                 : 'text-stone-500 hover:text-stone-800'
             }`}
           >
@@ -418,370 +460,168 @@ export function SeasonalMonthMatrix({
         </div>
       </div>
 
-      {/* 2. Bảng biểu đồ tiến độ dạng lịch chi tiết theo đúng thiết kế */}
-      <div className="overflow-x-auto pb-1">
-        <div className="min-w-[940px] select-none text-stone-800">
-          {/* Header Bảng */}
-          <div className="flex items-center border-b border-stone-200 pb-2 text-xs font-semibold text-stone-500">
-            <div className="w-48 shrink-0 pl-2">Dịp</div>
+      {/* 2. Một câu tóm tắt nổi bật theo phong cách Hình 1 */}
+      {chartMeta.nearest && (
+        <p className="m-0 text-xs sm:text-[13px] font-normal text-stone-600 leading-relaxed">
+          Trong {viewMode === '120d' ? '4 tháng tới' : 'cả năm'} có{' '}
+          <strong className="font-semibold text-stone-900">{displayRows.length} dịp</strong>:{' '}
+          gần nhất là{' '}
+          <strong className="font-semibold text-stone-900">{chartMeta.nearest.name}</strong>{' '}
+          (còn {chartMeta.nearest.nextDeadline.daysLeft} ngày
+          {chartMeta.nearest.expectedOrders ? `, ${chartMeta.nearest.expectedOrders} đơn` : ''})
+          {chartMeta.upcomingFocus && (
+            <>
+              , tiếp theo là{' '}
+              <strong className="font-semibold text-stone-900">{chartMeta.upcomingFocus.name}</strong>{' '}
+              (còn {chartMeta.upcomingFocus.nextDeadline.daysLeft} ngày
+              {chartMeta.upcomingFocus.expectedOrders ? `, ${chartMeta.upcomingFocus.expectedOrders} đơn` : ''})
+            </>
+          )}
+          {chartMeta.peak && chartMeta.peak.id !== chartMeta.nearest.id && chartMeta.peak.id !== chartMeta.upcomingFocus?.id && (
+            <>
+              {' '}và nhiều đơn nhất là{' '}
+              <strong className="font-semibold text-[#007700]">
+                {chartMeta.peak.name} ({chartMeta.peak.expectedOrders} đơn)
+              </strong>
+            </>
+          )}
+          .
+        </p>
+      )}
 
-            {/* Header Timeline 4 tháng */}
-            <div className="relative flex-1 grid grid-cols-4 text-xs font-medium">
-              {monthHeaders.map((mH, idx) => (
-                <div key={idx} className={`text-left ${idx === 0 ? 'pl-1' : 'pl-2'}`}>
-                  <span className={idx === 0 ? 'text-stone-700 font-bold' : 'text-stone-600'}>
-                    {mH.label}
-                  </span>
-                  {mH.isFirst && (
-                    <div className="text-[11px] font-bold text-rose-600 flex items-center gap-1 leading-none mt-0.5">
-                      <span className="text-[9px]">▼</span> Hôm nay {todayLabel}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="w-52 shrink-0 pl-4 flex items-center gap-1 group/th relative">
-              <span>Hạn tiếp theo</span>
-              <Info size={12} className="text-stone-400 cursor-help" />
-              <div className="absolute left-4 top-6 hidden group-hover/th:block z-30 w-60 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
-                <strong className="text-emerald-400 block mb-1">Căn cứ tính mốc hạn:</strong>
-                • Ngày diễn ra dịp theo lịch.<br />
-                • Hạn chốt = ngày dịp trừ số ngày sản xuất và giao hàng cấu hình cho từng dịp.<br />
-                • Đánh dấu <strong>Gấp</strong> khi còn dưới 14 ngày.
-              </div>
-            </div>
-
-            <div className="w-24 shrink-0 pl-3 flex items-center gap-1 group/th relative">
-              <span>Dự kiến</span>
-              <Info size={12} className="text-stone-400 cursor-help" />
-              <div className="absolute left-0 top-6 hidden group-hover/th:block z-30 w-60 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
-                <strong className="text-emerald-400 block mb-1">Dự kiến số đơn:</strong>
-                • Tính từ nhịp đơn 90 ngày gần nhất của shop × hệ số nhu cầu dịp (khoảng 80% P10–P90). Nếu shop chưa đủ 5 đơn hoàn tất gần đây sẽ hiện "Chưa có dữ liệu".
-              </div>
-            </div>
-
-            <div className="w-24 shrink-0 pl-3 flex items-center gap-1 group/th relative">
-              <span>Tin cậy</span>
-              <Info size={12} className="text-stone-400 cursor-help" />
-              <div className="absolute right-0 top-6 hidden group-hover/th:block z-30 w-64 rounded-lg bg-stone-900 p-2.5 text-[11px] text-white shadow-lg pointer-events-none leading-relaxed">
-                <strong className="text-emerald-400 block mb-1">Cách xếp mức này:</strong>
-                • Xếp theo quy tắc khoảng cách ngày tới dịp (dịp xa hơn 60 ngày là Sơ bộ).<br />
-                • Chưa đối chiếu với số liệu đơn hàng thực tế.
-              </div>
-            </div>
-          </div>
-
-          {/* Danh sách các dịp trong khung lịch */}
-          <div className="relative divide-y divide-stone-100/90 pt-1">
-            {/* Vạch đỏ HÔM NAY chạy xuyên suốt qua tất cả các dòng */}
-            <div
-              className="pointer-events-none absolute top-0 bottom-0 z-20 border-l-2 border-rose-500"
-              style={{
-                left: `calc(192px + 2px)`,
+      {/* 3. Biểu đồ cột kết hợp đường */}
+      <div className="space-y-2 pt-1">
+        <div className="h-60 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={rechartsData}
+              margin={{ top: 10, right: 8, left: -12, bottom: 4 }}
+              onClick={state => {
+                const clickedId = state?.activePayload?.[0]?.payload?.id as string | undefined;
+                if (clickedId) {
+                  onSelectCampaign(clickedId);
+                  setActiveModalId(clickedId);
+                }
               }}
-            />
-
-            {displayRows.map(row => {
-              const isSelected = activeCampId === row.id;
-
-              // Tọa độ các mốc thời gian của dải 4 pha (%)
-              const p1Start = getPct(row.stages.prepStartDays);
-              const p2Start = getPct(row.stages.tractionStartDays);
-              const p3Peak = getPct(row.stages.peakDays);
-              const p4Cutoff = getPct(row.stages.cutoffDays);
-              const pEnd = getPct(row.stages.endDays);
-
-              const p1Width = Math.max(2, p2Start - p1Start);
-              const p2Width = Math.max(3, p4Cutoff - p2Start);
-              const p3Width = Math.max(3, pEnd - p4Cutoff);
-              const p4Width = Math.max(2, 4);
-
-              // Tọa độ đường cong ngọn đồi sức mua (Bell Curve Hill)
-              const hillStart = Math.max(0, p1Start);
-              const hillPeak = p3Peak;
-              const hillEnd = Math.min(100, pEnd + 2);
-
-              return (
-                <div
-                  key={row.id}
-                  onClick={() => {
-                    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-                    setHoveredOccasion(null);
-                    setHoverPos(null);
-                    onSelectCampaign(row.id);
-                    setActiveModalId(row.id);
-                  }}
-                  onMouseEnter={e => handleRowMouseEnter(row, e)}
-                  onMouseLeave={handleRowMouseLeave}
-                  className={`group relative flex items-center py-4 px-2 rounded-xl transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-50/50 ring-1 ring-emerald-300/80 shadow-2xs'
-                      : 'hover:bg-stone-50/80'
-                  }`}
-                >
-                  {/* Cột 1: Tên Dịp & Thứ/Ngày */}
-                  <div className="w-48 shrink-0 pr-3">
-                    <div className="text-sm font-bold text-stone-900 group-hover:text-[#007700] transition-colors flex items-center gap-1.5">
-                      <span className="p-1 rounded-md bg-stone-100 group-hover:bg-emerald-100/70 transition-colors">
-                        {getCampaignLucideIcon(row.id)}
-                      </span>
-                      <span>{row.name}</span>
-                    </div>
-                    <div className="text-xs text-stone-500 mt-0.5 flex items-center justify-between">
-                      <span>{row.weekdayText}</span>
-                      <span className="text-[10px] font-bold text-[#007700] opacity-0 group-hover:opacity-100 transition-opacity">
-                        Xem chi tiết →
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Cột 2: Trục Timeline (Thanh 4 pha + Đường cong sức mua + Vạch hạn chốt) */}
-                  <div className="relative flex-1 h-14 flex items-center">
-                    {/* Các vạch ngăn tháng mờ */}
-                    <div className="pointer-events-none absolute inset-0 grid grid-cols-4">
-                      {[0, 1, 2, 3].map(col => (
-                        <div key={col} className="h-full border-r border-dashed border-stone-200/50" />
-                      ))}
-                    </div>
-
-                    {/* Đường cong ngọn đồi sức mua (Demand Hill Area) */}
-                    <svg
-                      viewBox="0 0 100 40"
-                      preserveAspectRatio="none"
-                      className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
-                    >
-                      <defs>
-                        <linearGradient id={`hillGrad-${row.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stopColor="#d6d3d1" stopOpacity="0.30" />
-                          <stop offset="100%" stopColor="#e7e5e4" stopOpacity="0.08" />
-                        </linearGradient>
-                      </defs>
-                      <path
-                        d={`M ${hillStart} 36 C ${(hillStart + hillPeak) / 2} 32, ${hillPeak - 5} 12, ${hillPeak} 8 C ${hillPeak + 5} 12, ${(hillPeak + hillEnd) / 2} 32, ${hillEnd} 36 Z`}
-                        fill={`url(#hillGrad-${row.id})`}
-                        stroke="#a8a29e"
-                        strokeWidth="0.8"
-                        strokeDasharray={row.isDashedCurve ? '2 2' : undefined}
-                      />
-                    </svg>
-
-                    {/* Thanh 4 pha tiến độ liên tục (4-Phase Segmented Bar) */}
-                    <div
-                      style={{
-                        left: `${p1Start}%`,
-                        width: `${Math.min(100 - p1Start, pEnd - p1Start + 4)}%`,
-                      }}
-                      className="relative z-10 h-4 rounded-sm flex items-center overflow-hidden shadow-2xs"
-                    >
-                      {/* Pha 1: Chuẩn bị mẫu (Xanh rất nhạt) */}
-                      <div
-                        style={{ width: `${(p1Width / (pEnd - p1Start + 4)) * 100}%` }}
-                        className="h-full bg-[#dbeafe] border-r border-white/60"
-                        title="Pha 1: Chuẩn bị mẫu"
-                      />
-                      {/* Pha 2: Đăng bán & gom tương tác (Xanh dương vừa) */}
-                      <div
-                        style={{ width: `${(p2Width / (pEnd - p1Start + 4)) * 100}%` }}
-                        className="h-full bg-[#7dd3fc] border-r border-white/60"
-                        title="Pha 2: Đăng bán & gom tương tác"
-                      />
-                      {/* Pha 3: Tuần cao điểm (Xanh dương đậm) */}
-                      <div
-                        style={{ width: `${(p3Width / (pEnd - p1Start + 4)) * 100}%` }}
-                        className="h-full bg-[#0284c7] border-r border-white/60"
-                        title="Pha 3: Cao điểm bán hàng"
-                      />
-                      {/* Pha 4: Hạn chốt nhận đơn & giao hàng (Cam hổ phách) */}
-                      <div
-                        style={{ width: `${(p4Width / (pEnd - p1Start + 4)) * 100}%` }}
-                        className="h-full bg-[#ea580c]"
-                        title="Pha 4: Hạn chốt nhận đơn"
-                      />
-                    </div>
-
-                    {/* Vạch đứng màu đen đánh dấu Hạn chốt nhận đơn (Cut-off line) */}
-                    <div
-                      style={{ left: `${pEnd + 4}%` }}
-                      className="absolute top-2 bottom-2 w-[2.5px] bg-stone-900 z-20 pointer-events-none rounded-xs"
-                      title="Hạn chốt nhận đơn"
-                    />
-                  </div>
-
-                  {/* Cột 3: Hạn tiếp theo */}
-                  <div className="w-52 shrink-0 pl-4">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-xs text-stone-900">
-                        {row.nextDeadline.title}
-                      </span>
-                      {row.nextDeadline.isUrgent && (
-                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-800">
-                          Gấp
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-stone-400 mt-0.5">
-                      còn {row.nextDeadline.daysLeft} ngày
-                    </div>
-                    {(() => {
-                      const pw = getPrepWarning(row);
-                      if (!pw) return null;
-                      return (
-                        <span
-                          title={pw.text}
-                          className={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-extrabold ${
-                            pw.level === 'warn' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
+              <XAxis
+                dataKey="shortLabel"
+                tick={{ fontSize: 11, fill: '#57534e' }}
+                axisLine={{ stroke: '#e7e5e4' }}
+                tickLine={false}
+                interval={0}
+              />
+              <YAxis
+                yAxisId="orders"
+                allowDecimals={false}
+                tick={{ fontSize: 11, fill: '#78716c' }}
+                axisLine={false}
+                tickLine={false}
+                width={42}
+              />
+              <YAxis
+                yAxisId="days"
+                orientation="right"
+                allowDecimals={false}
+                tick={{ fontSize: 11, fill: '#d97706' }}
+                axisLine={false}
+                tickLine={false}
+                width={42}
+              />
+              <Tooltip
+                cursor={{ fill: 'rgba(0, 119, 0, 0.05)' }}
+                content={({ active, payload }) => {
+                  if (!active || !payload || payload.length === 0) return null;
+                  const item = payload[0]?.payload as (typeof rechartsData)[number] | undefined;
+                  if (!item) return null;
+                  return (
+                    <div className="w-64 rounded-xl border border-stone-200/95 bg-white p-3.5 shadow-xl text-stone-800">
+                      <div className="text-xs font-bold text-stone-900">{item.name}</div>
+                      <div className="text-[11px] text-stone-500 mt-0.5">{item.weekdayText}</div>
+                      <div className="mt-2 pt-2 border-t border-stone-100 space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-stone-500">Đơn dự kiến</span>
+                          <span className={`font-bold ${item.hasForecastData ? 'text-[#007700]' : 'text-stone-500'}`}>
+                            {item.expectedOrdersDisplay}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-stone-500 truncate">{item.deadlineTitle}</span>
+                          <span className="font-bold text-amber-600 shrink-0">còn {item.daysLeft} ngày</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-stone-500">Tin cậy</span>
+                          <span className="font-semibold text-stone-700">{item.confidenceText}</span>
+                        </div>
+                      </div>
+                      {item.warningShort && (
+                        <div
+                          className={`mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                            item.warningLevel === 'warn' ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-700'
                           }`}
                         >
-                          <AlertTriangle size={10} /> {pw.short}
-                        </span>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Cột 4: Dự kiến */}
-                  <div className="w-24 shrink-0 pl-3">
-                    {row.expectedOrders ? (
-                      <>
-                        <div className="font-bold text-xs text-stone-900">{row.expectedOrders}</div>
-                        <div className="text-[11px] text-stone-400">đơn</div>
-                      </>
-                    ) : (
-                      <div className="text-[11px] text-stone-400">Chưa có dữ liệu</div>
-                    )}
-                  </div>
-
-                  {/* Cột 5: Tin cậy (với các chấm tròn) */}
-                  <div className="w-24 shrink-0 pl-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-stone-800">
-                        {row.confidenceText}
-                      </span>
-                      <div className="flex items-center gap-0.5 text-stone-800">
-                        {[1, 2, 3, 4].map(dot => (
-                          <span
-                            key={dot}
-                            className={`inline-block h-1.5 w-1.5 rounded-full ${
-                              dot <= row.confidenceDots
-                                ? 'bg-stone-900'
-                                : 'border border-stone-400 bg-transparent'
-                            }`}
-                          />
-                        ))}
+                          <AlertTriangle size={12} className="shrink-0" />
+                          <span>{item.warningShort}</span>
+                        </div>
+                      )}
+                      <div className="mt-2 pt-1.5 border-t border-stone-100 text-[11px] font-semibold text-[#007700]">
+                        Bấm để chọn &amp; xem chi tiết mốc
                       </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                }}
+              />
+              <Bar
+                yAxisId="orders"
+                dataKey="expectedOrdersAvg"
+                barSize={viewMode === '120d' ? 32 : 18}
+                radius={[6, 6, 0, 0]}
+                cursor="pointer"
+                onClick={barData => {
+                  const id = barData?.id as string | undefined;
+                  if (id) {
+                    onSelectCampaign(id);
+                    setActiveModalId(id);
+                  }
+                }}
+              >
+                {rechartsData.map(entry => {
+                  const isSelected = activeCampId === entry.id || (!activeCampId && selectedRow?.id === entry.id);
+                  const fill = !entry.hasForecastData
+                    ? isSelected ? '#78716c' : '#e7e5e4'
+                    : isSelected ? '#007700' : '#bbf7d0';
+                  return <Cell key={entry.id} fill={fill} />;
+                })}
+              </Bar>
+              <Line
+                yAxisId="days"
+                type="monotone"
+                dataKey="daysLeft"
+                stroke="#f59e0b"
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: '#ffffff', stroke: '#f59e0b', strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: '#f59e0b', stroke: '#ffffff', strokeWidth: 2 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
-      </div>
 
-      {/* 3. Chú thích màu sắc (Legend) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-stone-100 text-xs text-stone-600">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-3 rounded-xs bg-[#dbeafe]" />
-            <span>Chuẩn bị mẫu</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-3 rounded-xs bg-[#7dd3fc]" />
-            <span>Đăng bán &amp; gom tương tác</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-3 rounded-xs bg-[#0284c7]" />
-            <span>Cao điểm sức mua</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-3 rounded-xs bg-[#ea580c]" />
-            <span>Hạn chốt nhận đơn</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-3 w-[2px] bg-stone-900" />
-            <span>Vạch chốt đơn</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-3 w-[2px] bg-rose-500" />
-            <span className="font-semibold text-rose-600">Hôm nay {todayLabel}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. HOVER PREVIEW CARD: chỉ hiển thị dữ liệu có thật */}
-      {hoveredOccasion && hoverPos && !activeModalOccasion && hoveredDetails && (
-        <div
-          style={{
-            position: 'fixed',
-            top: hoverPos.top,
-            left: hoverPos.left,
-            width: 400,
-            maxWidth: 'calc(100vw - 32px)',
-            zIndex: 60,
-          }}
-          className="pointer-events-none rounded-xl border border-stone-200/95 bg-white p-4 shadow-xl text-stone-800"
-        >
-          <div className="flex items-center gap-2.5 border-b border-stone-100 pb-2.5">
-            <span className="p-1.5 rounded-lg bg-emerald-50 text-[#007700]">
-              {getCampaignLucideIcon(hoveredOccasion.id)}
+        {/* Chú thích ngắn gọn đặt ngay dưới 2 trục dọc tương ứng */}
+        <div className="flex items-center justify-between gap-4 pt-1 text-[11px] font-medium text-stone-600">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-xs bg-[#007700]" />
+            <span>Đơn dự kiến</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-amber-700">
+            <span className="inline-flex items-center">
+              <span className="h-0.5 w-3 bg-amber-500" />
+              <span className="h-2 w-2 -ml-1.5 rounded-full border-2 border-amber-500 bg-white" />
             </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-stone-900 m-0">{hoveredDetails.title}</h4>
-                {hoveredDetails.badge && (
-                  <span className="rounded bg-emerald-100/80 px-1.5 py-0.5 text-[10.5px] font-bold text-emerald-800">
-                    {hoveredDetails.badge}
-                  </span>
-                )}
-              </div>
-              <span className="text-[11px] text-stone-500 font-medium">{hoveredOccasion.weekdayText}</span>
-            </div>
-          </div>
-
-          <div className="mt-2.5 space-y-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-stone-700">{hoveredOccasion.nextDeadline.title}</span>
-              <span className="text-stone-500">còn {hoveredOccasion.nextDeadline.daysLeft} ngày</span>
-            </div>
-
-            {(() => {
-              const pw = getPrepWarning(hoveredOccasion);
-              if (!pw) return null;
-              return (
-                <div
-                  className={`flex items-start gap-1.5 rounded-lg p-2 text-[11px] leading-relaxed border ${
-                    pw.level === 'warn'
-                      ? 'bg-amber-50 border-amber-200 text-amber-900'
-                      : 'bg-rose-50 border-rose-200 text-rose-900'
-                  }`}
-                >
-                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                  <span>
-                    <strong>{pw.short}.</strong> {pw.text}
-                  </span>
-                </div>
-              );
-            })()}
-
-            {hoveredDetails.categoryFocus.length > 0 && (
-              <div className="rounded-lg bg-stone-50/90 p-2 border border-stone-100">
-                <span className="block text-[11px] font-bold text-stone-700 mb-1">Nhóm hàng gợi ý của dịp:</span>
-                <div className="flex flex-wrap gap-1">
-                  {hoveredDetails.categoryFocus.slice(0, 4).map((p, idx) => (
-                    <span key={idx} className="rounded bg-white px-1.5 py-0.5 text-[10.5px] border border-stone-200/80 text-stone-700">
-                      {p}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="pt-2 border-t border-stone-100 text-[11px] text-emerald-700 font-semibold">
-              Bấm chuột để xem mô tả chi tiết các mốc thời gian
-            </div>
-          </div>
+            <span>Ngày còn lại</span>
+          </span>
         </div>
-      )}
+      </div>
 
       {/* 5. FORM CHI TIẾT khi bấm vào dịp: chỉ dữ liệu có nguồn */}
       {activeModalOccasion && modalDetails && (

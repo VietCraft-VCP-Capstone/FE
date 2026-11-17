@@ -1,11 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import {
   ArrowUpRight,
-  BarChart2,
   ChevronDown,
   ChevronUp,
-  Download,
   ExternalLink,
+  Eye,
   HelpCircle,
   Layers,
   Lightbulb,
@@ -74,6 +73,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
   className = '',
 }) => {
   const [showTrends, setShowTrends] = useState<boolean>(true);
+  const [showDetails, setShowDetails] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
 
@@ -285,36 +285,49 @@ export const CampaignFunnelCard: React.FC<Props> = ({
       } ${className}`}
     >
       {/* 1. Header Khối & Nút điều khiển */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-stone-100 pb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <Layers size={16} className="text-[#007700]" />
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-bold text-stone-900 text-sm sm:text-base">
-              Phễu chuyển đổi {occasionName}
-            </h3>
-            {currentFunnel?.actual?.window_label && (
-              <span className="text-[11px] font-medium text-stone-500 bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200/60 font-sans">
-                {currentFunnel.actual.window_label}
-              </span>
-            )}
-            {currentFunnel?.forecast_method_info && (
-              <span
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70"
-                title={`Phương pháp: ${currentFunnel.forecast_method_info.method} (Độ phủ conformal: ${currentFunnel.forecast_method_info.empirical_coverage_pct}%)`}
-              >
-                <ShieldCheck size={11} className="text-emerald-700" />
-                <span>{currentFunnel.forecast_method_info.method_display_name || 'Seasonal-Naive Conformal'}</span>
-              </span>
-            )}
-          </div>
+          <h3 className="m-0 font-bold text-stone-950 text-base sm:text-lg">
+            Phễu chuyển đổi {occasionName}
+          </h3>
+          {currentFunnel?.actual?.window_label && (
+            <span className="text-[11px] font-medium text-stone-500 bg-stone-100 px-2 py-0.5 rounded-md">
+              {currentFunnel.actual.window_label}
+            </span>
+          )}
         </div>
 
         {/* Nút điều khiển tinh gọn */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
+            onClick={() => onOpenEvidence(funnelEvidence)}
+            className="text-stone-400 hover:text-[#007700] inline-flex items-center justify-center p-1.5 rounded-lg hover:bg-stone-100/70 transition-colors cursor-pointer"
+            title="Căn cứ con số"
+            aria-label="Căn cứ con số"
+          >
+            <HelpCircle size={15} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowDetails(!showDetails)}
+            className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+              showDetails
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                : 'border-stone-200 text-stone-600 hover:bg-stone-50'
+            }`}
+            title="Chuyển chế độ xem tối giản / chi tiết đầy đủ các tỷ lệ"
+          >
+            <Eye size={12} />
+            <span>Chi tiết</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowTrends(!showTrends)}
-            className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
               showTrends
                 ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
                 : 'border-stone-200 text-stone-600 hover:bg-stone-50'
@@ -327,7 +340,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
               isExpanded
                 ? 'bg-[#007700] text-white border-[#007700]'
                 : 'border-stone-200 text-stone-700 hover:bg-stone-50'
@@ -339,94 +352,123 @@ export const CampaignFunnelCard: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* 2. Phễu Chuyển Đổi 4 Tầng Chuẩn Mực */}
-      <div className="rounded-xl bg-stone-50/50 p-4 border border-stone-200/80 space-y-3.5">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-bold text-stone-800 flex items-center gap-1.5">
-            <BarChart2 size={14} className="text-[#007700]" />
-            Các bước chuyển đổi
-          </span>
-          <button
-            type="button"
-            onClick={() => onOpenEvidence(funnelEvidence)}
-            className="text-[11px] font-semibold text-[#007700] hover:underline flex items-center gap-1"
-          >
-            <span>Căn cứ con số</span>
-            <HelpCircle size={11} />
-          </button>
-        </div>
+      {/* 2. Một dòng tóm tắt trọng tâm */}
+      <p className="m-0 text-xs sm:text-[13px] text-stone-600 leading-relaxed">
+        {hasActualTraffic ? (
+          <>
+            Từ <strong className="font-semibold text-stone-900">{(actualImpressions ?? 0).toLocaleString('vi-VN')}</strong> hiển thị đạt{' '}
+            <strong className="font-semibold text-[#007700]">{(actualOrders ?? 0).toLocaleString('vi-VN')} đơn</strong>{' '}
+            (mục tiêu {(displayOrders ?? 0).toLocaleString('vi-VN')} đơn) · CTR{' '}
+            <strong className="font-semibold text-stone-900">{realCtrPct ?? 0}%</strong>, thêm giỏ{' '}
+            <strong className="font-semibold text-stone-900">{realCartRatePct ?? 0}%</strong>, chốt đơn{' '}
+            <strong className="font-semibold text-stone-900">{realOrderRatePct ?? 0}%</strong>.
+          </>
+        ) : (
+          <>
+            Mục tiêu <strong className="font-semibold text-[#007700]">{(displayOrders ?? 0).toLocaleString('vi-VN')} đơn</strong> từ{' '}
+            <strong className="font-semibold text-stone-900">{(displayImpressions ?? 0).toLocaleString('vi-VN')}</strong> hiển thị
+            (CTR {currentFunnel.ctr_pct || 25}%, chốt đơn {currentFunnel.conversion_rate_pct || 8.5}%).
+          </>
+        )}
+      </p>
 
-        {/* 4 Tầng Phễu */}
-        <div className="space-y-3 pt-1">
-          {/* Tầng 1: Lượt hiển thị */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-stone-700">1. Lượt hiển thị (Impressions)</span>
+      {/* 3. Phễu 4 tầng (Tối giản mặc định / Đầy đủ khi bật Chi tiết) */}
+      <div className="space-y-2.5 pt-1">
+        {/* Tầng 1: Hiển thị */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-stone-700">
+                {showDetails ? '1. Lượt hiển thị (Impressions)' : '1. Hiển thị'}
+              </span>
+              {showTrends && hasActualTraffic && !showDetails && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
+                  <ArrowUpRight size={10} /> CTR +{ctrLiftPct}% vs ngày thường
+                </span>
+              )}
+            </div>
+            {showDetails ? (
               <div className="flex items-center gap-2">
                 <span className="text-stone-500 font-medium">Thực tế: {(actualImpressions ?? 0).toLocaleString('vi-VN')}</span>
                 <span className="text-stone-300">|</span>
                 <span className="font-bold text-stone-900">Mục tiêu: {(displayImpressions ?? 0).toLocaleString('vi-VN')}</span>
               </div>
-            </div>
-            <div className="h-6 w-full rounded-lg bg-stone-200/70 overflow-hidden relative">
-              <div
-                className={`h-full rounded-lg flex items-center justify-end pr-2.5 transition-all duration-500 ${
-                  rawP1 > 100 ? 'bg-gradient-to-r from-emerald-600 to-teal-500 shadow-xs' : 'bg-[#2da874]'
-                }`}
-                style={{ width: `${Math.max(12, p1Pct)}%` }}
-              >
-                <span className="text-[10px] font-bold text-white">
-                  {actualImpressions === 0 ? '0% · Chưa mở cổng' : (rawP1 > 100 ? `${rawP1}% · Vượt chỉ tiêu` : `${p1Pct}%`)}
-                </span>
-              </div>
+            ) : (
+              <span className="text-stone-600 tabular-nums">
+                <strong className="text-stone-900">{(actualImpressions ?? 0).toLocaleString('vi-VN')}</strong> / {(displayImpressions ?? 0).toLocaleString('vi-VN')}
+              </span>
+            )}
+          </div>
+          <div className="h-5 w-full rounded-lg bg-stone-100 overflow-hidden">
+            <div
+              className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-500 bg-[#2da874]"
+              style={{ width: `${Math.max(10, p1Pct)}%` }}
+            >
+              <span className="text-[10px] font-bold text-white tabular-nums">
+                {actualImpressions === 0
+                  ? (showDetails ? '0% · Chưa mở cổng' : '0%')
+                  : (showDetails && rawP1 > 100 ? `${rawP1}% · Vượt chỉ tiêu` : `${rawP1 > 100 ? rawP1 : p1Pct}%`)}
+              </span>
             </div>
           </div>
+        </div>
 
-          {/* Tỷ lệ CTR nối tầng 1 và 2 */}
+        {(showDetails || showTrends) && (
           <div className="flex flex-wrap items-center gap-2 pl-3 text-[11px] text-stone-500">
             {hasActualTraffic && realCtrPct !== null ? (
               <>
-                <span className="font-semibold text-[#007700]">
-                  Tỷ lệ nhấp (CTR): {realCtrPct}% {currentFunnel.ctr_pct && Math.abs(currentFunnel.ctr_pct - realCtrPct) > 0.1 ? `(Mục tiêu: ${currentFunnel.ctr_pct}%)` : ''}
-                </span>
-                {showTrends && (
-                  <span className="inline-flex items-center text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.2 rounded">
+                {showDetails && (
+                  <span className="font-semibold text-[#007700]">
+                    Tỷ lệ nhấp (CTR): {realCtrPct}% {currentFunnel.ctr_pct && Math.abs(currentFunnel.ctr_pct - realCtrPct) > 0.1 ? `(Mục tiêu: ${currentFunnel.ctr_pct}%)` : ''}
+                  </span>
+                )}
+                {showTrends && showDetails && (
+                  <span className="inline-flex items-center text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
                     <ArrowUpRight size={10} /> +{ctrLiftPct}% vs ngày thường
                   </span>
                 )}
               </>
-            ) : (
+            ) : showDetails ? (
               <span className="font-semibold text-stone-600">
                 Mục tiêu nhấp (CTR): {currentFunnel.ctr_pct || 25}% (Kỳ vọng mùa vụ)
               </span>
-            )}
+            ) : null}
           </div>
+        )}
 
-          {/* Tầng 2: Lượt xem chi tiết */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-stone-700">2. Lượt xem chi tiết (Clicks)</span>
+        {/* Tầng 2: Xem chi tiết */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-stone-700">
+              {showDetails ? '2. Lượt xem chi tiết (Clicks)' : '2. Xem chi tiết'}
+            </span>
+            {showDetails ? (
               <div className="flex items-center gap-2">
                 <span className="text-stone-500 font-medium">Thực tế: {(actualClicks ?? 0).toLocaleString('vi-VN')}</span>
                 <span className="text-stone-300">|</span>
                 <span className="font-bold text-stone-900">Mục tiêu: {(displayClicks ?? 0).toLocaleString('vi-VN')}</span>
               </div>
-            </div>
-            <div className="h-6 w-full rounded-lg bg-stone-200/70 overflow-hidden relative">
-              <div
-                className={`h-full rounded-lg flex items-center justify-end pr-2.5 transition-all duration-500 ${
-                  rawP2 > 100 ? 'bg-gradient-to-r from-emerald-700 to-emerald-500 shadow-xs' : 'bg-[#008f5a]'
-                }`}
-                style={{ width: `${Math.max(12, p2Pct)}%` }}
-              >
-                <span className="text-[10px] font-bold text-white">
-                  {actualClicks === 0 ? '0% · Chưa mở cổng' : (rawP2 > 100 ? `${rawP2}% · Vượt chỉ tiêu` : `${p2Pct}%`)}
-                </span>
-              </div>
+            ) : (
+              <span className="text-stone-600 tabular-nums">
+                <strong className="text-stone-900">{(actualClicks ?? 0).toLocaleString('vi-VN')}</strong> / {(displayClicks ?? 0).toLocaleString('vi-VN')}
+              </span>
+            )}
+          </div>
+          <div className="h-5 w-full rounded-lg bg-stone-100 overflow-hidden">
+            <div
+              className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-500 bg-[#008f5a]"
+              style={{ width: `${Math.max(10, p2Pct)}%` }}
+            >
+              <span className="text-[10px] font-bold text-white tabular-nums">
+                {actualClicks === 0
+                  ? (showDetails ? '0% · Chưa mở cổng' : '0%')
+                  : (showDetails && rawP2 > 100 ? `${rawP2}% · Vượt chỉ tiêu` : `${rawP2 > 100 ? rawP2 : p2Pct}%`)}
+              </span>
             </div>
           </div>
+        </div>
 
-          {/* Tỷ lệ thêm giỏ nối tầng 2 và 3 */}
+        {showDetails && (
           <div className="flex flex-wrap items-center gap-2 pl-3 text-[11px] text-stone-500">
             {hasActualTraffic && realCartRatePct !== null ? (
               <span className="font-semibold text-amber-700">
@@ -438,32 +480,41 @@ export const CampaignFunnelCard: React.FC<Props> = ({
               </span>
             )}
           </div>
+        )}
 
-          {/* Tầng 3: Thêm vào giỏ */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-stone-700">3. Thêm vào giỏ hàng (Cart Adds)</span>
+        {/* Tầng 3: Thêm giỏ */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-stone-700">
+              {showDetails ? '3. Thêm vào giỏ hàng (Cart Adds)' : '3. Thêm giỏ'}
+            </span>
+            {showDetails ? (
               <div className="flex items-center gap-2">
                 <span className="text-stone-500 font-medium">Thực tế: {(actualCartAdds ?? 0).toLocaleString('vi-VN')}</span>
                 <span className="text-stone-300">|</span>
                 <span className="font-bold text-stone-900">Mục tiêu: {(displayCartAdds ?? 0).toLocaleString('vi-VN')}</span>
               </div>
-            </div>
-            <div className="h-6 w-full rounded-lg bg-stone-200/70 overflow-hidden relative">
-              <div
-                className={`h-full rounded-lg flex items-center justify-end pr-2.5 transition-all duration-500 ${
-                  rawP3 > 100 ? 'bg-gradient-to-r from-emerald-800 to-teal-600 shadow-xs' : 'bg-[#007700]'
-                }`}
-                style={{ width: `${Math.max(12, p3Pct)}%` }}
-              >
-                <span className="text-[10px] font-bold text-white">
-                  {actualCartAdds === 0 ? '0% · Chưa mở cổng' : (rawP3 > 100 ? `${rawP3}% · Vượt chỉ tiêu` : `${p3Pct}%`)}
-                </span>
-              </div>
+            ) : (
+              <span className="text-stone-600 tabular-nums">
+                <strong className="text-stone-900">{(actualCartAdds ?? 0).toLocaleString('vi-VN')}</strong> / {(displayCartAdds ?? 0).toLocaleString('vi-VN')}
+              </span>
+            )}
+          </div>
+          <div className="h-5 w-full rounded-lg bg-stone-100 overflow-hidden">
+            <div
+              className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-500 bg-[#007700]"
+              style={{ width: `${Math.max(10, p3Pct)}%` }}
+            >
+              <span className="text-[10px] font-bold text-white tabular-nums">
+                {actualCartAdds === 0
+                  ? (showDetails ? '0% · Chưa mở cổng' : '0%')
+                  : (showDetails && rawP3 > 100 ? `${rawP3}% · Vượt chỉ tiêu` : `${rawP3 > 100 ? rawP3 : p3Pct}%`)}
+              </span>
             </div>
           </div>
+        </div>
 
-          {/* Tỷ lệ chốt đơn nối tầng 3 và 4 */}
+        {showDetails && (
           <div className="flex flex-wrap items-center gap-2 pl-3 text-[11px] text-stone-500">
             {hasActualTraffic && realOrderRatePct !== null ? (
               <>
@@ -471,7 +522,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                   Tỷ lệ chuyển đổi (CVR): {realOrderRatePct}% {currentFunnel.conversion_rate_pct && Math.abs(currentFunnel.conversion_rate_pct - realOrderRatePct) > 0.1 ? `(Mục tiêu: ${currentFunnel.conversion_rate_pct}%)` : ''}
                 </span>
                 {showTrends && (
-                  <span className="inline-flex items-center text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.2 rounded">
+                  <span className="inline-flex items-center text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
                     <ArrowUpRight size={10} /> {cvrMultiplier >= 1.2 ? `${cvrMultiplier}x vs ngày thường` : (cvrMultiplier > 1.0 ? `+${Math.round((cvrMultiplier - 1) * 100)}% vs ngày thường` : 'Ổn định vs ngày thường')}
                   </span>
                 )}
@@ -482,28 +533,43 @@ export const CampaignFunnelCard: React.FC<Props> = ({
               </span>
             )}
           </div>
+        )}
 
-          {/* Tầng 4: Đơn hàng hoàn tất */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-stone-700">4. Đơn hàng hoàn tất (Orders)</span>
+        {/* Tầng 4: Đơn hoàn tất */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-stone-700">
+                {showDetails ? '4. Đơn hàng hoàn tất (Orders)' : '4. Đơn hoàn tất'}
+              </span>
+              {showTrends && hasActualTraffic && !showDetails && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
+                  <ArrowUpRight size={10} /> {cvrMultiplier >= 1.2 ? `${cvrMultiplier}x vs ngày thường` : cvrMultiplier > 1.0 ? `+${Math.round((cvrMultiplier - 1) * 100)}% vs ngày thường` : 'Ổn định vs ngày thường'}
+                </span>
+              )}
+            </div>
+            {showDetails ? (
               <div className="flex items-center gap-2">
                 <span className="text-emerald-700 font-bold">Thực tế: {(actualOrders ?? 0).toLocaleString('vi-VN')} đơn</span>
                 <span className="text-stone-300">|</span>
                 <span className="font-bold text-stone-900">Mục tiêu: {(displayOrders ?? 0).toLocaleString('vi-VN')} đơn</span>
               </div>
-            </div>
-            <div className="h-6 w-full rounded-lg bg-stone-200/70 overflow-hidden relative">
-              <div
-                className={`h-full rounded-lg flex items-center justify-end pr-2.5 transition-all duration-500 ${
-                  rawP4 > 100 ? 'bg-gradient-to-r from-emerald-900 to-[#005B00] shadow-xs' : 'bg-[#005B00]'
-                }`}
-                style={{ width: `${Math.max(12, p4Pct)}%` }}
-              >
-                <span className="text-[10px] font-bold text-white">
-                  {actualOrders === 0 ? '0% · Chưa mở cổng' : (rawP4 > 100 ? `${rawP4}% · Vượt chỉ tiêu` : `${p4Pct}%`)}
-                </span>
-              </div>
+            ) : (
+              <span className="text-stone-600 tabular-nums">
+                <strong className="text-[#007700]">{(actualOrders ?? 0).toLocaleString('vi-VN')}</strong> / {(displayOrders ?? 0).toLocaleString('vi-VN')} đơn
+              </span>
+            )}
+          </div>
+          <div className="h-5 w-full rounded-lg bg-stone-100 overflow-hidden">
+            <div
+              className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-500 bg-[#005B00]"
+              style={{ width: `${Math.max(10, p4Pct)}%` }}
+            >
+              <span className="text-[10px] font-bold text-white tabular-nums">
+                {actualOrders === 0
+                  ? (showDetails ? '0% · Chưa mở cổng' : '0%')
+                  : (showDetails && rawP4 > 100 ? `${rawP4}% · Vượt chỉ tiêu` : `${rawP4 > 100 ? rawP4 : p4Pct}%`)}
+              </span>
             </div>
           </div>
         </div>
@@ -599,43 +665,40 @@ export const CampaignFunnelCard: React.FC<Props> = ({
       )}
 
       {/* 5. Bảng Chi Tiết Từng Kênh Phân Phối */}
-      <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wide">
-              {hasActualTraffic ? 'Đóng góp doanh số theo kênh bán hàng' : 'Kế hoạch phân bổ mục tiêu theo kênh bán hàng'}
+      <div className="space-y-2.5">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="m-0 font-bold text-stone-900 text-sm">
+              {hasActualTraffic ? 'Doanh số theo kênh bán' : 'Phân bổ mục tiêu theo kênh'}
             </h4>
             {!hasActualTraffic && (
-              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
-                Phân bổ chuẩn ngành cho {displayOrders} đơn mục tiêu
+              <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md">
+                Mục tiêu {displayOrders} đơn
               </span>
             )}
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                alert('Dữ liệu phân tích kênh đã được xuất ra định dạng Excel/CSV.');
-              }}
-              className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-50 shadow-2xs"
-            >
-              <Download size={12} />
-              <span>Xuất dữ liệu</span>
-            </button>
-          </div>
+          {(() => {
+            const topCh = [...channels].sort((a, b) => b.gmv_vnd - a.gmv_vnd || b.orders_count - a.orders_count)[0];
+            if (!topCh || topCh.orders_count <= 0) return null;
+            return (
+              <p className="m-0 text-xs text-stone-600">
+                Kênh dẫn đầu: <strong className="font-semibold text-stone-900">{topCh.name}</strong>{' '}
+                (<strong className="font-semibold text-[#007700]">{topCh.orders_count} đơn · {money(topCh.gmv_vnd)}</strong>, chiếm {topCh.share_pct}%).
+              </p>
+            );
+          })()}
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse select-none">
             <thead>
-              <tr className="border-b border-stone-200 text-[11px] font-bold uppercase tracking-wider text-stone-500 bg-stone-50/70">
-                <th className="py-2 px-3">Kênh bán hàng</th>
-                <th className="py-2 px-3">{hasActualTraffic ? 'Doanh thu (GMV)' : 'Dự thu mục tiêu (GMV)'}</th>
-                <th className="py-2 px-3">{hasActualTraffic ? 'Đơn hàng (Orders)' : 'Mục tiêu đơn'}</th>
-                <th className="py-2 px-3">{hasActualTraffic ? 'Số lượng bán (Items)' : 'Số lượng dự kiến'}</th>
-                <th className="py-2 px-3">{hasActualTraffic ? 'Giá trị TB đơn (AOV)' : 'AOV kỳ vọng'}</th>
-                <th className="py-2 px-3 text-center">Chi tiết</th>
+              <tr className="border-b border-stone-200 text-[11px] font-semibold text-stone-500 bg-stone-50/70">
+                <th className="py-2 px-3">Kênh bán</th>
+                <th className="py-2 px-3">{hasActualTraffic ? 'Doanh thu' : 'Dự thu'}</th>
+                <th className="py-2 px-3">{hasActualTraffic ? 'Đơn hàng' : 'Mục tiêu'}</th>
+                <th className="py-2 px-3">Sản phẩm</th>
+                <th className="py-2 px-3">TB / đơn</th>
+                <th className="py-2 px-3 text-right">Chi tiết</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 text-xs">
@@ -651,80 +714,63 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                       }`}
                     >
                       {/* Tên Kênh */}
-                      <td className="py-3 px-3">
-                        <div>
-                          <span className="font-bold text-stone-900 block">{ch.name}</span>
-                          <span className="text-[11px] text-stone-400">{ch.action_tip}</span>
-                        </div>
+                      <td className="py-2.5 px-3">
+                        <span className="font-semibold text-stone-900 block">{ch.name}</span>
+                        {showDetails && ch.action_tip && (
+                          <span className="text-[11px] text-stone-400 block mt-0.5">{ch.action_tip}</span>
+                        )}
                       </td>
 
-                      {/* GMV */}
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5 font-bold text-stone-900">
-                            <span className="text-emerald-800">{ch.orders_count > 0 ? `${ch.share_pct}%` : '0%'}</span>
-                            <span className="text-stone-300">|</span>
-                            <span>{ch.orders_count > 0 ? money(ch.gmv_vnd) : '0đ'}</span>
-                          </div>
-                          {hasActualTraffic && showTrends ? (
-                            ch.orders_count > 0 && typeof ch.growth_pct === 'number' && ch.growth_pct > 0 ? (
-                              <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
-                                <ArrowUpRight size={10} />
-                                <span>+{ch.growth_pct}% vs tuần trước</span>
-                              </div>
-                            ) : (
-                              <div className="text-[10px] text-stone-400">
-                                <span>— {ch.orders_count === 0 ? 'Chưa có đơn' : 'Kỳ đầu ghi nhận'}</span>
-                              </div>
-                            )
-                          ) : (
-                            <div className="text-[10px] text-stone-400">
-                              <span>— {hasActualTraffic ? 'Kỳ đầu ghi nhận' : 'Chỉ tiêu dự thu'}</span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Orders */}
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5 font-bold text-stone-900">
-                            <span className="text-stone-600">{ch.orders_count > 0 ? `${ch.share_pct}%` : '0%'}</span>
-                            <span className="text-stone-300">|</span>
-                            <span>{hasActualTraffic ? `${ch.orders_count} đơn` : `Mục tiêu ${ch.orders_count} đơn`}</span>
-                          </div>
-                          <span className="text-[10px] text-stone-400 block">
-                            {hasActualTraffic ? `${ch.sku_orders} mã SKU` : `Dự kiến ~${ch.sku_orders} mã SKU`}
+                      {/* Doanh thu */}
+                      <td className="py-2.5 px-3 tabular-nums">
+                        <div className="flex items-center gap-1.5 font-semibold text-stone-900">
+                          <span>{ch.orders_count > 0 ? money(ch.gmv_vnd) : '0đ'}</span>
+                          <span className="text-[11px] font-medium text-stone-400">
+                            ({ch.orders_count > 0 ? `${ch.share_pct}%` : '0%'})
                           </span>
                         </div>
+                        {hasActualTraffic && showTrends && ch.orders_count > 0 && typeof ch.growth_pct === 'number' && ch.growth_pct > 0 && (
+                          <div className="inline-flex items-center gap-0.5 text-[10px] text-emerald-700 font-semibold">
+                            <ArrowUpRight size={10} />
+                            <span>+{ch.growth_pct}% vs tuần trước</span>
+                          </div>
+                        )}
                       </td>
 
-                      {/* Items */}
-                      <td className="py-3 px-3">
-                        <div className="font-semibold text-stone-800">
-                          {hasActualTraffic ? `${ch.items_sold} sản phẩm` : `Dự kiến ~${ch.items_sold} sản phẩm`}
-                        </div>
+                      {/* Đơn hàng */}
+                      <td className="py-2.5 px-3 tabular-nums">
+                        <span className="font-semibold text-stone-900 block">
+                          {ch.orders_count} đơn
+                        </span>
+                        {showDetails && (
+                          <span className="text-[10px] text-stone-400 block">
+                            {hasActualTraffic ? `${ch.sku_orders} mã SKU` : `~${ch.sku_orders} mã SKU`}
+                          </span>
+                        )}
                       </td>
 
-                      {/* AOV */}
-                      <td className="py-3 px-3">
-                        <div className="font-bold text-[#007700]">
-                          {ch.orders_count > 0 ? money(ch.aov_vnd) : '—'}
-                        </div>
+                      {/* Sản phẩm */}
+                      <td className="py-2.5 px-3 tabular-nums text-stone-700">
+                        {ch.items_sold} sp
                       </td>
 
-                      {/* Action */}
-                      <td className="py-3 px-3 text-center">
+                      {/* TB / đơn */}
+                      <td className="py-2.5 px-3 tabular-nums font-semibold text-[#007700]">
+                        {ch.orders_count > 0 ? money(ch.aov_vnd) : '—'}
+                      </td>
+
+                      {/* Nút chi tiết */}
+                      <td className="py-2.5 px-3 text-right">
                         <button
                           type="button"
                           onClick={() => setExpandedChannel(isExpandedRow ? null : ch.channel_key)}
-                          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold border transition-colors ${
+                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold border transition-colors cursor-pointer ${
                             isExpandedRow
                               ? 'bg-[#007700] text-white border-[#007700]'
                               : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-50'
                           }`}
                         >
-                          <span>{isExpandedRow ? 'Thu gọn' : (hasActualTraffic && ch.source_type === 'shop_actual' && ch.orders_count > 0 ? 'Chi tiết & Đơn' : 'Kế hoạch')}</span>
+                          <span>{isExpandedRow ? 'Thu gọn' : (hasActualTraffic && ch.source_type === 'shop_actual' && ch.orders_count > 0 ? 'Chi tiết' : 'Kế hoạch')}</span>
                           {isExpandedRow ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                         </button>
                       </td>

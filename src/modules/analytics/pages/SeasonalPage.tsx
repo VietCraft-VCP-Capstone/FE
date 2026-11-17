@@ -709,15 +709,42 @@ export function SeasonalPage() {
                         activeMilestones[i] = false;
                       }
                     }
+                    const stopWords = new Set(['cho', 'dịp', 'mùa', 'tặng', 'quà', 'set', 'bộ', 'mẫu', 'sản', 'phẩm', 'và', 'của', 'theo', 'phong', 'cách', 'phiên', 'bản', 'siêu', 'sale']);
+                    const ideaTokensList = savedIdeaItems.map(item => ({
+                      id: item.id,
+                      titleLower: (item.title || '').toLowerCase().trim(),
+                      tokens: (item.title || '')
+                        .toLowerCase()
+                        .split(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/i)
+                        .filter((w: string) => w.length >= 3 && !stopWords.has(w)),
+                    }));
+                    const ideaMatchedProducts = savedIdeaItems.length === 0
+                      ? []
+                      : allShopProducts.filter((p: any) => {
+                          if (p.source_idea_id && savedIdeaItems.some(i => i.id === p.source_idea_id)) return true;
+                          const pName = String(p.name || p.title || '').toLowerCase().trim();
+                          return ideaTokensList.some(it => {
+                            if (it.titleLower && (pName === it.titleLower || pName.includes(it.titleLower))) return true;
+                            if (it.tokens.length < 3) return false;
+                            const hits = it.tokens.filter((tk: string) => pName.includes(tk)).length;
+                            return hits >= Math.max(4, Math.ceil(it.tokens.length * 0.65));
+                          });
+                        });
+                    const ideaInStockCount = ideaMatchedProducts.filter((p: any) => (p.stock ?? 1) > 0).length;
+                    const ideaOrdersCount = ideaMatchedProducts.reduce(
+                      (sum: number, p: any) => sum + Number(p.sold_count ?? p.orders_count ?? 0),
+                      0
+                    );
                     return (
                       <ApplyPlaybookCard
                         playbooks={data.apply_playbooks}
                         savedIdeas={savedIdeas}
                         savedIdeaItems={savedIdeaItems}
                         aiIdeas={aiIdeas}
-                        matchingProductsCount={matchingProducts.length}
-                        inStockMatchingCount={matchingProducts.filter((p: any) => (p.stock ?? 1) > 0).length}
-                        actualOrdersCount={data.impact?.actual_orders ?? 0}
+                        allShopProducts={allShopProducts}
+                        matchingProductsCount={ideaMatchedProducts.length}
+                        inStockMatchingCount={ideaInStockCount}
+                        actualOrdersCount={ideaOrdersCount}
                         checkedMilestones={activeMilestones}
                         onToggleMilestone={toggleMilestone}
                         onEditSavedIdea={id => {
