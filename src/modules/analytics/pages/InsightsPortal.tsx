@@ -9,6 +9,7 @@ import { CompetitorsPage } from './CompetitorsPage';
 import { ForecastPage } from './ForecastPage';
 import { ListingDetailPage } from './ListingDetailPage';
 import { ListingsPage } from './ListingsPage';
+import { MoneyPage } from './MoneyPage';
 import { NichesPage } from './NichesPage';
 import { OverviewPage } from './OverviewPage';
 import { PricingPage } from './PricingPage';
@@ -38,6 +39,7 @@ export function InsightsPortal({ user, onLogout }: { user: any; onLogout: () => 
 
         <Route path="overview" element={<OverviewPage />} />
         <Route path="categories" element={<CategoriesPage />} />
+        <Route path="money" element={<MoneyPage />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="listings" element={<ListingsPage />} />
         <Route path="listings/:id" element={<ListingDetailPage />} />
