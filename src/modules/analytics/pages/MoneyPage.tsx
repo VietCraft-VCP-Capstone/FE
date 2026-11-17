@@ -72,8 +72,6 @@ export function MoneyPage() {
             <p className="m-0 text-xs text-stone-500">
               Xem thêm:{' '}
               <Link to={`${INSIGHTS_ROOT}/alerts`} className="font-semibold text-[#005B00] hover:underline">Cảnh báo bất thường</Link>
-              {' · '}
-              <Link to={`${INSIGHTS_ROOT}/forecast`} className="font-semibold text-[#005B00] hover:underline">Dự báo doanh thu</Link>
             </p>
           </div>
         )}
