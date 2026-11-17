@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Info, Sparkles, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react';
 import type { AdviceKey, MoneyReport } from '../../moneyTypes';
 import { Skeleton } from '../ui';
 import { moneyVerdicts, type VerdictTone } from './verdictRules';
@@ -11,11 +11,10 @@ const TONE = {
   neutral: { Icon: Info, cls: 'text-stone-400', label: 'Chưa đủ dữ liệu' },
 } satisfies Record<VerdictTone, unknown>;
 
-function AiTyping() {
+function TipLoading() {
   return (
     <p className="m-0 mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-[#005B00]">
-      <Sparkles size={12} className="animate-pulse motion-reduce:animate-none" aria-hidden />
-      AI đang phân tích…
+      Đang soạn gợi ý…
       <Skeleton className="h-3 flex-1" />
     </p>
   );
@@ -40,17 +39,16 @@ export function MoneyVerdicts({ data, tips, aiLoading }: {
               <p className="m-0 mt-1 line-clamp-2 text-[15px] font-bold leading-snug text-stone-900" title={v.title}>{v.title}</p>
               {tip ? (
                 <p className="m-0 mt-1.5 text-sm text-stone-700">
-                  <span className="mr-1 inline-flex items-center gap-1 align-[-2px] text-xs font-semibold text-[#005B00]">
-                    <Sparkles size={12} aria-hidden />AI gợi ý:
-                  </span>
+                  <span className="mr-1 font-semibold text-[#005B00]">Nên làm:</span>
                   {tip}
                 </p>
               ) : (
                 <>
                   <p className="m-0 mt-1 text-sm text-stone-600">{v.detail}</p>
-                  {aiLoading && <AiTyping />}
+                  {aiLoading && <TipLoading />}
                 </>
-              )}            </div>
+              )}
+            </div>
           </article>
         );
       })}
