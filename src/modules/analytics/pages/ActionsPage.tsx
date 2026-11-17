@@ -58,11 +58,13 @@ function evidenceLinks(rec: Recommendation): { to: string; label: string }[] {
     return [
       { to: '/seller/insights/categories', label: 'Doanh thu theo loại phôi' },
       { to: '/seller/insights/forecast', label: 'Dự báo doanh thu' },
+      { to: '/seller/insights/seasonal', label: 'Kế hoạch cao điểm' },
     ];
   }
   return [
     { to: '/seller/insights/niches', label: 'Cung và cầu của ngách' },
     { to: '/seller/insights/forecast', label: 'Dự báo doanh thu' },
+    { to: '/seller/insights/seasonal', label: 'Kế hoạch cao điểm' },
   ];
 }
 

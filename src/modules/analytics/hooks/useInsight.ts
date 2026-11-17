@@ -78,7 +78,9 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
     const forced = forceRef.current;
     forceRef.current = false;
     const hit = cache.get(key);
-    if (!forced && hit && Date.now() - hit.at < TTL_MS) {
+    // Đối với phân tích mùa vụ /seasonal: luôn đọc dữ liệu đơn hàng mới nhất của gian hàng
+    const isNoCachePath = path?.includes('seasonal');
+    if (!forced && !isNoCachePath && hit && Date.now() - hit.at < TTL_MS) {
       setState(hit.value as InsightState<T>);
       return;
     }
@@ -92,9 +94,8 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
           res.meta?.status === 'insufficient_data' || res.data === null
             ? { kind: 'insufficient', reason: res.meta?.reason || 'Chưa đủ dữ liệu để tính.', meta: res.meta, viewer: res.viewer }
             : { kind: 'ready', data: res.data as T, meta: res.meta, viewer: res.viewer };
-        // Chỉ lưu cache khi có dữ liệu (ready). Trạng thái 'insufficient' không lưu cache dài
-        // để khi người bán có đơn mới thì dữ liệu được cập nhật ngay lập tức.
-        if (value.kind === 'ready') {
+        // Không lưu cache cứng cho seasonal để phản hồi ngay khi có đơn mới
+        if (value.kind === 'ready' && !isNoCachePath) {
           cache.set(key, { at: Date.now(), value });
         }
         setState(value);

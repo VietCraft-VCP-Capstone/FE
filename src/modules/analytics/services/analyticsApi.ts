@@ -103,6 +103,44 @@ export const analyticsApi = {
     return res.data?.data;
   },
 
+  /** Lưu hoặc bỏ lưu ý tưởng sản phẩm theo dịp vào database gian hàng */
+  async saveSeasonalIdea(ideaId: string): Promise<{ success: boolean; saved_ideas: string[] }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/save-idea`, { idea_id: ideaId });
+    return res.data;
+  },
+
+  /** Lưu bản chỉnh sửa trực tiếp của seller cho ý tưởng mùa vụ */
+  async saveSeasonalIdeaDraft(payload: {
+    idea_id: string;
+    title: string;
+    concept: string;
+    price_vnd?: number;
+    tags: string[];
+  }): Promise<{ success: boolean; idea_drafts: Record<string, any>; saved_ideas?: string[] }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/idea-draft`, payload);
+    return res.data;
+  },
+
+  /** Lưu đánh giá thành quả sau dịp của seller */
+  async saveSeasonalReview(payload: {
+    camp_id: string;
+    rating: 'good' | 'neutral' | 'poor';
+    note: string;
+  }): Promise<{ success: boolean; occasion_reviews: Record<string, any> }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/review`, payload);
+    return res.data;
+  },
+
+  /** Cập nhật tiến độ checklist mốc thời gian vào database gian hàng */
+  async toggleSeasonalMilestone(milestoneIdx: number, isDone: boolean, campId?: string): Promise<{ success: boolean; checked_milestones: Record<string, boolean> }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/milestone`, { milestone_idx: milestoneIdx, is_done: isDone, camp_id: campId });
+    return res.data;
+  },
+
+  /** Gắn thẻ từ khóa cơ hội trực tiếp vào các sản phẩm của shop */
+  async attachSeasonalTag(tag: string, productIds: string[]): Promise<{ success: boolean; modified_count: number }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/attach-tag`, { tag, product_ids: productIds });
+    return res.data;
   /** Ảnh sản phẩm (tối đa 6 data URL đã thu nhỏ, cùng sản phẩm) → tên gợi ý, danh mục, chất liệu, các màu. */
   async recognizeProductImage(imageDataUrls: string[]): Promise<ImageRecognitionResult> {
     const res = await api.post(`${BASE}/product/recognize-image`, { images: imageDataUrls.slice(0, 6) }, { timeout: 50000 });
