@@ -244,11 +244,8 @@ export interface CategoryRevenue {
 
 /** GET /competitor-brief: việc nên làm tuần này, gom từ F32–F36. Chỉ có cho gian hàng thật. */
 export interface CompetitorBrief {
-  /** rules = lập theo luật; llm = mô hình ngôn ngữ viết lại, số đã đối chiếu với số liệu gốc. */
-  source: 'rules' | 'llm';
-  provider: string | null;
-  /** API xếp sẵn từ gấp tới nên làm; `priority` thiếu khi AI còn chạy bản cũ. */
-  actions: { action: string; why: string; link: string | null; priority?: 'gap' | 'quan_trong' | 'nen_lam' }[];
+  /** API xếp sẵn từ khẩn cấp tới duy trì; `priority` thiếu khi AI còn chạy bản cũ. */
+  actions: { action: string; why: string; link: string | null; priority?: 'gap' | 'quan_trong' | 'nen_lam' | 'duy_tri' }[];
   facts_count: number;
   generated_at: string;
 }
@@ -267,6 +264,8 @@ export interface DirectRival {
   near_identical?: boolean;
   /** Các từ hai sản phẩm cùng có, vd ["mèo", "cung hoàng đạo"]. */
   reasons: string[];
+  /** Chất liệu shop đó ghi; rỗng là chưa ghi. */
+  materials?: string[];
 }
 
 export interface RivalShop {
@@ -280,11 +279,71 @@ export interface RivalShop {
   categories?: string[];
 }
 
+/** Một shop trong danh mục đang xem (kể cả shop bạn): số cho bản đồ vị thế và bảng so sánh. Chỉ shop thật. */
+export interface CompetitorShop {
+  shop_id: string;
+  shop_name: string | null;
+  is_me: boolean;
+  n_listings: number;
+  /** Loại hàng (danh mục lá) và số sản phẩm, nhiều nhất trước. */
+  types: { name: string; count: number }[];
+  /** Tối đa 3 chất liệu đã quy về tên chuẩn. */
+  materials: string[];
+  /** Sản phẩm đăng trong 8 tuần gần nhất. */
+  new_8w: number;
+  price_vnd: { p25: number; median: number; p75: number };
+  units_90d: number;
+  share_pct: number;
+  /** Sao đã co ngót theo số lượt; null khi chưa có đánh giá. */
+  rating: number | null;
+  n_reviews: number;
+  favorites: number;
+  /** Trung vị phút từ lúc khách hỏi tới tin trả lời đầu tiên, đo từ chat 90 ngày; null = dưới 5 lượt hỏi. */
+  response_minutes: number | null;
+  /** % lượt khách hỏi được trả lời; null như trên. */
+  reply_rate: number | null;
+  /** Số bán trong danh mục theo tuần, cũ -> mới (8 tuần). */
+  weekly_units: number[];
+  /** surge: tăng đột biến tuần này; up/down: thị phần 4 tuần gần đổi thật (kiểm định); null: chưa đủ số. */
+  trend: { kind: 'surge' | 'up' | 'down' | 'stable' | null; last_week?: number; baseline?: number; share_before_pct?: number; share_after_pct?: number; z?: number };
+  /** Số sản phẩm của bạn mà shop này có hàng giống (AI so nội dung). */
+  similar_listings: number;
+  /** 0–100: cùng loại hàng × giá gần bạn. null ở dòng của bạn. */
+  rivalry: number | null;
+  shared_types: string[];
+  /** Cùng phân khúc giá với bạn mà bán gấp nhiều lần: shop nên tham khảo. */
+  is_peer: boolean;
+}
+
+/** Mỗi sản phẩm trong danh mục một điểm, để vẽ biểu đồ giá theo loại hàng và chất liệu. Chỉ shop thật. */
+export interface PricePoint {
+  listing_id: string;
+  title: string | null;
+  shop_name: string | null;
+  is_mine: boolean;
+  product_type_id: string | null;
+  product_type_name: string;
+  price_vnd: number;
+  units_90d: number;
+  /** Tên chuẩn theo từ điển chất liệu; rỗng là chưa ghi hoặc chưa nhận ra. */
+  materials: string[];
+  /** Cách gõ chưa có trong từ điển (chữ thường). */
+  materials_unknown: string[];
+  /** Giá riêng theo chất liệu khi biến thể chất liệu đó khác `price_vnd`. */
+  price_by_material?: Record<string, number>;
+}
+
 export interface Competitors {
   category_id: string;
+  /** Chỉ có ở shop thật. */
+  shops?: CompetitorShop[];
+  concentration_top3_pct?: number;
+  price_points?: PricePoint[];
   available_categories: string[];
   /** Chỉ có ở shop thật: mã danh mục -> tên. Danh mục của sàn không có trong bảng nhãn cứng. */
   category_names?: Record<string, string | null>;
+  /** Chỉ có ở shop thật: mã danh mục -> loại hàng của bạn trong đó, nhiều sản phẩm trước. */
+  my_types_by_category?: Record<string, string[]>;
   /** Dưới 5 sản phẩm của shop khác: vẫn hiện đủ số đang có, thứ hạng chỉ để tham khảo. */
   low_sample?: boolean;
   my_listings: {
@@ -298,6 +357,7 @@ export interface Competitors {
     /** Hạng theo số bán 90 ngày trong danh mục; hoà thì theo số đánh giá (BR-188). */
     rank_in_cat: number;
     n_in_cat: number;
+    materials?: string[];
     /** Chỉ có ở shop thật. */
     direct_rivals?: DirectRival[];
   }[];
@@ -503,6 +563,20 @@ export interface CompetitorTracking {
     /** Shop thật: danh mục shop đó bán nhiều nhất và ngày đăng sản phẩm gần nhất (SRS 3.9.5). */
     category_name?: string | null;
     last_new_listing_at?: string | null;
+    /** Shop thật: số bán theo tuần, cũ -> mới (8 tuần). */
+    weekly_sales?: number[];
+    /** Shop thật: sản phẩm đăng trong 8 tuần; cùng ngách với bạn thì kèm mức cạnh tranh. */
+    launches?: {
+      listing_id: string;
+      title: string | null;
+      listed_at: string;
+      product_type_name: string | null;
+      price_vnd: number;
+      in_my_niche: boolean;
+      threat: Threat | null;
+      /** Giá sản phẩm của bạn giống nó nhất. */
+      matched_price_vnd: number | null;
+    }[];
   }[];
   slots_used: number;
   slots_limit: number;
@@ -527,7 +601,17 @@ export interface CompetitorTracking {
   }[];
   alerts_total: number;
   /** Chỉ có ở shop thật: shop đang theo dõi có tuần gần nhất bán vượt hẳn các tuần trước. */
-  surging?: { shop_id: string; shop_name: string | null; last_week: number; baseline: number; ratio: number | null; z: number }[];
+  surging?: {
+    shop_id: string;
+    shop_name: string | null;
+    last_week: number;
+    baseline: number;
+    ratio: number | null;
+    z: number;
+    /** Ngưỡng báo (trung vị + 3,5 × độ lệch bền) và số bán 8 tuần, để vẽ biểu đồ kiểm soát. */
+    threshold?: number;
+    weeks?: number[] | null;
+  }[];
   my_niche_tags: string[];
   /** Chỉ có ở shop thật: slug tag -> tên hiển thị. */
   tag_names?: Record<string, string>;
@@ -541,6 +625,8 @@ export interface ShopSearchResult {
   shop_id: string;
   shop_name: string;
   is_tracked: boolean;
+  /** Chỉ có khi tìm theo danh mục: số sản phẩm shop đang bán trong danh mục đó. */
+  products_in_category?: number;
 }
 
 /* ------------------------------------------------------------ F37 -------- */
