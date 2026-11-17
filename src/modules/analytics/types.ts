@@ -289,7 +289,8 @@ export interface CompetitorShop {
   types: { name: string; count: number }[];
   /** Tối đa 3 chất liệu đã quy về tên chuẩn. */
   materials: string[];
-  new_30d: number;
+  /** Sản phẩm đăng trong 8 tuần gần nhất. */
+  new_8w: number;
   price_vnd: { p25: number; median: number; p75: number };
   units_90d: number;
   share_pct: number;
@@ -297,8 +298,10 @@ export interface CompetitorShop {
   rating: number | null;
   n_reviews: number;
   favorites: number;
-  /** null = chưa đo được. */
+  /** Trung vị phút từ lúc khách hỏi tới tin trả lời đầu tiên, đo từ chat 90 ngày; null = dưới 5 lượt hỏi. */
   response_minutes: number | null;
+  /** % lượt khách hỏi được trả lời; null như trên. */
+  reply_rate: number | null;
   /** Số bán trong danh mục theo tuần, cũ -> mới (8 tuần). */
   weekly_units: number[];
   /** surge: tăng đột biến tuần này; up/down: thị phần 4 tuần gần đổi thật (kiểm định); null: chưa đủ số. */
@@ -339,6 +342,8 @@ export interface Competitors {
   available_categories: string[];
   /** Chỉ có ở shop thật: mã danh mục -> tên. Danh mục của sàn không có trong bảng nhãn cứng. */
   category_names?: Record<string, string | null>;
+  /** Chỉ có ở shop thật: mã danh mục -> loại hàng của bạn trong đó, nhiều sản phẩm trước. */
+  my_types_by_category?: Record<string, string[]>;
   /** Dưới 5 sản phẩm của shop khác: vẫn hiện đủ số đang có, thứ hạng chỉ để tham khảo. */
   low_sample?: boolean;
   my_listings: {

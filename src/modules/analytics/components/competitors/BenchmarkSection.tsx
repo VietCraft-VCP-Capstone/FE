@@ -1,5 +1,5 @@
 /**
- * F33 — radar so sánh shop (SRS 3.9.2), hiện ở kiểu xem "Radar" của bảng so sánh với đối thủ.
+ * F33 — radar so sánh shop (SRS 3.9.2), hiện ở kiểu xem "Radar (SRS)" của phần Đối thủ.
  * Đúng SRS: 5 trục, shop bạn tô nổi, 5 shop doanh thu cao nhất màu nhạt, bấm chú thích để ẩn/hiện, rê chuột thấy số thật.
  * Mỗi trục chuẩn hoá min–max trên các shop đang so nên chênh nhỏ cũng hiện lớn; số thật nằm ở dạng Bảng.
  */
@@ -52,10 +52,8 @@ export function RadarSRS({ state, reload }: { state: InsightState<ShopComparison
                 ...data.competitors.map((c, i) => ({ name: c.shop_name, values: c.values, color: RADAR_COLORS[i % RADAR_COLORS.length], raw: rawCua(c.raw) })),
               ]}
             />
+            {/* Tập shop (5 shop doanh thu cao nhất) đã ghi ở dòng Phạm vi của phần. */}
             <p className="m-0 text-xs text-stone-500">
-              {data.ranked_by === 'reviews'
-                ? 'Sàn chưa có đơn đã giao trong 90 ngày nên 5 shop được chọn theo số đánh giá. '
-                : '5 shop có doanh thu 90 ngày cao nhất danh mục. '}
               Mỗi tiêu chí được chuẩn hoá min–max theo các shop đang so, nên chênh lệch nhỏ cũng hiển thị lớn; số liệu thực xem ở dạng Bảng.
             </p>
           </div>

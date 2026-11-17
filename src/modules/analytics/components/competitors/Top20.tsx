@@ -23,7 +23,7 @@ interface Cot { key: string; nhan: string; ten: string; shop: string; gia: numbe
 
 const CHI_SO: { ten: string; lay: (c: Cot) => number; fmt: (v: number) => string }[] = [
   { ten: 'Lượng bán 90 ngày', lay: c => c.ban, fmt: v => count(v) },
-  { ten: 'Giá', lay: c => c.gia, fmt: v => `${Math.round(v / 1000)}k` },
+  { ten: 'Giá', lay: c => c.gia, fmt: v => money(v) },
   { ten: 'Lượt đánh giá', lay: c => c.dg, fmt: v => count(v) },
   { ten: 'Lượt yêu thích', lay: c => c.yt, fmt: v => count(v) },
 ];
@@ -51,7 +51,6 @@ export function Top20({ data, canTrack, trackedIds, pendingShop, khoa, full, onT
   const theoKhoa = new Map(cot.map(c => [c.key, c]));
   const c = dangXem ? theoKhoa.get(dangXem) : undefined;
   const banChayToi = cuaToi[0];
-  const hangToi = banChayToi ? 1 + rows.filter(r => r.est_sales_90d > banChayToi.est_sales_90d).length : null;
   const tongDg = rows.reduce((s, r) => s + (r.n_reviews ?? 0), 0);
   const dgTop5 = rows.slice(0, 5).reduce((s, r) => s + (r.n_reviews ?? 0), 0);
 
@@ -85,7 +84,7 @@ export function Top20({ data, canTrack, trackedIds, pendingShop, khoa, full, onT
                       <th scope="col" className="w-[1%] whitespace-nowrap border-b border-stone-200 px-3 py-2 text-right font-semibold">Giá</th>
                       <th scope="col" className="w-[1%] whitespace-nowrap border-b border-stone-200 px-3 py-2 text-right font-semibold">Lượng bán 90 ngày</th>
                       <th scope="col" className="w-[1%] whitespace-nowrap border-b border-stone-200 px-3 py-2 text-right font-semibold">Lượt đánh giá</th>
-                      <th scope="col" className="w-[1%] whitespace-nowrap border-b border-stone-200 px-3 py-2 text-right font-semibold">Lượt yêu thích</th>
+                      <th scope="col" className="w-[1%] whitespace-nowrap border-b border-stone-200 px-3 py-2 text-right font-semibold">Yêu thích</th>
                       {canTrack && <th scope="col" className="w-[1%] border-b border-stone-200 px-2 py-2"><span className="sr-only">Theo dõi shop</span></th>}
                     </tr>
                   </thead>
@@ -125,16 +124,29 @@ export function Top20({ data, canTrack, trackedIds, pendingShop, khoa, full, onT
                       </tr>
                     ))}
                   </tbody>
+                  {/* BR-189: shop bạn không nằm trong top 20; sản phẩm bán chạy nhất của bạn đứng riêng ở chân bảng, ngoài phân trang. */}
+                  {banChayToi && (
+                    <tfoot>
+                      <tr className="bg-[#f3f8f1]">
+                        <th scope="row" className="border-t-2 border-[#cfe3c9] py-2 pr-2 text-left font-bold text-[#005B00]">Bạn</th>
+                        <td className="max-w-0 border-t-2 border-[#cfe3c9] px-2 py-2">
+                          <span className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-2">
+                            <span className="min-w-0 truncate font-semibold text-stone-900" title={banChayToi.title}>{banChayToi.title}</span>
+                            {banChayToi.rank_in_cat != null && <span className="shrink-0 text-xs text-stone-500">· hạng {count(banChayToi.rank_in_cat)} nếu tính chung</span>}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap border-t-2 border-[#cfe3c9] px-2 py-2 text-xs text-stone-600">{data.price_points?.find(p => p.listing_id === banChayToi.listing_id)?.product_type_name ?? ''}</td>
+                        <td className="whitespace-nowrap border-t-2 border-[#cfe3c9] px-2 py-2 text-right font-semibold tabular-nums text-stone-900">{money(banChayToi.price_vnd)}</td>
+                        <td className="whitespace-nowrap border-t-2 border-[#cfe3c9] px-2 py-2 text-right tabular-nums text-stone-700">{banChayToi.est_sales_90d > 0 ? count(banChayToi.est_sales_90d) : <span className="text-stone-400">Chưa có đơn</span>}</td>
+                        <td className="border-t-2 border-[#cfe3c9] px-2 py-2 text-right tabular-nums text-stone-700">{count(banChayToi.n_reviews ?? 0)}</td>
+                        <td className="border-t-2 border-[#cfe3c9] px-2 py-2 text-right tabular-nums text-stone-700">{count(banChayToi.favorite_count ?? 0)}</td>
+                        {canTrack && <td className="border-t-2 border-[#cfe3c9]" />}
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="m-0 text-xs text-stone-500">
-                  {banChayToi && hangToi !== null
-                    ? `Sản phẩm bán chạy nhất của bạn (${banChayToi.title}, ${count(banChayToi.est_sales_90d)} sản phẩm đã bán) xếp hạng ${count(hangToi)} nếu tính chung.`
-                    : ''}
-                </p>
-                <PhanTrang trang={t} tong={rows.length} onDoi={setTrang} nhan="Các trang của bảng xếp hạng top 20" />
-              </div>
+              <PhanTrang trang={t} tong={rows.length} onDoi={setTrang} nhan="Các trang của bảng xếp hạng top 20" />
             </>
           ) : (
             <>
@@ -178,7 +190,7 @@ export function Top20({ data, canTrack, trackedIds, pendingShop, khoa, full, onT
                 </div>
               </div>
               {tongDg >= 5 && dgTop5 / tongDg >= 0.5 && (
-                <p className="m-0 text-xs text-stone-500">Lượt đánh giá tập trung ở nhóm dẫn đầu: 5 sản phẩm đầu chiếm {count(dgTop5)}/{count(tongDg)} lượt đánh giá của top {count(rows.length)}. Giá gồm nhiều loại hàng; để so giá, dùng biểu đồ phân tích giá phía trên.</p>
+                <p className="m-0 text-xs text-stone-500">Lượt đánh giá tập trung ở nhóm dẫn đầu: 5 sản phẩm đầu chiếm {count(dgTop5)}/{count(tongDg)} lượt đánh giá của top {count(rows.length)}. Giá gồm nhiều loại hàng; để so giá, dùng thẻ Phân bố giá bên dưới.</p>
               )}
             </>
           )}

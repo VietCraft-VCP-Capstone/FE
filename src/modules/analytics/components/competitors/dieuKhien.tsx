@@ -35,7 +35,7 @@ export function CongTac<T extends string>({ nhan, giaTri, onDoi, luaChon }: {
   nhan: string;
   giaTri: T;
   onDoi: (v: T) => void;
-  luaChon: { value: T; label: string }[];
+  luaChon: { value: T; label: React.ReactNode }[];
 }) {
   return (
     <div role="group" aria-label={nhan} className="inline-flex shrink-0 gap-0.5 rounded-full bg-stone-100 p-[3px]">

@@ -7,24 +7,24 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BellRing, Eye, Plus, Trash2, UserPlus, X } from 'lucide-react';
+import { BellRing, Eye, Plus, Trash2, UserPlus, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Bar, BarChart, Cell, ReferenceArea, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, ReferenceArea, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { ConfirmModal } from '../../../../shared/components/ConfirmModal';
 import { ModalOverlay } from '../../../../shared/components/ModalOverlay';
 import { useToast } from '../../../../shared/components/Toast';
-import { CHART_INK } from '../../../../shared/components/charts/chartTheme';
-import { count, timeAgo } from '../../../../shared/utils/format';
+import { CHART_INK, SERIES } from '../../../../shared/components/charts/chartTheme';
+import { count, money, timeAgo } from '../../../../shared/utils/format';
 import { InsightBlock } from '../InsightBlock';
-import { SourceFooter } from '../SourceFooter';
 import { useFocusTrap } from '../intel/IntelPreviewModal';
 import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, type Tone } from '../ui';
-import { decimal, fullDate } from '../../format';
+import { decimal } from '../../format';
 import { invalidateInsights, type InsightState } from '../../hooks/useInsight';
 import { MSG, analyticsApi, analyticsErrorMessage } from '../../services/analyticsApi';
 import { categoryLabel, tagLabel } from '../../labels';
-import { NutAnHien, PhanTrang, catTrang } from './dieuKhien';
+import { PhanTrang, catTrang } from './dieuKhien';
 import { GIAI_THICH, NhanTinCay } from './giaiThich';
+import { Sparkline } from './BangSoSanh';
 import type { CompetitorTracking, Competitors, ShopSearchResult, Threat } from '../../types';
 
 export const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> = {
@@ -33,15 +33,11 @@ export const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> 
   low: { label: 'Cạnh tranh thấp', tone: 'neutral' },
 };
 
-/** Lý do AI chấm mức cạnh tranh, nói bằng lời. */
+/** Sản phẩm mới đụng hàng nào của bạn, nói ngắn; % tương đồng nằm ở chú thích khi rê chuột, chênh giá ở thanh giá bên cạnh. */
 export function lyDoDeDoa(t: Threat, loaiHang?: string | null): string {
   if (!t.matched_title) return 'Bạn chưa bán loại hàng này';
-  if (!t.near_identical && t.similarity < 0.15) return `Cùng loại ${(loaiHang ?? 'hàng').toLowerCase()}, mẫu mã khác biệt`;
-  const phan = [t.near_identical
-    ? `Gần như trùng với "${t.matched_title}" của bạn (tương đồng ${Math.round(t.similarity * 100)}%)`
-    : `Tương đồng ${Math.round(t.similarity * 100)}% với "${t.matched_title}" của bạn`];
-  if (t.price_gap_pct !== null && t.price_gap_pct > 0) phan.push(`giá thấp hơn ${t.price_gap_pct}%`);
-  return phan.join(', ');
+  if (t.near_identical) return `Gần như trùng ${t.matched_title}`;
+  return t.similarity < 0.15 ? `Cùng loại ${(loaiHang ?? 'hàng').toLowerCase()}, mẫu mã khác biệt` : `Giống ${t.matched_title}`;
 }
 
 const FIELD_CLASS =
@@ -55,21 +51,10 @@ const SO_GOI_Y = 6;
 const SO_SP_MOI_TRANG = 3;
 const NGAY = 86_400_000;
 const SO_TUAN = 8;
-const CAM = '#eb6834';
-const LAM_NHAT = 'rgba(42,120,214,0.35)';
 
 type GoiY = { shop_id: string; shop_name: string; why: string };
 type Launch = NonNullable<CompetitorTracking['tracked'][number]['launches']>[number];
-type Surge = NonNullable<CompetitorTracking['surging']>[number];
 
-/** Hình và màu của một sản phẩm mới trên dòng thời gian; hình khác nhau để không chỉ dựa vào màu. */
-const DAU: Record<Threat['level'] | 'ngoai', { ten: string; mau: string; vien: string; thoi: boolean; co: number }> = {
-  high: { ten: 'cạnh tranh cao', mau: '#d9480f', vien: '#9a3412', thoi: true, co: 12 },
-  medium: { ten: 'cạnh tranh vừa', mau: '#eda100', vien: '#8a4b00', thoi: true, co: 10 },
-  low: { ten: 'cạnh tranh thấp', mau: '#a8a29e', vien: '#78716c', thoi: false, co: 11 },
-  ngoai: { ten: 'ngoài phân khúc của bạn', mau: '#ffffff', vien: '#8f8a85', thoi: false, co: 11 },
-};
-const dauCua = (l: Launch) => DAU[l.in_my_niche && l.threat ? l.threat.level : 'ngoai'];
 const ngayNgan = (iso: string) => {
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -296,128 +281,134 @@ function ThemShop({ live, used, limit, trackedIds, goiY, onTrack, onClose }: {
   );
 }
 
-/** Một dòng cảnh báo chính: shop đăng mẫu gần như trùng hàng của bạn (kèm tăng đột biến nếu có). */
-function CanhBaoChinh({ data }: { data: CompetitorTracking }) {
-  for (const t of data.tracked) {
-    const sao = (t.launches ?? []).filter(l => l.threat?.near_identical && l.threat.level === 'high');
-    if (!sao.length) continue;
-    const re = sao.map(l => l.threat!.price_gap_pct).filter((v): v is number => v !== null && v > 0);
-    const khoang = re.length ? (Math.min(...re) === Math.max(...re) ? `${Math.min(...re)}` : `${Math.min(...re)}–${Math.max(...re)}`) : '';
-    const vot = data.surging?.find(s => s.shop_id === t.shop_id);
-    return (
-      <div role="note" className="flex items-start gap-2.5 rounded-lg bg-amber-50 px-3.5 py-3 text-[13px] text-stone-900">
-        <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-700" aria-hidden />
-        <p className="m-0">
-          <strong>{t.shop_name}</strong> đã đăng {count(sao.length)} mẫu gần như trùng với sản phẩm của bạn
-          {khoang ? `, giá thấp hơn ${khoang}%` : ''}
-          {vot?.ratio ? `; lượng bán tuần này gấp ${decimal(vot.ratio, 1)} lần mức nền` : ''}.
-        </p>
-      </div>
-    );
-  }
-  return null;
+/** SRS 3.9.5: danh sách shop đang theo dõi. Mỗi dòng trả lời hai câu: họ ra bao nhiêu hàng mới, và đang bán lên hay xuống. */
+function DanhSachTheoDoi({ data, onRemove }: { data: CompetitorTracking; onRemove: (id: string, name: string | null) => void }) {
+  const vot = new Map((data.surging ?? []).map(s => [s.shop_id, s]));
+  // Cùng một thang cho mọi dòng, để đường cao hơn nghĩa là bán nhiều hơn thật.
+  const maxTuan = Math.max(1, ...data.tracked.flatMap(t => t.weekly_sales ?? []));
+  return (
+    <DataTable
+      caption="Danh sách shop đang theo dõi"
+      head={
+        <>
+          <th scope="col">Shop</th>
+          <th scope="col" className="text-right">Sản phẩm mới<span className="block font-normal text-stone-400">8 tuần</span></th>
+          <th scope="col" className="text-right">Cạnh tranh cao</th>
+          <th scope="col">Lượng bán 8 tuần</th>
+          <th scope="col" className="text-right"><span className="sr-only">Bỏ theo dõi</span></th>
+        </>
+      }
+    >
+      {data.tracked.map(t => {
+        const moi = t.launches ?? [];
+        const cao = moi.filter(l => l.in_my_niche && l.threat?.level === 'high').length;
+        const tuan = t.weekly_sales ?? [];
+        return (
+          <tr key={t.shop_id}>
+            <td>
+              <Link to={`/seller/competitors/${t.shop_id}`} className="font-semibold text-stone-900 no-underline hover:text-[#007700]">{t.shop_name || 'Chưa có tên'}</Link>
+              <span className="block text-xs text-stone-500">
+                {t.category_name || 'Chưa rõ danh mục'} · {count(t.listings_total)} sản phẩm{t.last_new_listing_at ? ` · mới nhất ${ngayNgan(t.last_new_listing_at)}` : ''}
+              </span>
+            </td>
+            <td className="text-right text-base font-bold tabular-nums text-stone-900">{count(moi.length)}</td>
+            <td className="text-right">{cao ? <Chip tone="bad">{count(cao)}</Chip> : <span className="tabular-nums text-stone-400">0</span>}</td>
+            <td>
+              {tuan.length > 0 ? (
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <Sparkline tuan={tuan} max={maxTuan} mau={SERIES.blue} />
+                  <span className="whitespace-nowrap text-xs text-stone-600">tuần này <strong className="tabular-nums text-stone-900">{count(tuan[tuan.length - 1])}</strong></span>
+                  {vot.has(t.shop_id) && <Chip tone="warn">Tăng đột biến{vot.get(t.shop_id)?.ratio ? ` · gấp ${decimal(vot.get(t.shop_id)!.ratio!, 1)} lần` : ''}</Chip>}
+                </span>
+              ) : <span className="text-stone-400">—</span>}
+            </td>
+            <td className="text-right">
+              <button type="button" onClick={() => onRemove(t.shop_id, t.shop_name)} aria-label={`Bỏ theo dõi ${t.shop_name || t.shop_id}`} className={NUT_BO_THEO_DOI}>
+                <Trash2 size={14} aria-hidden />
+                Bỏ theo dõi
+              </button>
+            </td>
+          </tr>
+        );
+      })}
+    </DataTable>
+  );
 }
 
-/** Dòng thời gian 8 tuần: mỗi shop một làn, cột nhạt là số bán mỗi tuần, dấu là sản phẩm mới theo mức cạnh tranh. */
-function DongThoiGian({ data, onRemove }: { data: CompetitorTracking; onRemove: (id: string, name: string | null) => void }) {
-  const [dangXem, setDangXem] = useState<string | null>(null);
-  const goc = data.alerts_computed_at ? new Date(data.alerts_computed_at).getTime() : Date.now();
-  const batDau = goc - SO_TUAN * 7 * NGAY;
-  const maxTuan = Math.max(1, ...data.tracked.flatMap(t => t.weekly_sales ?? []));
-  const vot = new Set((data.surging ?? []).map(s => s.shop_id));
-  const tatCa = data.tracked.flatMap(t => (t.launches ?? []).map(l => ({ ...l, shop: t.shop_name, khoa: `${t.shop_id}-${l.listing_id}` })));
-  const chiTiet = tatCa.find(m => m.khoa === dangXem);
-  const nhanTuan = Array.from({ length: SO_TUAN + 1 }, (_, k) => {
-    const d = new Date(batDau + k * 7 * NGAY);
-    return `${d.getDate()}/${d.getMonth() + 1}`;
-  });
+type HangMoi = Launch & { shop: string | null; shopId: string };
+interface DiemMoi { x: number; y: number; l: HangMoi; trai: boolean }
 
+const MAU_MUC: Record<Threat['level'], string> = { high: '#d9480f', medium: '#eda100', low: '#a8a29e' };
+const NHAN_VUNG = { fill: '#44403c', fontSize: 12, fontWeight: 600 };
+const ngayMs = (v: number) => {
+  const d = new Date(v);
+  return `${d.getDate()}/${d.getMonth() + 1}`;
+};
+
+function DiemHangMoi({ cx = 0, cy = 0, payload }: { cx?: number; cy?: number; payload?: DiemMoi }) {
+  if (!payload) return null;
   return (
-    <div className="space-y-2">
-      <p aria-live="polite" className={`m-0 min-h-[2.25rem] rounded-lg bg-stone-50 px-3 py-2 text-[13px] ${chiTiet ? 'text-stone-900' : 'text-stone-500'}`}>
-        {chiTiet
-          ? `${chiTiet.shop} · ${ngayNgan(chiTiet.listed_at)} · ${chiTiet.title} · ${dauCua(chiTiet).ten}${chiTiet.threat ? ` (${chiTiet.threat.score}/100)` : ''}${chiTiet.threat?.near_identical ? ' · gần như trùng sản phẩm của bạn' : ''}`
-          : 'Rê chuột hoặc chạm vào một điểm để xem chi tiết sản phẩm mới. Cột nhạt: lượng bán theo tuần; cột cam: tuần tăng đột biến.'}
-      </p>
-      {/* Màn hẹp: thông tin shop nằm trên, làn thời gian chiếm cả bề ngang bên dưới. */}
-      <div>
-        {data.tracked.map(t => {
-          const cungNgay = new Map<string, number>();
-          return (
-            <div key={t.shop_id} className="flex flex-col gap-2 border-b border-stone-100 py-3 sm:flex-row sm:gap-5">
-              <div className="sm:w-56 sm:shrink-0">
-                <Link to={`/seller/competitors/${t.shop_id}`} className="font-semibold text-stone-900 no-underline hover:text-[#007700]">{t.shop_name || 'Chưa có tên'}</Link>
-                <span className="block text-xs text-stone-500">{t.category_name || 'Chưa rõ danh mục'} · {count(t.listings_total)} sản phẩm</span>
-                <span className="block text-xs text-stone-500">Sản phẩm mới gần nhất: {fullDate(t.last_new_listing_at)}</span>
-                <button type="button" onClick={() => onRemove(t.shop_id, t.shop_name)} aria-label={`Bỏ theo dõi ${t.shop_name || t.shop_id}`} className={`${NUT_BO_THEO_DOI} -ml-2 mt-1`}>
-                  <Trash2 size={13} aria-hidden />
-                  Bỏ theo dõi
-                </button>
-              </div>
-              <div className="relative h-24 min-w-0 border-b border-stone-300 sm:flex-1">
-                {(t.weekly_sales ?? []).map((v, k) => {
-                  const cao = Math.round((v / maxTuan) * 56);
-                  const laVot = vot.has(t.shop_id) && k === SO_TUAN - 1;
-                  return (
-                    <div key={k} aria-hidden>
-                      <div className="absolute bottom-0 w-[8%] rounded-t-[3px]" style={{ left: `${k * 12.5 + 2.25}%`, height: cao, background: laVot ? CAM : LAM_NHAT }} />
-                      {laVot && <span className="absolute w-[8%] text-center text-[11px] font-bold text-[#9a3412]" style={{ left: `${k * 12.5 + 2.25}%`, bottom: cao + 2 }}>{v}</span>}
-                    </div>
-                  );
-                })}
-                {(t.launches ?? []).map(l => {
-                  const d = dauCua(l);
-                  const ngay = l.listed_at.slice(0, 10);
-                  const lan = (cungNgay.get(ngay) ?? 0) + 1;
-                  cungNgay.set(ngay, lan);
-                  const vi = Math.min(97, Math.max(1, ((new Date(l.listed_at).getTime() - batDau) / (SO_TUAN * 7 * NGAY)) * 100));
-                  const khoa = `${t.shop_id}-${l.listing_id}`;
-                  return (
-                    <button
-                      key={l.listing_id}
-                      type="button"
-                      aria-label={`${ngayNgan(l.listed_at)}: ${l.title ?? 'sản phẩm mới'}, ${d.ten}`}
-                      onMouseEnter={() => setDangXem(khoa)}
-                      onMouseLeave={() => setDangXem(null)}
-                      onFocus={() => setDangXem(khoa)}
-                      onBlur={() => setDangXem(null)}
-                      className={`absolute top-1 z-[1] -ml-[13px] flex h-[26px] w-[26px] cursor-default items-center justify-center rounded-full border-none p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007700] ${dangXem === khoa ? 'bg-sky-100' : 'bg-transparent'}`}
-                      style={{ left: `calc(${vi}% - ${(lan - 1) * 18}px)` }}
-                    >
-                      {d.thoi ? (
-                        <span className="block rotate-45" style={{ width: d.co, height: d.co, background: d.mau, boxShadow: `0 0 0 1.5px ${d.vien}, 0 0 0 3px #fff` }} />
-                      ) : (
-                        <span className="block rounded-full" style={{ width: d.co, height: d.co, background: d.mau, border: `2px solid ${d.vien}`, boxSizing: 'border-box' }} />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-        <div className="flex gap-5" aria-hidden>
-          <div className="hidden w-56 shrink-0 sm:block" />
-          <div className="relative mt-1 h-5 flex-1 text-[11px] text-stone-500">
-            {nhanTuan.map((n, k) => (
-              <span key={k} className={`absolute whitespace-nowrap ${k % 2 ? 'hidden sm:inline' : ''}`} style={{ left: `${k * 12.5}%`, transform: k === 0 ? 'none' : k === SO_TUAN ? 'translateX(-100%)' : 'translateX(-50%)' }}>{n}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-      <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-stone-600">
-        {(['high', 'medium', 'low', 'ngoai'] as const).map(k => (
-          <li key={k} className="inline-flex items-center gap-1.5">
-            {DAU[k].thoi ? (
-              <span className="block rotate-45" style={{ width: 9, height: 9, background: DAU[k].mau, boxShadow: `0 0 0 1.5px ${DAU[k].vien}` }} aria-hidden />
-            ) : (
-              <span className="block rounded-full" style={{ width: 10, height: 10, background: DAU[k].mau, border: `2px solid ${DAU[k].vien}`, boxSizing: 'border-box' }} aria-hidden />
-            )}
-            Sản phẩm mới: {DAU[k].ten}
-          </li>
-        ))}
-        <li className="inline-flex items-center gap-1.5"><span className="block h-3 w-2 rounded-t-sm" style={{ background: LAM_NHAT }} aria-hidden />Lượng bán theo tuần</li>
-      </ul>
+    <g>
+      <circle cx={cx} cy={cy} r={7} fill={MAU_MUC[payload.l.threat!.level]} stroke="#fff" strokeWidth={2} />
+      <text x={payload.trai ? cx - 11 : cx + 11} y={cy + 4} textAnchor={payload.trai ? 'end' : 'start'} fontSize={11} fontWeight={700}
+        fill="#1c1917" stroke="#fff" strokeWidth={3} paintOrder="stroke">{payload.l.threat!.score}</text>
+    </g>
+  );
+}
+
+function HangMoiTooltip({ active, payload }: { active?: boolean; payload?: { payload?: DiemMoi }[] }) {
+  const d = payload?.[0]?.payload;
+  if (!active || !d) return null;
+  const th = d.l.threat!;
+  return (
+    // Ô chú thích hẹp hơn biểu đồ trên điện thoại, để không đẩy trang tràn ngang.
+    <div className="rounded-lg border border-[#e3e6e3] bg-white px-3 py-2 text-xs shadow-[0_6px_20px_rgba(16,33,26,0.12)]" style={{ maxWidth: 'min(260px, calc(100vw - 180px))' }}>
+      <div className="font-bold text-stone-900">{d.l.title ?? 'Sản phẩm mới'}</div>
+      <div className="text-stone-600">{d.l.shop} · đăng {ngayNgan(d.l.listed_at)}</div>
+      <div className="text-stone-600">{MUC_DE_DOA[th.level].label}: <strong className="text-stone-900">{th.score}/100</strong></div>
+      <div className="text-stone-600">{lyDoDeDoa(th, d.l.product_type_name)}</div>
+      {d.l.matched_price_vnd !== null && <div className="text-stone-600">Giá {money(d.l.price_vnd)} · của bạn {money(d.l.matched_price_vnd)}</div>}
+    </div>
+  );
+}
+
+/** Cùng kiểu với bản đồ Vị thế: mỗi chấm một sản phẩm mới, ngang là ngày đăng, dọc là mức cạnh tranh; số cạnh chấm khớp với danh sách bên dưới. */
+function BieuDoHangMoi({ ds, batDau, goc }: { ds: HangMoi[]; batDau: number; goc: number }) {
+  // shortcut: đọc cỡ màn một lần lúc vẽ như ViTheCanhTranh; xoay máy thì chờ lần vẽ sau.
+  const hep = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
+  const buoc = (hep ? 14 : 7) * NGAY;
+  const ticks = Array.from({ length: Math.floor((goc - batDau) / buoc) + 1 }, (_, k) => batDau + k * buoc);
+  const tho = ds.map(l => ({ x: Math.min(goc, Math.max(batDau, new Date(l.listed_at).getTime())), y: l.threat!.score, l })).sort((a, b) => a.x - b.x);
+  // Nhãn số mặc định bên phải chấm; sát mép phải, hoặc có chấm khác ngay bên phải cùng tầm điểm, thì đặt bên trái.
+  const diem: DiemMoi[] = tho.map((d, i) => ({
+    ...d,
+    trai: d.x > batDau + 0.86 * (goc - batDau)
+      || (d.x > batDau + 5 * NGAY && tho.slice(i + 1).some(e => e.x - d.x < 7 * NGAY && Math.abs(e.y - d.y) < 12)),
+  }));
+  const soCao = ds.filter(l => l.threat!.level === 'high').length;
+  return (
+    <div
+      className="w-full"
+      style={{ height: hep ? 240 : 270 }}
+      role="img"
+      aria-label={`Sản phẩm mới của các shop đang theo dõi trong 8 tuần: ${count(ds.length)} sản phẩm cùng nhóm hàng với bạn, ${count(soCao)} sản phẩm cạnh tranh cao. Trục ngang là ngày đăng, trục dọc là mức cạnh tranh từ 0 tới 100.`}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <ScatterChart margin={{ top: 12, right: 16, bottom: 0, left: 4 }}>
+          <CartesianGrid stroke={CHART_INK.grid} horizontal={false} />
+          <ReferenceArea y1={50} y2={100} fill={MAU_MUC.high} fillOpacity={0.07} ifOverflow="hidden" />
+          <ReferenceArea y1={25} y2={50} fill={MAU_MUC.medium} fillOpacity={0.09} ifOverflow="hidden" />
+          <XAxis type="number" dataKey="x" domain={[batDau, goc]} ticks={ticks} tickFormatter={ngayMs}
+            tick={{ fill: CHART_INK.axis, fontSize: 11 }} tickLine={false} />
+          {/* Tên ba mức ghi ngay trên trục dọc (giữa mỗi vùng) thay cho số, để chữ không đè lên chấm. */}
+          <YAxis type="number" dataKey="y" domain={[0, 100]} ticks={[12.5, 37.5, 75]} width={hep ? 40 : 58}
+            tickFormatter={(v: number) => (v > 50 ? 'Cao' : v > 25 ? 'Vừa' : 'Thấp')}
+            tick={NHAN_VUNG} tickLine={false}
+            label={hep ? undefined : { value: 'Mức cạnh tranh', angle: -90, position: 'insideLeft', offset: 0, fill: CHART_INK.axis, fontSize: 12 }} />
+          <Tooltip content={<HangMoiTooltip />} cursor={false} isAnimationActive={false} />
+          <Scatter data={diem} isAnimationActive={false} shape={(p: unknown) => <DiemHangMoi {...(p as { cx?: number; cy?: number; payload?: DiemMoi })} />} />
+        </ScatterChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -434,100 +425,60 @@ function SanPhamMoi({ data, tagName }: { data: CompetitorTracking; tagName: (t: 
   const lo = Math.min(...gia) * 0.9;
   const hi = Math.max(...gia) * 1.05;
   const vi = (v: number) => ((v - lo) / Math.max(hi - lo, 1)) * 100;
+  // Từ khoá ngách của bạn: trước là một mục gập riêng, giờ nằm trong ⓘ của thẻ.
+  const tuKhoa = data.my_niche_tags.slice(0, 40).map(tagName).join(', ');
 
   return (
-    <InsightCard title="Sản phẩm mới cần lưu ý" info={GIAI_THICH.hangMoi} action={<NhanTinCay loai="tham" />}>
+    <InsightCard
+      title="Sản phẩm mới cần lưu ý"
+      info={tuKhoa ? `${GIAI_THICH.hangMoi} Từ khoá của shop bạn: ${tuKhoa}.` : GIAI_THICH.hangMoi}
+      action={<NhanTinCay loai="tham" />}
+    >
       {ds.length === 0 ? (
         <Note>Chưa có sản phẩm mới nào cùng nhóm hàng với bạn từ các shop đang theo dõi trong 8 tuần.</Note>
       ) : (
         <div className="space-y-2">
+          <BieuDoHangMoi ds={ds} batDau={goc - SO_TUAN * 7 * NGAY} goc={goc} />
           <ul className="m-0 list-none divide-y divide-stone-100 p-0">
             {rows.map(l => {
               const th = l.threat!;
               const moi = goc - new Date(l.listed_at).getTime() <= 7 * NGAY;
               return (
                 <li key={`${l.shopId}-${l.listing_id}`} className="py-2.5">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <span className="min-w-0 font-semibold text-stone-900">{l.title}</span>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <Chip tone={MUC_DE_DOA[th.level].tone}>{MUC_DE_DOA[th.level].label} · {th.score}</Chip>
-                  </div>
-                  <span className="block text-xs text-stone-500">
-                    <Link to={`/seller/competitors/${l.shopId}`} className="text-stone-600 no-underline hover:text-[#007700]">{l.shop}</Link>
-                    {' · '}đăng {ngayNgan(l.listed_at)}{moi ? ' · mới tuần này' : ''}
-                  </span>
-                  <span className="mt-0.5 block text-[13px] text-stone-800">{lyDoDeDoa(th, l.product_type_name)}</span>
-                  {l.matched_price_vnd !== null && (
-                    <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="relative block h-4 min-w-[10rem] max-w-xs flex-1" aria-hidden>
-                        <span className="absolute inset-x-0 top-[7px] h-0.5 bg-stone-100" />
-                        <span className="absolute top-[7px] h-0.5 bg-stone-400" style={{ left: `${Math.min(vi(l.price_vnd), vi(l.matched_price_vnd))}%`, width: `${Math.abs(vi(l.matched_price_vnd) - vi(l.price_vnd))}%` }} />
-                        <span className="absolute top-0.5 h-3 w-3 -translate-x-1/2 rounded-full ring-2 ring-white" style={{ left: `${vi(l.price_vnd)}%`, background: '#d9480f' }} />
-                        <span className="absolute top-0.5 h-3 w-3 -translate-x-1/2 rounded-full ring-2 ring-white" style={{ left: `${vi(l.matched_price_vnd)}%`, background: '#1a6b1a' }} />
-                      </span>
-                      <span className="text-xs text-stone-600">
-                        Giá {Math.round(l.price_vnd / 1000)}k so với {Math.round(l.matched_price_vnd / 1000)}k của bạn
-                        {th.price_gap_pct !== null && th.price_gap_pct !== 0 ? ` (${th.price_gap_pct > 0 ? 'thấp hơn' : 'cao hơn'} ${Math.abs(th.price_gap_pct)}%)` : ''}
-                      </span>
+                    <span className="min-w-0 font-semibold text-stone-900">{l.title}</span>
+                    <span className="text-xs text-stone-500">
+                      <Link to={`/seller/competitors/${l.shopId}`} className="text-stone-600 no-underline hover:text-[#007700]">{l.shop}</Link>
+                      {' · '}{ngayNgan(l.listed_at)}{moi ? ' · mới tuần này' : ''}
                     </span>
-                  )}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+                    <span className="text-[13px] text-stone-800" title={th.matched_title ? `Tương đồng ${Math.round(th.similarity * 100)}%` : undefined}>{lyDoDeDoa(th, l.product_type_name)}</span>
+                    {l.matched_price_vnd !== null && (
+                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="relative block h-4 w-32 sm:w-40" aria-hidden>
+                          <span className="absolute inset-x-0 top-[7px] h-0.5 bg-stone-100" />
+                          <span className="absolute top-[7px] h-0.5 bg-stone-400" style={{ left: `${Math.min(vi(l.price_vnd), vi(l.matched_price_vnd))}%`, width: `${Math.abs(vi(l.matched_price_vnd) - vi(l.price_vnd))}%` }} />
+                          <span className="absolute top-0.5 h-3 w-3 -translate-x-1/2 rounded-full ring-2 ring-white" style={{ left: `${vi(l.price_vnd)}%`, background: SERIES.blue }} />
+                          <span className="absolute top-0.5 h-3 w-3 -translate-x-1/2 rounded-full ring-2 ring-white" style={{ left: `${vi(l.matched_price_vnd)}%`, background: SERIES.green }} />
+                        </span>
+                        {/* Chấm màu cạnh từng giá thay cho dòng chú thích riêng. */}
+                        <span className="flex items-center gap-2 whitespace-nowrap text-xs text-stone-700">
+                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: SERIES.blue }} aria-hidden />{money(l.price_vnd)}</span>
+                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: SERIES.green }} aria-hidden />Bạn {money(l.matched_price_vnd)}</span>
+                          {th.price_gap_pct ? <strong className="text-stone-900">{th.price_gap_pct > 0 ? '−' : '+'}{Math.abs(th.price_gap_pct)}%</strong> : null}
+                        </span>
+                      </span>
+                    )}
+                  </div>
                 </li>
               );
             })}
           </ul>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-2">
-            <span className="text-[11px] text-stone-500">Chấm cam: giá đối thủ · chấm xanh lá: giá sản phẩm tương ứng của bạn</span>
-            <PhanTrang trang={t} tong={ds.length} onDoi={setTrang} moiTrang={SO_SP_MOI_TRANG} nhan="Các trang của danh sách sản phẩm mới" />
-          </div>
+          <PhanTrang trang={t} tong={ds.length} onDoi={setTrang} moiTrang={SO_SP_MOI_TRANG} nhan="Các trang của danh sách sản phẩm mới" />
         </div>
       )}
-      {data.my_niche_tags.length > 0 && (
-        <details className="mt-3 text-xs text-stone-500">
-          <summary className="cursor-pointer font-semibold text-stone-600">Hệ thống dựa vào từ khoá nào của shop bạn?</summary>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {data.my_niche_tags.slice(0, 40).map(tag => (
-              <Chip key={tag} tone="neutral">{tagName(tag)}</Chip>
-            ))}
-          </div>
-        </details>
-      )}
-    </InsightCard>
-  );
-}
-
-/** Tăng trưởng đột biến: một câu kết luận; biểu đồ kiểm soát (vì sao báo) chỉ hiện khi bấm. */
-function TangDotBien({ s }: { s: Surge }) {
-  const [mo, setMo] = useState(false);
-  const tuan = s.weeks ?? [];
-  const nguong = s.threshold ?? null;
-  const max = Math.max(...tuan, nguong ?? 0, 1) * 1.12;
-  return (
-    <InsightCard title={`Tăng trưởng đột biến: ${s.shop_name ?? s.shop_id}`} info={GIAI_THICH.tangToc} action={<NhanTinCay loai="kiem" />}>
-      <div className="space-y-3">
-        <p className="m-0 text-[13px] text-stone-800">
-          Tuần này bán <strong>{count(s.last_week)} sản phẩm</strong>
-          {s.ratio ? `, gấp ${decimal(s.ratio, 1)} lần mức nền` : ''} ({decimal(s.baseline, 0)} sản phẩm/tuần).
-        </p>
-        {tuan.length > 0 && <NutAnHien mo={mo} onDoi={() => setMo(!mo)} xem="Xem biểu đồ kiểm soát" an="Ẩn biểu đồ" />}
-        {mo && tuan.length > 0 && (
-          <>
-            <div className="h-48 w-full" role="img" aria-label={`Lượng bán 8 tuần của ${s.shop_name ?? ''}: tuần này ${s.last_week}, mức nền ${decimal(s.baseline, 0)}${nguong !== null ? `, ngưỡng cảnh báo ${decimal(nguong, 0)}` : ''}.`}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={tuan.map((v, k) => ({ k, v }))} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="k" interval={0} tickFormatter={(k: number) => (k === 0 ? '8 tuần trước' : k === tuan.length - 1 ? 'Tuần này' : '')} tickLine={false} axisLine={{ stroke: CHART_INK.grid }} tick={{ fill: CHART_INK.axis, fontSize: 11 }} />
-                  <YAxis width={32} domain={[0, Math.ceil(max)]} tickCount={3} allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: CHART_INK.axis, fontSize: 11 }} />
-                  {nguong !== null && <ReferenceArea y1={0} y2={nguong} fill="#f2f5f9" ifOverflow="hidden" />}
-                  {nguong !== null && <ReferenceLine y={nguong} stroke="#d9480f" strokeDasharray="5 4" strokeWidth={2} label={{ value: `Ngưỡng cảnh báo: ${decimal(nguong, 0)}`, position: 'insideTopLeft', fill: '#9a3412', fontSize: 11 }} />}
-                  <ReferenceLine y={s.baseline} stroke="#78716c" strokeDasharray="5 4" strokeWidth={2} label={{ value: `Mức nền: ${decimal(s.baseline, 0)}`, position: 'insideTopLeft', fill: '#44403c', fontSize: 11 }} />
-                  <Bar dataKey="v" maxBarSize={28} radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                    {tuan.map((_, k) => <Cell key={k} fill={k === tuan.length - 1 ? CAM : 'rgba(42,120,214,0.45)'} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="m-0 text-xs text-stone-500">Vùng xám là biên độ bình thường. Cảnh báo khi lượng bán tuần này vượt ngưỡng tính từ trung vị và độ lệch tuyệt đối trung vị (MAD) của 7 tuần trước, nên một tuần biến động lẻ không gây báo nhầm. Kiểm chứng trên dữ liệu Olist: tỉ lệ báo nhầm khoảng 1%.</p>
-          </>
-        )}
-      </div>
     </InsightCard>
   );
 }
@@ -601,17 +552,15 @@ export function TrackingSection({ state, reload, rivals }: {
   return (
     <>
       <InsightBlock state={state} onRetry={reload} errorText={MSG[147]}>
-        {(data, meta) => {
+        {data => {
           const full = data.slots_used >= data.slots_limit;
           const tagName = (tag: string) => tagLabel(data.tag_names?.[tag] ?? null, tag);
+          // Số shop đã dùng (2/10) nằm ở dòng Phạm vi của phần, không nhắc lại ở đây.
           const nutThem = (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-stone-500">Đang theo dõi {count(data.slots_used)}/{count(data.slots_limit)}</span>
-              <button type="button" onClick={() => setMo(true)} disabled={full} title={full ? MSG[143] : undefined} className={`${ACTION_CLASS} h-9`}>
-                <Plus size={15} aria-hidden />
-                Thêm shop
-              </button>
-            </div>
+            <button type="button" onClick={() => setMo(true)} disabled={full} title={full ? MSG[143] : undefined} className={`${ACTION_CLASS} h-9`}>
+              <Plus size={15} aria-hidden />
+              Thêm shop
+            </button>
           );
 
           if (data.tracked.length === 0) {
@@ -637,10 +586,9 @@ export function TrackingSection({ state, reload, rivals }: {
 
           return (
             <div className="space-y-5">
-              {live && <CanhBaoChinh data={data} />}
               <InsightCard
-                title={live ? 'Dòng thời gian hoạt động (8 tuần)' : 'Shop bạn đang theo dõi'}
-                info={live ? 'Mỗi shop một làn: dấu là sản phẩm mới (hình và màu theo mức cạnh tranh với hàng của bạn), cột nhạt là số bán mỗi tuần. Bấm tên shop để xem hồ sơ, sản phẩm và khuyến mãi của họ.' : 'Shop mẫu: thêm bằng mã shop, ví dụ shp_00042.'}
+                title="Shop bạn đang theo dõi"
+                info={live ? GIAI_THICH.theoDoi : 'Shop mẫu: thêm bằng mã shop, ví dụ shp_00042.'}
                 action={nutThem}
                 bodyClassName="px-4 py-3"
               >
@@ -650,7 +598,14 @@ export function TrackingSection({ state, reload, rivals }: {
                   </div>
                 )}
                 {live ? (
-                  <DongThoiGian data={data} onRemove={(id, name) => setRemoving({ id, name })} />
+                  <>
+                    <DanhSachTheoDoi data={data} onRemove={(id, name) => setRemoving({ id, name })} />
+                    {!full && (
+                      <p className="m-0 mt-3 text-xs text-stone-600">
+                        Muốn theo dõi thêm: bấm <strong className="text-stone-800">+ Thêm shop</strong>, hoặc <strong className="text-stone-800">+ Theo dõi</strong> ở bảng của phần Đối thủ.
+                      </p>
+                    )}
+                  </>
                 ) : (
                   <DataTable
                     caption="Danh sách shop đang theo dõi"
@@ -683,17 +638,10 @@ export function TrackingSection({ state, reload, rivals }: {
               </InsightCard>
 
               {live ? (
-                <div className={`grid grid-cols-1 items-start gap-5 ${(data.surging?.length ?? 0) > 0 ? 'lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}`}>
-                  <SanPhamMoi data={data} tagName={tagName} />
-                  {(data.surging?.length ?? 0) > 0 && (
-                    <div className="space-y-5">{data.surging!.map(s => <TangDotBien key={s.shop_id} s={s} />)}</div>
-                  )}
-                </div>
+                <SanPhamMoi data={data} tagName={tagName} />
               ) : (
-                <Note>Sản phẩm mới và tăng trưởng đột biến chỉ có ở gian hàng thật: dữ liệu mẫu không có ngày đăng sản phẩm thật.</Note>
+                <Note>Sản phẩm mới và lượng bán theo tuần chỉ có ở gian hàng thật: dữ liệu mẫu không có ngày đăng sản phẩm thật.</Note>
               )}
-
-              <div className="px-1"><SourceFooter meta={meta} limitation={data.limitation} /></div>
             </div>
           );
         }}

@@ -1,7 +1,7 @@
 /**
- * Phân tích giá thị trường: mỗi sản phẩm cùng loại hàng là một chấm (giá × số bán 90 ngày), lọc theo chất liệu,
- * mặc định cùng chất liệu với bạn. Vùng tô là khoảng giá chứa 50% LƯỢNG BÁN (phân vị có trọng số theo số bán),
- * nên mẫu bán nhiều có tiếng nói lớn hơn mẫu không ai mua. Loại hàng và chất liệu là ô chọn vì sẽ dài thêm theo hàng của shop.
+ * Phân bố giá: mỗi sản phẩm cùng loại hàng là một chấm (giá × số bán 90 ngày), lọc theo chất liệu, mặc định cùng
+ * chất liệu với bạn. Giá bán chạy là phân vị 25–75% có trọng số theo số bán, nên chứa ít nhất một nửa lượng bán.
+ * Mặc định chỉ hiện giá bán chạy và giá của bạn; biểu đồ mở khi bấm, hoặc tự mở khi tới từ việc "Rà soát giá" của kế hoạch.
  */
 
 import { useMemo, useState } from 'react';
@@ -10,6 +10,7 @@ import { CHART_INK, SERIES } from '../../../../shared/components/charts/chartThe
 import { count, money } from '../../../../shared/utils/format';
 import type { PricePoint } from '../../types';
 import { InsightCard, Note, SelectField } from '../ui';
+import { NutAnHien } from './dieuKhien';
 import { GIAI_THICH } from './giaiThich';
 import { buocDep, vachChia } from './ViTheCanhTranh';
 
@@ -17,6 +18,7 @@ const KHONG_GHI = '__chua_ghi';
 const TAT_CA = '__tat_ca';
 const NHAT = '#d6d3d1';
 const gonK = (v: number) => `${Math.round(v / 1000)}k`;
+const khoangGia = (a: number, b: number) => (a === b ? money(a) : `${money(a)} – ${money(b)}`);
 
 /** Khoá chất liệu của một sản phẩm: tên chuẩn, cách gõ chưa có trong từ điển (tiền tố ?), hoặc "chưa ghi". */
 const khoaCl = (p: PricePoint) => (p.materials.length || p.materials_unknown.length ? [...p.materials, ...p.materials_unknown.map(m => `?${m}`)] : [KHONG_GHI]);
@@ -38,21 +40,10 @@ function vungBanChay(ds: PricePoint[]) {
   return { p25: pv(0.25), p50: pv(0.5), p75: pv(0.75) };
 }
 
+interface Diem extends PricePoint { x: number; y: number; nhan: string | null }
 
-interface Diem extends PricePoint { x: number; y: number; nhan: string | null; trai: boolean }
-
-function DiemDoiThu({ cx = 0, cy = 0, payload, mau, r }: { cx?: number; cy?: number; payload?: Diem; mau: string; r: number }) {
-  if (!payload) return null;
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r={r} fill={mau} stroke="#fff" strokeWidth={2} />
-      {payload.nhan && (
-        <text x={payload.trai ? cx - r - 5 : cx + r + 5} y={cy + 4} textAnchor={payload.trai ? 'end' : 'start'} fontSize={12} fill="#1c1917" stroke="#fff" strokeWidth={3} paintOrder="stroke">
-          {payload.nhan}
-        </text>
-      )}
-    </g>
-  );
+function DiemDoiThu({ cx = 0, cy = 0, mau, r }: { cx?: number; cy?: number; mau: string; r: number }) {
+  return <circle cx={cx} cy={cy} r={r} fill={mau} stroke="#fff" strokeWidth={2} />;
 }
 
 function DiemCuaBan({ cx = 0, cy = 0, payload }: { cx?: number; cy?: number; payload?: Diem }) {
@@ -80,7 +71,12 @@ function GiaTooltip({ active, payload }: { active?: boolean; payload?: { payload
   );
 }
 
-export function PhanTichGia({ points }: { points: PricePoint[] }) {
+export function PhanTichGia({ points, loaiBanDau, moSan = false }: {
+  points: PricePoint[];
+  /** Loại hàng chọn sẵn, lấy từ link của kế hoạch (?loai=). */
+  loaiBanDau?: string;
+  moSan?: boolean;
+}) {
   // Loại hàng của bạn trước (nhiều sản phẩm trước), rồi tới loại bạn chưa bán.
   const loaiDs = useMemo(() => {
     const dem = new Map<string, { tat: number; toi: number }>();
@@ -92,8 +88,9 @@ export function PhanTichGia({ points }: { points: PricePoint[] }) {
     }
     return [...dem.entries()].sort((a, b) => b[1].toi - a[1].toi || b[1].tat - a[1].tat).map(([ten, d]) => ({ ten, ...d }));
   }, [points]);
-  const [loaiChon, setLoai] = useState<string>('');
+  const [loaiChon, setLoai] = useState<string>(loaiBanDau ?? '');
   const [clChon, setCl] = useState<string | null>(null);
+  const [mo, setMo] = useState(moSan);
   const loai = loaiDs.some(l => l.ten === loaiChon) ? loaiChon : loaiDs[0]?.ten ?? '';
 
   const goc = points.filter(p => p.product_type_name === loai);
@@ -125,69 +122,80 @@ export function PhanTichGia({ points }: { points: PricePoint[] }) {
   const yTop = Math.max(...cungLoai.map(p => p.units_90d), 4);
   const bY = buocDep(yTop / 4);
   const yMax = Math.ceil((yTop * 1.08) / bY) * bY;
-  const trai = (x: number) => x > xMin + 0.65 * (xMax - xMin);
-  // shortcut: đọc cỡ màn một lần lúc vẽ như RadarCompare. Màn hẹp chỉ ghi nhãn "Bạn", tên sản phẩm xem bằng cách chạm.
-  const hep = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
-  const top2 = hep ? [] : [...nhom].filter(p => p.units_90d > 0).sort((a, b) => b.units_90d - a.units_90d).slice(0, 2).map(p => p.listing_id);
-  const lam = (p: PricePoint, nhan: string | null): Diem => ({ ...p, x: p.price_vnd, y: p.units_90d, nhan, trai: trai(p.price_vnd) });
+  const lam = (p: PricePoint, nhan: string | null): Diem => ({ ...p, x: p.price_vnd, y: p.units_90d, nhan });
   const diemKhac = doiThu.filter(p => !khop(p)).map(p => lam(p, null));
-  const diemKhop = nhom.map(p => lam(p, top2.includes(p.listing_id) ? p.title : null));
+  const diemKhop = nhom.map(p => lam(p, null));
   const diemToi = cuaToi.map((p, i) => lam(p, i === 0 ? 'Bạn' : null));
 
   const tenNhom = `${loai.toLowerCase()}${cl === TAT_CA ? '' : ` ${tenCl(cl)}`}`;
   const giaToi = cuaToi.map(p => p.price_vnd);
   const minToi = giaToi.length ? Math.min(...giaToi) : null;
   const maxToi = giaToi.length ? Math.max(...giaToi) : null;
-  let soSanh = '';
-  if (minToi !== null && maxToi !== null && nhom.length) {
-    const re = nhom.filter(p => p.price_vnd < minToi).length;
-    const datNhat = Math.max(...nhom.map(p => p.price_vnd));
-    soSanh = re === nhom.length
-      ? `Cao hơn toàn bộ ${count(nhom.length)} sản phẩm ${tenNhom} của đối thủ (cao nhất ${gonK(datNhat)})`
-      : re === 0 ? `Thấp hơn mọi sản phẩm ${tenNhom} của đối thủ` : `Cao hơn ${count(re)}/${count(nhom.length)} sản phẩm ${tenNhom} của đối thủ`;
-    if (vung) {
-      soSanh += minToi > vung.p75 ? ` và cao hơn vùng giá bán chạy ${gonK(minToi - vung.p75)}.` : maxToi < vung.p25 ? ` và thấp hơn vùng giá bán chạy ${gonK(vung.p25 - maxToi)}.` : ', nằm trong vùng giá bán chạy.';
-    } else {
-      soSanh += '.';
-    }
-  }
-  const dauBang = [...nhom].sort((a, b) => b.units_90d - a.units_90d)[0];
   const soShop = new Set(nhom.map(p => p.shop_name)).size;
 
+  const boLoc = (
+    // Nằm ở đầu thẻ: max-w-full để ô chọn co theo bề ngang thẻ trên điện thoại thay vì tràn ra ngoài.
+    <div className="flex min-w-0 max-w-full flex-wrap items-end gap-3">
+      <SelectField
+        label="Loại hàng"
+        value={loai}
+        onChange={v => { setLoai(v); setCl(null); }}
+        options={loaiDs.map(l => ({ value: l.ten, label: l.toi ? l.ten : `${l.ten} (bạn chưa bán)` }))}
+        className="min-w-0 max-w-full"
+      />
+      <SelectField
+        label="Chất liệu"
+        value={cl}
+        onChange={setCl}
+        options={[
+          { value: TAT_CA, label: 'Mọi chất liệu' },
+          ...[...demCl.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => ({ value: k, label: tenCl(k) })),
+        ]}
+        className="min-w-0 max-w-full"
+      />
+    </div>
+  );
+
   return (
-    <InsightCard title="Phân bố giá và vùng giá bán chạy" info={GIAI_THICH.vungGia}>
+    <InsightCard title="Phân bố giá" info={`${GIAI_THICH.vungGia} Đang tính trên ${count(nhom.length)} sản phẩm của ${count(soShop)} shop.`} action={boLoc}>
       <div className="space-y-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <SelectField
-            label="Loại hàng"
-            value={loai}
-            onChange={v => { setLoai(v); setCl(null); }}
-            options={loaiDs.map(l => ({ value: l.ten, label: l.toi ? `${l.ten} (${count(l.toi)} sản phẩm của bạn)` : `${l.ten} (bạn chưa bán)` }))}
-            className="min-w-0 max-w-full"
-          />
-          <SelectField
-            label="Chất liệu"
-            value={cl}
-            onChange={setCl}
-            options={[
-              { value: TAT_CA, label: `Tất cả chất liệu (${count(doiThu.length)})` },
-              ...[...demCl.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ value: k, label: `${tenCl(k)} (${count(n)})${clToi.has(k) ? ' · chất liệu của bạn' : ''}` })),
-            ]}
-            className="min-w-0 max-w-full"
-          />
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+          <div>
+            <p className="m-0 text-xs font-semibold text-stone-500">Giá bán chạy</p>
+            {vung ? (
+              <p className="m-0 mt-0.5 text-2xl font-bold tabular-nums text-stone-900">{khoangGia(vung.p25, vung.p75)}</p>
+            ) : (
+              <p className="m-0 mt-0.5 text-[13px] text-stone-600">Chưa đủ dữ liệu: cần ít nhất 3 sản phẩm có đơn.</p>
+            )}
+          </div>
+          {minToi !== null && maxToi !== null && (
+            <p className="m-0 mb-1 inline-flex items-center gap-2 text-sm text-stone-900">
+              <span className="h-2.5 w-2.5 rotate-45" style={{ background: SERIES.green }} aria-hidden />
+              Bạn {khoangGia(minToi, maxToi)}
+            </p>
+          )}
+          <div className="ml-auto">
+            <NutAnHien mo={mo} onDoi={() => setMo(!mo)} xem="Xem biểu đồ" an="Ẩn biểu đồ" controls="bieu-do-phan-bo-gia" />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-          <div className="min-w-0">
-            <div className="h-[300px] w-full" role="img" aria-label={`Giá và lượng bán 90 ngày của từng sản phẩm ${tenNhom}${vung ? `; 50% lượng bán ở ${gonK(vung.p25)} đến ${gonK(vung.p75)}` : ''}${minToi !== null ? `; giá của bạn từ ${gonK(minToi)}` : ''}.`}>
+        {mo && (
+          <div id="bieu-do-phan-bo-gia" className="min-w-0">
+            <div className="h-[300px] w-full" role="img" aria-label={`Giá và lượng bán 90 ngày của từng sản phẩm ${tenNhom}${vung ? `; giá bán chạy ${khoangGia(vung.p25, vung.p75)}` : ''}${minToi !== null ? `; giá của bạn từ ${money(minToi)}` : ''}.`}>
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart margin={{ top: 12, right: 16, bottom: 22, left: 4 }}>
                   <CartesianGrid stroke={CHART_INK.grid} />
                   <XAxis type="number" dataKey="x" domain={[xMin, xMax]} ticks={vachChia(xMin, xMax, bX)} tickFormatter={gonK} tick={{ fill: CHART_INK.axis, fontSize: 11 }} tickLine={false}
-                    label={{ value: 'Giá bán →', position: 'insideBottomRight', offset: -14, fill: CHART_INK.axis, fontSize: 12 }} />
+                    label={{ value: 'Giá bán', position: 'insideBottom', offset: -14, fill: CHART_INK.axis, fontSize: 12 }} />
                   <YAxis type="number" dataKey="y" domain={[0, yMax]} ticks={vachChia(0, yMax, bY)} width={44} allowDecimals={false} tick={{ fill: CHART_INK.axis, fontSize: 11 }} tickLine={false}
                     label={{ value: 'Lượng bán 90 ngày', angle: -90, position: 'insideLeft', offset: 10, fill: CHART_INK.axis, fontSize: 12 }} />
-                  {vung && <ReferenceArea x1={vung.p25} x2={Math.max(vung.p75, vung.p25 + (xMax - xMin) * 0.006)} fill={SERIES.blue} fillOpacity={0.1} stroke={SERIES.blue} strokeOpacity={0.4} ifOverflow="hidden" />}
+                  {vung && (
+                    <ReferenceArea
+                      x1={vung.p25} x2={Math.max(vung.p75, vung.p25 + (xMax - xMin) * 0.006)}
+                      fill={SERIES.blue} fillOpacity={0.1} stroke={SERIES.blue} strokeOpacity={0.4} ifOverflow="hidden"
+                      label={{ value: 'Giá bán chạy', position: 'insideTop', fill: '#1e3a8a', fontSize: 12, fontWeight: 600 }}
+                    />
+                  )}
                   {vung && <ReferenceLine x={vung.p50} stroke={SERIES.blue} strokeWidth={2} strokeDasharray="5 4" />}
                   <Tooltip content={<GiaTooltip />} cursor={false} isAnimationActive={false} />
                   <Scatter data={diemKhac} isAnimationActive={false} shape={(p: unknown) => <DiemDoiThu {...(p as object)} mau={NHAT} r={4} />} />
@@ -197,38 +205,13 @@ export function PhanTichGia({ points }: { points: PricePoint[] }) {
               </ResponsiveContainer>
             </div>
             <ul className="m-0 mt-2 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-stone-600">
-              <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: SERIES.blue }} aria-hidden />Sản phẩm {tenNhom} của đối thủ</li>
+              <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: SERIES.blue }} aria-hidden />Đối thủ · {cl === TAT_CA ? loai.toLowerCase() : tenCl(cl)}</li>
               {cl !== TAT_CA && <li className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: NHAT }} aria-hidden />Chất liệu khác</li>}
-              <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rotate-45" style={{ background: SERIES.green }} aria-hidden />Sản phẩm của bạn</li>
-              <li className="inline-flex items-center gap-1.5"><span className="h-3 w-4 border-l-2 border-dashed" style={{ background: 'rgba(42,120,214,0.14)', borderColor: SERIES.blue }} aria-hidden />Vùng giá bán chạy · nét đứt: giá trung vị</li>
+              <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rotate-45" style={{ background: SERIES.green }} aria-hidden />Bạn</li>
+              {vung && <li className="inline-flex items-center gap-1.5"><span className="h-3 w-0 border-l-2 border-dashed" style={{ borderColor: SERIES.blue }} aria-hidden />Trung vị {money(vung.p50)}</li>}
             </ul>
           </div>
-
-          <aside aria-label="Tóm tắt vùng giá" className="self-start rounded-lg bg-stone-50 p-4">
-            <p className="m-0 text-xs font-semibold text-stone-500">{loai} · {cl === TAT_CA ? 'mọi chất liệu' : tenCl(cl)}</p>
-            {vung ? (
-              <>
-                <p className="m-0 mt-1 text-2xl font-bold tabular-nums text-stone-900">{vung.p25 === vung.p75 ? gonK(vung.p25) : `${gonK(vung.p25)} – ${gonK(vung.p75)}`}</p>
-                <p className="m-0 mt-0.5 text-[13px] text-stone-600">50% lượng bán nằm trong khoảng giá này · trung vị {gonK(vung.p50)}</p>
-              </>
-            ) : (
-              <p className="m-0 mt-1 text-[13px] text-stone-600">Chưa đủ dữ liệu để xác định vùng giá (cần ít nhất 3 sản phẩm có đơn).</p>
-            )}
-            {minToi !== null && maxToi !== null && (
-              <div className="mt-3 border-t border-stone-200 pt-3">
-                <p className="m-0 text-sm font-bold text-[#005B00]">Bạn: {minToi === maxToi ? gonK(minToi) : `${gonK(minToi)} – ${gonK(maxToi)}`}</p>
-                {soSanh && <p className="m-0 mt-0.5 text-[13px] text-stone-600">{soSanh}</p>}
-              </div>
-            )}
-            {dauBang && dauBang.units_90d > 0 && (
-              <div className="mt-3 border-t border-stone-200 pt-3">
-                <p className="m-0 text-xs font-semibold text-stone-500">Sản phẩm dẫn đầu nhóm</p>
-                <p className="m-0 mt-0.5 text-[13px] text-stone-800">{dauBang.title} · {gonK(dauBang.price_vnd)} · {count(dauBang.units_90d)} sản phẩm đã bán ({dauBang.shop_name})</p>
-              </div>
-            )}
-            <p className="m-0 mt-3 text-[11px] text-stone-500">Dữ liệu: {count(nhom.length)} sản phẩm của {count(soShop)} shop. Vùng giá tính theo trọng số lượng bán.</p>
-          </aside>
-        </div>
+        )}
       </div>
     </InsightCard>
   );
