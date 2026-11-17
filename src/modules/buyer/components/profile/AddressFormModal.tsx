@@ -243,9 +243,11 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     const [districts, setDistricts] = useState<any[]>([]);
     const [wards, setWards] = useState<any[]>([]);
 
-    const [selectedProvinceId, setSelectedProvinceId] = useState('79');
-    const [selectedDistrictId, setSelectedDistrictId] = useState('760');
-    const [selectedWardCode, setSelectedWardCode] = useState('26734');
+    // Không chọn sẵn TP HCM / Quận 1: người ở tỉnh khác không để ý sẽ lưu nhầm địa chỉ
+    const [selectedProvinceId, setSelectedProvinceId] = useState('');
+    const [selectedDistrictId, setSelectedDistrictId] = useState('');
+    const [selectedWardCode, setSelectedWardCode] = useState('');
+    const [formError, setFormError] = useState<string | null>(null);
 
     const loadWards = async (dId: string, targetWCode?: string) => {
         try {
@@ -257,7 +259,7 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
                 name: w.name
             }));
             setWards(mapped);
-            const wCode = targetWCode || mapped[0]?.code || '';
+            const wCode = targetWCode || ''; // người dùng tự chọn, không lấy phường đầu danh sách
             setSelectedWardCode(wCode);
         } catch (err) {
             console.error('Failed to load wards', err);
@@ -276,7 +278,7 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
                 name: d.name
             }));
             setDistricts(mapped);
-            const dCode = targetDCode || mapped[0]?.id || '';
+            const dCode = targetDCode || '';
             setSelectedDistrictId(dCode);
             if (dCode) {
                 await loadWards(dCode, targetWCode);
@@ -333,26 +335,35 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
             const streetPart = editingAddress.address_detail.split(',')[0].trim();
             setAddressDetail(streetPart);
             setIsDefault(editingAddress.is_default);
-            setSelectedProvinceId(editingAddress.province_id || '79');
-            setSelectedDistrictId(editingAddress.district_id || '760');
-            setSelectedWardCode(editingAddress.ward_code || '26734');
-            loadDistricts(editingAddress.province_id || '79', editingAddress.district_id || '760', editingAddress.ward_code || '26734');
+            setSelectedProvinceId(editingAddress.province_id || '');
+            setSelectedDistrictId(editingAddress.district_id || '');
+            setSelectedWardCode(editingAddress.ward_code || '');
+            if (editingAddress.province_id) {
+                loadDistricts(editingAddress.province_id, editingAddress.district_id, editingAddress.ward_code);
+            }
         } else {
             setRecipientName('');
             setPhone('');
             setAddressDetail('');
             setIsDefault(false);
-            setSelectedProvinceId('79');
-            setSelectedDistrictId('760');
-            setSelectedWardCode('26734');
-            loadDistricts('79', '760', '26734');
+            setSelectedProvinceId('');
+            setSelectedDistrictId('');
+            setSelectedWardCode('');
+            setDistricts([]);
+            setWards([]);
         }
+        setFormError(null);
     }, [editingAddress, isOpen]);
 
     if (!isOpen) return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!selectedProvinceId || !selectedDistrictId || !selectedWardCode) {
+            setFormError('Vui lòng chọn đủ Tỉnh / Thành phố, Quận / Huyện và Phường / Xã.');
+            return;
+        }
+        setFormError(null);
 
         const selectedProvName = provinces.find(p => p.id === selectedProvinceId)?.name || '';
         const selectedDistName = districts.find(d => d.id === selectedDistrictId)?.name || '';
@@ -497,6 +508,7 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
                         placeholder="Chọn Phường / Xã"
                         disabled={districts.length === 0}
                     />
+                    {formError && <p className="text-xs font-semibold text-red-600">{formError}</p>}
 
                     {/* Grid row 4: Detailed Address */}
                     <div>

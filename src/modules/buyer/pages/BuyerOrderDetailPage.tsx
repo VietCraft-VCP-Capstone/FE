@@ -495,8 +495,10 @@ export function BuyerOrderDetailPage() {
                 {/* Shop Header */}
                 <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/10">
                     <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
-                            <img src={order.shopLogo || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=80'} alt={order.shopName} className="w-full h-full object-cover" />
+                        <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500 uppercase">
+                            {order.shopLogo
+                                ? <img src={order.shopLogo} alt={order.shopName} className="w-full h-full object-cover" />
+                                : (order.shopName || '?').trim().charAt(0)}
                         </div>
                         <span className="font-extrabold text-sm text-gray-800">{order.shopName || 'VietCraft Shop'}</span>
                     </div>

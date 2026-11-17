@@ -79,8 +79,6 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
 
-  // Khởi tạo kết nối WebSocket cho toàn bộ Seller portal
-  useSocket();
 
   useEffect(() => {
     chatService.getUnreadCount()

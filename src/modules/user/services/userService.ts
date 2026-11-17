@@ -23,7 +23,6 @@ export interface UserProfile {
         push: boolean;
         email: boolean;
     };
-    rank?: string;
     stats?: {
         ordersCount: number;
         collectionsCount: number;
