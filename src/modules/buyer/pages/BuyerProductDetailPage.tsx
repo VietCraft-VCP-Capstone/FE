@@ -22,7 +22,7 @@ interface Product {
   /** 'SKU' = phân loại theo mẫu (set/lẻ/combo): nhóm `color` hiện thành "Mẫu" có ảnh nhỏ. */
   variantMode?: 'SKU';
   colors?: Array<{ name: string; hex: string }>;
-  shopInfo?: { id: string; name: string; logo?: string; rating: number };
+  shopInfo?: { id: string; name: string; logo?: string; rating: number; ratingCount?: number };
   rating?: number;
   reviews_count?: number;
   reviews?: Array<{ id: string; name: string; date: string; rating: number; avatar?: string; text: string; images?: string[] }>;
@@ -146,7 +146,7 @@ export function BuyerProductDetailPage() {
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
-  const [avgRating, setAvgRating] = useState(5.0);
+  const [avgRating, setAvgRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
   const [starBreakdown, setStarBreakdown] = useState<Record<string, { count: number; pct: string }>>({});
 
@@ -186,7 +186,7 @@ export function BuyerProductDetailPage() {
         const items = data.items || [];
         setReviews(items);
         if (data.summary) {
-          const avg = Number(data.summary.averageRating) || 5.0;
+          const avg = Number(data.summary.averageRating) || 0;
           const total = Number(data.summary.totalReviews ?? data.summary.reviewCount ?? items.length) || 0;
           setAvgRating(avg);
           setReviewCount(total);
@@ -737,10 +737,12 @@ export function BuyerProductDetailPage() {
                 >
                   <Store size={14} color="#008000" />
                   <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
-                    <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                    <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || avgRating.toFixed(1)}</span>
-                  </div>
+                  {(product.shopInfo.ratingCount ?? 0) > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                      <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
+                      <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating.toFixed(1)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

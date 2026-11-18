@@ -135,7 +135,7 @@ export function BuyerShopPage() {
             address: detail.address,
             city: detail.city,
             province: detail.province,
-            rating: typeof detail.averageRating === 'number' ? detail.averageRating : (detail.rating || 5),
+            rating: Number(detail.averageRating ?? detail.rating ?? 0),
             ratingCount: detail.ratingCount || 0,
             followersCount: detail.followersCount || 0,
             isFollowing: Boolean(detail.isFollowing),
@@ -149,7 +149,8 @@ export function BuyerShopPage() {
           setShop(info ? {
             name: info.name,
             logo: info.logo,
-            rating: info.rating ?? 5,
+            rating: info.rating ?? 0,
+            ratingCount: info.ratingCount ?? 0,
             followersCount: 0,
             isFollowing: false
           } : null);
@@ -312,7 +313,7 @@ export function BuyerShopPage() {
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 font-sans">
       <SeoMeta
         title={shop?.name ? `${shop.name} - Nghệ nhân VietCraft` : 'Gian hàng VietCraft'}
-        description={shop?.description || shop?.slogan || `Gian hàng thủ công chính hãng ${shop?.name || ''} trên sàn VietCraft. Đánh giá ${shop?.rating || 5} sao.`}
+        description={shop?.description || shop?.slogan || `Gian hàng thủ công chính hãng ${shop?.name || ''} trên sàn VietCraft.${shop?.ratingCount ? ` Đánh giá ${shop.rating.toFixed(1)} sao.` : ''}`}
         ogImage={shop?.banner || shop?.logo}
         schema={shop ? {
           "@context": "https://schema.org",
@@ -320,11 +321,14 @@ export function BuyerShopPage() {
           "name": shop.name,
           "description": shop.description || shop.slogan,
           "image": shop.logo || shop.banner,
-          "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": shop.rating || 5,
-            "reviewCount": shop.ratingCount || 1
-          }
+          // Chỉ khai báo điểm khi có đánh giá thật
+          ...(shop.ratingCount ? {
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": shop.rating,
+              "reviewCount": shop.ratingCount
+            }
+          } : {})
         } : undefined}
       />
       {/* Nút quay lại & Banner thông báo nếu là seller */}
@@ -462,10 +466,14 @@ export function BuyerShopPage() {
           <div className="mt-5 pt-4 border-t border-stone-100 flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm font-medium text-stone-600">
             <div className="flex items-center gap-1.5 bg-amber-50/80 text-amber-900 px-3 py-1.5 rounded-xl border border-amber-200/60 font-semibold">
               <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              <span>{(shop?.rating ?? 5).toFixed(1)} / 5.0</span>
-              <span className="text-amber-700/80 font-normal">
-                ({shop?.ratingCount || 0} đánh giá)
-              </span>
+              {shop?.ratingCount ? (
+                <>
+                  <span>{shop.rating.toFixed(1)} / 5.0</span>
+                  <span className="text-amber-700/80 font-normal">({shop.ratingCount} đánh giá)</span>
+                </>
+              ) : (
+                <span className="font-normal">Chưa có đánh giá</span>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 bg-stone-50 px-3 py-1.5 rounded-xl text-stone-700">
@@ -767,13 +775,17 @@ export function BuyerShopPage() {
                           </h3>
 
                           {/* Đánh giá sao & Đã bán */}
-                          <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-1.5">
-                            <div className="flex items-center gap-0.5 text-amber-500">
-                              <Star className="w-3.5 h-3.5 fill-current" />
-                              <span className="font-semibold text-stone-700 ml-0.5">
-                                {(p.rating || 5).toFixed(1)}
-                              </span>
-                            </div>
+                          <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-stone-500 mt-1.5">
+                            {(p.ratingCount ?? 0) > 0 ? (
+                              <div className="flex items-center gap-0.5 text-amber-500">
+                                <Star className="w-3.5 h-3.5 fill-current" />
+                                <span className="font-semibold text-stone-700 ml-0.5">
+                                  {(p.rating ?? 0).toFixed(1)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="italic text-stone-400">Chưa có đánh giá</span>
+                            )}
                             <span>•</span>
                             <span>Đã bán {soldCount}</span>
                           </div>

@@ -301,10 +301,10 @@ export function SellerCompetitorDetailPage() {
             <Star size={18} className="text-amber-500 fill-amber-500" />
           </div>
           <div className="text-2xl font-black text-stone-900">
-            {(shop?.averageRating || shop?.rating || 5.0).toFixed(1)} / 5.0
+            {shop?.ratingCount ? `${(shop.averageRating ?? shop.rating ?? 0).toFixed(1)} / 5.0` : '—'}
           </div>
           <div className="text-[11px] text-stone-400 mt-0.5 font-medium">
-            {shop?.ratingCount || 0} lượt đánh giá thực tế
+            {shop?.ratingCount ? `${shop.ratingCount} lượt đánh giá thực tế` : 'Chưa có đánh giá'}
           </div>
         </div>
 
@@ -424,7 +424,8 @@ export function SellerCompetitorDetailPage() {
               const pId = p.id || p._id;
               const pPrice = Number(p.base_price || p.price || p.regular_price || p.variants?.[0]?.retail_price || 0);
               const pImg = p.images?.[0] || p.thumbnail || p.image || '/image-not-found.jpg';
-              const pRating = typeof p.average_rating === 'number' ? p.average_rating : (p.rating || 5);
+              const pRatingCount = Number(p.rating_count ?? p.ratingCount ?? 0);
+              const pRating = pRatingCount > 0 ? Number(p.average_rating ?? p.rating ?? 0) : 0;
               const pSold = p.sold_count || p.total_sold || 0;
 
               return (
@@ -448,10 +449,14 @@ export function SellerCompetitorDetailPage() {
                         {p.title || 'Sản phẩm đối thủ'}
                       </h4>
                       <div className="flex items-center gap-2 text-[11px] text-stone-500 mt-2">
-                        <span className="flex items-center gap-0.5 text-amber-600 font-bold">
-                          <Star size={12} className="fill-amber-400 text-amber-400" />
-                          {pRating.toFixed(1)}
-                        </span>
+                        {pRatingCount > 0 ? (
+                          <span className="flex items-center gap-0.5 text-amber-600 font-bold">
+                            <Star size={12} className="fill-amber-400 text-amber-400" />
+                            {pRating.toFixed(1)}
+                          </span>
+                        ) : (
+                          <span className="italic text-stone-400">Chưa có đánh giá</span>
+                        )}
                         {pSold > 0 && (
                           <>
                             <span>•</span>
