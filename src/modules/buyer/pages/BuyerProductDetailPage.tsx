@@ -22,7 +22,7 @@ interface Product {
   /** 'SKU' = phân loại theo mẫu (set/lẻ/combo): nhóm `color` hiện thành "Mẫu" có ảnh nhỏ. */
   variantMode?: 'SKU';
   colors?: Array<{ name: string; hex: string }>;
-  shopInfo?: { id: string; name: string; logo?: string; rating: number };
+  shopInfo?: { id: string; name: string; logo?: string; rating: number; ratingCount?: number };
   rating?: number;
   reviews_count?: number;
   reviews?: Array<{ id: string; name: string; date: string; rating: number; avatar?: string; text: string; images?: string[] }>;
@@ -146,7 +146,7 @@ export function BuyerProductDetailPage() {
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
-  const [avgRating, setAvgRating] = useState(5.0);
+  const [avgRating, setAvgRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
   const [starBreakdown, setStarBreakdown] = useState<Record<string, { count: number; pct: string }>>({});
 
@@ -186,7 +186,7 @@ export function BuyerProductDetailPage() {
         const items = data.items || [];
         setReviews(items);
         if (data.summary) {
-          const avg = Number(data.summary.averageRating) || 5.0;
+          const avg = Number(data.summary.averageRating) || 0;
           const total = Number(data.summary.totalReviews ?? data.summary.reviewCount ?? items.length) || 0;
           setAvgRating(avg);
           setReviewCount(total);
@@ -626,7 +626,6 @@ export function BuyerProductDetailPage() {
     page: { fontFamily: "'Inter', system-ui, sans-serif", background: '#fcfcfc', minHeight: '100vh' } as React.CSSProperties,
     container: { maxWidth: 1100, margin: '0 auto', padding: '24px 20px' } as React.CSSProperties,
     backBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, fontWeight: 600, marginBottom: 20, padding: '6px 0' } as React.CSSProperties,
-    grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 36, alignItems: 'start' } as React.CSSProperties,
     mainImg: { width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 12, background: '#f0f0f0', display: 'block' } as React.CSSProperties,
     thumbRail: { display: 'flex', gap: 8, marginTop: 12 } as React.CSSProperties,
     thumb: (active: boolean) => ({ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: active ? '2px solid #008000' : '2px solid transparent', flexShrink: 0 } as React.CSSProperties),
@@ -649,7 +648,6 @@ export function BuyerProductDetailPage() {
       transition: 'all 0.15s',
       flexShrink: 0
     } as React.CSSProperties),
-    actionBar: { display: 'flex', gap: 10, marginTop: 24 } as React.CSSProperties,
     btnChat: { padding: '13px 18px', border: '2px solid #008000', borderRadius: 10, background: '#f0fdf4', color: '#008000', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s', whiteSpace: 'nowrap' as const } as React.CSSProperties,
     btnOutline: { flex: 1, padding: '13px 0', border: '2px solid #008000', borderRadius: 10, background: '#fff', color: '#008000', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
     btnFill: { flex: 1, padding: '13px 0', border: 'none', borderRadius: 10, background: '#008000', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
@@ -662,7 +660,6 @@ export function BuyerProductDetailPage() {
     reviewCard: { display: 'flex', gap: 14, padding: '20px 0', borderBottom: '1px solid #f0f0f0' } as React.CSSProperties,
     avatar: { width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 } as React.CSSProperties,
     sectionTitle: { fontSize: 20, fontWeight: 800, color: '#330033', marginBottom: 20 } as React.CSSProperties,
-    productGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 } as React.CSSProperties,
     card: { background: '#fff', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', transition: 'transform 0.2s, box-shadow 0.2s' } as React.CSSProperties,
     cardImg: { width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block' } as React.CSSProperties,
     cardInfo: { padding: '10px 12px 14px' } as React.CSSProperties,
@@ -705,7 +702,8 @@ export function BuyerProductDetailPage() {
         </button>
 
         {/* ── Top: Gallery + Info ────────────────────────────────────────────── */}
-        <div style={S.grid}>
+        {/* Điện thoại và máy tính bảng: ảnh nằm trên thông tin; từ 768px hai cột. */}
+        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 md:gap-9">
           {/* Gallery */}
           <div>
             <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }}>
@@ -739,10 +737,12 @@ export function BuyerProductDetailPage() {
                 >
                   <Store size={14} color="#008000" />
                   <span style={{ fontSize: 13, color: '#008000', fontWeight: 700 }}>{product.shopInfo.name}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
-                    <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                    <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating?.toFixed(1) || avgRating.toFixed(1)}</span>
-                  </div>
+                  {(product.shopInfo.ratingCount ?? 0) > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                      <Star size={11} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
+                      <span style={{ fontSize: 12, color: '#555' }}>{product.shopInfo.rating.toFixed(1)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -945,14 +945,15 @@ export function BuyerProductDetailPage() {
             </div>
 
             {/* Action Buttons */}
-            <div style={S.actionBar}>
-              <button style={S.btnChat} onClick={handleChatWithSeller} title="Chat với người bán">
+            {/* Dưới 1024px: Chat và Thêm giỏ ở hàng trên, Mua ngay rộng hết dòng ở hàng dưới. */}
+            <div className="mt-6 flex flex-wrap gap-2.5">
+              <button className="flex-1 sm:flex-initial" style={S.btnChat} onClick={handleChatWithSeller} title="Chat với người bán">
                 <MessageCircle size={18} /> Chat ngay
               </button>
-              <button style={S.btnOutline} onClick={addToCart}>
+              <button className="flex-1" style={S.btnOutline} onClick={addToCart}>
                 <ShoppingCart size={18} /> Thêm vào giỏ
               </button>
-              <button style={S.btnFill} onClick={buyNow}>
+              <button className="w-full basis-full lg:w-auto lg:basis-auto lg:flex-1" style={{ ...S.btnFill, flex: undefined }} onClick={buyNow}>
                 <Zap size={18} /> Mua ngay
               </button>
             </div>
@@ -1064,7 +1065,7 @@ export function BuyerProductDetailPage() {
         {related.length > 0 && (
           <section style={{ marginTop: 48 }}>
             <h2 style={S.sectionTitle}>Sản phẩm cùng loại</h2>
-            <div style={S.productGrid}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
               {related.map((p: any) => (
                 <div key={p.id} style={S.card}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'; }}
@@ -1085,7 +1086,7 @@ export function BuyerProductDetailPage() {
         {suggestions.length > 0 && (
           <section style={{ marginTop: 40, marginBottom: 48 }}>
             <h2 style={S.sectionTitle}>Sản phẩm bạn có thể thích</h2>
-            <div style={S.productGrid}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
               {suggestions.map((p: any) => (
                 <div key={p.id} style={S.card}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'; }}

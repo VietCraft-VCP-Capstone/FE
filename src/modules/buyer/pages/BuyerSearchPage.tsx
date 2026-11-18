@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, type MouseEvent } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { promotionService } from '../../promotion/services/promotionService';
@@ -41,6 +41,7 @@ const PRIMARY_CATEGORIES = [
 
 export function BuyerSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [moLoc, setMoLoc] = useState(false);
   const navigate = useNavigate();
 
   const qParam = searchParams.get('q') || '';
@@ -184,16 +185,30 @@ export function BuyerSearchPage() {
         <SearchActiveFilterTags filters={filters} updateQuery={updateQuery} onResetFilters={handleResetFilters} />
       )}
 
-      <div className="grid grid-cols-[260px_1fr] items-start gap-7">
-        <SearchFilterSidebar
-          categories={categories}
-          filters={filters}
-          hasActiveFilters={hasActiveFilters}
-          updateQuery={updateQuery}
-          onResetFilters={handleResetFilters}
-        />
+      {/* Dưới 1024px bộ lọc gom vào một nút, để kết quả dùng hết bề rộng màn hình. */}
+      <button
+        type="button"
+        onClick={() => setMoLoc((v) => !v)}
+        aria-expanded={moLoc}
+        className="mb-4 inline-flex cursor-pointer items-center gap-2 rounded-[12px] border border-[#e7e5e4] bg-white px-4 py-2.5 text-[13px] font-bold text-[#1c1917] lg:hidden"
+      >
+        <SlidersHorizontal size={16} color="#007700" />
+        Bộ lọc{hasActiveFilters ? ' (đang lọc)' : ''}
+        <ChevronDown size={16} className={moLoc ? 'rotate-180' : ''} />
+      </button>
 
-        <section>
+      <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-[260px_1fr]">
+        <div className={moLoc ? 'block' : 'hidden lg:block'}>
+          <SearchFilterSidebar
+            categories={categories}
+            filters={filters}
+            hasActiveFilters={hasActiveFilters}
+            updateQuery={updateQuery}
+            onResetFilters={handleResetFilters}
+          />
+        </div>
+
+        <section className="min-w-0">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#e7e5e4] bg-white px-5 py-3">
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="text-[13px] font-bold text-[#78716c]">Sắp xếp theo:</span>

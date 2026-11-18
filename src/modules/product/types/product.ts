@@ -69,6 +69,7 @@ export interface ProductItem {
     name: string;
     logo?: string;
     rating: number;
+    ratingCount?: number;
   };
   sellerId?: string;
   rating?: number;

@@ -66,6 +66,7 @@ export function LandingTrending({ products, onSelectProduct, onViewAll }: Landin
                   </h3>
                   
                   {/* Stars Rating */}
+                  {p.reviews > 0 ? (
                   <div className="flex items-center gap-1 mt-2">
                     <div className="flex text-amber-500">
                       {[...Array(5)].map((_, i) => (
@@ -77,6 +78,9 @@ export function LandingTrending({ products, onSelectProduct, onViewAll }: Landin
                     </div>
                     <span className="text-xs text-stone-400 font-medium">({p.reviews})</span>
                   </div>
+                  ) : (
+                    <p className="mt-2 text-xs italic text-stone-400">Chưa có đánh giá</p>
+                  )}
                 </div>
 
                 <span className="text-[#007700] font-bold text-base block pt-1">

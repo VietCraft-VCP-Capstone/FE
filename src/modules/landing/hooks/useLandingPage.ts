@@ -29,8 +29,8 @@ export function useLandingPage() {
                         id: s._id,
                         name: s.shop_name,
                         location: s.description || 'Bespoke Artisan',
-                        rating: s.average_rating || 5.0,
-                        reviews: s.reviews_count || s.listing_count || 0,
+                        rating: Number(s.average_rating) || 0,
+                        reviews: Number(s.rating_count) || 0,
                         avatar: s.logo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
                         banner: s.banner || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=600',
                     }));
@@ -40,8 +40,8 @@ export function useLandingPage() {
                         id: p.id,
                         title: p.title,
                         price: p.price,
-                        rating: p.rating || 5,
-                        reviews: p.reviews_count || p.sales_count || 0,
+                        rating: Number(p.rating) || 0,
+                        reviews: Number(p.ratingCount) || 0,
                         isBestseller: Boolean(p.is_bestseller || (p.sales_count && p.sales_count > 10)),
                         image: p.images?.[0] || 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&q=80&w=600',
                     }));
