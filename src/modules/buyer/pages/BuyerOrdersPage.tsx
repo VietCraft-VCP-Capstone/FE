@@ -519,13 +519,13 @@ export function BuyerOrdersPage() {
                             return (
                                 <div key={order.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                                     {/* Card Header (Shop, Status, Return Badge) */}
-                                    <div className="p-4 border-b border-gray-50 flex flex-wrap items-center justify-between gap-2 bg-gray-50/20">
+                                    <div className="p-4 border-b border-gray-50 flex items-center justify-between gap-2 bg-gray-50/20">
                                         <div className="flex min-w-0 items-center gap-2">
-                                            <Store size={16} className="text-gray-500" />
-                                            <span className="font-extrabold text-sm text-gray-800">{order.shopName}</span>
+                                            <Store size={16} className="shrink-0 text-gray-500" />
+                                            <span className="truncate font-extrabold text-sm text-gray-800">{order.shopName}</span>
                                         </div>
-                                        <div className="flex flex-wrap items-center gap-2.5 whitespace-nowrap">
-                                            <span className="text-[10px] font-bold text-gray-400">Mã đơn: #{order.id}</span>
+                                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-2.5 gap-y-1 whitespace-nowrap">
+                                            <span className="text-[10px] font-bold text-gray-400"><span className="hidden sm:inline">Mã đơn: </span>#{order.id}</span>
                                             {activeReturn && (
                                                 <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700">
                                                     <ArrowRightLeft size={10} /> Đang yêu cầu đổi/trả
@@ -560,8 +560,9 @@ export function BuyerOrdersPage() {
                                                     <span className="font-extrabold text-gray-900 text-sm">
                                                         {(item.price * item.quantity).toLocaleString('vi-VN')}đ
                                                     </span>
+                                                    {/* Điện thoại: ẩn nút đánh giá từng món (chân thẻ đã có) để tên sản phẩm không bị cắt. */}
                                                     {order.status === 'completed' && (
-                                                        <div className="mt-2">
+                                                        <div className="mt-2 hidden sm:block">
                                                             {item.is_reviewed ? (
                                                                 <button
                                                                     type="button"
@@ -597,15 +598,16 @@ export function BuyerOrdersPage() {
                                     </div>
 
                                     {/* Card Footer (Actions, Total) */}
-                                    <div className="p-4 bg-gray-50/10 border-t border-gray-50 flex flex-col sm:flex-row items-end sm:items-center justify-between gap-4">
-                                        <div>
+                                    <div className="p-4 bg-gray-50/10 border-t border-gray-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+                                        <div className="flex items-baseline justify-between">
                                             <span className="text-xs text-gray-500 font-bold">Tổng số tiền:</span>
                                             <span className="font-black text-emerald-600 text-base ml-1.5">
                                                 {order.totalAmount.toLocaleString('vi-VN')}đ
                                             </span>
                                         </div>
 
-                                        <div className="flex flex-wrap items-center justify-end gap-2">
+                                        {/* Điện thoại: nút giãn đều hàng, nút cuối (thường là Mua lại) xuống dòng chiếm cả hàng. */}
+                                        <div className="flex flex-wrap items-center justify-end gap-2 max-sm:[&>button]:flex-1 max-sm:[&>button]:justify-center [&>button]:whitespace-nowrap">
                                             {activeReturn && (
                                                 <button
                                                     type="button"

@@ -169,7 +169,24 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
 
   const displayCartCount = cartCount;
 
+  const navLinks = (
+    <>
+      <a onClick={() => handleNav('home')} className={location.pathname === '/' ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Khám phá</a>
+      <a onClick={() => handleNav('gifts')} className={isActive('/gifts') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Quà tặng</a>
+      <a onClick={() => handleNav('collections')} className={isActive('/collections') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Bộ sưu tập</a>
+      <a onClick={() => handleNav('vouchers')} className={isActive('/vouchers') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Voucher</a>
+      <a
+        onClick={() => navigate(user?.role?.toLowerCase() === 'seller' ? '/seller' : '/seller/register')}
+        className={location.pathname.startsWith('/seller') ? 'nav-active text-[#007700] font-bold' : 'text-[#007700] font-semibold hover:text-[#005B00]'}
+        style={{ cursor: 'pointer' }}
+      >
+        Kênh Người Bán
+      </a>
+    </>
+  );
+
   return (
+    <>
     <header className="buyer-header-nav">
       <div className="buyer-header-container">
         {/* Logo */}
@@ -178,19 +195,7 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
         </div>
 
         {/* Navigation Menu */}
-        <nav className="buyer-nav-menu">
-          <a onClick={() => handleNav('home')} className={location.pathname === '/' ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Khám phá</a>
-          <a onClick={() => handleNav('gifts')} className={isActive('/gifts') ? 'nav-active' : ''} style={{ cursor: 'pointer' }}>Quà tặng</a>
-          <a onClick={() => handleNav('collections')} className={`buyer-nav-optional ${isActive('/collections') ? 'nav-active' : ''}`} style={{ cursor: 'pointer' }}>Bộ sưu tập</a>
-          <a onClick={() => handleNav('vouchers')} className={`buyer-nav-optional ${isActive('/vouchers') ? 'nav-active' : ''}`} style={{ cursor: 'pointer' }}>Voucher</a>
-          <a
-            onClick={() => navigate(user?.role?.toLowerCase() === 'seller' ? '/seller' : '/seller/register')}
-            className={`buyer-nav-optional ${location.pathname.startsWith('/seller') ? 'nav-active text-[#007700] font-bold' : 'text-[#007700] font-semibold hover:text-[#005B00]'}`}
-            style={{ cursor: 'pointer' }}
-          >
-            Kênh Người Bán
-          </a>
-        </nav>
+        <nav className="buyer-nav-menu">{navLinks}</nav>
 
         <div className="buyer-search-bar" ref={searchBox.containerRef} style={{ position: 'relative' }}>
           <Search className="search-icon" size={16} style={{ cursor: 'pointer' }} onClick={() => searchBox.onExecuteSearch()} />
@@ -311,6 +316,9 @@ export function BuyerHeader({ user, cartCount = 0, search, setSearch }: BuyerHea
         </div>
       </div>
     </header>
+    {/* Màn hẹp: danh mục thành một hàng cuộn ngang dưới thanh đầu trang, không dính theo khi cuộn. */}
+    <nav className="buyer-nav-strip" aria-label="Danh mục">{navLinks}</nav>
+    </>
   );
 }
 

@@ -32,8 +32,8 @@ export function OrderItemRow({ orderId, item, completed, returnable, eligibility
           {returnable && <OrderItemEligibilityNote eligibility={eligibility} />}
         </div>
       </div>
-      <div className="flex flex-col items-end gap-3 lg:max-w-[60%]">
-        <span className="text-sm font-extrabold text-gray-900">{((item.price || 0) * (item.quantity || 0)).toLocaleString('vi-VN')}đ</span>
+      <div className="flex flex-col items-stretch gap-3 lg:max-w-[60%] lg:items-end">
+        <span className="self-end text-sm font-extrabold text-gray-900">{((item.price || 0) * (item.quantity || 0)).toLocaleString('vi-VN')}đ</span>
         {returnable && <OrderItemActions orderId={orderId} item={item} reviewable={completed} eligibility={eligibility} onReview={onReview} onReorder={onReorder} refund={refund} />}
       </div>
     </div>
