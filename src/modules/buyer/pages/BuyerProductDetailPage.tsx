@@ -129,6 +129,8 @@ export function BuyerProductDetailPage() {
     const p = (id ? productDetailCache.get(id) : null) || (initialMatches ? initialProduct : null);
     return p?.variants?.[0]?.material || '';
   });
+  // Kiểu Shopee: chỉ hiện khoảng giá TRƯỚC khi khách tự bấm chọn mẫu; bấm 1 cái là chốt giá đúng mẫu đó.
+  const [hasPickedVariant, setHasPickedVariant] = useState(false);
   const [customText, setCustomText] = useState('');
   const [qty, setQty] = useState(1);
   const [descOpen, setDescOpen] = useState(true);
@@ -333,6 +335,7 @@ export function BuyerProductDetailPage() {
   }, [product?.variants, selectedColor, selectedSize, selectedMaterial, selectedVariant]);
 
   const handleSelectColor = (c: string) => {
+    setHasPickedVariant(true);
     setSelectedColor(c);
     const match = product?.variants?.find(v =>
       v.color === c &&
@@ -348,6 +351,7 @@ export function BuyerProductDetailPage() {
   };
 
   const handleSelectSize = (sz: string) => {
+    setHasPickedVariant(true);
     setSelectedSize(sz);
     const match = product?.variants?.find(v =>
       v.size === sz &&
@@ -362,6 +366,7 @@ export function BuyerProductDetailPage() {
   };
 
   const handleSelectMaterial = (m: string) => {
+    setHasPickedVariant(true);
     setSelectedMaterial(m);
     const match = product?.variants?.find(v =>
       v.material === m &&
@@ -379,6 +384,16 @@ export function BuyerProductDetailPage() {
   const basePrice = typeof rawBasePrice === 'object' && rawBasePrice?.$numberDecimal
     ? parseFloat(rawBasePrice.$numberDecimal)
     : Number(rawBasePrice) || 0;
+
+  // Các mẫu (áo riêng/quần riêng/combo...) có giá khác nhau: hiện khoảng giá bên cạnh giá đang chọn, như Shopee.
+  const variantPriceRange = useMemo(() => {
+    const prices = (product?.variants || [])
+      .map(v => Number((v as any)?.price?.$numberDecimal ?? v.price) || 0)
+      .filter(p => p > 0);
+    if (prices.length < 2) return null;
+    const min = Math.min(...prices), max = Math.max(...prices);
+    return min < max ? { min, max } : null;
+  }, [product?.variants]);
 
   // Active promotion: CHỈ áp dụng Flash Sale trực tiếp nếu đủ điều kiện đơn tối thiểu
   const activePromotion = useMemo(() => {
@@ -757,18 +772,24 @@ export function BuyerProductDetailPage() {
               ))}
             </div>
 
-            {/* Price */}
+            {/* Price: chưa chọn mẫu thì hiện khoảng giá, chọn 1 mẫu rồi thì chốt đúng giá mẫu đó (kiểu Shopee) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-              <span style={S.price}>{fmtPrice(displayPrice)}</span>
-              {hasDiscount && (
+              {variantPriceRange && !hasPickedVariant ? (
+                <span style={S.price}>{fmtPrice(variantPriceRange.min)} - {fmtPrice(variantPriceRange.max)}</span>
+              ) : (
                 <>
-                  <span style={S.strike}>{fmtPrice(strikePrice)}</span>
-                  {isFlashSale ? (
-                    <span className="flash-sale-badge">
-                      ⚡ FLASH SALE {discountBadgeText}
-                    </span>
-                  ) : (
-                    <span style={S.tag('#fff', '#e11d48')}>{discountBadgeText}</span>
+                  <span style={S.price}>{fmtPrice(displayPrice)}</span>
+                  {hasDiscount && (
+                    <>
+                      <span style={S.strike}>{fmtPrice(strikePrice)}</span>
+                      {isFlashSale ? (
+                        <span className="flash-sale-badge">
+                          ⚡ FLASH SALE {discountBadgeText}
+                        </span>
+                      ) : (
+                        <span style={S.tag('#fff', '#e11d48')}>{discountBadgeText}</span>
+                      )}
+                    </>
                   )}
                 </>
               )}

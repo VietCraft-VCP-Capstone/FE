@@ -36,7 +36,6 @@ export function ProductFormBasicFields({
         label="Tên sản phẩm"
         required
         error={errors.title}
-        hint="Nêu rõ sản phẩm là gì, chất liệu và điểm nổi bật để người mua dễ tìm thấy."
         focusTarget="title"
       >
         <input
