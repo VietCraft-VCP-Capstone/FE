@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Sparkles, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { FormSection } from './form/formUi';
 import { buildFormNav } from './form/formSections';
 import { ProductFormNav } from './form/ProductFormNav';
@@ -21,6 +21,7 @@ import { ProposeCategoryModal } from './ProposeCategoryModal';
 import { ImageRecognitionPanel } from './ImageRecognitionPanel';
 
 import SmartProductAiModal from '../../seller/components/SmartProductAiModal';
+import { netFromGross } from '../../../shared/utils/commission';
 
 /** Gộp chất liệu AI gợi ý ("Lụa tơ tằm, Gỗ") vào ô chất liệu: bỏ trùng (không phân biệt hoa thường), tối đa 5 như MaterialInput. */
 function mergeMaterials(current: string[] = [], suggested: string): string[] {
@@ -94,6 +95,9 @@ export function ProductFormModal({
     });
     if (current !== activeId) setActiveId(current);
   };
+  // AI gợi ý giá KHÁCH TRẢ; ô "Giá bán" là giá seller nhận (BE cộng hoa hồng lúc lưu) → bóc hoa hồng trước khi điền
+  const toNetPrice = (listPrice: number) =>
+    commissionPercent === null ? listPrice : netFromGross(listPrice, commissionPercent);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,9 +116,6 @@ export function ProductFormModal({
             <h3 className="m-0 text-lg font-bold text-stone-900">
               {isEdit ? 'Chỉnh sửa thông tin sản phẩm' : 'Thêm sản phẩm mới'}
             </h3>
-            <p className="m-0 mt-0.5 truncate text-[13px] text-stone-500">
-              {isEdit ? `Mã SKU: ${product?.sku}` : 'Mục có dấu * là bắt buộc. Các mục còn lại giúp sản phẩm dễ được tìm thấy hơn.'}
-            </p>
           </div>
           <button
             type="button"
@@ -150,7 +151,7 @@ export function ProductFormModal({
               </div>
             )}
 
-            <FormSection id="pf-images" title="Hình ảnh" description="Ảnh bìa là ảnh người mua thấy đầu tiên ở trang tìm kiếm.">
+            <FormSection id="pf-images" title="Hình ảnh" >
               <div data-focus-target="images">
                 <ProductFormImageManager
                   images={formData.images}
@@ -173,14 +174,13 @@ export function ProductFormModal({
             <FormSection
               id="pf-basic"
               title="Thông tin cơ bản"
-              description="Tên, danh mục và thẻ quyết định sản phẩm hiện ra ở đâu."
               action={
                 <button
                   type="button"
                   onClick={() => setShowAiModal(true)}
                   className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-[#BECAB6] bg-[#EAF0E2] px-3 text-[13px] font-semibold text-[#005B00] transition-colors hover:border-[#007700]"
                 >
-                  <Sparkles size={15} aria-hidden /> AI gợi ý tên, giá và từ khóa
+                  Gợi ý tên, giá và từ khóa
                 </button>
               }
             >
@@ -203,7 +203,7 @@ export function ProductFormModal({
               <ProductFormPricing formData={formData} errors={errors} commissionPercent={commissionPercent} onPatch={patch} />
             </FormSection>
 
-            <FormSection id="pf-variants" title="Phân loại" description="Không bắt buộc. Thêm màu và kích thước nếu sản phẩm có nhiều lựa chọn.">
+            <FormSection id="pf-variants" title="Phân loại">
               <div className="space-y-5">
                 {!formData.skus && (
                   <ProductFormColorManager colors={formData.colors} onChangeColors={(colors) => patch({ colors })} />
@@ -272,9 +272,11 @@ export function ProductFormModal({
           initialTitle={formData.title}
           initialMaterial={(formData.materials || []).join(', ')}
           blankCost={0}
+          commissionPercent={commissionPercent}
+          existingContent={{ title: formData.title, description: formData.description }}
           isPod={false}
           onApplyTitle={(t) => patch({ title: t })}
-          onApplyPrice={(p) => patch({ price: p })}
+          onApplyPrice={(p) => patch({ price: toNetPrice(p) })}
           onApplyDescription={(d) => patch({ description: d })}
           onApplyMaterial={(m) => patch({ materials: mergeMaterials(formData.materials, m) })}
           onApplyTags={(tagList) => {
@@ -283,7 +285,7 @@ export function ProductFormModal({
           onApplyAll={(aiData) => {
             const updates: Partial<ProductFormData> = {};
             if (aiData.title) updates.title = aiData.title;
-            if (aiData.price > 0) updates.price = aiData.price;
+            if (aiData.price > 0) updates.price = toNetPrice(aiData.price);
             if (aiData.description) updates.description = aiData.description;
             if (aiData.material) updates.materials = mergeMaterials(formData.materials, aiData.material);
             if (aiData.categoryId) {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { CatalogOption } from '../types/product';
-import { ERROR_TEXT, HINT, LABEL, inputClass } from './form/formUi';
+import { ERROR_TEXT, LABEL, inputClass } from './form/formUi';
 
 interface ProductFormTagFieldProps {
   tags: CatalogOption[];
@@ -82,9 +82,6 @@ export function ProductFormTagField({
         {!catalogLoading && tags.length === 0 && newTagNames.length === 0 && (
           <span className="text-xs text-stone-500">Sàn chưa có thẻ nào. Hãy đề xuất thẻ mới ở ô bên trên.</span>
         )}
-        {!catalogLoading && !query && tags.length > 0 && visible.length === 0 && newTagNames.length === 0 && (
-          <span className="text-xs text-stone-400">Chọn danh mục để xem thẻ gợi ý phù hợp, hoặc gõ thẻ mới phía trên.</span>
-        )}
         {newTagNames.map((name) => (
           <span
             key={`new-${name}`}
@@ -131,11 +128,7 @@ export function ProductFormTagField({
         </button>
       )}
 
-      {error ? (
-        <p role="alert" className={ERROR_TEXT}>{error}</p>
-      ) : (
-        <p className={HINT}>Gõ để lọc rồi bấm chọn thẻ có sẵn. Thẻ bạn tự đề xuất sẽ hiện sau khi sàn duyệt.</p>
-      )}
+      {error && <p role="alert" className={ERROR_TEXT}>{error}</p>}
     </div>
   );
 }

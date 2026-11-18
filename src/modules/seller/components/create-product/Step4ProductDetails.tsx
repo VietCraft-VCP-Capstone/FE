@@ -280,7 +280,7 @@ export function Step4ProductDetails({
                 onClose={() => setIsAiModalOpen(false)}
                 categories={categories}
                 initialCategory={categoryId}
-                initialTitle={title || (blank?.title ? `${blank.title} Nghệ Thuật` : '')}
+                initialTitle={title || blank?.title || ''}
                 initialMaterial={blank?.material || blank?.variations?.[0]?.material || ''}
                 blankCost={baseBlankCost}
                 commissionPercent={commissionPercent}

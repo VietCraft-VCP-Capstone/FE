@@ -17,8 +17,15 @@ const API_ORIGIN = (import.meta.env.VITE_API_URL || (window.location.hostname ==
 /** Ảnh (URL Cloudinary hoặc /uploads của BE) → JPEG base64 thu nhỏ ~1024px để gửi AI (ảnh gốc có thể vài MB). */
 async function imageUrlToDataUrl(url: string, maxSide = 1024): Promise<string> {
   const abs = url.startsWith('http') || url.startsWith('data:') ? url : `${API_ORIGIN}${url}`;
-  const blob = await (await fetch(abs)).blob();
-  const bmp = await createImageBitmap(blob);
+  let bmp: ImageBitmap;
+  try {
+    const res = await fetch(abs);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    bmp = await createImageBitmap(await res.blob());
+  } catch {
+    // Trang chứa ảnh không cho trình duyệt đọc (CORS), link hỏng hoặc không phải ảnh
+    throw new Error('Không đọc được ảnh từ link này (trang chứa ảnh không cho phép hoặc link không phải ảnh). Hãy tải ảnh lên từ máy để AI nhận diện.');
+  }
   const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bmp.width * scale);

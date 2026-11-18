@@ -98,6 +98,8 @@ export const analyticsApi = {
     keywords?: string;
     material?: string;
     blank_cost?: number;
+    /** % hoa hồng sàn: AI dùng để tính giá sàn không bán lỗ và tiền lời sau phí */
+    commission_percent?: number;
   }, signal?: AbortSignal) {
     const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
     return res.data?.data;
