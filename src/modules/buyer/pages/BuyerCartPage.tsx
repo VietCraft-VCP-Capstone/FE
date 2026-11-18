@@ -396,16 +396,16 @@ export function BuyerCartPage() {
                             const hasDiscount = itemDiscount.strikePrice > itemDiscount.finalPrice;
 
                             return (
-                                <div key={item.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow">
+                                <div key={item.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shadow-sm hover:shadow-md transition-shadow">
                                     {/* Left Checkbox and Product Details */}
-                                    <div className="flex items-center gap-4 flex-1">
+                                    <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                                         <input
                                             type="checkbox"
                                             checked={item.checked}
                                             onChange={() => handleToggleCheck(item.id)}
                                             className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
                                         />
-                                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
+                                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
                                             <img 
                                                 src={item.image} 
                                                 alt={item.title} 
@@ -415,7 +415,7 @@ export function BuyerCartPage() {
                                                 }}
                                             />
                                         </div>
-                                        <div className="space-y-1">
+                                        <div className="space-y-1 min-w-0">
                                             <h3 className="font-bold text-gray-900 leading-snug line-clamp-1">{item.title}</h3>
                                             <p className="text-xs text-gray-500">Cửa hàng: <span className="font-medium text-gray-700">{item.shopName}</span></p>
                                             <p className="text-xs text-gray-400">Phân loại: {item.variantName}</p>
@@ -423,8 +423,8 @@ export function BuyerCartPage() {
                                     </div>
 
                                     {/* Right Side: Price, Qty and Delete */}
-                                    <div className="flex items-center gap-6 pr-2">
-                                        <div className="text-right flex flex-col items-end min-w-[120px]">
+                                    <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 pl-7 sm:pl-0 sm:pr-2">
+                                        <div className="sm:text-right flex flex-col sm:items-end sm:min-w-[120px]">
                                             <span className="font-extrabold text-gray-900 text-lg leading-tight">
                                                 {(itemFinalPrice * item.quantity).toLocaleString('vi-VN')}đ
                                             </span>
@@ -517,7 +517,7 @@ export function BuyerCartPage() {
             {/* Bottom bar */}
             {cartItems.length > 0 && (
                 <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] py-4 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mt-8">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+                    <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 flex items-center justify-between gap-3">
                         {/* Select All */}
                         <div className="flex items-center gap-2">
                             <input
@@ -527,17 +527,17 @@ export function BuyerCartPage() {
                                 onChange={handleToggleAll}
                                 className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded cursor-pointer"
                             />
-                            <label htmlFor="selectAll" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
+                            <label htmlFor="selectAll" className="text-xs sm:text-sm whitespace-nowrap font-semibold text-gray-700 cursor-pointer select-none">
                                 Chọn tất cả ({cartItems.length})
                             </label>
                         </div>
 
                         {/* Summary details */}
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-3 sm:gap-6">
                             <div className="text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                    <span className="text-sm text-gray-500 font-medium">Tổng thanh toán ({totalSelectedQty} sản phẩm):</span>
-                                    <span className="text-xl font-black text-[#10b981]">
+                                <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end sm:gap-2">
+                                    <span className="text-xs sm:text-sm text-gray-500 font-medium">Tổng thanh toán ({totalSelectedQty} sản phẩm):</span>
+                                    <span className="text-lg sm:text-xl font-black text-[#10b981]">
                                         {totalPrice.toLocaleString('vi-VN')}đ
                                     </span>
                                 </div>
@@ -549,7 +549,7 @@ export function BuyerCartPage() {
                             </div>
                             <button
                                 onClick={handleCheckout}
-                                className="bg-[#008000] hover:bg-emerald-700 text-white rounded-full py-2.5 px-10 font-bold transition-all shadow-md active:scale-95 text-sm cursor-pointer"
+                                className="bg-[#008000] hover:bg-emerald-700 text-white rounded-full py-2.5 px-5 sm:px-10 whitespace-nowrap font-bold transition-all shadow-md active:scale-95 text-sm cursor-pointer"
                             >
                                 Mua Hàng
                             </button>

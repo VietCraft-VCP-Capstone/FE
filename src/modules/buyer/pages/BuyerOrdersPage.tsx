@@ -519,12 +519,12 @@ export function BuyerOrdersPage() {
                             return (
                                 <div key={order.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                                     {/* Card Header (Shop, Status, Return Badge) */}
-                                    <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/20">
-                                        <div className="flex items-center gap-2">
+                                    <div className="p-4 border-b border-gray-50 flex flex-wrap items-center justify-between gap-2 bg-gray-50/20">
+                                        <div className="flex min-w-0 items-center gap-2">
                                             <Store size={16} className="text-gray-500" />
                                             <span className="font-extrabold text-sm text-gray-800">{order.shopName}</span>
                                         </div>
-                                        <div className="flex items-center gap-2.5">
+                                        <div className="flex flex-wrap items-center gap-2.5 whitespace-nowrap">
                                             <span className="text-[10px] font-bold text-gray-400">Mã đơn: #{order.id}</span>
                                             {activeReturn && (
                                                 <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700">
@@ -556,7 +556,7 @@ export function BuyerOrdersPage() {
                                                     </p>
                                                     <p className="text-xs font-semibold text-gray-500 mt-0.5">x{item.quantity}</p>
                                                 </div>
-                                                <div className="text-right flex flex-col items-end justify-between">
+                                                <div className="shrink-0 whitespace-nowrap text-right flex flex-col items-end justify-between">
                                                     <span className="font-extrabold text-gray-900 text-sm">
                                                         {(item.price * item.quantity).toLocaleString('vi-VN')}đ
                                                     </span>
@@ -605,7 +605,7 @@ export function BuyerOrdersPage() {
                                             </span>
                                         </div>
 
-                                        <div className="flex flex-wrap items-center gap-2">
+                                        <div className="flex flex-wrap items-center justify-end gap-2">
                                             {activeReturn && (
                                                 <button
                                                     type="button"
