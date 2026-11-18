@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { CalendarClock, CheckCircle2, AlertTriangle, ArrowUpRight, HelpCircle, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ApplyPlaybook } from '../../types';
@@ -193,7 +193,7 @@ export function ApplyPlaybookCard({
                         {item.title}
                       </span>
                     </div>
-                    <div className="text-[10px] text-stone-500 truncate mt-0.5">
+                    <div className="text-[11px] text-stone-500 truncate mt-0.5">
                       {isSelectedIdea ? 'Đang xem tiến độ bên dưới' : (item.subtitle || 'Bấm để xem tiến độ')}
                     </div>
                   </div>
@@ -204,7 +204,7 @@ export function ApplyPlaybookCard({
                         e.stopPropagation();
                         onEditSavedIdea(item.id);
                       }}
-                      className="shrink-0 inline-flex items-center gap-1 rounded-md border border-[#007700] bg-emerald-50/60 px-2 py-1 text-[10px] font-bold text-[#007700] hover:bg-[#007700] hover:text-white transition-colors cursor-pointer"
+                      className="shrink-0 inline-flex items-center gap-1 rounded-md border border-[#007700] bg-emerald-50/60 px-2 py-1 text-[11px] font-bold text-[#007700] hover:bg-[#007700] hover:text-white transition-colors cursor-pointer"
                       title="Chỉnh sửa & Tạo sản phẩm thực"
                     >
                       <Pencil size={10} /> Tạo SP

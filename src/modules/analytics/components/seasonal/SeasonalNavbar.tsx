@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   BarChart3,
   LayoutDashboard,
@@ -84,7 +84,7 @@ export const SeasonalNavbar: React.FC<Props> = ({
                     <span>{tab.label}</span>
                     {tab.badge !== undefined && (
                       <span
-                        className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                        className={`px-1.5 py-0.2 rounded-full text-[11px] font-extrabold ${
                           isActive
                             ? 'bg-white/25 text-white'
                             : 'bg-emerald-50 text-emerald-800 border border-emerald-200'

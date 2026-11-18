@@ -1,4 +1,4 @@
-import {
+﻿import {
   CheckCircle2,
   Circle,
   Hourglass,
@@ -74,7 +74,7 @@ export function SeasonalTimelineTab({
             <div className="my-5 rounded-xl bg-stone-50/70 p-4 border border-stone-200/80">
               <div className="relative mb-2 flex items-center justify-between">
                 <div className="flex flex-col items-center">
-                  <span className="text-[10px] font-bold text-rose-600 mb-1">Hôm nay</span>
+                  <span className="text-[11px] font-bold text-rose-600 mb-1">Hôm nay</span>
                   <span className="h-3 w-3 rounded-full bg-rose-600 ring-4 ring-rose-100 shadow-xs" />
                 </div>
 
@@ -83,14 +83,14 @@ export function SeasonalTimelineTab({
                   <span className="text-[11px] font-bold text-stone-800 mt-1">
                     {activeCamp.launch_window?.start ? fullDate(activeCamp.launch_window.start) : 'Trước 6 tuần'}
                   </span>
-                  <span className="text-[10px] text-stone-400">Chuẩn bị</span>
+                  <span className="text-[11px] text-stone-400">Chuẩn bị</span>
                 </div>
 
                 <div className="flex flex-col items-center">
                   <span className="text-[11px] font-bold text-stone-800 mb-1">
                     {activeCamp.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'Hạn chót'}
                   </span>
-                  <span className="text-[10px] text-stone-400 mb-1">Hạn chót đăng bán</span>
+                  <span className="text-[11px] text-stone-400 mb-1">Hạn chót đăng bán</span>
                   <span className="h-3 w-3 rounded-full bg-orange-600 ring-4 ring-orange-100 shadow-xs" />
                 </div>
 
@@ -99,7 +99,7 @@ export function SeasonalTimelineTab({
                   <span className="text-[11px] font-bold text-[#007700] mt-1">
                     {activeCamp.launch_window?.peak_date ? fullDate(activeCamp.launch_window.peak_date) : 'Đỉnh'}
                   </span>
-                  <span className="text-[10px] text-[#007700] font-semibold">Đỉnh sức mua</span>
+                  <span className="text-[11px] text-[#007700] font-semibold">Đỉnh sức mua</span>
                 </div>
               </div>
               <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-rose-500 via-amber-400 via-orange-400 to-[#16a34a]" />

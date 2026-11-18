@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   ChevronDown,
@@ -382,7 +382,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                 {showDetails ? '1. Lượt hiển thị (Impressions)' : '1. Hiển thị'}
               </span>
               {showTrends && hasActualTraffic && !showDetails && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
+                <span className="inline-flex items-center gap-0.5 text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
                   <ArrowUpRight size={10} /> CTR +{ctrLiftPct}% vs ngày thường
                 </span>
               )}
@@ -404,7 +404,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
               className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-500 bg-[#2da874]"
               style={{ width: `${Math.max(10, p1Pct)}%` }}
             >
-              <span className="text-[10px] font-bold text-white tabular-nums">
+              <span className="text-[11px] font-bold text-white tabular-nums">
                 {actualImpressions === 0
                   ? (showDetails ? '0% · Chưa mở cổng' : '0%')
                   : (showDetails && rawP1 > 100 ? `${rawP1}% · Vượt chỉ tiêu` : `${rawP1 > 100 ? rawP1 : p1Pct}%`)}
@@ -423,7 +423,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                   </span>
                 )}
                 {showTrends && showDetails && (
-                  <span className="inline-flex items-center text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
+                  <span className="inline-flex items-center text-[11px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
                     <ArrowUpRight size={10} /> +{ctrLiftPct}% vs ngày thường
                   </span>
                 )}
@@ -459,7 +459,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
               className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-500 bg-[#008f5a]"
               style={{ width: `${Math.max(10, p2Pct)}%` }}
             >
-              <span className="text-[10px] font-bold text-white tabular-nums">
+              <span className="text-[11px] font-bold text-white tabular-nums">
                 {actualClicks === 0
                   ? (showDetails ? '0% · Chưa mở cổng' : '0%')
                   : (showDetails && rawP2 > 100 ? `${rawP2}% · Vượt chỉ tiêu` : `${rawP2 > 100 ? rawP2 : p2Pct}%`)}
@@ -505,7 +505,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
               className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-500 bg-[#007700]"
               style={{ width: `${Math.max(10, p3Pct)}%` }}
             >
-              <span className="text-[10px] font-bold text-white tabular-nums">
+              <span className="text-[11px] font-bold text-white tabular-nums">
                 {actualCartAdds === 0
                   ? (showDetails ? '0% · Chưa mở cổng' : '0%')
                   : (showDetails && rawP3 > 100 ? `${rawP3}% · Vượt chỉ tiêu` : `${rawP3 > 100 ? rawP3 : p3Pct}%`)}
@@ -522,7 +522,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                   Tỷ lệ chuyển đổi (CVR): {realOrderRatePct}% {currentFunnel.conversion_rate_pct && Math.abs(currentFunnel.conversion_rate_pct - realOrderRatePct) > 0.1 ? `(Mục tiêu: ${currentFunnel.conversion_rate_pct}%)` : ''}
                 </span>
                 {showTrends && (
-                  <span className="inline-flex items-center text-[10px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
+                  <span className="inline-flex items-center text-[11px] text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
                     <ArrowUpRight size={10} /> {cvrMultiplier >= 1.2 ? `${cvrMultiplier}x vs ngày thường` : (cvrMultiplier > 1.0 ? `+${Math.round((cvrMultiplier - 1) * 100)}% vs ngày thường` : 'Ổn định vs ngày thường')}
                   </span>
                 )}
@@ -543,7 +543,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                 {showDetails ? '4. Đơn hàng hoàn tất (Orders)' : '4. Đơn hoàn tất'}
               </span>
               {showTrends && hasActualTraffic && !showDetails && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
+                <span className="inline-flex items-center gap-0.5 text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
                   <ArrowUpRight size={10} /> {cvrMultiplier >= 1.2 ? `${cvrMultiplier}x vs ngày thường` : cvrMultiplier > 1.0 ? `+${Math.round((cvrMultiplier - 1) * 100)}% vs ngày thường` : 'Ổn định vs ngày thường'}
                 </span>
               )}
@@ -565,7 +565,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
               className="h-full rounded-lg flex items-center justify-end pr-2 transition-all duration-500 bg-[#005B00]"
               style={{ width: `${Math.max(10, p4Pct)}%` }}
             >
-              <span className="text-[10px] font-bold text-white tabular-nums">
+              <span className="text-[11px] font-bold text-white tabular-nums">
                 {actualOrders === 0
                   ? (showDetails ? '0% · Chưa mở cổng' : '0%')
                   : (showDetails && rawP4 > 100 ? `${rawP4}% · Vượt chỉ tiêu` : `${rawP4 > 100 ? rawP4 : p4Pct}%`)}
@@ -654,7 +654,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                   }`}>
                     Dự thu: {money(sc.projected_gmv)}
                   </div>
-                  <div className="text-[10px] text-stone-400">
+                  <div className="text-[11px] text-stone-400">
                     Căn cứ: {sc.formula_basis}
                   </div>
                 </div>
@@ -730,7 +730,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                           </span>
                         </div>
                         {hasActualTraffic && showTrends && ch.orders_count > 0 && typeof ch.growth_pct === 'number' && ch.growth_pct > 0 && (
-                          <div className="inline-flex items-center gap-0.5 text-[10px] text-emerald-700 font-semibold">
+                          <div className="inline-flex items-center gap-0.5 text-[11px] text-emerald-700 font-semibold">
                             <ArrowUpRight size={10} />
                             <span>+{ch.growth_pct}% vs tuần trước</span>
                           </div>
@@ -743,7 +743,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                           {ch.orders_count} đơn
                         </span>
                         {showDetails && (
-                          <span className="text-[10px] text-stone-400 block">
+                          <span className="text-[11px] text-stone-400 block">
                             {hasActualTraffic ? `${ch.sku_orders} mã SKU` : `~${ch.sku_orders} mã SKU`}
                           </span>
                         )}
@@ -789,7 +789,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                                     <PackageCheck size={14} className="text-[#007700]" />
                                     <span>Quy tắc nhận diện kênh</span>
                                   </div>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-stone-100 text-stone-600">
+                                  <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-stone-100 text-stone-600">
                                     {ch.source_type === 'shop_actual' && ch.orders_count > 0
                                       ? `Đạt ${ch.orders_count} đơn thực tế`
                                       : 'Mục tiêu chuẩn ngành'}
@@ -813,7 +813,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                                         key={tidx}
                                         className="flex items-start gap-2 text-[11px] text-stone-700 leading-snug"
                                       >
-                                        <span className="flex items-center justify-center h-4 w-4 rounded-full bg-emerald-50 text-[#007700] text-[10px] font-bold shrink-0 mt-0.5 border border-emerald-200">
+                                        <span className="flex items-center justify-center h-4 w-4 rounded-full bg-emerald-50 text-[#007700] text-[11px] font-bold shrink-0 mt-0.5 border border-emerald-200">
                                           {tidx + 1}
                                         </span>
                                         <span>{task}</span>
@@ -872,7 +872,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                                               {money(ord.total_amount || 0)}
                                             </span>
                                           </div>
-                                          <p className="text-[10px] text-stone-500 truncate mt-0.5" title={ord.item_summary}>
+                                          <p className="text-[11px] text-stone-500 truncate mt-0.5" title={ord.item_summary}>
                                             {ord.item_summary}
                                           </p>
                                         </div>
@@ -880,7 +880,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                                     </div>
 
                                     {ch.orders_count > 4 && (
-                                      <div className="pt-1.5 border-t border-stone-100 flex items-center justify-between text-[10px] text-stone-400">
+                                      <div className="pt-1.5 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-400">
                                         <span>Hiển thị 4/{ch.orders_count} đơn đối soát gần nhất</span>
                                         <a
                                           href="/seller/orders"
@@ -975,7 +975,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                 <span className="font-bold text-stone-900 text-xs block">
                   {motivation.source_type === 'shop_actual' ? 'Mục đích mua sắm thực tế' : 'Dự báo thị hiếu mua sắm'}
                 </span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                <span className={`text-[11px] font-bold px-1.5 py-0.2 rounded border ${
                   motivation.source_type === 'shop_actual'
                     ? 'text-emerald-800 bg-emerald-50 border-emerald-200/60'
                     : 'text-stone-600 bg-stone-100 border-stone-200'
