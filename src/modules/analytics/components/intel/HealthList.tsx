@@ -1,148 +1,126 @@
-import { Progress, Segmented, Table, Tooltip } from 'antd';
+import { useState } from 'react';
+import { Table, Input, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ListFilter, Info } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, Search, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { formatTodoSummary, plainText, scoreText } from '../../format';
+import { plainText, scoreText, cleanTitle, formatUrgentWarning } from '../../format';
 import type { HealthRow } from '../../healthTypes';
-import { detailLink, RowActions } from '../health/HealthCells';
+import { detailLink } from '../health/HealthCells';
+import { cleanTodoText } from '../health/visibleTodos';
+import { editLink } from '../HealthParts';
 import { Thumb } from '../health/Thumb';
+import { Chip } from '../ui';
 import { healthTier } from './intelLabels';
 
-export const TIERS = ['Cần chú ý', 'Cần cải thiện', 'Tốt'] as const;
+export const TIERS = ['Yếu', 'Cần cải thiện', 'Tốt'] as const;
 export type TierFilter = (typeof TIERS)[number] | '';
+
+function TodoCell({ row }: { row: HealthRow }) {
+  if (row.urgent) {
+    const { short, detail } = formatUrgentWarning(row.top_todo);
+    return (
+      <Tooltip title={detail || undefined} placement="topLeft">
+        <div className="inline-flex max-w-full items-center gap-1.5 text-[13px] font-semibold text-rose-700">
+          <AlertCircle size={14} className="shrink-0" aria-hidden />
+          <span className="truncate">Sửa gấp: {short}</span>
+        </div>
+      </Tooltip>
+    );
+  }
+
+  if (!row.top_todo) {
+    return (
+      <div className="inline-flex items-center gap-1.5 text-[13px] text-stone-500">
+        <CheckCircle2 size={14} className="text-[#007700]" aria-hidden />
+        <span>Không còn việc cần làm</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex max-w-full items-center gap-2 text-[13px] text-stone-800" title={plainText(row.top_todo)}>
+      <span className="w-10 shrink-0 font-bold tabular-nums text-[#007700]">
+        {row.top_impact !== null ? `+${Math.round(row.top_impact)}đ` : ''}
+      </span>
+      <span className="truncate">{cleanTodoText(row.top_todo.split(/\.\s/)[0])}</span>
+    </div>
+  );
+}
 
 const columns: ColumnsType<HealthRow> = [
   {
     title: 'Sản phẩm',
     key: 'title',
-    width: 320,
     render: (_, row) => (
-      <div className="flex min-w-0 items-center gap-3">
-        <Thumb src={row.thumbnail} size={44} />
+      <div className="flex min-w-0 items-center gap-3 py-1">
+        <span className="shrink-0">
+          <Thumb src={row.thumbnail} size={44} />
+        </span>
         <div className="min-w-0">
           <Link
             to={detailLink(row.product_id)}
-            className="line-clamp-2 font-jakarta text-xs font-bold text-stone-900 transition-colors hover:text-[#007700]"
+            className="block truncate text-[13px] font-semibold text-stone-900 no-underline hover:text-[#007700]"
             onClick={e => e.stopPropagation()}
+            title={row.title}
           >
-            {row.title || 'Sản phẩm chưa có tên'}
+            {cleanTitle(row.title)}
           </Link>
-          <span className="text-[10px] font-mono text-stone-400">
-            Mã tin: #{row.product_id.slice(-8).toUpperCase()}
-          </span>
+          <div className="mt-1.5 md:hidden">
+            <TodoCell row={row} />
+          </div>
         </div>
       </div>
     ),
   },
   {
-    title: (
-      <div className="flex items-center gap-1">
-        <span>Điểm chất lượng</span>
-        <Tooltip title="Thang điểm từ 0 đến 100. Từ 80 là Tốt, 50 - 79 là Cần cải thiện, dưới 50 là Cần chú ý.">
-          <Info size={11} className="text-stone-300 hover:text-stone-600 cursor-help" />
-        </Tooltip>
-      </div>
-    ),
+    title: 'Điểm',
     key: 'score',
-    width: 170,
+    width: 80,
+    align: 'right',
     sorter: (a, b) => (a.score ?? -1) - (b.score ?? -1),
+    render: (_, row) =>
+      row.score === null
+        ? <span className="text-xs text-stone-400">Đang chấm</span>
+        : <span className="text-lg font-extrabold tabular-nums text-stone-900">{scoreText(row.score)}</span>,
+  },
+  {
+    title: 'Mức',
+    key: 'tier',
+    width: 150,
     render: (_, row) => {
-      if (row.score === null) {
-        return <span className="text-xs text-stone-400">Đang chờ chấm</span>;
-      }
+      if (row.score === null) return null;
       const tier = healthTier(row.score);
-      const strokeColor =
-        tier.tone === 'good' ? '#007700' : tier.tone === 'warn' ? '#b45309' : '#BA1A1A';
-
-      const badgeClass =
-        tier.tone === 'good'
-          ? 'bg-[#EAF0E2] text-[#007700] border-[#BECAB6]'
-          : tier.tone === 'warn'
-          ? 'bg-amber-50 text-amber-800 border-amber-200'
-          : 'bg-rose-50 text-[#BA1A1A] border-rose-200';
-
-      return (
-        <div className="space-y-1 max-w-[130px]">
-          <div className="flex items-center justify-between">
-            <span className="font-jakarta text-sm font-extrabold tabular-nums text-stone-900">
-              {scoreText(row.score)}
-            </span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${badgeClass}`}>
-              {tier.label}
-            </span>
-          </div>
-          <Progress
-            percent={Math.max(0, Math.min(100, row.score))}
-            strokeColor={strokeColor}
-            showInfo={false}
-            size={['100%', 3]}
-            railColor="#f5f5f4"
-          />
-        </div>
-      );
+      return <Chip tone={tier.tone}>{tier.label}</Chip>;
     },
   },
   {
-    title: (
-      <div className="flex items-center gap-1">
-        <span>Gợi ý ưu tiên sửa</span>
-        <Tooltip title="Hành động có tác động lớn nhất giúp bạn tăng điểm chất lượng tin đăng.">
-          <Info size={11} className="text-stone-300 hover:text-stone-600 cursor-help" />
-        </Tooltip>
-      </div>
-    ),
+    title: 'Việc nên làm trước',
     key: 'todo',
+    width: 300,
     responsive: ['md'],
-    render: (_, row) => {
-      const summary = formatTodoSummary(row.top_todo, row.top_field);
-      if (!summary) {
-        return <span className="text-xs text-[#007700] font-medium">Đã đạt tiêu chuẩn tốt</span>;
-      }
-      return (
-        <Tooltip title={plainText(row.top_todo || '')} placement="topLeft">
-          <div className="flex items-center justify-between gap-3 min-w-0">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span
-                  className={`text-[10px] font-bold px-1.5 py-0.2 rounded border shrink-0 font-mono ${summary.tagColor.bg} ${summary.tagColor.text} ${summary.tagColor.border}`}
-                >
-                  {summary.tag}
-                </span>
-                <span className="text-xs font-semibold text-stone-900 truncate" title={summary.primary}>
-                  {summary.primary}
-                </span>
-              </div>
-              <div className="mt-0.5 text-[11px] text-stone-500 truncate" title={summary.secondary}>
-                {summary.secondary}
-              </div>
-            </div>
-            {row.top_impact !== null && (
-              <Tooltip title="Số điểm bạn sẽ nhận thêm ngay sau khi hoàn thành mục này">
-                <span className="cursor-help text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#EAF0E2] text-[#007700] border border-[#BECAB6] font-mono shrink-0">
-                  +{Math.round(row.top_impact)}đ
-                </span>
-              </Tooltip>
-            )}
-          </div>
-        </Tooltip>
-      );
-    },
+    render: (_, row) => <TodoCell row={row} />,
   },
   {
-    title: 'Thao tác',
     key: 'actions',
     responsive: ['md'],
-    width: 110,
+    width: 70,
     align: 'right',
     render: (_, row) => (
-      <div onClick={e => e.stopPropagation()}>
-        <RowActions id={row.product_id} title={row.title} field={row.top_field} />
-      </div>
+      <Link
+        to={editLink(row.product_id, row.top_field)}
+        onClick={e => e.stopPropagation()}
+        aria-label={`Sửa ${row.title}`}
+        className="inline-flex items-center gap-0.5 text-[13px] font-semibold text-[#007700] no-underline hover:underline"
+      >
+        Sửa
+        <ChevronRight size={14} aria-hidden />
+      </Link>
     ),
   },
 ];
 
 const byScore = (a: HealthRow, b: HealthRow) =>
+  Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)) ||
   (a.score ?? Number.MAX_SAFE_INTEGER) - (b.score ?? Number.MAX_SAFE_INTEGER);
 
 export function HealthList({
@@ -161,73 +139,75 @@ export function HealthList({
   issueLabel?: string;
 }) {
   const navigate = useNavigate();
-  const count = (t: TierFilter) => items.filter(i => !t || healthTier(i.score).label === t).length;
-  const shown = items.filter(i => !filter || healthTier(i.score).label === filter).sort(byScore);
-  const options = (['', ...TIERS] as TierFilter[]).map(t => ({
-    value: t,
-    label: `${t || 'Tất cả'} (${count(t)})`,
-  }));
+  const [search, setSearch] = useState('');
+
+  const filtered = items
+    .filter(i => !filter || healthTier(i.score).label === filter)
+    .filter(i => !search.trim() || (i.title || '').toLowerCase().includes(search.trim().toLowerCase()))
+    .sort(byScore);
+
+  const chips = [
+    ...(filter ? [{ label: `Mức điểm: ${filter}`, clear: () => onFilter('') }] : []),
+    ...(activeIssue && onClearIssue ? [{ label: issueLabel || activeIssue, clear: onClearIssue }] : []),
+  ];
 
   return (
-    <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-2xs">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-start gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#EAF0E2] text-[#007700]">
-            <ListFilter size={15} />
-          </div>
-          <div>
-            <h2 className="m-0 font-jakarta text-sm font-bold tracking-tight text-stone-900">
-              Danh sách chi tiết sản phẩm
-            </h2>
-            <p className="m-0 mt-0.5 text-xs text-stone-500">
-              Sản phẩm có điểm thấp được xếp trước để tiện theo dõi. Bấm vào dòng để xem chi tiết.
-            </p>
-          </div>
+    <section className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-2xs sm:p-6">
+      <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="m-0 text-base font-bold text-stone-900">
+            {filtered.length} sản phẩm
+          </h2>
+          {chips.map(c => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={c.clear}
+              aria-label={`Bỏ lọc ${c.label}`}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-stone-900 px-2.5 py-0.5 text-xs font-semibold text-white transition hover:bg-stone-700"
+            >
+              <span>{c.label}</span>
+              <X size={12} aria-hidden />
+            </button>
+          ))}
         </div>
 
-        <div className="max-w-full overflow-x-auto">
-          <Segmented
-            options={options}
-            value={filter}
-            onChange={v => onFilter(v as TierFilter)}
-            className="!p-0.5 !bg-stone-100"
+        <div className="w-full sm:w-64">
+          <Input
+            prefix={<Search size={14} className="text-stone-400" />}
+            placeholder="Tìm theo tên sản phẩm"
+            allowClear
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="!rounded-xl !border-stone-200 !text-[13px]"
           />
         </div>
       </div>
 
-      {activeIssue && (
-        <div className="mb-3.5 flex items-center justify-between rounded-lg bg-[#EAF0E2]/60 border border-[#BECAB6] px-3.5 py-2 text-xs text-stone-800">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-semibold text-stone-700">Đang lọc theo gợi ý:</span>
-            <span className="font-bold text-[#007700] underline">{issueLabel || activeIssue}</span>
-            <span className="text-stone-500">({shown.length} sản phẩm phù hợp)</span>
-          </div>
-          {onClearIssue && (
-            <button
-              type="button"
-              onClick={onClearIssue}
-              className="text-xs font-bold text-[#007700] hover:text-[#005B00] cursor-pointer"
-            >
-              ✕ Bỏ lọc gợi ý
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <Table
-          rowKey="product_id"
-          columns={columns}
-          dataSource={shown}
-          size="middle"
-          pagination={{ pageSize: 20, hideOnSinglePage: true }}
-          onRow={row => ({
-            onClick: () => navigate(detailLink(row.product_id)),
-            className: 'cursor-pointer transition-colors hover:bg-[#EAF0E2]/25',
-          })}
-          locale={{ emptyText: 'Không có sản phẩm nào phù hợp với bộ lọc hiện tại.' }}
-        />
-      </div>
+      <Table
+        rowKey="product_id"
+        columns={columns}
+        dataSource={filtered}
+        size="small"
+        tableLayout="fixed"
+        pagination={{
+          pageSize: 10,
+          hideOnSinglePage: true,
+          showSizeChanger: true,
+          pageSizeOptions: ['10', '20', '50'],
+          showTotal: (total, range) => (
+            <span className="text-xs text-stone-500">
+              {range[0]} đến {range[1]} trên {total} sản phẩm
+            </span>
+          ),
+          className: '!px-4 !py-3 !m-0 border-t border-stone-100 flex items-center justify-between',
+        }}
+        onRow={row => ({
+          onClick: () => navigate(detailLink(row.product_id)),
+          className: 'cursor-pointer hover:!bg-stone-50/60 transition-colors',
+        })}
+        locale={{ emptyText: 'Không có sản phẩm nào khớp bộ lọc.' }}
+      />
     </section>
   );
 }

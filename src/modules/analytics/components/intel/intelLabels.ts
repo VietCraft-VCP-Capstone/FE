@@ -8,7 +8,7 @@ export const AXIS_LABEL: Record<IntelAxisKey, string> = {
   text: 'Từ khoá',
   tags: 'Tag',
   market: 'Thị hiếu và cạnh tranh',
-  trend: 'Trend và mùa vụ',
+  trend: 'Trend và dịp cao điểm',
 };
 
 export const AXIS_SHORT: Record<IntelAxisKey, string> = { image: 'Ảnh', text: 'Từ khoá', tags: 'Tag', market: 'Thị hiếu', trend: 'Trend' };
@@ -58,7 +58,7 @@ export const AXIS_SIMPLE: Record<IntelAxisKey, string> = {
   text: 'Tiêu đề, mô tả',
   tags: 'Tag',
   market: 'Giá, cạnh tranh',
-  trend: 'Mùa vụ',
+  trend: 'Dịp cao điểm',
 };
 
 export const TIER_COLOR: Record<Tone, string> = {
@@ -69,5 +69,5 @@ export function healthTier(score: number | null): { label: string; tone: Tone } 
   if (score === null) return { label: 'Thiếu dữ liệu', tone: 'neutral' };
   if (score >= 80) return { label: 'Tốt', tone: 'good' };
   if (score >= 50) return { label: 'Cần cải thiện', tone: 'warn' };
-  return { label: 'Cần chú ý', tone: 'bad' };
+  return { label: 'Yếu', tone: 'bad' };
 }

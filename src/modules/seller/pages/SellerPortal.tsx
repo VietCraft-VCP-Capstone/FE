@@ -56,8 +56,6 @@ export function SellerPortal({ user, onLogout }: SellerPortalProps) {
             "Phân tích & AI", nên chuyển tiếp thay vì để người bán gặp trang trắng. Giữ
             chuyển tiếp để đường dẫn cũ ai đã lưu vẫn dùng được. */}
         <Route path="analytics" element={<Navigate to="/seller/insights/overview" replace />} />
-        <Route path="forecast" element={<Navigate to="/seller/insights/forecast" replace />} />
-        <Route path="golden-hour" element={<Navigate to="/seller/insights/categories" replace />} />
         <Route path="price-optimize" element={<Navigate to="/seller/insights/pricing" replace />} />
         <Route path="market-share" element={<Navigate to="/seller/insights/competitors" replace />} />
         <Route path="product-status" element={<Navigate to="/seller/insights/listings" replace />} />

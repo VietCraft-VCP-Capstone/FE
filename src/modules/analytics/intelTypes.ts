@@ -85,7 +85,7 @@ export interface ListingIntel {
   material: IntelMaterial;
   keywords: IntelKeyword[];
   tags: IntelTag[];
-  suggested_tags: { tag: string; reason: string }[];
+  suggested_tags: { tag: string; reason: string; kind?: 'fact' | 'context' }[];
   images: IntelImage[];
   market: IntelMarket | null;
   advice: IntelAdvice[];

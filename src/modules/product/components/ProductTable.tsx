@@ -74,41 +74,63 @@ export function ProductTable({
 
   const renderSparkline = (data?: number[], index: number = 0) => {
     const trendPresets = [
-      { points: [15, 30, 45, 60, 55, 75, 90], pct: '+85%' },
-      { points: [40, 35, 50, 65, 80, 95, 120], pct: '+120%' },
-      { points: [20, 25, 35, 45, 50, 60, 68], pct: '+68%' },
-      { points: [50, 48, 55, 62, 70, 75, 88], pct: '+88%' },
-      { points: [10, 20, 30, 35, 40, 50, 55], pct: '+55%' },
+      [15, 25, 35, 45, 55, 70, 85],
+      [40, 38, 45, 55, 65, 75, 90],
+      [35, 32, 38, 42, 40, 48, 52],
+      [50, 48, 52, 58, 62, 68, 75],
+      [20, 22, 28, 30, 32, 35, 40],
     ];
-    const preset = trendPresets[index % trendPresets.length];
-    const chartData = data && data.length > 2 ? data : preset.points;
-    const pct = data && data.length > 0 ? `+${data[data.length - 1]}%` : preset.pct;
+    const fallback = trendPresets[index % trendPresets.length];
+    const chartData = data && data.length >= 2 ? data : fallback;
+
+    const startVal = chartData[0];
+    const endVal = chartData[chartData.length - 1];
+
+    let pctNum = 0;
+    if (startVal > 0) {
+      pctNum = Math.round(((endVal - startVal) / startVal) * 100);
+    } else if (endVal > 0) {
+      pctNum = 100;
+    } else {
+      pctNum = 0;
+    }
+
+    const isPositive = pctNum > 0;
+    const isNegative = pctNum < 0;
+    const pct = isPositive ? `+${pctNum}%` : `${pctNum}%`;
+    const strokeColor = isNegative ? '#BA1A1A' : isPositive ? '#007700' : '#78716c';
+    const textColor = isNegative ? 'text-[#BA1A1A]' : isPositive ? 'text-[#007700]' : 'text-stone-500';
 
     const min = Math.min(...chartData);
-    const max = Math.max(...chartData) || 1;
+    const max = Math.max(...chartData);
     const width = 56;
     const height = 20;
     const svgPoints = chartData
       .map((val, idx) => {
         const x = (idx / (chartData.length - 1)) * width;
-        const y = height - ((val - min) / (max - min || 1)) * (height - 4) - 2;
+        const y = max === min
+          ? height / 2
+          : height - ((val - min) / (max - min)) * (height - 6) - 3;
         return `${x},${y}`;
       })
       .join(' ');
 
     return (
-      <div className="flex items-center gap-2" title="Chỉ số tương tác 7 ngày qua">
+      <div 
+        className="flex items-center gap-2" 
+        title={`Chỉ số tương tác 7 ngày: ${chartData.join(' → ')} (${pct})`}
+      >
         <svg width={width} height={height} className="overflow-visible">
           <polyline
             fill="none"
-            stroke="#007700"
+            stroke={strokeColor}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             points={svgPoints}
           />
         </svg>
-        <span className="text-xs font-bold text-[#007700] font-inter">{pct}</span>
+        <span className={`text-xs font-bold font-inter ${textColor}`}>{pct}</span>
       </div>
     );
   };
@@ -173,8 +195,8 @@ export function ProductTable({
               <th className="py-4 px-3 w-[13%]">GIÁ BÁN & TỒN KHO</th>
               <th className="py-4 px-3 w-[12%]">
                 <div className="flex items-center gap-1 whitespace-nowrap">
-                  <span>SỨC KHOẺ</span>
-                  <Tooltip title="Chất lượng tin đăng từ 0 - 100: dựa trên ảnh, mô tả, thẻ tag, chất liệu, đánh giá và giá cả. Bấm vào điểm để xem chi tiết.">
+                  <span>TỐI ƯU SẢN PHẨM</span>
+                  <Tooltip title="Điểm tối ưu sản phẩm từ 0 - 100: dựa trên ảnh, mô tả, thẻ tag, chất liệu, đánh giá và giá cả. Bấm vào điểm để xem chi tiết.">
                     <Info size={11} className="text-stone-400 hover:text-stone-600 cursor-help" />
                   </Tooltip>
                 </div>
@@ -289,10 +311,10 @@ export function ProductTable({
                         tier.tone === 'good' ? 'bg-[#007700]' : tier.tone === 'warn' ? 'bg-amber-600' : 'bg-[#BA1A1A]';
                       const tooltipMsg =
                         tier.tone === 'good'
-                          ? `Sức khoẻ tin đăng: ${scoreText(score)}/100 (${tier.label}) — Đầy đủ thông tin, chuẩn chỉnh. Bấm để xem chi tiết.`
+                          ? `Điểm tối ưu sản phẩm: ${scoreText(score)}/100 (${tier.label}) — Đầy đủ thông tin, chuẩn chỉnh. Bấm để xem chi tiết.`
                           : tier.tone === 'warn'
-                          ? `Sức khoẻ tin đăng: ${scoreText(score)}/100 (${tier.label}) — Có một số gợi ý giúp tăng đơn. Bấm để xem.`
-                          : `Sức khoẻ tin đăng: ${scoreText(score)}/100 (${tier.label}) — Thiếu nhiều thông tin quan trọng. Bấm để sửa ngay.`;
+                          ? `Điểm tối ưu sản phẩm: ${scoreText(score)}/100 (${tier.label}) — Có một số gợi ý giúp tăng đơn. Bấm để xem.`
+                          : `Điểm tối ưu sản phẩm: ${scoreText(score)}/100 (${tier.label}) — Thiếu nhiều thông tin quan trọng. Bấm để sửa ngay.`;
 
                       return (
                         <Tooltip title={tooltipMsg} placement="top">
