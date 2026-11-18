@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import {
   Boxes,
   Check,
@@ -295,11 +295,11 @@ export function SeasonalPotentialTab({
                 >
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-[#007700]">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-[#007700]">
                         <Wand2 size={10} /> {ai.source_type === 'llm_scoped' ? 'Ý tưởng AI (Scoped)' : 'Phác thảo dữ liệu'}
                       </span>
                       {draft?.title && (
-                        <span className="rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                        <span className="rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
                           Đã chỉnh sửa
                         </span>
                       )}
@@ -310,7 +310,7 @@ export function SeasonalPotentialTab({
 
                     <div className="flex flex-wrap gap-1">
                       {displayTags.map(tg => (
-                        <span key={tg} className="rounded bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-700">
+                        <span key={tg} className="rounded bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-700">
                           #{tg}
                         </span>
                       ))}
@@ -318,11 +318,11 @@ export function SeasonalPotentialTab({
 
                     <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-50 border border-stone-200/70 p-2.5 text-xs">
                       <div>
-                        <span className="text-[10px] text-stone-500 block">Giá bán đề xuất</span>
+                        <span className="text-[11px] text-stone-500 block">Giá bán đề xuất</span>
                         <strong className="text-[#007700]">{displayPrice.toLocaleString('vi-VN')}đ</strong>
                       </div>
                       <div>
-                        <span className="text-[10px] text-stone-500 block">Biên lãi dự kiến</span>
+                        <span className="text-[11px] text-stone-500 block">Biên lãi dự kiến</span>
                         <strong className="text-stone-900">{ai.expected_margin_pct}%</strong>
                       </div>
                     </div>
@@ -414,7 +414,7 @@ export function SeasonalPotentialTab({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-1.5 mb-1">
                         {item.platform && (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 border border-amber-200">
                             <ShoppingBag size={10} />
                             {item.platform}
                           </span>

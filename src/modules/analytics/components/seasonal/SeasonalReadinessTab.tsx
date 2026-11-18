@@ -57,10 +57,15 @@ export function SeasonalReadinessTab({
   // Danh sách sản phẩm được xem xét: ưu tiên sản phẩm matching, nếu rỗng thì dùng allShopProducts
   const pool = matchingProducts.length > 0 ? matchingProducts : allShopProducts;
 
-  // Giả lập/đọc số đơn hàng của sản phẩm
+  // Đọc số đơn hàng thật của sản phẩm (trả null nếu chưa có dữ liệu, tuyệt đối không giả lập)
   const enrichedPool = useMemo(() => {
-    return pool.map((prod, idx) => {
-      const orders = prod.sold_count ?? prod.orders_count ?? (idx % 3 === 0 ? 0 : idx % 2 === 0 ? 3 : 18);
+    return pool.map((prod) => {
+      const orders: number | null =
+        typeof prod.sold_count === 'number'
+          ? prod.sold_count
+          : typeof prod.orders_count === 'number'
+          ? prod.orders_count
+          : null;
       const analysis = prod?.readiness_analysis;
 
       const checklist: any[] = analysis?.checklist || [
@@ -70,8 +75,8 @@ export function SeasonalReadinessTab({
           is_done: Boolean((prod?.images?.length ?? 0) >= 2 || getProductImageSrc(prod)),
           action_title: `Bổ sung ảnh concept dịp ${campName}`,
           action_detail: `Tải thêm ảnh chụp sản phẩm với bối cảnh hoặc hộp quà theo chủ đề dịp ${campName}.`,
-          market_data: 'Ảnh bối cảnh lễ hội đạt tỷ lệ nhấp chuột (CTR) cao hơn 58% so với ảnh chụp nền trắng trơn.',
-          impact: '+58% CTR nhấp chuột',
+          market_data: 'Ảnh theo chủ đề dịp lễ giúp người mua dễ hình dung sản phẩm khi chọn làm quà tặng.',
+          impact: 'Tăng thu hút thị giác',
         },
         {
           id: 'keywords',
@@ -79,8 +84,8 @@ export function SeasonalReadinessTab({
           is_done: Boolean((prod?.tags?.length ?? 0) > 0 || (prod?.categories?.length ?? 0) > 0),
           action_title: 'Gắn thẻ tag ngách theo dịp',
           action_detail: `Cập nhật thẻ tag đón tìm kiếm sớm trước ngày diễn ra sự kiện.`,
-          market_data: 'Hệ thống tìm kiếm sàn cần từ 5 đến 7 ngày để index từ khóa. Gắn sớm giúp đón đúng đỉnh sóng.',
-          impact: '+42% hiển thị tự nhiên',
+          market_data: 'Hệ thống tìm kiếm sàn cần thời gian để index từ khóa mới. Gắn sớm giúp sản phẩm sẵn sàng khi nhu cầu tăng.',
+          impact: 'Cải thiện hiển thị tìm kiếm',
         },
         {
           id: 'combo',
@@ -88,8 +93,8 @@ export function SeasonalReadinessTab({
           is_done: Boolean(/set|combo|hộp quà|quà tặng/i.test(prod?.title || '')),
           action_title: 'Tạo combo set quà tặng',
           action_detail: 'Thêm phân loại kèm hộp quà nơ đóng sẵn và thiệp chúc mừng viết tay.',
-          market_data: 'Khách mua làm quà tặng sẵn sàng trả thêm 35.000đ - 50.000đ cho hộp nơ đẹp; tăng AOV 1.4x.',
-          impact: 'Tăng 2.4x tỷ lệ chốt đơn',
+          market_data: 'Khách mua làm quà tặng thường ưu tiên các set đóng gói sẵn để tiết kiệm thời gian.',
+          impact: 'Tăng giá trị giỏ hàng',
         },
         {
           id: 'shipping_buffer',
@@ -97,8 +102,8 @@ export function SeasonalReadinessTab({
           is_done: Boolean(activeCamp.occasion_window?.days_to_cutoff && activeCamp.occasion_window.days_to_cutoff > 0),
           action_title: 'Đặt mốc ngưng nhận đơn trước hạn chốt',
           action_detail: `Ngưng nhận đơn sau ngày ${activeCamp.occasion_window?.cut_off_date || 'hạn chốt'} để tránh trễ hạn giao lễ.`,
-          market_data: '92% đánh giá 1 sao vào mùa lễ xuất phát từ việc hàng giao tới sau ngày diễn ra sự kiện.',
-          impact: 'Loại trừ 100% rủi ro hoàn trễ',
+          market_data: 'Giao hàng đúng hẹn trước ngày lễ giúp hạn chế khiếu nại và đánh giá thấp do trễ vận chuyển.',
+          impact: 'Giảm rủi ro hoàn trễ',
         },
       ];
 
@@ -119,8 +124,8 @@ export function SeasonalReadinessTab({
     return {
       all: enrichedPool.length,
       zero: enrichedPool.filter(p => p.computedOrders === 0).length,
-      low: enrichedPool.filter(p => p.computedOrders >= 1 && p.computedOrders <= 4).length,
-      high: enrichedPool.filter(p => p.computedOrders >= 5).length,
+      low: enrichedPool.filter(p => p.computedOrders !== null && p.computedOrders >= 1 && p.computedOrders <= 4).length,
+      high: enrichedPool.filter(p => p.computedOrders !== null && p.computedOrders >= 5).length,
     };
   }, [enrichedPool]);
 
@@ -128,8 +133,8 @@ export function SeasonalReadinessTab({
   const filteredProducts = useMemo(() => {
     return enrichedPool.filter(p => {
       if (filterTier === 'zero' && p.computedOrders !== 0) return false;
-      if (filterTier === 'low' && (p.computedOrders < 1 || p.computedOrders > 4)) return false;
-      if (filterTier === 'high' && p.computedOrders < 5) return false;
+      if (filterTier === 'low' && (p.computedOrders === null || p.computedOrders < 1 || p.computedOrders > 4)) return false;
+      if (filterTier === 'high' && (p.computedOrders === null || p.computedOrders < 5)) return false;
 
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
@@ -181,7 +186,7 @@ export function SeasonalReadinessTab({
             }`}
           >
             <span>Tất cả</span>
-            <span className="text-[10px] opacity-80">({tierCounts.all})</span>
+            <span className="text-[11px] opacity-80">({tierCounts.all})</span>
           </button>
 
           <button
@@ -195,7 +200,7 @@ export function SeasonalReadinessTab({
           >
             <span className="h-2 w-2 rounded-full bg-rose-500" />
             <span>Chưa có đơn</span>
-            <span className="text-[10px]">({tierCounts.zero})</span>
+            <span className="text-[11px]">({tierCounts.zero})</span>
           </button>
 
           <button
@@ -209,7 +214,7 @@ export function SeasonalReadinessTab({
           >
             <span className="h-2 w-2 rounded-full bg-amber-500" />
             <span>Tiềm năng (1–4)</span>
-            <span className="text-[10px]">({tierCounts.low})</span>
+            <span className="text-[11px]">({tierCounts.low})</span>
           </button>
 
           <button
@@ -223,7 +228,7 @@ export function SeasonalReadinessTab({
           >
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
             <span>Bán chạy (5+)</span>
-            <span className="text-[10px]">({tierCounts.high})</span>
+            <span className="text-[11px]">({tierCounts.high})</span>
           </button>
         </div>
 
@@ -283,7 +288,7 @@ export function SeasonalReadinessTab({
                           <button
                             type="button"
                             onClick={() => copyId(String(prod._id))}
-                            className="hover:text-stone-800 flex items-center gap-1 font-mono text-[10px]"
+                            className="hover:text-stone-800 flex items-center gap-1 font-mono text-[11px]"
                             title="Copy ID sản phẩm"
                           >
                             <span>ID: {String(prod._id).slice(-8)}</span>
@@ -295,11 +300,11 @@ export function SeasonalReadinessTab({
                           </button>
                           <span>·</span>
                           <span className="font-semibold text-stone-700">
-                            {prod.computedOrders} đơn đã bán
+                            {prod.computedOrders !== null ? `${prod.computedOrders} đơn đã bán` : 'Chưa có dữ liệu'}
                           </span>
                           <span>·</span>
                           <span className="font-bold text-[#007700]">
-                            {money(prod.original_price || 250000)}
+                            {(prod.original_price ?? prod.price) != null ? money(prod.original_price ?? prod.price) : 'Chưa có giá'}
                           </span>
                         </div>
                       </div>
@@ -327,7 +332,7 @@ export function SeasonalReadinessTab({
                           style={{ width: `${pctComplete}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-stone-400 block">
+                      <span className="text-[11px] text-stone-400 block">
                         {pctComplete === 100 ? 'Sẵn sàng đón bão đơn' : 'Cần tối ưu thêm'}
                       </span>
                     </div>
@@ -389,7 +394,7 @@ export function SeasonalReadinessTab({
                                         <span>{task.label}</span>
                                       </div>
                                       <div className="flex items-center gap-1.5 shrink-0">
-                                        <span className="rounded bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-bold text-amber-950">
+                                        <span className="rounded bg-amber-200/80 px-1.5 py-0.5 text-[11px] font-bold text-amber-950">
                                           Cần làm
                                         </span>
                                         {task.market_data && (

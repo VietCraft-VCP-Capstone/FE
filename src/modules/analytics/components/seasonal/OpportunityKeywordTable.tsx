@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Check,
   Copy,
@@ -263,12 +263,12 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                           )}
                         </button>
                         {kw.listing_type === 'pod' && (
-                          <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-700 border border-sky-200">
+                          <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-bold text-sky-700 border border-sky-200">
                             Phôi POD
                           </span>
                         )}
                         {kw.customizable && (
-                          <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[9px] font-bold text-purple-700 border border-purple-200">
+                          <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[11px] font-bold text-purple-700 border border-purple-200">
                             In tên riêng
                           </span>
                         )}
@@ -284,14 +284,14 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                             <span className="font-bold text-stone-900">
                               {Number((kw as any).sold_count_real).toLocaleString('vi-VN')}
                             </span>
-                            <span className="text-[10px] text-stone-400">lượt bán</span>
+                            <span className="text-[11px] text-stone-400">lượt bán</span>
                           </>
                         ) : (kw as any).trend_index != null ? (
                           <>
                             <span className="font-bold text-stone-900">
                               {(kw as any).trend_index}/100
                             </span>
-                            <span className="text-[10px] text-stone-400">chỉ số tìm kiếm</span>
+                            <span className="text-[11px] text-stone-400">chỉ số tìm kiếm</span>
                           </>
                         ) : (
                           <span className="text-[11px] text-stone-400">Chưa có dữ liệu</span>
@@ -308,7 +308,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                             <span className="font-medium text-stone-700">
                               {kw.competition.toLocaleString('vi-VN')}
                             </span>
-                            <span className="text-[10px] text-stone-400">gian hàng</span>
+                            <span className="text-[11px] text-stone-400">gian hàng</span>
                           </>
                         ) : (
                           <span className="text-[11px] text-stone-400">Chưa đo được</span>
@@ -334,7 +334,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                               <button
                                 type="button"
                                 onClick={() => setOpenProductsKwId(prev => (prev === kw.id ? null : kw.id))}
-                                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1 rounded-full bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
                               >
                                 <Check size={11} />
                                 <span>Đã có ({kw.shop_coverage.matching} mẫu)</span>
@@ -345,7 +345,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                               {isProdsOpen && targetProds.length > 0 && (
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 w-64 rounded-xl border border-stone-200 bg-white p-2.5 text-left shadow-lg">
                                   <div className="flex items-center justify-between border-b border-stone-100 pb-1.5 mb-1.5">
-                                    <span className="text-[10px] font-bold uppercase tracking-wide text-stone-500">
+                                    <span className="text-[11px] font-bold uppercase tracking-wide text-stone-500">
                                       Sản phẩm gắn thẻ ({targetProds.length})
                                     </span>
                                     <button
@@ -372,19 +372,19 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                             </div>
                           );
                         })() : (
-                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 border border-amber-200">
                             Chưa kinh doanh
                           </span>
                         )
                       ) : kw.is_in_shop ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
                           <Check size={11} /> Đã kinh doanh
                         </span>
                       ) : (
                         <span className="text-[11px] text-stone-400">Chưa khai thác</span>
                       )}
                       {kw.search_wow_pct != null && (
-                        <div className="mt-0.5 text-[10px] font-medium text-stone-500">
+                        <div className="mt-0.5 text-[11px] font-medium text-stone-500">
                           Xu hướng 4 tuần: {kw.search_wow_pct > 0 ? '+' : ''}{kw.search_wow_pct}%
                         </div>
                       )}
@@ -475,7 +475,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                       <td colSpan={7} className="p-3.5 pl-12 text-xs text-stone-600 space-y-2">
                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-stone-200/80">
                           <div>
-                            <span className="text-[10px] uppercase font-bold text-stone-400 block">
+                            <span className="text-[11px] uppercase font-bold text-stone-400 block">
                               Mô hình phân phối
                             </span>
                             <span className="font-semibold text-stone-800">
@@ -485,7 +485,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] uppercase font-bold text-stone-400 block">
+                            <span className="text-[11px] uppercase font-bold text-stone-400 block">
                               Cá nhân hóa theo tên
                             </span>
                             <span className="font-semibold text-stone-800">
@@ -493,7 +493,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] uppercase font-bold text-stone-400 block">
+                            <span className="text-[11px] uppercase font-bold text-stone-400 block">
                               Khoảng giá bán trung bình
                             </span>
                             <span className="font-bold text-[#007700]">
@@ -501,7 +501,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] uppercase font-bold text-stone-400 block">
+                            <span className="text-[11px] uppercase font-bold text-stone-400 block">
                               Tỷ lệ chốt đơn kỳ vọng
                             </span>
                             <span className="font-bold text-stone-800">
