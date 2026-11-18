@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Star,
   Store,
@@ -59,7 +59,10 @@ export function BuyerShopPage() {
   const isSeller = user?.role?.toLowerCase() === 'seller';
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
+  // Seller mở ở tab mới (không có lịch sử) thì mới về Quản lý đối thủ; còn lại lùi đúng trang trước.
+  const veQuanLyDoiThu = isSeller && location.key === 'default';
   const productsSectionRef = useRef<HTMLDivElement>(null);
 
   // Shop & Product Data
@@ -334,17 +337,11 @@ export function BuyerShopPage() {
       {/* Nút quay lại & Banner thông báo nếu là seller */}
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <button
-          onClick={() => {
-            if (isSeller) {
-              navigate('/seller/competitors');
-            } else {
-              navigate(-1);
-            }
-          }}
+          onClick={() => (veQuanLyDoiThu ? navigate('/seller/competitors') : navigate(-1))}
           className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-stone-600 transition-colors hover:text-[#15803d]"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>{isSeller ? 'Quay lại Quản lý đối thủ' : 'Quay lại'}</span>
+          <span>{veQuanLyDoiThu ? 'Quay lại Quản lý đối thủ' : 'Quay lại'}</span>
         </button>
 
         {isSeller && (
