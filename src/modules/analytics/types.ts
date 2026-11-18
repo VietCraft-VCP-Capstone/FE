@@ -270,11 +270,13 @@ export interface CompetitorShop {
   price_vnd: { p25: number; median: number; p75: number };
   units_90d: number;
   share_pct: number;
-  /** Sao đã co ngót theo số lượt; null khi chưa có đánh giá. */
+  /** Sao đã co ngót theo số lượt (dùng xếp hạng); null khi chưa có đánh giá. */
   rating: number | null;
+  /** Sao thật: trung bình mọi lượt đánh giá, để hiện như trang shop. */
+  rating_real: number | null;
   n_reviews: number;
   favorites: number;
-  /** Trung vị phút từ lúc khách hỏi tới tin trả lời đầu tiên, đo từ chat 90 ngày; null = dưới 5 lượt hỏi. */
+  /** Trung vị phút từ lúc khách hỏi tới tin trả lời đầu tiên, đo từ chat 90 ngày; null = dưới 6 lượt hỏi. */
   response_minutes: number | null;
   /** % lượt khách hỏi được trả lời; null như trên. */
   reply_rate: number | null;
@@ -289,6 +291,10 @@ export interface CompetitorShop {
   shared_types: string[];
   /** Cùng phân khúc giá với bạn mà bán gấp nhiều lần: shop nên tham khảo. */
   is_peer: boolean;
+  /** Ai trả lời nhanh hơn, chỉ khi Mann–Whitney trên từng lượt hỏi cho p < 0,05. */
+  response_better: 'them' | 'me' | null;
+  /** Đối thủ đăng nhiều sản phẩm mới hơn bạn, kiểm định Poisson p < 0,05. */
+  more_new: boolean;
 }
 
 /** Mỗi sản phẩm trong danh mục một điểm, để vẽ biểu đồ giá theo loại hàng và chất liệu. Chỉ shop thật. */
@@ -519,14 +525,13 @@ export interface PricingAnalysis {
 
 /** AI chấm mức đe doạ của một sản phẩm mới của đối thủ. */
 export interface Threat {
-  score: number;
+  /** high: gần như trùng và rẻ hơn; medium: gần như trùng, hoặc tương tự và rẻ hơn; low: còn lại. */
   level: 'high' | 'medium' | 'low';
   similarity: number;
   matched_product_id: string | null;
   matched_title: string | null;
   /** > 0: đối thủ rẻ hơn sản phẩm khớp của bạn bao nhiêu %. */
   price_gap_pct: number | null;
-  shop_strength: number;
   near_identical?: boolean;
 }
 

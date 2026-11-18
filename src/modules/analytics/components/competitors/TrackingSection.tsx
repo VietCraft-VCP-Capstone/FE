@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BellRing, Eye, Plus, Trash2, UserPlus, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { CartesianGrid, ReferenceArea, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ConfirmModal } from '../../../../shared/components/ConfirmModal';
 import { ModalOverlay } from '../../../../shared/components/ModalOverlay';
 import { useToast } from '../../../../shared/components/Toast';
@@ -33,11 +33,13 @@ export const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> 
   low: { label: 'Cạnh tranh thấp', tone: 'neutral' },
 };
 
+const HANG_MUC: Record<Threat['level'], number> = { high: 0, medium: 1, low: 2 };
+
 /** Sản phẩm mới đụng hàng nào của bạn, nói ngắn; % tương đồng nằm ở chú thích khi rê chuột, chênh giá ở thanh giá bên cạnh. */
 export function lyDoDeDoa(t: Threat, loaiHang?: string | null): string {
   if (!t.matched_title) return 'Bạn chưa bán loại hàng này';
   if (t.near_identical) return `Gần như trùng ${t.matched_title}`;
-  return t.similarity < 0.15 ? `Cùng loại ${(loaiHang ?? 'hàng').toLowerCase()}, mẫu mã khác biệt` : `Giống ${t.matched_title}`;
+  return t.similarity < 0.15 ? `Cùng loại ${(loaiHang ?? 'hàng').toLowerCase()}, mẫu mã khác biệt` : `Tương tự ${t.matched_title}`;
 }
 
 const FIELD_CLASS =
@@ -336,79 +338,89 @@ function DanhSachTheoDoi({ data, onRemove }: { data: CompetitorTracking; onRemov
 }
 
 type HangMoi = Launch & { shop: string | null; shopId: string };
-interface DiemMoi { x: number; y: number; l: HangMoi; trai: boolean }
+interface TuanMoi { nhan: string; khoang: string; low: number; medium: number; high: number; tong: number; sp: HangMoi[] }
 
 const MAU_MUC: Record<Threat['level'], string> = { high: '#d9480f', medium: '#eda100', low: '#a8a29e' };
-const NHAN_VUNG = { fill: '#44403c', fontSize: 12, fontWeight: 600 };
+const MUC_TU_DUOI = ['low', 'medium', 'high'] as const;
+const dauNgay = (v: number) => new Date(v).setHours(0, 0, 0, 0);
 const ngayMs = (v: number) => {
   const d = new Date(v);
   return `${d.getDate()}/${d.getMonth() + 1}`;
 };
 
-function DiemHangMoi({ cx = 0, cy = 0, payload }: { cx?: number; cy?: number; payload?: DiemMoi }) {
-  if (!payload) return null;
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r={7} fill={MAU_MUC[payload.l.threat!.level]} stroke="#fff" strokeWidth={2} />
-      <text x={payload.trai ? cx - 11 : cx + 11} y={cy + 4} textAnchor={payload.trai ? 'end' : 'start'} fontSize={11} fontWeight={700}
-        fill="#1c1917" stroke="#fff" strokeWidth={3} paintOrder="stroke">{payload.l.threat!.score}</text>
-    </g>
-  );
-}
-
-function HangMoiTooltip({ active, payload }: { active?: boolean; payload?: { payload?: DiemMoi }[] }) {
-  const d = payload?.[0]?.payload;
-  if (!active || !d) return null;
-  const th = d.l.threat!;
+function HangMoiTooltip({ active, payload }: { active?: boolean; payload?: { payload?: TuanMoi }[] }) {
+  const t = payload?.[0]?.payload;
+  if (!active || !t || t.tong === 0) return null;
   return (
     // Ô chú thích hẹp hơn biểu đồ trên điện thoại, để không đẩy trang tràn ngang.
-    <div className="rounded-lg border border-[#e3e6e3] bg-white px-3 py-2 text-xs shadow-[0_6px_20px_rgba(16,33,26,0.12)]" style={{ maxWidth: 'min(260px, calc(100vw - 180px))' }}>
-      <div className="font-bold text-stone-900">{d.l.title ?? 'Sản phẩm mới'}</div>
-      <div className="text-stone-600">{d.l.shop} · đăng {ngayNgan(d.l.listed_at)}</div>
-      <div className="text-stone-600">{MUC_DE_DOA[th.level].label}: <strong className="text-stone-900">{th.score}/100</strong></div>
-      <div className="text-stone-600">{lyDoDeDoa(th, d.l.product_type_name)}</div>
-      {d.l.matched_price_vnd !== null && <div className="text-stone-600">Giá {money(d.l.price_vnd)} · của bạn {money(d.l.matched_price_vnd)}</div>}
+    <div className="rounded-lg border border-[#e3e6e3] bg-white px-3 py-2 text-xs shadow-[0_6px_20px_rgba(16,33,26,0.12)]" style={{ maxWidth: 'min(300px, calc(100vw - 120px))' }}>
+      <div className="font-bold text-stone-900">Tuần {t.khoang} · {count(t.tong)} sản phẩm mới</div>
+      {t.sp.slice(0, 4).map(l => (
+        <div key={`${l.shopId}-${l.listing_id}`} className="mt-1 text-stone-600">
+          <span className="mr-1 inline-block h-2 w-2 rounded-sm align-middle" style={{ background: MAU_MUC[l.threat!.level] }} aria-hidden />
+          <span className="font-semibold text-stone-800">{MUC_DE_DOA[l.threat!.level].label} · tương đồng {Math.round(l.threat!.similarity * 100)}%</span>
+          {' '}{l.title ?? 'Sản phẩm mới'} · {l.shop}
+        </div>
+      ))}
+      {t.sp.length > 4 && <div className="mt-1 text-stone-500">và {count(t.sp.length - 4)} sản phẩm khác ở danh sách bên dưới</div>}
     </div>
   );
 }
 
-/** Cùng kiểu với bản đồ Vị thế: mỗi chấm một sản phẩm mới, ngang là ngày đăng, dọc là mức cạnh tranh; số cạnh chấm khớp với danh sách bên dưới. */
-function BieuDoHangMoi({ ds, batDau, goc }: { ds: HangMoi[]; batDau: number; goc: number }) {
+/** Mỗi cột là một tuần: cao bao nhiêu là bấy nhiêu sản phẩm mới, phần màu trong cột là mức cạnh tranh như nhãn ở danh sách bên dưới. */
+function BieuDoHangMoi({ ds, goc }: { ds: HangMoi[]; goc: number }) {
   // shortcut: đọc cỡ màn một lần lúc vẽ như WeeklySalesChart; xoay máy thì chờ lần vẽ sau.
   const hep = typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches;
-  const buoc = (hep ? 14 : 7) * NGAY;
-  const ticks = Array.from({ length: Math.floor((goc - batDau) / buoc) + 1 }, (_, k) => batDau + k * buoc);
-  const tho = ds.map(l => ({ x: Math.min(goc, Math.max(batDau, new Date(l.listed_at).getTime())), y: l.threat!.score, l })).sort((a, b) => a.x - b.x);
-  // Nhãn số mặc định bên phải chấm; sát mép phải, hoặc có chấm khác ngay bên phải cùng tầm điểm, thì đặt bên trái.
-  const diem: DiemMoi[] = tho.map((d, i) => ({
-    ...d,
-    trai: d.x > batDau + 0.86 * (goc - batDau)
-      || (d.x > batDau + 5 * NGAY && tho.slice(i + 1).some(e => e.x - d.x < 7 * NGAY && Math.abs(e.y - d.y) < 12)),
-  }));
-  const soCao = ds.filter(l => l.threat!.level === 'high').length;
+  // Tuần theo ngày lịch, tuần cuối kết thúc hôm nay: một sản phẩm chỉ thuộc đúng một tuần.
+  const tuanDau = dauNgay(goc) - (SO_TUAN * 7 - 1) * NGAY;
+  const tuan: TuanMoi[] = Array.from({ length: SO_TUAN }, (_, k) => {
+    const tu = tuanDau + k * 7 * NGAY;
+    return { nhan: k === SO_TUAN - 1 ? 'Tuần này' : ngayMs(tu), khoang: `${ngayMs(tu)} – ${ngayMs(tu + 6 * NGAY)}`,
+      low: 0, medium: 0, high: 0, tong: 0, sp: [] };
+  });
+  for (const l of ds) {
+    const k = Math.min(SO_TUAN - 1, Math.max(0, Math.floor((dauNgay(new Date(l.listed_at).getTime()) - tuanDau) / (7 * NGAY))));
+    tuan[k][l.threat!.level] += 1;
+    tuan[k].tong += 1;
+    tuan[k].sp.push(l);
+  }
+  const theoMuc = (m: Threat['level']) => ds.filter(l => l.threat!.level === m).length;
   return (
-    <div
-      className="w-full"
-      style={{ height: hep ? 240 : 270 }}
-      role="img"
-      aria-label={`Sản phẩm mới của các shop đang theo dõi trong 8 tuần: ${count(ds.length)} sản phẩm cùng nhóm hàng với bạn, ${count(soCao)} sản phẩm cạnh tranh cao. Trục ngang là ngày đăng, trục dọc là mức cạnh tranh từ 0 tới 100.`}
-    >
-      <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 12, right: 16, bottom: 0, left: 4 }}>
-          <CartesianGrid stroke={CHART_INK.grid} horizontal={false} />
-          <ReferenceArea y1={50} y2={100} fill={MAU_MUC.high} fillOpacity={0.07} ifOverflow="hidden" />
-          <ReferenceArea y1={25} y2={50} fill={MAU_MUC.medium} fillOpacity={0.09} ifOverflow="hidden" />
-          <XAxis type="number" dataKey="x" domain={[batDau, goc]} ticks={ticks} tickFormatter={ngayMs}
-            tick={{ fill: CHART_INK.axis, fontSize: 11 }} tickLine={false} />
-          {/* Tên ba mức ghi ngay trên trục dọc (giữa mỗi vùng) thay cho số, để chữ không đè lên chấm. */}
-          <YAxis type="number" dataKey="y" domain={[0, 100]} ticks={[12.5, 37.5, 75]} width={hep ? 40 : 58}
-            tickFormatter={(v: number) => (v > 50 ? 'Cao' : v > 25 ? 'Vừa' : 'Thấp')}
-            tick={NHAN_VUNG} tickLine={false}
-            label={hep ? undefined : { value: 'Mức cạnh tranh', angle: -90, position: 'insideLeft', offset: 0, fill: CHART_INK.axis, fontSize: 12 }} />
-          <Tooltip content={<HangMoiTooltip />} cursor={false} isAnimationActive={false} />
-          <Scatter data={diem} isAnimationActive={false} shape={(p: unknown) => <DiemHangMoi {...(p as { cx?: number; cy?: number; payload?: DiemMoi })} />} />
-        </ScatterChart>
-      </ResponsiveContainer>
+    <div className="space-y-1.5">
+      {/* Chú thích kèm số đếm từng mức, cùng tên với nhãn ở danh sách bên dưới. */}
+      <p className="m-0 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone-600">
+        {[...MUC_TU_DUOI].reverse().map(m => (
+          <span key={m} className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MAU_MUC[m] }} aria-hidden />
+            {MUC_DE_DOA[m].label} <strong className="text-stone-900">{count(theoMuc(m))}</strong>
+          </span>
+        ))}
+      </p>
+      <div
+        className="w-full"
+        style={{ height: hep ? 220 : 250 }}
+        role="img"
+        aria-label={`Sản phẩm mới của các shop đang theo dõi trong 8 tuần: ${count(ds.length)} sản phẩm cùng nhóm hàng với bạn, ${count(theoMuc('high'))} cạnh tranh cao. Mỗi cột là một tuần, chiều cao là số sản phẩm mới, phần màu là mức cạnh tranh.`}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={tuan} margin={{ top: 20, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid stroke={CHART_INK.grid} vertical={false} />
+            <XAxis dataKey="nhan" tick={{ fill: CHART_INK.axis, fontSize: 11 }} tickLine={false} interval={hep ? 'preserveStartEnd' : 0} />
+            <YAxis allowDecimals={false} width={hep ? 28 : 52} tick={{ fill: CHART_INK.axis, fontSize: 11 }} tickLine={false} axisLine={false}
+              label={hep ? undefined : { value: 'Sản phẩm mới', angle: -90, position: 'insideLeft', offset: 8, fill: CHART_INK.axis, fontSize: 12 }} />
+            <Tooltip content={<HangMoiTooltip />} cursor={{ fill: 'rgba(28,25,23,0.04)' }} isAnimationActive={false} />
+            {MUC_TU_DUOI.map(m => (
+              <Bar key={m} dataKey={m} stackId="muc" fill={MAU_MUC[m]} stroke="#fff" strokeWidth={1} maxBarSize={44} isAnimationActive={false}>
+                {/* Tổng của tuần ghi trên đỉnh cột (gắn vào phần trên cùng); tuần không có hàng mới thì để trống. */}
+                {m === 'high' && (
+                  <LabelList dataKey="tong" position="top" fill="#1c1917" fontSize={12} fontWeight={700}
+                    formatter={(v: unknown) => (Number(v) > 0 ? String(v) : '')} />
+                )}
+              </Bar>
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -419,7 +431,8 @@ function SanPhamMoi({ data, tagName }: { data: CompetitorTracking; tagName: (t: 
   const goc = data.alerts_computed_at ? new Date(data.alerts_computed_at).getTime() : Date.now();
   const ds = data.tracked
     .flatMap(t => (t.launches ?? []).filter(l => l.in_my_niche && l.threat).map(l => ({ ...l, shop: t.shop_name, shopId: t.shop_id })))
-    .sort((a, b) => b.threat!.score - a.threat!.score || b.listed_at.localeCompare(a.listed_at));
+    .sort((a, b) => HANG_MUC[a.threat!.level] - HANG_MUC[b.threat!.level] || b.threat!.similarity - a.threat!.similarity
+      || (b.threat!.price_gap_pct ?? 0) - (a.threat!.price_gap_pct ?? 0) || b.listed_at.localeCompare(a.listed_at));
   const { t, rows } = catTrang(ds, trang, SO_SP_MOI_TRANG);
   const gia = ds.flatMap(l => [l.price_vnd, l.matched_price_vnd ?? l.price_vnd]);
   const lo = Math.min(...gia) * 0.9;
@@ -432,13 +445,13 @@ function SanPhamMoi({ data, tagName }: { data: CompetitorTracking; tagName: (t: 
     <InsightCard
       title="Sản phẩm mới cần lưu ý"
       info={tuKhoa ? `${GIAI_THICH.hangMoi} Từ khoá của shop bạn: ${tuKhoa}.` : GIAI_THICH.hangMoi}
-      action={<NhanTinCay loai="tham" />}
+      action={<NhanTinCay loai="kiem" />}
     >
       {ds.length === 0 ? (
         <Note>Chưa có sản phẩm mới nào cùng nhóm hàng với bạn từ các shop đang theo dõi trong 8 tuần.</Note>
       ) : (
         <div className="space-y-2">
-          <BieuDoHangMoi ds={ds} batDau={goc - SO_TUAN * 7 * NGAY} goc={goc} />
+          <BieuDoHangMoi ds={ds} goc={goc} />
           <ul className="m-0 list-none divide-y divide-stone-100 p-0">
             {rows.map(l => {
               const th = l.threat!;
@@ -446,7 +459,7 @@ function SanPhamMoi({ data, tagName }: { data: CompetitorTracking; tagName: (t: 
               return (
                 <li key={`${l.shopId}-${l.listing_id}`} className="py-2.5">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <Chip tone={MUC_DE_DOA[th.level].tone}>{MUC_DE_DOA[th.level].label} · {th.score}</Chip>
+                    <Chip tone={MUC_DE_DOA[th.level].tone}>{MUC_DE_DOA[th.level].label}</Chip>
                     <span className="min-w-0 font-semibold text-stone-900">{l.title}</span>
                     <span className="text-xs text-stone-500">
                       <Link to={`/seller/competitors/${l.shopId}`} className="text-stone-600 no-underline hover:text-[#007700]">{l.shop}</Link>
@@ -508,7 +521,7 @@ export function TrackingSection({ state, reload, rivals }: {
     const ra = new Map<string, GoiY>();
     for (const s of rivals.rival_shops_by_category?.all ?? rivals.direct_rival_shops ?? []) {
       const o = s.categories?.length ? ` · ở ${s.categories.map(tenDm).join(', ')}` : '';
-      ra.set(s.shop_id, { shop_id: s.shop_id, shop_name: s.shop_name ?? 'Shop chưa đặt tên', why: `Có hàng giống ${count(s.overlap)} sản phẩm của bạn${o}` });
+      ra.set(s.shop_id, { shop_id: s.shop_id, shop_name: s.shop_name ?? 'Shop chưa đặt tên', why: `Có hàng tương tự ${count(s.overlap)} sản phẩm của bạn${o}` });
     }
     const dm = tenDm(rivals.category_id);
     for (const c of rivals.competitors) {
