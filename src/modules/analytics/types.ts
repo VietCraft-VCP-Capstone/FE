@@ -557,6 +557,8 @@ export interface CompetitorTracking {
       threat: Threat | null;
       /** Giá sản phẩm của bạn giống nó nhất. */
       matched_price_vnd: number | null;
+      /** Từ khoá của shop bạn mà sản phẩm này trùng (vì sao nó thuộc ngách của bạn). */
+      matched_tags?: string[];
     }[];
   }[];
   slots_used: number;

@@ -35,11 +35,30 @@ export const MUC_DE_DOA: Record<Threat['level'], { label: string; tone: Tone }> 
 
 const HANG_MUC: Record<Threat['level'], number> = { high: 0, medium: 1, low: 2 };
 
-/** Sản phẩm mới đụng hàng nào của bạn, nói ngắn; % tương đồng nằm ở chú thích khi rê chuột, chênh giá ở thanh giá bên cạnh. */
-export function lyDoDeDoa(t: Threat, loaiHang?: string | null): string {
-  if (!t.matched_title) return 'Bạn chưa bán loại hàng này';
-  if (t.near_identical) return `Gần như trùng ${t.matched_title}`;
-  return t.similarity < 0.15 ? `Cùng loại ${(loaiHang ?? 'hàng').toLowerCase()}, mẫu mã khác biệt` : `Tương tự ${t.matched_title}`;
+const GIONG_MOT_PHAN = 0.15;   // = NGUONG_GIONG của AI (Shopee: bắt được 79% hàng cùng sản phẩm)
+
+/** Nói bằng lời vì sao sản phẩm mới ở mức này: giống mẫu nào của bạn tới đâu, rồi rẻ hơn hay đắt hơn bao nhiêu. */
+function SoVoiBan({ l, tagName }: { l: HangMoi; tagName: (t: string) => string }) {
+  const th = l.threat!;
+  const pct = Math.round(th.similarity * 100);
+  const ten = `“${th.matched_title}”`;
+  const dam = (s: string) => <strong className="font-semibold text-stone-900">{s}</strong>;
+  const giong = !th.matched_title
+    ? <>{dam(`Bạn chưa bán ${(l.product_type_name ?? 'loại hàng này').toLowerCase()}`)}{l.matched_tags?.length ? `, hiện ở đây vì trùng từ khoá “${tagName(l.matched_tags[0])}” của shop bạn` : ''}</>
+    : th.near_identical ? <>{dam('Gần như trùng')} {ten} của bạn (giống {pct}%)</>
+      : th.similarity >= GIONG_MOT_PHAN ? <>{dam('Giống một phần')} {ten} của bạn (giống {pct}%)</>
+        : <>{dam('Khác mẫu')} hàng của bạn, chỉ giống {pct}% với {ten}</>;
+  const g = th.price_gap_pct ?? 0;
+  return (
+    <div className="mt-1 space-y-0.5 text-[13px] leading-snug text-stone-700">
+      <p className="m-0">{giong}</p>
+      <p className="m-0">
+        {l.matched_price_vnd === null ? <>Giá {money(l.price_vnd)}</> : (
+          <>{dam(g > 0 ? `Rẻ hơn ${g}%` : g < 0 ? `Đắt hơn ${-g}%` : 'Ngang giá')}: {money(l.price_vnd)} so với {money(l.matched_price_vnd)} của bạn</>
+        )}
+      </p>
+    </div>
+  );
 }
 
 const FIELD_CLASS =
@@ -434,10 +453,6 @@ function SanPhamMoi({ data, tagName }: { data: CompetitorTracking; tagName: (t: 
     .sort((a, b) => HANG_MUC[a.threat!.level] - HANG_MUC[b.threat!.level] || b.threat!.similarity - a.threat!.similarity
       || (b.threat!.price_gap_pct ?? 0) - (a.threat!.price_gap_pct ?? 0) || b.listed_at.localeCompare(a.listed_at));
   const { t, rows } = catTrang(ds, trang, SO_SP_MOI_TRANG);
-  const gia = ds.flatMap(l => [l.price_vnd, l.matched_price_vnd ?? l.price_vnd]);
-  const lo = Math.min(...gia) * 0.9;
-  const hi = Math.max(...gia) * 1.05;
-  const vi = (v: number) => ((v - lo) / Math.max(hi - lo, 1)) * 100;
   // Từ khoá ngách của bạn: trước là một mục gập riêng, giờ nằm trong ⓘ của thẻ.
   const tuKhoa = data.my_niche_tags.slice(0, 40).map(tagName).join(', ');
 
@@ -452,39 +467,27 @@ function SanPhamMoi({ data, tagName }: { data: CompetitorTracking; tagName: (t: 
       ) : (
         <div className="space-y-2">
           <BieuDoHangMoi ds={ds} goc={goc} />
+          <p className="m-0 border-t border-stone-100 pt-2 text-xs text-stone-500">
+            Mức cạnh tranh: <strong className="font-semibold text-stone-700">cao</strong> khi gần như trùng mẫu của bạn và rẻ hơn;
+            {' '}<strong className="font-semibold text-stone-700">vừa</strong> khi gần như trùng, hoặc giống một phần và rẻ hơn; còn lại là{' '}
+            <strong className="font-semibold text-stone-700">thấp</strong>.
+          </p>
           <ul className="m-0 list-none divide-y divide-stone-100 p-0">
             {rows.map(l => {
               const th = l.threat!;
               const moi = goc - new Date(l.listed_at).getTime() <= 7 * NGAY;
               return (
-                <li key={`${l.shopId}-${l.listing_id}`} className="py-2.5">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <Chip tone={MUC_DE_DOA[th.level].tone}>{MUC_DE_DOA[th.level].label}</Chip>
-                    <span className="min-w-0 font-semibold text-stone-900">{l.title}</span>
-                    <span className="text-xs text-stone-500">
-                      <Link to={`/seller/competitors/${l.shopId}`} className="text-stone-600 no-underline hover:text-[#007700]">{l.shop}</Link>
-                      {' · '}{ngayNgan(l.listed_at)}{moi ? ' · mới tuần này' : ''}
-                    </span>
+                <li key={`${l.shopId}-${l.listing_id}`} className="py-3">
+                  {/* Điện thoại: nhãn mức một dòng riêng để tên sản phẩm có đủ bề ngang. */}
+                  <div className="flex flex-col items-start gap-1 sm:flex-row sm:gap-2">
+                    <Chip tone={MUC_DE_DOA[th.level].tone} className="shrink-0 sm:mt-0.5">{MUC_DE_DOA[th.level].label}</Chip>
+                    <span className="line-clamp-2 min-w-0 font-semibold text-stone-900" title={l.title ?? undefined}>{l.title}</span>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
-                    <span className="text-[13px] text-stone-800" title={th.matched_title ? `Tương đồng ${Math.round(th.similarity * 100)}%` : undefined}>{lyDoDeDoa(th, l.product_type_name)}</span>
-                    {l.matched_price_vnd !== null && (
-                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="relative block h-4 w-32 sm:w-40" aria-hidden>
-                          <span className="absolute inset-x-0 top-[7px] h-0.5 bg-stone-100" />
-                          <span className="absolute top-[7px] h-0.5 bg-stone-400" style={{ left: `${Math.min(vi(l.price_vnd), vi(l.matched_price_vnd))}%`, width: `${Math.abs(vi(l.matched_price_vnd) - vi(l.price_vnd))}%` }} />
-                          <span className="absolute top-0.5 h-3 w-3 -translate-x-1/2 rounded-full ring-2 ring-white" style={{ left: `${vi(l.price_vnd)}%`, background: SERIES.blue }} />
-                          <span className="absolute top-0.5 h-3 w-3 -translate-x-1/2 rounded-full ring-2 ring-white" style={{ left: `${vi(l.matched_price_vnd)}%`, background: SERIES.green }} />
-                        </span>
-                        {/* Chấm màu cạnh từng giá thay cho dòng chú thích riêng. */}
-                        <span className="flex items-center gap-2 whitespace-nowrap text-xs text-stone-700">
-                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: SERIES.blue }} aria-hidden />{money(l.price_vnd)}</span>
-                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: SERIES.green }} aria-hidden />Bạn {money(l.matched_price_vnd)}</span>
-                          {th.price_gap_pct ? <strong className="text-stone-900">{th.price_gap_pct > 0 ? '−' : '+'}{Math.abs(th.price_gap_pct)}%</strong> : null}
-                        </span>
-                      </span>
-                    )}
-                  </div>
+                  <p className="m-0 mt-0.5 text-xs text-stone-500">
+                    <Link to={`/seller/competitors/${l.shopId}`} className="text-stone-600 no-underline hover:text-[#007700]">{l.shop}</Link>
+                    {' · '}đăng {ngayNgan(l.listed_at)}{moi ? ' · mới tuần này' : ''}
+                  </p>
+                  <SoVoiBan l={l} tagName={tagName} />
                 </li>
               );
             })}
