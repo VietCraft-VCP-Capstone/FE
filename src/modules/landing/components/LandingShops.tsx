@@ -54,8 +54,14 @@ export function LandingShops({ shops, onSelectShop }: LandingShopsProps) {
                   
                   <div className="flex items-center gap-1 mt-2 text-xs font-semibold text-amber-500 bg-amber-50/50 border border-amber-100 px-2.5 py-0.5 rounded-full">
                     <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-                    <span>{shop.rating.toFixed(1)}</span>
-                    <span className="text-stone-400">({shop.reviews} reviews)</span>
+                    {shop.reviews > 0 ? (
+                      <>
+                        <span>{shop.rating.toFixed(1)}</span>
+                        <span className="text-stone-400">({shop.reviews} đánh giá)</span>
+                      </>
+                    ) : (
+                      <span className="text-stone-400">Chưa có đánh giá</span>
+                    )}
                   </div>
                 </div>
 
