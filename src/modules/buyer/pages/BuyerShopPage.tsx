@@ -698,15 +698,15 @@ export function BuyerShopPage() {
         </div>
       ) : (
         <div>
-          {/* Vùng sản phẩm kết hợp 2 nút điều hướng bên trái và bên phải (không bao giờ đè lên sản phẩm) */}
+          {/* Vùng sản phẩm kết hợp 2 nút điều hướng bên trái và bên phải (từ sm trở lên) */}
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4 lg:gap-5">
-            {/* Nút mũi tên chuyển trang bên TRÁI */}
+            {/* Nút mũi tên chuyển trang bên TRÁI (từ sm trở lên, trên mobile chuyển xuống cụm phân trang dưới để không đè/ép sản phẩm) */}
             {totalPages > 1 && (
               <button
                 type="button"
                 disabled={currentPage === 1}
                 onClick={() => handlePageChange(currentPage - 1)}
-                className={`shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                className={`hidden sm:flex shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border items-center justify-center transition-all duration-200 ${
                   currentPage === 1
                     ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
                     : 'bg-white text-stone-700 border-stone-200 shadow-md hover:bg-[#15803d] hover:text-white hover:border-[#15803d] hover:scale-105 active:scale-95 cursor-pointer shadow-stone-200/50'
@@ -797,13 +797,13 @@ export function BuyerShopPage() {
               </div>
             </div>
 
-            {/* Nút mũi tên chuyển trang bên PHẢI */}
+            {/* Nút mũi tên chuyển trang bên PHẢI (từ sm trở lên) */}
             {totalPages > 1 && (
               <button
                 type="button"
                 disabled={currentPage === totalPages}
                 onClick={() => handlePageChange(currentPage + 1)}
-                className={`shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                className={`hidden sm:flex shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border items-center justify-center transition-all duration-200 ${
                   currentPage === totalPages
                     ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
                     : 'bg-white text-stone-700 border-stone-200 shadow-md hover:bg-[#15803d] hover:text-white hover:border-[#15803d] hover:scale-105 active:scale-95 cursor-pointer shadow-stone-200/50'
@@ -818,23 +818,55 @@ export function BuyerShopPage() {
 
           {/* Dấu chấm chuyển trang tinh tế và chỉ số trang phía dưới */}
           {totalPages > 1 && (
-            <div className="mt-8 flex flex-col items-center justify-center gap-2">
-              <div className="flex items-center gap-2">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => handlePageChange(p)}
-                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                      currentPage === p
-                        ? 'w-7 bg-[#15803d]'
-                        : 'w-2 bg-stone-300 hover:bg-stone-400'
-                    }`}
-                    aria-label={`Trang ${p}`}
-                    title={`Trang ${p}`}
-                  />
-                ))}
+            <div className="mt-8 flex flex-col items-center justify-center gap-3">
+              <div className="flex items-center gap-3">
+                {/* Trên màn hình nhỏ: nút chuyển trang đặt ở đây để không che hay ép sản phẩm */}
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={`sm:hidden w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                    currentPage === 1
+                      ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
+                      : 'bg-white text-stone-700 border-stone-200 shadow-sm active:scale-95 cursor-pointer'
+                  }`}
+                  aria-label="Trang trước"
+                >
+                  <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => handlePageChange(p)}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                        currentPage === p
+                          ? 'w-7 bg-[#15803d]'
+                          : 'w-2 bg-stone-300 hover:bg-stone-400'
+                      }`}
+                      aria-label={`Trang ${p}`}
+                      title={`Trang ${p}`}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={`sm:hidden w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                    currentPage === totalPages
+                      ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
+                      : 'bg-white text-stone-700 border-stone-200 shadow-sm active:scale-95 cursor-pointer'
+                  }`}
+                  aria-label="Trang sau"
+                >
+                  <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
               </div>
+
               <span className="text-xs text-stone-400 font-medium">
                 Trang {currentPage} / {totalPages} ({totalItems} sản phẩm)
               </span>
