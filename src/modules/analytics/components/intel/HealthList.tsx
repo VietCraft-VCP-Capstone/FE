@@ -1,33 +1,38 @@
 import { useState } from 'react';
-import { Table, Input, Tooltip } from 'antd';
+import { Table, Input } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { AlertCircle, CheckCircle2, ChevronRight, Search, X } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Search, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { plainText, scoreText, cleanTitle, formatUrgentWarning } from '../../format';
+import { plainText, scoreText, cleanTitle } from '../../format';
 import type { HealthRow } from '../../healthTypes';
+import type { HealthStatus } from '../../types';
 import { detailLink } from '../health/HealthCells';
+import { STATUS_INFO } from '../health/factorState';
 import { cleanTodoText } from '../health/visibleTodos';
 import { editLink } from '../HealthParts';
 import { Thumb } from '../health/Thumb';
-import { Chip } from '../ui';
-import { healthTier } from './intelLabels';
+import { Chip, type Tone } from '../ui';
 
-export const TIERS = ['Yếu', 'Cần cải thiện', 'Tốt'] as const;
-export type TierFilter = (typeof TIERS)[number] | '';
+export const TIERS = ['good', 'needs_improvement', 'poor', 'blocked'] as const;
+export type Tier = (typeof TIERS)[number];
+export type TierFilter = Tier | '';
+
+export const TIER_INFO: Record<Tier, { label: string; tone: Tone }> = {
+  ...STATUS_INFO,
+  blocked: { label: 'Bị chặn bán', tone: 'bad' },
+};
+
+export function tierOf(row: Pick<HealthRow, 'status' | 'score'>): HealthStatus | null {
+  if (row.status) return row.status;
+  if (row.score === null) return null;
+  if (row.score >= 80) return 'good';
+  return row.score >= 50 ? 'needs_improvement' : 'poor';
+}
+
+export const inTier = (row: HealthRow, filter: TierFilter) =>
+  !filter || (filter === 'blocked' ? row.blockers.length > 0 : tierOf(row) === filter);
 
 function TodoCell({ row }: { row: HealthRow }) {
-  if (row.urgent) {
-    const { short, detail } = formatUrgentWarning(row.top_todo);
-    return (
-      <Tooltip title={detail || undefined} placement="topLeft">
-        <div className="inline-flex max-w-full items-center gap-1.5 text-[13px] font-semibold text-rose-700">
-          <AlertCircle size={14} className="shrink-0" aria-hidden />
-          <span className="truncate">Sửa gấp: {short}</span>
-        </div>
-      </Tooltip>
-    );
-  }
-
   if (!row.top_todo) {
     return (
       <div className="inline-flex items-center gap-1.5 text-[13px] text-stone-500">
@@ -39,9 +44,6 @@ function TodoCell({ row }: { row: HealthRow }) {
 
   return (
     <div className="flex max-w-full items-center gap-2 text-[13px] text-stone-800" title={plainText(row.top_todo)}>
-      <span className="w-10 shrink-0 font-bold tabular-nums text-[#007700]">
-        {row.top_impact !== null ? `+${Math.round(row.top_impact)}đ` : ''}
-      </span>
       <span className="truncate">{cleanTodoText(row.top_todo.split(/\.\s/)[0])}</span>
     </div>
   );
@@ -73,24 +75,34 @@ const columns: ColumnsType<HealthRow> = [
     ),
   },
   {
-    title: 'Điểm',
+    title: 'Độ hoàn thiện',
     key: 'score',
-    width: 80,
+    width: 150,
     align: 'right',
     sorter: (a, b) => (a.score ?? -1) - (b.score ?? -1),
-    render: (_, row) =>
-      row.score === null
-        ? <span className="text-xs text-stone-400">Đang chấm</span>
-        : <span className="text-lg font-extrabold tabular-nums text-stone-900">{scoreText(row.score)}</span>,
+    render: (_, row) => (
+      <div className="flex flex-col items-end">
+        {row.score === null
+          ? <span className="text-xs text-stone-400">Đang chấm</span>
+          : <span className="text-lg font-extrabold tabular-nums text-stone-900">{scoreText(row.score)}</span>}
+        <span className="whitespace-nowrap text-[11px] tabular-nums text-stone-500">
+          {row.coverage ? `Đánh giá ${row.coverage.evaluated}/${row.coverage.total} tiêu chí` : '—'}
+        </span>
+      </div>
+    ),
   },
   {
     title: 'Mức',
     key: 'tier',
     width: 150,
     render: (_, row) => {
-      if (row.score === null) return null;
-      const tier = healthTier(row.score);
-      return <Chip tone={tier.tone}>{tier.label}</Chip>;
+      const tier = tierOf(row);
+      return (
+        <div className="flex flex-col items-start gap-1">
+          {tier && <Chip tone={TIER_INFO[tier].tone}>{TIER_INFO[tier].label}</Chip>}
+          {row.blockers.length > 0 && <Chip tone="bad">Bị chặn bán</Chip>}
+        </div>
+      );
     },
   },
   {
@@ -120,7 +132,7 @@ const columns: ColumnsType<HealthRow> = [
 ];
 
 const byScore = (a: HealthRow, b: HealthRow) =>
-  Number(Boolean(b.urgent)) - Number(Boolean(a.urgent)) ||
+  Number(b.blockers.length > 0) - Number(a.blockers.length > 0) ||
   (a.score ?? Number.MAX_SAFE_INTEGER) - (b.score ?? Number.MAX_SAFE_INTEGER);
 
 export function HealthList({
@@ -142,12 +154,12 @@ export function HealthList({
   const [search, setSearch] = useState('');
 
   const filtered = items
-    .filter(i => !filter || healthTier(i.score).label === filter)
+    .filter(i => inTier(i, filter))
     .filter(i => !search.trim() || (i.title || '').toLowerCase().includes(search.trim().toLowerCase()))
     .sort(byScore);
 
   const chips = [
-    ...(filter ? [{ label: `Mức điểm: ${filter}`, clear: () => onFilter('') }] : []),
+    ...(filter ? [{ label: `Mức điểm: ${TIER_INFO[filter].label}`, clear: () => onFilter('') }] : []),
     ...(activeIssue && onClearIssue ? [{ label: issueLabel || activeIssue, clear: onClearIssue }] : []),
   ];
 
@@ -156,7 +168,7 @@ export function HealthList({
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="m-0 text-base font-bold text-stone-900">
-            {filtered.length} sản phẩm
+           Shop đang có {filtered.length} sản phẩm
           </h2>
           {chips.map(c => (
             <button

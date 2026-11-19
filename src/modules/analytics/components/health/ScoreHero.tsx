@@ -1,43 +1,46 @@
 import { scoreText } from '../../format';
-import type { ListingHealth } from '../../healthTypes';
-import { healthTier, TIER_COLOR } from '../intel/intelLabels';
+import type { HealthBlocker, ListingHealth } from '../../healthTypes';
+import type { HealthStatus } from '../../types';
+import { TIER_COLOR } from '../intel/intelLabels';
 import { Chip } from '../ui';
-import { CAP_FIELD, scorePlan } from './visibleTodos';
+import { statusInfo } from './factorState';
 
-function verdict(data: ListingHealth): { lead: string; rest?: string } {
-  const { now, todos, potential } = scorePlan(data);
-  if (data.cap) {
-    const where = data.cap.fields.map(f => CAP_FIELD[f] ?? f).join(', ');
-    return {
-      lead: `Điểm đang bị khoá ở ${Math.floor(data.cap.score)}`,
-      rest: `Còn lỗi ở ${where}. Sửa lỗi gấp trước, điểm sẽ lên ${Math.floor(data.cap.raw)}.`,
-    };
-  }
-  if (potential > Math.floor(now)) return { lead: `Còn ${todos.length} việc để lên ${potential} điểm` };
-  return { lead: 'Sản phẩm đã tối ưu tốt', rest: 'Không còn việc nào tăng thêm điểm.' };
+const statusOf = (data: ListingHealth): HealthStatus | null => {
+  if (data.status) return data.status;
+  if (typeof data.score !== 'number') return null;
+  if (data.score >= 80) return 'good';
+  return data.score >= 50 ? 'needs_improvement' : 'poor';
+};
+
+function Blockers({ items }: { items: HealthBlocker[] }) {
+  return (
+    <div className="mt-3 rounded-lg bg-red-50 p-3">
+      <Chip tone="bad">Bị chặn bán</Chip>
+      <ul className="m-0 mt-2 list-none space-y-1 p-0 text-sm text-red-800">
+        {items.map(b => <li key={b.message}>{b.message}</li>)}
+      </ul>
+    </div>
+  );
 }
 
 export function ScoreHero({ data }: { data: ListingHealth }) {
-  const tier = healthTier(data.score);
-  const v = verdict(data);
-  const { now, potential } = scorePlan(data);
+  const info = statusInfo(statusOf(data));
+  const now = data.score ?? 0;
+  const { coverage } = data;
+  const blockers = data.blockers ?? [];
   return (
     <div>
-      <div className="flex items-baseline gap-2">
+      <p className="m-0 mb-1.5 text-xs font-semibold text-stone-500">Độ hoàn thiện trang sản phẩm</p>
+      <div className="flex flex-wrap items-baseline gap-2">
         <span className="font-jakarta text-6xl font-extrabold leading-none tabular-nums text-stone-900">{scoreText(data.score)}</span>
         <span className="text-lg font-semibold text-stone-400">/100</span>
-        <Chip tone={tier.tone}>{tier.label}</Chip>
+        <Chip tone={info.tone}>{info.label}</Chip>
       </div>
-      <div
-        className="relative mt-4 h-2 overflow-hidden rounded-full bg-stone-100"
-        role="img"
-        aria-label={`Đang ${Math.floor(now)} điểm, có thể lên ${potential} điểm`}
-      >
-        <div className="absolute inset-y-0 left-0 rounded-full bg-[#007700]/25" style={{ width: `${potential}%` }} />
-        <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, now)}%`, background: TIER_COLOR[tier.tone] }} />
+      <div className="relative mt-4 h-2 overflow-hidden rounded-full bg-stone-100" role="img" aria-label={`Đang ${Math.floor(now)} điểm`}>
+        <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, now)}%`, background: TIER_COLOR[info.tone] }} />
       </div>
-      <p className={`m-0 mt-3 text-base font-bold leading-snug ${data.cap ? 'text-rose-800' : 'text-stone-900'}`}>{v.lead}</p>
-      {v.rest && <p className="m-0 mt-0.5 text-sm text-stone-600">{v.rest}</p>}
+      {coverage && <p className="m-0 mt-3 text-sm text-stone-600">Đánh giá {coverage.evaluated}/{coverage.total} tiêu chí</p>}
+      {blockers.length > 0 && <Blockers items={blockers} />}
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useInsight } from '../../hooks/useInsight';
 import type { ListingRanking, RankMetric } from '../../rankingTypes';
 import { InsightBlock } from '../InsightBlock';
-import { SourceFooter } from '../SourceFooter';
 import { RankingHighlights } from './RankingHighlights';
 import { RankingTable } from './RankingTable';
 import { metricOf, ranked } from './rankingMetrics';
@@ -16,7 +15,7 @@ export function RankingView({ params, setParam }: { params: URLSearchParams; set
 
   return (
     <InsightBlock state={ranking.state} onRetry={ranking.reload}>
-      {(data, meta) => {
+      {data => {
         const items = data.items.filter(i => !category || i.category === category);
         const rows = ranked(items, metric).map((item, i) => ({ ...item, rank: i + 1 }));
         return (
@@ -41,7 +40,6 @@ export function RankingView({ params, setParam }: { params: URLSearchParams; set
 
             <RankingHighlights items={items} active={metric} onPick={setMetric} />
             <RankingTable data={data} rows={rows} metric={metric} category={category} onCategory={c => setParam('cat', c)} />
-            <SourceFooter meta={meta} />
           </div>
         );
       }}

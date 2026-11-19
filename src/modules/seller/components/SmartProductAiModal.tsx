@@ -12,6 +12,9 @@ export interface SmartProductAiModalProps {
   initialTitle?: string;
   initialMaterial?: string;
   blankCost?: number;
+  /** Form sản phẩm thường: giá vốn seller nhập để AI gợi ý giá (POD dùng giá phôi ở blankCost) */
+  initialCost?: string;
+  onCostChange?: (value: string) => void;
   /** % hoa hồng sàn cộng lên giá seller nhận → giá niêm yết. POD: lời = giá niêm yết bỏ hoa hồng − giá phôi */
   commissionPercent?: number | null;
   /** Tên/mô tả seller đã có trong form: "Áp dụng tất cả" sẽ hỏi xác nhận trước khi ghi đè */
@@ -43,6 +46,8 @@ export function SmartProductAiModal({
   initialTitle = '',
   initialMaterial = '',
   blankCost = 0,
+  initialCost = '',
+  onCostChange,
   commissionPercent = null,
   existingContent,
   isPod = false,
@@ -75,6 +80,9 @@ export function SmartProductAiModal({
   // Mô tả cho sửa ngay trong modal
   const [descDraft, setDescDraft] = useState('');
   const [loadingStep, setLoadingStep] = useState(0);
+  const [costInput, setCostInput] = useState(initialCost);
+  const unitCost = isPod ? blankCost : Number(costInput.replace(/\D/g, '')) || 0;
+  const needsCost = !isPod && unitCost <= 0;
   // Hộp xác nhận khi "Áp dụng tất cả" sẽ thay tên/mô tả seller đã viết
   const [overwriteAsk, setOverwriteAsk] = useState(false);
 
@@ -106,7 +114,7 @@ export function SmartProductAiModal({
         category_name: catName,
         keywords: kwToUse.trim(),
         material: matToUse.trim(),
-        blank_cost: blankCost,
+        blank_cost: unitCost,
         product_type: isPod ? 'pod' : 'general',
         commission_percent: commissionPercent ?? undefined,
       }, controller.signal);
@@ -154,7 +162,7 @@ export function SmartProductAiModal({
     } finally {
       if (inflightRef.current === controller) setLoading(false);
     }
-  }, [selectedCategory, keywordIdea, material, blankCost, commissionPercent, isPod, categories]);
+  }, [selectedCategory, keywordIdea, material, unitCost, commissionPercent, isPod, categories]);
 
   useEffect(() => {
     if (isOpen) {
@@ -244,7 +252,7 @@ export function SmartProductAiModal({
   };
 
   const handleApplyAllChanges = (confirmed = false) => {
-    const finalPrice = chosenPrice || data?.pricing_insight?.recommended_price || 0;
+    const finalPrice = needsCost ? 0 : (chosenPrice || data?.pricing_insight?.recommended_price || 0);
     const finalMarkup = chosenMarkup;
     const finalTitle = chosenTitle || (data?.suggested_titles?.[0] ?? '');
     const finalDesc = descDraft;
@@ -538,7 +546,30 @@ export function SmartProductAiModal({
                     </h4>
                   </div>
 
-                  {data.pricing_insight.recommended_price <= 0 || data.pricing_insight.method === 'none' ? (
+                  {!isPod && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={costInput}
+                        aria-label="Giá vốn"
+                        placeholder="Giá vốn / sản phẩm (đ), bắt buộc để gợi ý giá"
+                        onChange={e => { setCostInput(e.target.value); onCostChange?.(e.target.value); }}
+                        onKeyDown={e => { if (e.key === 'Enter' && unitCost > 0) fetchSuggestion(); }}
+                        className="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-xs focus:outline-none focus:border-emerald-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fetchSuggestion()}
+                        disabled={unitCost <= 0 || loading}
+                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {needsCost ? 'Gợi ý giá' : 'Cập nhật'}
+                      </button>
+                    </div>
+                  )}
+
+                  {needsCost ? null : data.pricing_insight.recommended_price <= 0 || data.pricing_insight.method === 'none' ? (
                     <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl text-center space-y-1.5">
                       <p className="text-xs font-bold text-stone-700">
                         Chưa tìm thấy đủ sản phẩm tương tự để gợi ý giá
@@ -624,7 +655,7 @@ export function SmartProductAiModal({
                         ];
                         const shown = priceChoice === 'custom' ? (Number(customPrice) || 0) : chosenPrice;
                         // Lỗ khi số seller nhận (đã trừ phí sàn) không đủ trả giá phôi
-                        const warn = shown > 0 && blankCost > 0 && netFor(shown) <= blankCost
+                        const warn = shown > 0 && unitCost > 0 && netFor(shown) <= unitCost
                           ? 'Sau khi trừ phí sàn, giá này không đủ trả giá phôi, bạn sẽ bán lỗ.'
                           : shown > 0 && shown < pi.price_range.low
                             ? 'Rẻ hơn hầu hết sản phẩm tương tự.'

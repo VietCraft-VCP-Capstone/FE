@@ -39,6 +39,7 @@ export interface MoneyReport {
     without_orders: number;
     without_avg_vnd: number;
   } | null;
+  voucher_stock: VoucherStock;
   market: {
     category_slug: string;
     total: number;
@@ -52,4 +53,20 @@ export interface MoneyReport {
 
 export interface MoneyAdvice { source: 'llm' | 'none'; provider: string | null; tips: Partial<Record<AdviceKey, string>> }
 
-export type AdviceKey = 'cost' | 'voucher' | 'product' | 'pod';
+export type AdviceKey = 'next_voucher';
+
+export type VoucherStatus = 'ok' | 'unused' | 'low' | 'expiring' | 'ended';
+
+export interface VoucherStock {
+  total: number;
+  active: number;
+  used: number;
+  limit: number;
+  idle: number;
+  items: { code: string; title: string; type: string; value: number; used: number; limit: number; orders_in_range: number; end_date: string | null; status: VoucherStatus }[];
+  suggest: { type: string; action?: 'keep' | 'reactivate' | 'create'; code?: string | null; reason: string; points?: string[]; draft?: VoucherDraft | null } | null;
+}
+
+export interface VoucherDraft {
+  code: string; title: string; value: number; min_order: number; max_discount: number; limit: number; days: number;
+}

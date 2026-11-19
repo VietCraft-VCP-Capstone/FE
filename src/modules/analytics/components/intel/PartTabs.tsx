@@ -1,8 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Tabs } from 'antd';
-import { Layers, Image, FileText, Tag, BarChart2, TrendingUp, DollarSign } from 'lucide-react';
+import { Layers, Image, FileText, Tag, TrendingUp, DollarSign } from 'lucide-react';
 import type { IntelAxisKey, ListingIntel } from '../../intelTypes';
-import { SellChanceCard } from '../health/SellChanceCard';
 import { ImagePanel } from './ImagePanel';
 import { AXIS_KEYS, AXIS_SIMPLE } from './intelLabels';
 import { KeywordPanel } from './KeywordPanel';
@@ -10,7 +9,7 @@ import { MarketPanel } from './MarketPanel';
 import { TagPanel } from './TagPanel';
 import { TrendTimeline } from './TrendTimeline';
 
-type Part = IntelAxisKey | 'sell';
+type Part = IntelAxisKey;
 
 const TAB_ICONS: Record<Part, typeof Image> = {
   image: Image,
@@ -18,16 +17,14 @@ const TAB_ICONS: Record<Part, typeof Image> = {
   tags: Tag,
   market: DollarSign,
   trend: TrendingUp,
-  sell: BarChart2,
 };
 
-function panel(part: Part, data: ListingIntel, productId?: string): ReactNode {
+function panel(part: Part, data: ListingIntel): ReactNode {
   if (part === 'image') return <ImagePanel images={data.images} bare />;
   if (part === 'text') return <KeywordPanel keywords={data.keywords} material={data.material} bare />;
   if (part === 'tags') return <TagPanel tags={data.tags} suggested={data.suggested_tags} bare />;
   if (part === 'market') return <MarketPanel market={data.market} bare />;
-  if (part === 'trend') return <TrendTimeline points={data.score_timeline} bare />;
-  return productId ? <SellChanceCard productId={productId} /> : null;
+  return <TrendTimeline points={data.score_timeline} bare />;
 }
 
 const DETAIL_KEYS: IntelAxisKey[] = ['image', 'text', 'tags'];
@@ -48,21 +45,20 @@ export function PartTabs({
 }) {
   const keys = productId ? DETAIL_KEYS : AXIS_KEYS;
   const [active, setActive] = useState<Part>(() => weakest(data, keys));
-  const parts: Part[] = productId ? [...keys, 'sell'] : keys;
 
-  const tabItems = parts.map(p => {
+  const tabItems = keys.map(p => {
     const Icon = TAB_ICONS[p] ?? Layers;
     return {
       key: p,
       label: (
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
           <Icon size={14} />
-          {p === 'sell' ? 'Dự đoán đơn hàng' : AXIS_SIMPLE[p]}
+          {AXIS_SIMPLE[p]}
         </span>
       ),
       children: (
         <div className="pt-2">
-          {panel(p, data, productId)}
+          {panel(p, data)}
         </div>
       ),
     };

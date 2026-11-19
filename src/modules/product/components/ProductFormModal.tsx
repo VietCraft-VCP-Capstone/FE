@@ -75,6 +75,7 @@ export function ProductFormModal({
   } = useProductFormState(isOpen, product, prefill);
   const [showCatModal, setShowCatModal] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
+  const [aiCost, setAiCost] = useState('');
   const [activeId, setActiveId] = useState('pf-images');
 
   useFocusFormField(formRef, isOpen, focusField, catalogSettled);
@@ -271,7 +272,8 @@ export function ProductFormModal({
           initialCategory={formData.categoryId}
           initialTitle={formData.title}
           initialMaterial={(formData.materials || []).join(', ')}
-          blankCost={0}
+          initialCost={aiCost}
+          onCostChange={setAiCost}
           commissionPercent={commissionPercent}
           existingContent={{ title: formData.title, description: formData.description }}
           isPod={false}

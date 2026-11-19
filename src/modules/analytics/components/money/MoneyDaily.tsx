@@ -3,27 +3,16 @@ import { InsightCard } from '../ui';
 import { compactMoney } from '../../../../shared/utils/format';
 import { NA, shortDate } from '../../format';
 import type { MoneyReport } from '../../moneyTypes';
-import { bucketOf, dailyStats, toPoints, type ChartMode } from './dailyData';
+import { dailyStats, type ChartMode } from './dailyData';
 import { MoneyDailyChart } from './MoneyDailyChart';
 
-const GROUP_NOTE = { day: false, week: 'Gộp theo tuần.', month: 'Gộp theo tháng.' } as const;
-const DAY_LABEL = { day: 'Theo ngày', week: 'Theo tuần', month: 'Theo tháng' } as const;
 
 export function MoneyDaily({ data, onPick }: { data: MoneyReport; onPick: (from: string, to: string) => void }) {
   const [mode, setMode] = useState<ChartMode>('day');
-  const bucket = bucketOf(data.by_day.length);
-  const points = useMemo(() => toPoints(data.by_day, bucket), [data, bucket]);
-  const stats = useMemo(() => dailyStats(data.by_day), [data]);
-  const loss = data.by_day.filter(d => d.net_vnd < 0).length;
-  const notes = [
-    'Đơn đã giao xong, xếp theo ngày đặt, đã trừ tiền hoàn.',
-    GROUP_NOTE[bucket],
-    mode === 'cum'
-      ? 'Đường đi lên dốc là lúc tiền về nhiều, đoạn phẳng là những ngày không có đơn.'
-      : loss > 0 && `${loss} ngày bị âm do hoàn tiền (cột đỏ).`,
-  ];
+  const days = data.by_day;
+  const stats = useMemo(() => dailyStats(days), [days]);
   const modes: [ChartMode, string][] = [
-    ['day', DAY_LABEL[bucket]],
+    ['day', 'Từng kỳ'],
     ['cum', 'Cộng dồn'],
   ];
   const cells: [string, string][] = [
@@ -33,7 +22,7 @@ export function MoneyDaily({ data, onPick }: { data: MoneyReport; onPick: (from:
   ];
 
   return (
-    <InsightCard title="Thực nhận theo ngày" description={notes.filter(Boolean).join(' ')} bodyClassName="px-4 py-3">
+    <InsightCard title="Thực nhận theo thời gian" bodyClassName="px-4 py-3">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <dl className="grid flex-1 grid-cols-3 gap-3">
           {cells.map(([label, value]) => (
@@ -59,7 +48,7 @@ export function MoneyDaily({ data, onPick }: { data: MoneyReport; onPick: (from:
           ))}
         </div>
       </div>
-      <MoneyDailyChart points={points} avg={bucket === 'day' ? stats.avg : 0} mode={mode} onPick={onPick} />
+      <MoneyDailyChart byDay={days} avg={stats.avg} mode={mode} onPick={onPick} />
     </InsightCard>
   );
 }

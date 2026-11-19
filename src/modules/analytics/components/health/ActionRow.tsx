@@ -7,14 +7,12 @@ export function ActionRow({
   text,
   sub,
   hint,
-  gain,
   to,
   cta = 'Sửa',
 }: {
   text: string;
   sub?: ReactNode;
   hint?: string;
-  gain?: number;
   to?: string | null;
   cta?: string;
 }) {
@@ -24,7 +22,7 @@ export function ActionRow({
   const row = (
     <div className="group flex items-center gap-3 py-3">
       <span className={`w-12 shrink-0 text-sm font-bold tabular-nums ${urgent ? 'text-rose-700' : 'text-[#007700]'}`}>
-        {urgent ? 'Gấp' : gain !== undefined && gain >= 0.5 ? `+${Math.round(gain)}đ` : ''}
+        {urgent ? 'Gấp' : ''}
       </span>
       <div className="min-w-0 flex-1">
         {hint ? <Tooltip title={hint} placement="topLeft">{title}</Tooltip> : title}

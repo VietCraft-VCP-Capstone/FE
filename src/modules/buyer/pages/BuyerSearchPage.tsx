@@ -209,21 +209,22 @@ export function BuyerSearchPage() {
         </div>
 
         <section className="min-w-0">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#e7e5e4] bg-white px-5 py-3">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-[13px] font-bold text-[#78716c]">Sắp xếp theo:</span>
+          <div className="mb-5 flex items-center justify-between gap-3 rounded-[14px] border border-[#e7e5e4] bg-white px-3 py-2.5 sm:flex-wrap sm:px-5 sm:py-3">
+            {/* Điện thoại: các nút sắp xếp nằm một hàng cuộn ngang thay vì xuống 3 dòng. */}
+            <div className="no-scrollbar flex min-w-0 items-center gap-2.5 overflow-x-auto sm:flex-wrap">
+              <span className="shrink-0 text-[13px] font-bold text-[#78716c]">Sắp xếp theo:</span>
               {SORT_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
                   type="button"
                   onClick={() => updateQuery({ sort: opt.key })}
-                  className={`cursor-pointer rounded-[20px] border px-3.5 py-1.5 text-[12px] font-bold transition-all duration-150 ${sortParam === opt.key ? 'border-[#007700] bg-[#007700] text-white' : 'border-[#e7e5e4] bg-white text-[#44403c]'}`}
+                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-[20px] border px-3.5 py-1.5 text-[12px] font-bold transition-all duration-150 ${sortParam === opt.key ? 'border-[#007700] bg-[#007700] text-white' : 'border-[#e7e5e4] bg-white text-[#44403c]'}`}
                 >
                   {opt.label}
                 </button>
               ))}
             </div>
-            <div className="text-[13px] text-[#78716c]">
+            <div className="hidden shrink-0 whitespace-nowrap text-[13px] text-[#78716c] sm:block">
               Trang <strong className="text-[#1c1917]">{pageParam}</strong> / {totalPages || 1}
             </div>
           </div>

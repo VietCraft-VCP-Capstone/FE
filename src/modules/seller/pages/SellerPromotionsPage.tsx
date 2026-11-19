@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Ticket, Plus, Search, Trash2, Tag, Flame, Truck, Percent,
     Coins, Calendar, Check, Copy, X, AlertCircle, RefreshCw,
@@ -121,8 +122,27 @@ export function SellerPromotionsPage() {
         return selectableProducts.filter(p => p.title.toLowerCase().includes(term));
     }, [selectableProducts, productSearch]);
 
+    // ?new=FLASH_SALE&code=...&value=... (từ gợi ý voucher ở trang Thực nhận): mở sẵn hộp tạo mã đã điền
+    const [searchParams, setSearchParams] = useSearchParams();
     useEffect(() => {
         fetchCoupons();
+        const preset = searchParams.get('new');
+        if (preset && ['PERCENTAGE', 'FIXED_AMOUNT', 'FREE_SHIPPING', 'FLASH_SALE', 'BUNDLE'].includes(preset)) {
+            const num = (k: string, d?: number) => (searchParams.get(k) !== null && !isNaN(Number(searchParams.get(k))) ? Number(searchParams.get(k)) : d);
+            const days = num('days', 7) as number;
+            setFormData({
+                ...initialForm, discount_type: preset as CouponDiscountType,
+                code: (searchParams.get('code') || '').toUpperCase(), title: searchParams.get('title') || '',
+                discount_value: num('value', initialForm.discount_value) as number,
+                min_order_value: num('min', initialForm.min_order_value),
+                max_discount_amount: num('max', initialForm.max_discount_amount) || undefined,
+                usage_limit: num('limit', initialForm.usage_limit),
+                end_date: new Date(Date.now() + days * 86400000).toISOString().slice(0, 16),
+            });
+            setShowModal(true);
+            fetchSelectableProducts();
+            setSearchParams({}, { replace: true });
+        }
     }, []);
 
     const handleCopy = (code: string) => {

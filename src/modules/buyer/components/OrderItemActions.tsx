@@ -41,7 +41,7 @@ export function OrderItemActions({ orderId, item, eligibility, reviewable, onRev
   if (eligibility?.deadline) query.set('deadline', eligibility.deadline);
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 max-lg:[&>*]:flex-1 [&>*]:whitespace-nowrap">
       {reviewable && <>
       <button
         type="button"
