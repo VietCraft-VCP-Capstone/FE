@@ -342,7 +342,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         </div>
 
         {vouchers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 16px', background: '#fafaf9', borderRadius: 16, color: '#78716c' }}>
+          <div style={{ textAlign: 'center', padding: 'clamp(16px, 5vw, 32px) 16px', background: '#fafaf9', borderRadius: 16, color: '#78716c' }}>
             <Ticket size={32} style={{ margin: '0 auto 8px', color: '#a8a29e' }} />
             <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>Hiện chưa có mã ưu đãi công khai nào đang mở.</p>
           </div>
@@ -423,17 +423,18 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         </div>
 
         {flashDeals.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '36px 16px', background: '#fafaf9', borderRadius: 16, color: '#78716c', border: '1px dashed #e7e5e4' }}>
+          <div style={{ textAlign: 'center', padding: 'clamp(16px, 5vw, 36px) 16px', background: '#fafaf9', borderRadius: 16, color: '#78716c', border: '1px dashed #e7e5e4' }}>
             <Flame size={32} style={{ margin: '0 auto 8px', color: '#f59e0b' }} />
             <p style={{ fontWeight: 700, fontSize: 14, color: '#44403c', margin: 0 }}>
               Hiện chưa có sản phẩm Flash Sale chớp nhoáng nào đang mở.
             </p>
-            <p style={{ fontSize: 12, color: '#a8a29e', marginTop: 4, marginBottom: 12 }}>
+            <p className="hidden sm:block" style={{ fontSize: 12, color: '#a8a29e', margin: '4px 0 0' }}>
               Các gian hàng sẽ sớm tung ra khung giờ vàng giá sốc. Bạn hãy lưu voucher trước để sẵn sàng săn sale nhé!
             </p>
             <button
               onClick={() => navigate('/vouchers')}
               style={{
+                marginTop: 12,
                 backgroundColor: '#008000',
                 color: '#fff',
                 padding: '6px 16px',
@@ -677,7 +678,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
             {suggestedShops.length > 0 && (
               <>
                 <h3 style={{ fontSize: 15, fontWeight: 700, color: '#330033', margin: '20px 0 12px' }}>Gợi ý gian hàng nên theo dõi</h3>
-                <div className="buyer-grid-3">
+                <div className="buyer-grid-3 buyer-scroll-row">
                   {suggestedShops.map((shop, i) => {
                     const targetShop = shop.id || shop.slug;
                     const isFollowing = followingShopId === shop.shopId;
@@ -729,7 +730,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
             )}
           </>
         ) : (
-        <div className="buyer-grid-3">
+        <div className="buyer-grid-3 buyer-scroll-row">
           {subbedShops.map((shop, i) => {
             const targetShop = shop.id || shop.slug;
             return (
@@ -791,11 +792,11 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       </section>
 
       {/* Styles Discovery Section */}
-      <section id="collections-section" className="buyer-section pb-12" style={{ marginTop: 40, marginBottom: 40 }}>
+      <section id="collections-section" className="buyer-section" style={{ marginTop: 40, marginBottom: 40 }}>
         <div className="section-head" style={{ marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Khám phá các phong cách mới</h2>
         </div>
-        <div className="buyer-grid-3">
+        <div className="buyer-grid-3 buyer-scroll-row">
           <div className="style-card text-card-1" onClick={() => navigate('/')}>
             <img src="https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=400" alt="Vẻ Đẹp Đương Đại" />
             <div className="style-overlay">
