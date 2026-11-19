@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { CartesianGrid, ComposedChart, ReferenceArea, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { compactMoney } from '../../../../shared/utils/format';
 import { CHART_INK } from '../../../../shared/components/charts/chartTheme';
@@ -8,21 +8,27 @@ import { DailyHoverTip } from './DailyTooltip';
 import { DailyMiniMap } from './DailyMiniMap';
 import { PickBar } from './PickBar';
 import { cumSeries, daySeries } from './dailySeries';
-import { panBy, signedAxis, tickIndices, zoomAt, type ChartMode, type DayPoint } from './dailyData';
+import type { MoneyReport } from '../../moneyTypes';
+import { bucketOf, panBy, signedAxis, tickIndices, toPoints, zoomAt, type ChartMode } from './dailyData';
 
 const PAD_L = 40;
 const PAD_R = 8;
 const TICK = { fill: CHART_INK.axis, fontSize: 11 };
+const BUCKET_TEXT = { day: 'Theo ngày', week: 'Theo tuần', month: 'Theo tháng' } as const;
 
-interface Props { points: DayPoint[]; avg: number; mode: ChartMode; onPick: (from: string, to: string) => void }
+interface Props { byDay: MoneyReport['by_day']; avg: number; mode: ChartMode; onPick: (from: string, to: string) => void }
 
-export function MoneyDailyChart({ points, avg, mode, onPick }: Props) {
-  const n = points.length;
-  const zoomable = n > 7;
+export function MoneyDailyChart({ byDay, avg, mode, onPick }: Props) {
+  const days = useMemo(() => toPoints(byDay, 'day'), [byDay]);
+  const n = days.length;
+  const zoomable = n > 2;
   const minSpan = Math.min(4, n - 1);
   const { view, target, setTarget, reset } = useSmoothWindow(n, minSpan);
   const span = view.e - view.s;
   const zoomed = span < n - 1 - 0.01;
+  const bucket = bucketOf(span + 1);
+  const points = useMemo(() => toPoints(byDay, bucket), [byDay, bucket]);
+  const labelAt = useMemo(() => new Map(points.map(p => [p.i, p.label])), [points]);
   const [hover, setHover] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const [brush, setBrush] = useState<{ a: number; b: number } | null>(null);
@@ -35,6 +41,7 @@ export function MoneyDailyChart({ points, avg, mode, onPick }: Props) {
     return Math.min(1, Math.max(0, (x - left) / plotW()));
   };
   const hoverAt = (x: number) => Math.min(n - 1, Math.max(0, Math.round(view.s + fracAt(x) * span)));
+  const groupAt = (d: number) => points.findIndex(p => p.s <= d && d <= p.e);
 
   useWheelZoom(ref, zoomable, e => {
     const k = e.deltaMode === 1 ? 33 : 1;
@@ -68,7 +75,7 @@ export function MoneyDailyChart({ points, avg, mode, onPick }: Props) {
   };
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
     if (brush) { setBrush({ ...brush, b: hoverAt(e.clientX) }); return; }
-    if (lastX.current === null) { setHover(hoverAt(e.clientX)); return; }
+    if (lastX.current === null) { setHover(groupAt(hoverAt(e.clientX))); return; }
     const t = target.current;
     const dx = e.clientX - lastX.current;
     lastX.current = e.clientX;
@@ -81,6 +88,8 @@ export function MoneyDailyChart({ points, avg, mode, onPick }: Props) {
     setDragging(false);
   };
 
+  const visible = points.filter(p => p.e >= view.s && p.s <= view.e).length;
+  const hp = hover !== null && hover >= 0 ? points[hover] : undefined;
   const axis = signedAxis(points.map(p => (mode === 'cum' ? p.cum : p.net)));
   const cursor = zoomed ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : zoomable ? 'cursor-crosshair' : '';
 
@@ -101,11 +110,11 @@ export function MoneyDailyChart({ points, avg, mode, onPick }: Props) {
         className={`relative rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007700] ${cursor}`}
       >
         <ResponsiveContainer width="100%" height={260}>
-          <ComposedChart data={points} margin={{ top: 16, right: 8, left: -12, bottom: 0 }}>
+          <ComposedChart data={points} margin={{ top: 24, right: 8, left: -12, bottom: 0 }}>
             <CartesianGrid stroke={CHART_INK.grid} vertical={false} />
             <XAxis
               type="number" dataKey="i" domain={[view.s - 0.5, view.e + 0.5]} allowDataOverflow
-              ticks={tickIndices(view, n)} tickFormatter={i => points[Number(i)]?.label ?? ''}
+              ticks={tickIndices(points, view)} tickFormatter={i => labelAt.get(Number(i)) ?? ''}
               interval={0} tickLine={false} axisLine={false} tick={TICK} dy={4}
             />
             <YAxis
@@ -114,22 +123,23 @@ export function MoneyDailyChart({ points, avg, mode, onPick }: Props) {
               tickFormatter={v => (Number(v) === 0 ? '0' : compactMoney(Number(v)))}
             />
             {brush && <ReferenceArea x1={Math.min(brush.a, brush.b) - 0.5} x2={Math.max(brush.a, brush.b) + 0.5} fill="#007700" fillOpacity={0.15} stroke="#007700" strokeOpacity={0.4} ifOverflow="hidden" />}
-            {hover !== null && <ReferenceArea x1={hover - 0.5} x2={hover + 0.5} fill="#007700" fillOpacity={0.06} stroke="none" ifOverflow="hidden" />}
+            {hp && <ReferenceArea x1={hp.s - 0.5} x2={hp.e + 0.5} fill="#007700" fillOpacity={0.06} stroke="none" ifOverflow="hidden" />}
             {mode === 'cum'
-              ? cumSeries({ points, hover })
-              : daySeries({ avg, hover, barSize: Math.round(Math.min(56, Math.max(4, (plotW() / (span + 1)) * 0.6))) })}
+              ? cumSeries({ point: hp })
+              : daySeries({ avg: bucket === 'day' ? avg : 0, hover: hp?.i ?? null, values: visible <= 12, barSize: Math.round(Math.min(140, Math.max(4, (plotW() / (span + 1)) * (n / points.length) * 0.72))) })}
           </ComposedChart>
         </ResponsiveContainer>
-        {hover !== null && !dragging && <DailyHoverTip point={points[hover]} mode={mode} rel={(hover - view.s + 0.5) / (span + 1)} />}
+        {hp && !dragging && <DailyHoverTip point={hp} mode={mode} rel={(hp.i - view.s + 0.5) / (span + 1)} />}
+        <span className="pointer-events-none absolute left-12 top-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-600">{BUCKET_TEXT[bucket]}</span>
       </div>
       {zoomable && (
         <>
           <DailyMiniMap
-            points={points} view={view}
+            points={days} view={view}
             onPan={d => setTarget(panBy(target.current, n, minSpan, d), true)}
             onJump={c => setTarget({ s: c - span / 2, e: c + span / 2 })}
           />
-          <PickBar points={points} view={view} zoomed={zoomed} onReset={reset} onPick={onPick} />
+          <PickBar points={days} view={view} zoomed={zoomed} onReset={reset} onPick={onPick} />
         </>
       )}
     </div>

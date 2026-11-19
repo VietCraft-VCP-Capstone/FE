@@ -1,4 +1,4 @@
-import { Area, Bar, Line, ReferenceDot, Rectangle, ReferenceLine } from 'recharts';
+import { Area, Bar, LabelList, Line, ReferenceDot, Rectangle, ReferenceLine } from 'recharts';
 import { BRAND } from '../ui';
 import { compactMoney } from '../../../../shared/utils/format';
 import type { DayPoint } from './dailyData';
@@ -8,7 +8,7 @@ const RED = '#DC2626';
 interface BarShapeProps { x: number; y: number; width: number; height: number; payload: DayPoint }
 
 // Plain functions, not components: recharts only recognises its own element types among children.
-export function daySeries({ avg, hover, barSize }: { avg: number; hover: number | null; barSize: number }) {
+export function daySeries({ avg, hover, barSize, values }: { avg: number; hover: number | null; barSize: number; values: boolean }) {
   const opacity = (i: number) => (hover === null ? 0.85 : hover === i ? 1 : 0.35);
   return [
     avg > 0 && (
@@ -22,23 +22,22 @@ export function daySeries({ avg, hover, barSize }: { avg: number; hover: number 
         const s = p as BarShapeProps;
         return <Rectangle {...s} fill={s.payload.net < 0 ? RED : BRAND} fillOpacity={opacity(s.payload.i)} style={{ transition: 'fill-opacity 150ms' }} />;
       }}
-    />,
+    >
+      {values && <LabelList dataKey="net" position="top" offset={6} fill="#44403c" fontSize={12} fontWeight={600} formatter={(v: unknown) => (Number(v) ? compactMoney(Number(v)) : '')} />}
+    </Bar>,
     <Line key="empty" dataKey="empty" stroke="none" dot={{ r: 3, fill: '#d6d3d1', stroke: 'none' }} activeDot={false} isAnimationActive={false} legendType="none" />,
   ];
 }
 
-export function cumSeries({ points, hover }: { points: DayPoint[]; hover: number | null }) {
+export function cumSeries({ point }: { point?: DayPoint }) {
   return [
     <Area
       key="cum"
       type="monotone" dataKey="cum" stroke={BRAND} strokeWidth={2} fill={BRAND} fillOpacity={0.08}
       dot={false} activeDot={false} isAnimationActive={false}
     />,
-    hover !== null && (
-      <ReferenceDot
-        key="cum-dot"
-        x={hover} y={points[hover].cum} r={4} fill={BRAND} stroke="#fff" strokeWidth={2} ifOverflow="hidden"
-      />
+    point && (
+      <ReferenceDot key="cum-dot" x={point.i} y={point.cum} r={4} fill={BRAND} stroke="#fff" strokeWidth={2} ifOverflow="hidden" />
     ),
   ];
 }

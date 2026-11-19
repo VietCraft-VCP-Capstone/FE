@@ -3,48 +3,48 @@ import type { MoneyReport } from '../../moneyTypes';
 
 type Day = MoneyReport['by_day'][number];
 
-export interface DayPoint { i: number; key: string; end: string; label: string; full: string; net: number; cum: number; orders: number; empty: number | null }
+/** i: tâm cột tính theo chỉ số ngày; s..e: các ngày cột này gộp */
+export interface DayPoint { i: number; s: number; e: number; key: string; end: string; label: string; full: string; net: number; cum: number; orders: number; empty: number | null }
 
 export type Win = { s: number; e: number };
 export type ChartMode = 'day' | 'cum';
 export type Bucket = 'day' | 'week' | 'month';
 
-export const bucketOf = (days: number): Bucket => (days <= 45 ? 'day' : days <= 180 ? 'week' : 'month');
+/** Chọn độ gộp theo số ngày đang hiện trên biểu đồ. */
+export const bucketOf = (days: number): Bucket => (days >= 28 ? 'month' : days >= 7 ? 'week' : 'day');
 
-function groupBy(byDay: Day[], bucket: Bucket): Day[][] {
-  if (bucket === 'day') return byDay.map(d => [d]);
-  if (bucket === 'week') return Array.from({ length: Math.ceil(byDay.length / 7) }, (_, i) => byDay.slice(i * 7, i * 7 + 7));
-  const months = new Map<string, Day[]>();
-  for (const d of byDay) months.set(d.date.slice(0, 7), [...(months.get(d.date.slice(0, 7)) ?? []), d]);
-  return [...months.values()];
+function keyOf(date: string, bucket: Bucket) {
+  if (bucket === 'day') return date;
+  if (bucket === 'month') return date.slice(0, 7);
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
 }
 
 function labels(first: string, last: string, bucket: Bucket) {
   if (bucket === 'day') return { label: shortDate(first), full: fullDate(first) };
   if (bucket === 'week') return { label: shortDate(first), full: `Tuần ${shortDate(first)} – ${shortDate(last)}` };
   const [y, m] = first.split('-');
-  return { label: `T${Number(m)}/${y.slice(2)}`, full: `Tháng ${Number(m)}/${y}` };
+  const whole = first.endsWith('-01') && new Date(`${last}T00:00:00Z`).getUTCDate() === new Date(Date.UTC(+y, +m, 0)).getUTCDate();
+  return { label: `T${Number(m)}/${y.slice(2)}`, full: `Tháng ${Number(m)}/${y}${whole ? '' : ` (${shortDate(first)} – ${shortDate(last)})`}` };
 }
 
 export function toPoints(byDay: Day[], bucket: Bucket): DayPoint[] {
-  const groups = groupBy(byDay, bucket);
+  const groups: { s: number; days: Day[] }[] = [];
+  byDay.forEach((d, idx) => {
+    const g = groups[groups.length - 1];
+    if (g && keyOf(g.days[0].date, bucket) === keyOf(d.date, bucket)) g.days.push(d);
+    else groups.push({ s: idx, days: [d] });
+  });
   let cum = 0;
-  return groups.map((g, i) => {
-    const first = g[0].date;
-    const last = g[g.length - 1].date;
-    const orders = g.reduce((s, d) => s + d.orders, 0);
-    const net = g.reduce((s, d) => s + d.net_vnd, 0);
+  return groups.map(({ s, days }) => {
+    const first = days[0].date;
+    const last = days[days.length - 1].date;
+    const orders = days.reduce((t, d) => t + d.orders, 0);
+    const net = days.reduce((t, d) => t + d.net_vnd, 0);
     cum += net;
-    return {
-      i,
-      key: first,
-      end: last,
-      ...labels(first, last, bucket),
-      net,
-      cum,
-      orders,
-      empty: orders === 0 ? 0 : null,
-    };
+    const e = s + days.length - 1;
+    return { i: (s + e) / 2, s, e, key: first, end: last, ...labels(first, last, bucket), net, cum, orders, empty: orders === 0 ? 0 : null };
   });
 }
 
@@ -86,10 +86,8 @@ export function panBy(w: Win, n: number, minSpan: number, delta: number): Win {
   return clampWin({ s: w.s + delta, e: w.e + delta }, n, minSpan);
 }
 
-export function tickIndices(w: Win, n: number): number[] {
-  const k = Math.max(1, Math.ceil((w.e - w.s + 1) / 8));
-  const out: number[] = [];
-  for (let i = Math.ceil(w.s); i <= Math.min(n - 1, Math.floor(w.e)); i++) if (i % k === 0) out.push(i);
-  return out;
+export function tickIndices(points: DayPoint[], w: Win): number[] {
+  const vis = points.filter(p => p.i >= w.s - 0.5 && p.i <= w.e + 0.5);
+  const k = Math.max(1, Math.ceil(vis.length / 8));
+  return vis.filter((_, j) => j % k === 0).map(p => p.i);
 }
-
