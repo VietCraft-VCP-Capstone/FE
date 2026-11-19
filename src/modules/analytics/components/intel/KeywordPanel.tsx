@@ -81,7 +81,7 @@ export function KeywordPanel({ keywords, material, bare = false }: { keywords: I
             <ul className="m-0 list-none space-y-2 p-0">
               {shown.map(k => <Row key={k.term} k={k} max={max} />)}
             </ul>
-            <p className="m-0 text-[11px] text-stone-400">So hàng bán chạy với mức chung của cùng nhóm hàng, dữ liệu Tiki.</p>
+            <p className="m-0 text-[11px] text-stone-400">×2 nghĩa là từ này xuất hiện trong tên hàng bán chạy nhiều gấp 2 lần so với các sản phẩm khác cùng nhóm (dữ liệu Tiki, chỉ để tham khảo).</p>
           </>
         )}
       </div>

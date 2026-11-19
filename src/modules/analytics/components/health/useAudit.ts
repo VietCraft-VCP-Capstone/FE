@@ -4,15 +4,17 @@ import type { QualityAuditData } from '../../qualityTypes';
 
 export function useAudit(productId: string) {
   const [data, setData] = useState<QualityAuditData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [rechecking, setRechecking] = useState(false);
 
   useEffect(() => {
     if (!productId) return;
     setLoading(true);
+    setFailed(false);
     analyticsApi.listingQuality(productId)
       .then(res => res?.data && setData(res.data))
-      .catch(() => undefined)
+      .catch(() => setFailed(true))
       .finally(() => setLoading(false));
   }, [productId]);
 
@@ -20,13 +22,16 @@ export function useAudit(productId: string) {
     setRechecking(true);
     try {
       const res = await analyticsApi.listingQualityRecheck(productId);
-      if (res?.data) setData(res.data);
+      if (res?.data) {
+        setData(res.data);
+        setFailed(false);
+      }
     } catch {
-      return;
+      setFailed(true);
     } finally {
       setRechecking(false);
     }
   };
 
-  return { data, loading, rechecking, recheck };
+  return { data, loading, failed, rechecking, recheck };
 }

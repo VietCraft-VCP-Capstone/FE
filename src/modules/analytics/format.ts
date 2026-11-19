@@ -102,13 +102,6 @@ export const RANGE_OPTIONS = [
   { value: 'year', label: 'Theo năm' },
 ] as const;
 
-/** Nhãn BR-182: >= 80 · 50-79 · < 50. */
-export const HEALTH_STATUS_LABEL: Record<string, string> = {
-  good: 'Tốt',
-  needs_improvement: 'Nên sửa thêm',
-  poor: 'Cần sửa gấp',
-};
-
 export function plainText(text: string): string {
   return text
     .replace(/([\dđ%])\s*[–—]\s*(\d)/g, '$1 đến $2')

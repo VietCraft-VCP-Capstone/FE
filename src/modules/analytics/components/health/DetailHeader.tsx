@@ -8,7 +8,7 @@ export function DetailHeader({ id, title, thumbnail, data }: {
   thumbnail: string | null;
   data: ListingHealth | null;
 }) {
-  const price = data?.breakdown.find(r => r.key === 'price')?.value;
+  const price = data?.content_snapshot?.price;
 
   return (
     <header className="flex items-center gap-3">

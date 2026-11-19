@@ -12,7 +12,6 @@ const CHECKS: Check[] = [
   { codes: ['no_images', 'few_images'], label: 'Có đủ ảnh sản phẩm', axis: 'image' },
   { codes: ['blurry', 'low_resolution'], label: 'Ảnh rõ nét, đủ lớn', axis: 'image' },
   { codes: ['too_dark', 'too_bright'], label: 'Ảnh đủ sáng', axis: 'image' },
-  { codes: ['busy_background', 'text_overlay', 'bad_aspect'], label: 'Ảnh gọn: nền sạch, không chữ đè', axis: 'image' },
   { codes: ['title_short', 'title_long'], label: 'Tiêu đề dài vừa phải', axis: 'text' },
   { codes: ['keyword_stuffing', 'banned_word'], label: 'Tiêu đề không nhồi từ, không có từ cấm', axis: 'text' },
   { codes: ['missing_material', 'missing_color', 'missing_size'], label: 'Nêu đủ chất liệu, màu sắc, kích cỡ', axis: 'text' },

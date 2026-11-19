@@ -7,6 +7,10 @@ const pairText = (auc: number | null) => (auc === null ? NA : `${Math.round(auc 
 export function ModelCard({ model, bare = false }: { model: IntelModel; bare?: boolean }) {
   const [lo, hi] = model.auc_ci95;
   const base = model.best_baseline;
+  const missesBaseline = model.auc !== null && base.auc !== null && model.auc <= base.auc;
+  const caveat = missesBaseline
+    ? 'Chưa thắng mốc so sánh; tập kiểm tra từ Tiki, chưa kiểm chứng trên VietCraft.'
+    : 'Tập kiểm tra từ Tiki, chưa kiểm chứng trên VietCraft.';
   return (
     <InsightCard bare={bare}
       title="Độ tin cậy của cách chấm"
@@ -22,6 +26,7 @@ export function ModelCard({ model, bare = false }: { model: IntelModel; bare?: b
           )}
           {base.auc !== null && <>Cách tính đơn giản tốt nhất, <strong>{base.name}</strong>, đúng {pairText(base.auc)}.</>}
         </p>
+        <Note>{caveat}</Note>
         <Note>Phiên bản {model.version}. Dữ liệu dùng để học: {model.trained_on}.</Note>
       </div>
     </InsightCard>

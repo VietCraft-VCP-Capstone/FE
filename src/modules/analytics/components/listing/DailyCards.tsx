@@ -4,9 +4,8 @@ import { TrendLegend } from '../../../../shared/components/charts/TrendChart';
 import { count, money } from '../../../../shared/utils/format';
 import { RangeTabs } from '../../../seller/components/dashboard/SellerDashboardUi';
 import { RANGE_OPTIONS, decimal, fullDate, shortDate } from '../../format';
-import type { InsightMeta, ListingTimeseries, TimeRange } from '../../types';
+import type { ListingTimeseries, TimeRange } from '../../types';
 import { DailyBars } from '../charts/DailyBars';
-import { SourceFooter } from '../SourceFooter';
 import { Chip, InsightCard, Note, type Tone } from '../ui';
 
 function HalfChange({ values, what, unit }: { values: number[]; what: string; unit: string }) {
@@ -26,9 +25,8 @@ function HalfChange({ values, what, unit }: { values: number[]; what: string; un
   );
 }
 
-export function DailyCards({ data, meta, timeRange, setRange }: {
+export function DailyCards({ data, timeRange, setRange }: {
   data: ListingTimeseries;
-  meta: InsightMeta;
   timeRange: TimeRange;
   setRange: (value: TimeRange) => void;
 }) {
@@ -48,7 +46,6 @@ export function DailyCards({ data, meta, timeRange, setRange }: {
         title="Mỗi ngày có bao nhiêu người xem"
         description={coTrungVi ? 'Cột xanh lá là số lượt xem sản phẩm này. Đường xanh dương là mức thường gặp của sản phẩm cùng loại.' : 'Mỗi cột là số lượt khách mở trang sản phẩm trong ngày.'}
         action={<RangeTabs<TimeRange> value={timeRange} onChange={setRange} options={[...RANGE_OPTIONS]} label="Khoảng thời gian" />}
-        footer={<SourceFooter meta={meta} />}
       >
         <div className="mb-4 flex flex-wrap gap-2">
           <HalfChange values={data.series.map(p => p.views)} what="Lượt xem" unit="lượt" />
