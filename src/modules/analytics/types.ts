@@ -861,6 +861,7 @@ export interface OpportunityKeywordItem {
   sold_count_real?: number;
   etsy_favorers?: number;
   etsy_listings?: number;
+  effective_demand?: number;
   sales_per_shop?: number | null;
   trend_index?: number | null;
   trend_index_raw?: number | null;
@@ -868,11 +869,14 @@ export interface OpportunityKeywordItem {
   competition: number;
   competition_level: 'high' | 'medium' | 'low';
   keyword_score: number | null;
-  score_basis?: 'sales+trends' | 'sales_only' | 'etsy+trends' | 'etsy_engagement' | 'trends_only' | 'insufficient';
+  score_basis?: 'sales+etsy' | 'sales_only' | 'etsy_only' | 'insufficient' | string;
   score_breakdown?: {
     demand: number | null;
+    demand_pts?: number | null;
     headroom: number | null;
-    momentum: number | null;
+    headroom_pts?: number | null;
+    effective_demand?: number;
+    momentum?: number | null;
     etsy_signal?: number | null;
     sales_per_shop?: number | null;
     applied_caps?: string[];

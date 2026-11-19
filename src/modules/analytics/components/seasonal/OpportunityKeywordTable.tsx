@@ -338,7 +338,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                         </div>
                         {kw.sales_per_shop != null && (
                           <span className="pl-4 text-[10px] font-medium text-stone-500">
-                            ~{kw.sales_per_shop.toLocaleString('vi-VN')} bán/shop
+                            ~{kw.sales_per_shop.toLocaleString('vi-VN')} {(kw.etsy_favorers ?? 0) > 0 && (kw.sold_count_real ?? 0) === 0 ? 'cầu/shop' : 'bán/shop'}
                           </span>
                         )}
                       </div>
@@ -554,20 +554,19 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                           <div className="bg-stone-100/80 border border-stone-200/80 rounded-lg px-3 py-2 text-[11px] text-stone-700 space-y-1">
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                               <span>
-                                <strong>Cầu:</strong> {kw.score_breakdown.demand != null ? `${kw.score_breakdown.demand}/100` : 'N/A'}
+                                <strong>Sức cầu (50%):</strong>{' '}
+                                {kw.score_breakdown.demand_pts != null ? `${kw.score_breakdown.demand_pts}/50đ` : 'N/A'}
                               </span>
                               <span>
-                                <strong>Dư địa:</strong> {kw.score_breakdown.headroom != null ? `${kw.score_breakdown.headroom}/100` : 'N/A'}
+                                <strong>Dư địa/Shop (50%):</strong>{' '}
+                                {kw.score_breakdown.headroom_pts != null ? `${kw.score_breakdown.headroom_pts}/50đ` : 'N/A'}
                               </span>
-                              <span>
-                                <strong>Đà tăng 4w:</strong> {kw.score_breakdown.momentum != null ? `${kw.score_breakdown.momentum}/100` : 'Chưa có Trends khớp'}
-                              </span>
+                              {kw.score_breakdown.effective_demand != null && kw.score_breakdown.effective_demand > 0 && (
+                                <span className="text-stone-500">
+                                  (Tổng cầu quy đổi: {kw.score_breakdown.effective_demand.toLocaleString('vi-VN')})
+                                </span>
+                              )}
                             </div>
-                            {kw.score_breakdown.applied_caps && kw.score_breakdown.applied_caps.length > 0 && (
-                              <div className="text-amber-800 font-medium">
-                                Chốt chặn áp dụng: {kw.score_breakdown.applied_caps.join(' · ')}
-                              </div>
-                            )}
                           </div>
                         )}
 
