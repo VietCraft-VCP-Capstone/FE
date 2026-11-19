@@ -1,4 +1,4 @@
-/** Kho voucher: có bao nhiêu mã, đã dùng bao nhiêu, mã nào nằm im, kèm gợi ý loại nên tạo tiếp. */
+/** Kho voucher: có bao nhiêu mã, đã dùng bao nhiêu, mã nào hiệu quả thấp, kèm gợi ý loại nên tạo tiếp. */
 import { count } from '../../../../shared/utils/format';
 import { shortDate } from '../../format';
 import type { VoucherStatus, VoucherStock as Stock } from '../../moneyTypes';
@@ -18,7 +18,7 @@ export function VoucherStock({ stock, tip, aiLoading }: { stock: Stock; tip?: st
   const cells: [string, string, string][] = [
     ['Tổng số mã', count(stock.total), `${count(stock.active)} đang chạy${ended ? `, ${count(ended)} đã kết thúc` : ''}`],
     ['Đã dùng', stock.limit ? `${count(stock.used)}/${count(stock.limit)} lượt` : count(stock.used), 'Cộng mọi mã, tính từ lúc tạo'],
-    ['Mã nằm im', count(stock.idle), idleNote(stock.items)],
+    ['Mã hiệu quả thấp', count(stock.idle), idleNote(stock.items)],
   ];
   return (
     <InsightCard title="Kho voucher" bodyClassName="px-4 py-3">
