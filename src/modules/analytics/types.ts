@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Kiểu dữ liệu của 16 tính năng Product Analytics (F26–F41).
  *
  * Dựng theo JSON THẬT mà service AI trả qua cổng BE /api/seller/analytics, không theo
@@ -858,15 +858,32 @@ export interface OpportunityKeywordItem {
   id: string;
   tag: string;
   volume: number;
+  sold_count_real?: number;
+  etsy_favorers?: number;
+  etsy_listings?: number;
+  sales_per_shop?: number | null;
+  trend_index?: number | null;
+  trend_index_raw?: number | null;
   volume_level: 'high' | 'medium' | 'low';
   competition: number;
   competition_level: 'high' | 'medium' | 'low';
-  keyword_score: number;
+  keyword_score: number | null;
+  score_basis?: 'sales+trends' | 'sales_only' | 'etsy+trends' | 'etsy_engagement' | 'trends_only' | 'insufficient';
+  score_breakdown?: {
+    demand: number | null;
+    headroom: number | null;
+    momentum: number | null;
+    etsy_signal?: number | null;
+    sales_per_shop?: number | null;
+    applied_caps?: string[];
+    formula_text?: string;
+  };
+  platforms?: string[];
   listing_type?: 'physical' | 'pod' | 'custom' | string;
   customizable?: boolean;
   when_made?: string;
-  avg_price_vnd?: number;
-  conversion_rate_pct?: number;
+  avg_price_vnd?: number | null;
+  conversion_rate_pct?: number | null;
   is_starred?: boolean;
   is_in_shop?: boolean;
   matched_product?: {
@@ -878,7 +895,7 @@ export interface OpportunityKeywordItem {
   search_wow_pct?: number | null;
   trend_match?: 'exact' | 'partial' | 'proxy' | 'none';
   trend_series_used?: string | null;
-  volume_basis?: 'listing_sales+trends' | 'trends_only';
+  volume_basis?: 'listing_sales' | 'etsy_engagement' | 'trends_index' | 'insufficient' | 'listing_sales+trends' | 'trends_only';
   shop_coverage?: { matching: number; total: number; gap: boolean; product_ids: string[] };
   action?: { type: 'create_listing' | 'optimize_tags' | 'copy_tag'; label: string; priority: 'high' | 'normal' };
 }

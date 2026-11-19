@@ -1,8 +1,9 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Boxes,
   Check,
   ExternalLink,
+  Info,
   Package,
   Pencil,
   Plus,
@@ -293,43 +294,55 @@ export function SeasonalPotentialTab({
                     isSaved ? 'border-[#007700] ring-2 ring-[#007700]/15' : 'border-stone-200 hover:border-stone-300'
                   }`}
                 >
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-[#007700]">
-                        <Wand2 size={10} /> {ai.source_type === 'llm_scoped' ? 'Ý tưởng AI (Scoped)' : 'Phác thảo dữ liệu'}
-                      </span>
-                      {draft?.title && (
-                        <span className="rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
-                          Đã chỉnh sửa
-                        </span>
-                      )}
-                    </div>
-
-                    <h5 className="text-sm font-bold text-stone-900 leading-snug m-0">{displayTitle}</h5>
-                    <p className="text-xs text-stone-600 leading-relaxed m-0">{displayConcept}</p>
-
-                    <div className="flex flex-wrap gap-1">
-                      {displayTags.map(tg => (
-                        <span key={tg} className="rounded bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-700">
-                          #{tg}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-50 border border-stone-200/70 p-2.5 text-xs">
-                      <div>
-                        <span className="text-[11px] text-stone-500 block">Giá bán đề xuất</span>
-                        <strong className="text-[#007700]">{displayPrice.toLocaleString('vi-VN')}đ</strong>
+                  <div className="flex flex-1 flex-col justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <h5 className="text-sm font-bold text-stone-900 leading-snug m-0 flex-1">{displayTitle}</h5>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {draft?.title && (
+                            <span className="rounded bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                              Đã sửa
+                            </span>
+                          )}
+                          {ai.why_it_fits_shop && (
+                            <div className="group relative inline-flex">
+                              <span
+                                title={`Căn cứ: ${ai.why_it_fits_shop}`}
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-stone-200 bg-stone-50 text-stone-500 hover:border-[#007700] hover:bg-emerald-50 hover:text-[#007700] cursor-help transition-colors"
+                              >
+                                <Info size={13} />
+                              </span>
+                              <div className="pointer-events-none invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150 absolute right-0 top-full mt-1.5 z-30 w-64 rounded-xl border border-stone-200 bg-white p-2.5 text-[11px] leading-relaxed text-stone-600 shadow-lg">
+                                <strong className="text-stone-800">Căn cứ:</strong> {ai.why_it_fits_shop}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-[11px] text-stone-500 block">Biên lãi dự kiến</span>
-                        <strong className="text-stone-900">{ai.expected_margin_pct}%</strong>
-                      </div>
+
+                      <p className="text-xs text-stone-600 leading-relaxed m-0">{displayConcept}</p>
                     </div>
 
-                    <p className="text-[11px] text-stone-500 leading-snug m-0">
-                      <strong className="text-stone-700">Căn cứ:</strong> {ai.why_it_fits_shop}
-                    </p>
+                    <div className="space-y-2.5 pt-1">
+                      <div className="flex flex-wrap gap-1">
+                        {displayTags.map(tg => (
+                          <span key={tg} className="rounded bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-700">
+                            #{tg}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-50 border border-stone-200/70 p-2.5 text-xs">
+                        <div>
+                          <span className="text-[11px] text-stone-500 block">Giá bán đề xuất</span>
+                          <strong className="text-[#007700]">{displayPrice.toLocaleString('vi-VN')}đ</strong>
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-stone-500 block">Biên lãi dự kiến</span>
+                          <strong className="text-stone-900">{ai.expected_margin_pct}%</strong>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="pt-3 mt-3 border-t border-stone-100 space-y-2">
@@ -419,11 +432,15 @@ export function SeasonalPotentialTab({
                             {item.platform}
                           </span>
                         )}
-                        {item.sold_count > 0 && (
+                        {item.sold_count > 0 ? (
                           <span className="text-[11px] font-medium text-stone-500">
                             Đã bán {item.sold_count.toLocaleString('vi-VN')}
                           </span>
-                        )}
+                        ) : item.num_favorers > 0 ? (
+                          <span className="text-[11px] font-medium text-stone-500">
+                            {Number(item.num_favorers).toLocaleString('vi-VN')} lượt thích
+                          </span>
+                        ) : null}
                       </div>
                       {item.product_url ? (
                         <a
