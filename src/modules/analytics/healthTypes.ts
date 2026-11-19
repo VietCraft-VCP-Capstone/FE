@@ -140,33 +140,6 @@ export interface HealthSummaryPoint {
   n: number;
 }
 
-export interface SellChanceAdvice {
-  feature: string;
-  current: number | null;
-  target: number | null;
-  gain: number;
-}
-
-export interface SellChance {
-  product_id: string;
-  method?: 'model' | 'cold_start';
-  score: number;
-  probability: number;
-  peer_group: { type: 'category' | 'platform'; name: string | null; size: number };
-  advice: SellChanceAdvice[];
-  compare: { feature: string; value: number | null; peer_median: number | null }[];
-  model: {
-    version: string;
-    trained_on: string;
-    horizon_days: number;
-    test_auc: number;
-    test_auc_ci95: [number, number];
-    baseline_auc: Record<string, number>;
-    delta_vs_best_baseline: { vs: string; auc: number; ci95: [number, number] };
-    group_lift: Record<string, number>;
-  };
-}
-
 export type FactorState = 'scored' | 'seller_missing' | 'not_applicable' | 'technical_failure';
 
 export type HealthMethod = 'rule' | 'heuristic' | 'ml_unvalidated' | 'weak_supervision';
