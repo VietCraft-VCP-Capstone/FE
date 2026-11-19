@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Store,
   Star,
@@ -20,13 +20,16 @@ import { productsService } from '../../product/services/productsService';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { useToast } from '../../../shared/components/Toast';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
-import { useInsight } from '../../analytics/hooks/useInsight';
+import { useInsight, invalidateInsights } from '../../analytics/hooks/useInsight';
 import type { Competitors } from '../../analytics/types';
 
 export function SellerCompetitorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
+  // Về đúng trang đã mở shop này (phân tích đối thủ, kế hoạch hành động...); mở thẳng link thì về danh sách theo dõi.
+  const quayLai = () => (location.key !== 'default' ? navigate(-1) : navigate('/seller/competitors'));
 
   const [shop, setShop] = useState<ShopDetail | null>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -89,8 +92,9 @@ export function SellerCompetitorDetailPage() {
     try {
       setFollowPending(true);
       await shopService.unfollow(shopId);
+      invalidateInsights('/competitor-tracking');
       showToast(`Đã dừng theo dõi gian hàng "${shop.name || shop.shopName}".`, 'info');
-      navigate('/seller/competitors');
+      quayLai();
     } catch (err) {
       showToast(getApiErrorMessage(err, 'Không thể dừng theo dõi gian hàng này.'), 'error');
     } finally {
@@ -105,6 +109,7 @@ export function SellerCompetitorDetailPage() {
     try {
       setFollowPending(true);
       await shopService.follow(shopId);
+      invalidateInsights('/competitor-tracking');
       setIsFollowing(true);
       showToast(`Đã theo dõi gian hàng "${shop.name || shop.shopName}".`, 'success');
     } catch (err) {
@@ -183,11 +188,11 @@ export function SellerCompetitorDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-stone-500">
           <button
-            onClick={() => navigate('/seller/competitors')}
+            onClick={quayLai}
             className="hover:text-emerald-700 transition-colors cursor-pointer flex items-center gap-1 text-stone-600"
           >
             <ArrowLeft size={14} />
-            <span>Đối thủ đang theo dõi</span>
+            <span>Quay lại</span>
           </button>
           <ChevronRight size={12} className="text-stone-400" />
           <span className="text-stone-900 font-bold truncate max-w-xs">{shopDisplayName}</span>
@@ -472,12 +477,12 @@ export function SellerCompetitorDetailPage() {
                       {pPrice.toLocaleString('vi-VN')}đ
                     </span>
                     <button
-                      onClick={() => window.open(`/product/${pId}`, '_blank')}
+                      onClick={() => navigate(`/product/${pId}`)}
                       className="text-[11px] font-bold text-stone-500 hover:text-emerald-700 p-1 transition-colors flex items-center gap-1 cursor-pointer"
                       title="Xem sản phẩm trên sàn"
                     >
                       <span>Xem</span>
-                      <ExternalLink size={12} />
+                      <ChevronRight size={12} />
                     </button>
                   </div>
                 </div>
