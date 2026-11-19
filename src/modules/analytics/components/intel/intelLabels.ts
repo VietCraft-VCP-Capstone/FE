@@ -44,9 +44,6 @@ export const ISSUE_LABEL: Record<string, string> = {
   blurry: 'Ảnh mờ',
   too_dark: 'Quá tối',
   too_bright: 'Quá sáng',
-  busy_background: 'Nền rối',
-  text_overlay: 'Chữ đè ảnh',
-  bad_aspect: 'Tỉ lệ khung lạ',
 };
 
 export const issueText = (i: IntelIssue) => ISSUE_LABEL[i.code] ?? i.message ?? i.code;

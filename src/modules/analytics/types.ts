@@ -132,7 +132,7 @@ export interface ListingConversion {
 /* ------------------------------------------------------------ F29 -------- */
 export type HealthStatus = 'good' | 'needs_improvement' | 'poor';
 
-export type HealthAxis = 'image' | 'description' | 'tags' | 'material' | 'review' | 'price';
+export type HealthAxis = 'image' | 'description' | 'tags' | 'review' | 'price';
 
 /** Mục do engine F29 sinh: 'todo' tăng điểm, 'warning' chỉ nhắc, không trừ điểm. */
 export interface HealthTodo {

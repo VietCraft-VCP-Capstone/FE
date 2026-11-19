@@ -196,7 +196,7 @@ export function ProductTable({
               <th className="py-4 px-3 w-[12%]">
                 <div className="flex items-center gap-1 whitespace-nowrap">
                   <span>TỐI ƯU SẢN PHẨM</span>
-                  <Tooltip title="Điểm tối ưu sản phẩm từ 0 - 100: dựa trên ảnh, mô tả, thẻ tag, chất liệu, đánh giá và giá cả. Bấm vào điểm để xem chi tiết.">
+                  <Tooltip title="Độ hoàn thiện trang sản phẩm, từ 0 đến 100: ảnh, mô tả, từ khoá và tag, đánh giá, giá. Không đo bán chạy hay không. Bấm vào điểm để xem còn thiếu gì.">
                     <Info size={11} className="text-stone-400 hover:text-stone-600 cursor-help" />
                   </Tooltip>
                 </div>
@@ -311,10 +311,10 @@ export function ProductTable({
                         tier.tone === 'good' ? 'bg-[#007700]' : tier.tone === 'warn' ? 'bg-amber-600' : 'bg-[#BA1A1A]';
                       const tooltipMsg =
                         tier.tone === 'good'
-                          ? `Điểm tối ưu sản phẩm: ${scoreText(score)}/100 (${tier.label}) — Đầy đủ thông tin, chuẩn chỉnh. Bấm để xem chi tiết.`
+                          ? `Độ hoàn thiện: ${scoreText(score)}/100 (${tier.label}). Trang sản phẩm đã đủ thông tin. Bấm để xem chi tiết.`
                           : tier.tone === 'warn'
-                          ? `Điểm tối ưu sản phẩm: ${scoreText(score)}/100 (${tier.label}) — Có một số gợi ý giúp tăng đơn. Bấm để xem.`
-                          : `Điểm tối ưu sản phẩm: ${scoreText(score)}/100 (${tier.label}) — Thiếu nhiều thông tin quan trọng. Bấm để sửa ngay.`;
+                          ? `Độ hoàn thiện: ${scoreText(score)}/100 (${tier.label}). Còn vài mục nên bổ sung. Bấm để xem.`
+                          : `Độ hoàn thiện: ${scoreText(score)}/100 (${tier.label}). Còn thiếu nhiều thông tin quan trọng. Bấm để sửa.`;
 
                       return (
                         <Tooltip title={tooltipMsg} placement="top">

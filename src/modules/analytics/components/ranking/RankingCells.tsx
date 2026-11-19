@@ -204,7 +204,7 @@ export function ScoreTag({ score }: { score: number | null }) {
   if (score === null) return null;
   return (
     <span className="text-[11px] font-semibold text-stone-600 tabular-nums">
-      {scoreText(score)}đ tối ưu
+      Hoàn thiện {scoreText(score)}/100
     </span>
   );
 }

@@ -37,7 +37,7 @@ const ADVICE_META: Record<string, { label: string; unit: string }> = {
 };
 
 const ABOUT =
-  'Mô hình Machine Learning phân tích tương quan giữa chất lượng tin đăng, lịch sử vận hành gian hàng và tốc độ ra đơn để ước tính xác suất phát sinh đơn hàng trong 90 ngày tới.';
+  'Mô hình học từ dữ liệu sàn Olist (Brazil), dự đoán sản phẩm có ít nhất 1 đơn trong 90 ngày tới. Con số là thứ hạng so với sản phẩm cùng nhóm trên VietCraft, không phải xác suất. Chưa kiểm tra độ chính xác trên đơn hàng VietCraft.';
 
 function compareInsight(mine: number | null, peer: number | null, unit = '') {
   if (mine === null || peer === null) return { text: 'Chưa đủ dữ liệu', tone: 'neutral' };
@@ -99,7 +99,7 @@ function Body({ data }: { data: SellChance }) {
               Khả năng có đơn cao hơn {score}% {groupName}
             </h3>
             <p className="m-0 mt-0.5 text-xs text-stone-500">
-              Đối soát dựa trên tập dữ liệu {data.peer_group.size} sản phẩm đang có giao dịch thực tế.
+              So với {data.peer_group.size} sản phẩm có đơn trong 180 ngày qua.
             </p>
           </div>
 
@@ -126,7 +126,7 @@ function Body({ data }: { data: SellChance }) {
           <div className="flex justify-between items-center text-xs">
             <span className="text-[11px] font-semibold text-stone-500">Vị thế tương quan:</span>
             <span className="text-xs font-bold text-stone-900 tabular-nums">
-              Top {score}% toàn ngành
+              Top {Math.max(1, 100 - score)}% trong nhóm
             </span>
           </div>
 
@@ -139,7 +139,7 @@ function Body({ data }: { data: SellChance }) {
 
           <div className="flex justify-between items-center text-[10px] text-stone-400 font-medium">
             <span>0% (Thấp)</span>
-            <span>50% (Mức giữa ngành)</span>
+            <span>50% (Mức giữa nhóm)</span>
             <span>100% (Dẫn đầu)</span>
           </div>
         </div>
@@ -253,7 +253,7 @@ function Body({ data }: { data: SellChance }) {
                     </span>
                     {a.gain > 0 && (
                       <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-[#007700]">
-                        +{decimal(a.gain, 0)}% tiềm năng
+                        +{Math.round(a.gain * 100)}% theo mô hình
                       </span>
                     )}
                   </div>

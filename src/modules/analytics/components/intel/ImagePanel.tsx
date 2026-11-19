@@ -15,9 +15,6 @@ const ISSUE_HINT: Record<string, string> = {
   blurry: 'Ảnh có dấu hiệu mờ, chưa nét. Nên chụp lại dưới đủ ánh sáng tự nhiên.',
   too_dark: 'Ảnh bị thiếu sáng. Nên chụp nơi có ánh sáng ban ngày tự nhiên.',
   too_bright: 'Ảnh bị loá sáng, mất chi tiết bề mặt sản phẩm.',
-  busy_background: 'Phông nền có nhiều vật thể gây phân tâm. Nên chụp trên nền trơn hoặc góc tối giản.',
-  text_overlay: 'Ảnh có chèn chữ hoặc số điện thoại. Sàn khuyến nghị dùng ảnh mộc không chèn chữ để tăng tính chuyên nghiệp.',
-  bad_aspect: 'Khung ảnh nên là hình vuông (tỉ lệ 1:1) để hiển thị đẹp nhất trên ứng dụng.',
 };
 
 function ImageTile({ img, index }: { img: IntelImage; index: number }) {

@@ -108,7 +108,7 @@ export function SeasonPanel({
               </span>
             </div>
             <p className="m-0 text-[11px] text-stone-500">
-              Dự báo lực cầu sẽ tăng vọt vào 4 đợt Siêu Sale và sự kiện lễ hội sắp tới
+              Các dịp mua sắm sắp tới (tham khảo)
             </p>
           </div>
         </div>

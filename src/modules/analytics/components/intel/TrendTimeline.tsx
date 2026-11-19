@@ -59,8 +59,8 @@ export function TrendTimeline({
   return (
     <InsightCard
       bare={bare}
-      title="Dự báo đà mua sắm theo tuần & Sự kiện Siêu Sale"
-      info="Dự báo mức độ quan tâm của người mua qua các tuần và các sự kiện mua sắm lớn sắp tới để shop chuẩn bị tồn kho và khuyến mãi."
+      title="Xu hướng tham khảo đà mua sắm theo tuần & Sự kiện Siêu Sale"
+      info="Xu hướng tham khảo mức độ quan tâm của người mua qua các tuần và các sự kiện mua sắm lớn sắp tới để shop chuẩn bị tồn kho và khuyến mãi."
     >
       {points.length === 0 ? (
         <Note>Chưa có dữ liệu theo tuần.</Note>

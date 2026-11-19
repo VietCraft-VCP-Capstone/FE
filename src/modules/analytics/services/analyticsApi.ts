@@ -49,6 +49,10 @@ export const analyticsApi = {
     return res.data;
   },
 
+  async recordHealthAction(productId: string, body: { recommendation_id: string; action: 'open' | 'apply' | 'dismiss'; kind?: string }): Promise<void> {
+    await api.post(`${BASE}/listings/${productId}/health/actions`, body);
+  },
+
   async intelPreview(body: IntelPreviewBody, signal?: AbortSignal): Promise<InsightEnvelope<ListingIntel>> {
     const res = await api.post(`${BASE}/listings/intel/preview`, body, { signal });
     return res.data;

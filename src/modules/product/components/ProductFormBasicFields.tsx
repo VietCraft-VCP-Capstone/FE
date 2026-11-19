@@ -53,6 +53,7 @@ export function ProductFormBasicFields({
         required
         error={errors.category}
         className="md:max-w-md"
+        focusTarget="categories"
         action={
           <button
             type="button"
