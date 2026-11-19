@@ -303,6 +303,7 @@ export interface PricePoint {
   title: string | null;
   shop_name: string | null;
   is_mine: boolean;
+  category_name?: string | null;
   product_type_id: string | null;
   product_type_name: string;
   price_vnd: number;
@@ -321,6 +322,8 @@ export interface Competitors {
   shops?: CompetitorShop[];
   concentration_top3_pct?: number;
   price_points?: PricePoint[];
+  /** Điểm giá của các danh mục khác trên sàn, cho nhóm "Danh mục khác" ở thẻ Phân bố giá. */
+  price_points_other?: PricePoint[];
   available_categories: string[];
   /** Chỉ có ở shop thật: mã danh mục -> tên. Danh mục của sàn không có trong bảng nhãn cứng. */
   category_names?: Record<string, string | null>;

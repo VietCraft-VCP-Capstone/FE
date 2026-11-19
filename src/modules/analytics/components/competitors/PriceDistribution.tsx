@@ -72,29 +72,41 @@ function GiaTooltip({ active, payload }: { active?: boolean; payload?: { payload
   );
 }
 
-export function PriceDistribution({ points, loaiBanDau, moSan = false }: {
+export function PriceDistribution({ points, khac = [], tenDm, loaiBanDau, moSan = false }: {
   points: PricePoint[];
+  /** Sản phẩm của các danh mục khác trên sàn: nhóm "Danh mục khác" của ô Loại hàng. */
+  khac?: PricePoint[];
+  tenDm: string;
   /** Loại hàng chọn sẵn, lấy từ link của kế hoạch (?loai=). */
   loaiBanDau?: string;
   moSan?: boolean;
 }) {
-  // Loại hàng của bạn trước (nhiều sản phẩm trước), rồi tới loại bạn chưa bán.
+  // Khoá loại hàng của danh mục đang xem là tên, vì link ?loai= dùng tên; danh mục khác kèm tên danh mục để loại trùng tên không bị gộp.
+  const tatCa = useMemo(() => [
+    ...points.map(p => ({ ...p, khoa: p.product_type_name, khac: false })),
+    ...khac.map(p => ({ ...p, khoa: `${p.category_name ?? ''} › ${p.product_type_name}`, khac: true })),
+  ], [points, khac]);
+  // Danh mục đang xem trước; trong mỗi nhóm, loại hàng của bạn trước (nhiều sản phẩm trước), rồi tới loại bạn chưa bán.
   const loaiDs = useMemo(() => {
-    const dem = new Map<string, { tat: number; toi: number }>();
-    for (const p of points) {
-      const d = dem.get(p.product_type_name) ?? { tat: 0, toi: 0 };
+    const dem = new Map<string, { ten: string; dm: string | null; khac: boolean; tat: number; toi: number }>();
+    for (const p of tatCa) {
+      const d = dem.get(p.khoa) ?? { ten: p.product_type_name, dm: p.category_name ?? null, khac: p.khac, tat: 0, toi: 0 };
       d.tat += 1;
       if (p.is_mine) d.toi += 1;
-      dem.set(p.product_type_name, d);
+      dem.set(p.khoa, d);
     }
-    return [...dem.entries()].sort((a, b) => b[1].toi - a[1].toi || b[1].tat - a[1].tat).map(([ten, d]) => ({ ten, ...d }));
-  }, [points]);
+    return [...dem.entries()]
+      .sort((a, b) => Number(a[1].khac) - Number(b[1].khac) || b[1].toi - a[1].toi || b[1].tat - a[1].tat)
+      .map(([khoa, d]) => ({ khoa, ...d }));
+  }, [tatCa]);
   const [loaiChon, setLoai] = useState<string>(loaiBanDau ?? '');
   const [clChon, setCl] = useState<string | null>(null);
   const [mo, setMo] = useState(moSan);
-  const loai = loaiDs.some(l => l.ten === loaiChon) ? loaiChon : loaiDs[0]?.ten ?? '';
+  const loai = loaiDs.some(l => l.khoa === loaiChon) ? loaiChon : loaiDs[0]?.khoa ?? '';
+  const tenLoai = loaiDs.find(l => l.khoa === loai)?.ten ?? '';
+  const coKhac = loaiDs.some(l => l.khac);
 
-  const goc = points.filter(p => p.product_type_name === loai);
+  const goc = tatCa.filter(p => p.khoa === loai);
   const demCl = new Map<string, number>();
   const clToi = new Map<string, number>();
   goc.forEach(p => khoaCl(p).forEach(k => {
@@ -128,7 +140,7 @@ export function PriceDistribution({ points, loaiBanDau, moSan = false }: {
   const diemKhop = nhom.map(p => lam(p, null));
   const diemToi = cuaToi.map((p, i) => lam(p, i === 0 ? 'Bạn' : null));
 
-  const tenNhom = `${loai.toLowerCase()}${cl === TAT_CA ? '' : ` ${tenCl(cl)}`}`;
+  const tenNhom = `${tenLoai.toLowerCase()}${cl === TAT_CA ? '' : ` ${tenCl(cl)}`}`;
   const giaToi = cuaToi.map(p => p.price_vnd);
   const minToi = giaToi.length ? Math.min(...giaToi) : null;
   const maxToi = giaToi.length ? Math.max(...giaToi) : null;
@@ -141,7 +153,11 @@ export function PriceDistribution({ points, loaiBanDau, moSan = false }: {
         label="Loại hàng"
         value={loai}
         onChange={v => { setLoai(v); setCl(null); }}
-        options={loaiDs.map(l => ({ value: l.ten, label: l.toi ? l.ten : `${l.ten} (bạn chưa bán)` }))}
+        options={loaiDs.map(l => ({
+          value: l.khoa,
+          label: `${l.ten}${l.khac && l.dm && l.dm !== l.ten ? ` · ${l.dm}` : ''}${l.toi ? '' : ' (bạn chưa bán)'}`,
+          group: coKhac ? (l.khac ? 'Danh mục khác' : `Trong danh mục ${tenDm}`) : undefined,
+        }))}
         className="min-w-0 max-w-full"
       />
       <SelectField
@@ -213,7 +229,7 @@ export function PriceDistribution({ points, loaiBanDau, moSan = false }: {
               </ResponsiveContainer>
             </div>
             <ul className="m-0 mt-2 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-stone-600">
-              <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: SERIES.blue }} aria-hidden />Đối thủ · {cl === TAT_CA ? loai.toLowerCase() : tenCl(cl)}</li>
+              <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: SERIES.blue }} aria-hidden />Đối thủ · {cl === TAT_CA ? tenLoai.toLowerCase() : tenCl(cl)}</li>
               {cl !== TAT_CA && <li className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: NHAT }} aria-hidden />Chất liệu khác</li>}
               <li className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rotate-45" style={{ background: SERIES.green }} aria-hidden />Bạn</li>
               {vung && <li className="inline-flex items-center gap-1.5"><span className="h-3 w-0 border-l-2 border-dashed" style={{ borderColor: SERIES.blue }} aria-hidden />Trung vị {money(vung.p50)}</li>}
