@@ -15,7 +15,7 @@ function withCodes(text: string, codes: string[]) {
   return text.split(re).map((part, i) => (i % 2 ? <code key={i} className={CODE}>{part}</code> : part));
 }
 
-const LABEL = { create: 'Mã nên tạo', reactivate: 'Nên bật lại', keep: 'Mã đang hiệu quả' };
+const LABEL = { create: 'Mã nên tạo', reactivate: 'Nên bật lại', keep: 'Mã đang chạy' };
 const BTN = 'inline-flex items-center gap-1 rounded-md bg-[#008000] px-2.5 py-1 text-xs font-bold text-white no-underline hover:bg-[#006b00] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#008000]';
 
 export function VoucherSuggestRow({ suggest, typeName, tip, codes }: { suggest: Suggest; typeName: string; tip?: string; aiLoading: boolean; codes: string[] }) {

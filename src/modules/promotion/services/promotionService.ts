@@ -1,4 +1,5 @@
 import api from '../../../infrastructure/api/interceptors';
+import { invalidateInsights } from '../../analytics/hooks/useInsight';
 
 export type CouponDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING' | 'FLASH_SALE' | 'BUNDLE';
 export type CouponApplicableScope = 'ALL' | 'SPECIFIC_PRODUCTS';
@@ -116,16 +117,19 @@ export const promotionService = {
 
     createSellerCoupon: async (data: CreateCouponPayload): Promise<CouponDTO> => {
         const res = await api.post('/seller/promotions', data);
+        invalidateInsights('/money');
         return res.data;
     },
 
     toggleSellerCoupon: async (couponId: string): Promise<CouponDTO> => {
         const res = await api.patch(`/seller/promotions/${couponId}/toggle`);
+        invalidateInsights('/money');
         return res.data;
     },
 
     deleteSellerCoupon: async (couponId: string): Promise<{ success: boolean }> => {
         const res = await api.delete(`/seller/promotions/${couponId}`);
+        invalidateInsights('/money');
         return res.data;
     },
 

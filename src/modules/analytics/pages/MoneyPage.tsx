@@ -34,6 +34,16 @@ export function MoneyPage() {
   const rangeKey = `${timeRange}:${from}:${to}`;
 
   const { state, reload, refreshing } = useInsight<MoneyReport>('/money', query, { keepPrevious: true });
+  // Số tiền đổi theo đơn/hoàn tiền/voucher: mở trang hoặc quay lại tab thì tải lại ngầm, giữ số cũ trong lúc chờ.
+  const reloadRef = useRef(reload);
+  reloadRef.current = reload;
+  useEffect(() => {
+    if (state.kind === 'ready') reloadRef.current();
+    const onShow = () => document.visibilityState === 'visible' && reloadRef.current();
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Gợi ý AI gọi LLM nên chậm hơn: tải riêng, số liệu hiện trước.
   const advice = useInsight<MoneyAdvice>('/money/advice', query);
   const tips = advice.state.kind === 'ready' ? advice.state.data.tips : {};
