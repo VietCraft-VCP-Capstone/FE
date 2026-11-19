@@ -9,7 +9,7 @@ import { CartesianGrid, ReferenceArea, ReferenceLine, ResponsiveContainer, Scatt
 import { CHART_INK, SERIES } from '../../../../shared/components/charts/chartTheme';
 import { count, money } from '../../../../shared/utils/format';
 import type { PricePoint } from '../../types';
-import { InsightCard, Note, SelectField } from '../ui';
+import { Chip, InsightCard, Note, SelectField } from '../ui';
 import { NutAnHien } from './controls';
 import { GIAI_THICH } from './explanations';
 import { buocDep, vachChia } from './WeeklySalesChart';
@@ -17,7 +17,8 @@ import { buocDep, vachChia } from './WeeklySalesChart';
 const KHONG_GHI = '__chua_ghi';
 const TAT_CA = '__tat_ca';
 const NHAT = '#d6d3d1';
-const gonK = (v: number) => `${Math.round(v / 1000)}k`;
+/** Olist: khoảng tính từ 3–9 sản phẩm chỉ chứa 36,9% lượng bán, từ 10 sản phẩm 52,3% (lý thuyết 50%). */
+const IT_DU_LIEU = 10;
 const khoangGia = (a: number, b: number) => (a === b ? money(a) : `${money(a)} – ${money(b)}`);
 
 /** Khoá chất liệu của một sản phẩm: tên chuẩn, cách gõ chưa có trong từ điển (tiền tố ?), hoặc "chưa ghi". */
@@ -37,7 +38,7 @@ function vungBanChay(ds: PricePoint[]) {
     }
     return co[co.length - 1].price_vnd;
   };
-  return { p25: pv(0.25), p50: pv(0.5), p75: pv(0.75) };
+  return { p25: pv(0.25), p50: pv(0.5), p75: pv(0.75), n: co.length };
 }
 
 interface Diem extends PricePoint { x: number; y: number; nhan: string | null }
@@ -163,7 +164,14 @@ export function PriceDistribution({ points, loaiBanDau, moSan = false }: {
           <div>
             <p className="m-0 text-xs font-semibold text-stone-500">Giá bán chạy</p>
             {vung ? (
-              <p className="m-0 mt-0.5 text-2xl font-bold tabular-nums text-stone-900">{khoangGia(vung.p25, vung.p75)}</p>
+              <p className="m-0 mt-0.5 flex flex-wrap items-center gap-2 text-2xl font-bold tabular-nums text-stone-900">
+                {khoangGia(vung.p25, vung.p75)}
+                {vung.n < IT_DU_LIEU && (
+                  <span title={`Mới tính từ ${vung.n} sản phẩm có đơn. Đo trên Olist: dưới 10 sản phẩm, khoảng này chỉ chứa khoảng 37% lượng bán thay vì một nửa.`}>
+                    <Chip tone="warn">Ít dữ liệu · {count(vung.n)} sản phẩm</Chip>
+                  </span>
+                )}
+              </p>
             ) : (
               <p className="m-0 mt-0.5 text-[13px] text-stone-600">Chưa đủ dữ liệu: cần ít nhất 3 sản phẩm có đơn.</p>
             )}
@@ -185,7 +193,7 @@ export function PriceDistribution({ points, loaiBanDau, moSan = false }: {
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart margin={{ top: 12, right: 16, bottom: 22, left: 4 }}>
                   <CartesianGrid stroke={CHART_INK.grid} />
-                  <XAxis type="number" dataKey="x" domain={[xMin, xMax]} ticks={vachChia(xMin, xMax, bX)} tickFormatter={gonK} tick={{ fill: CHART_INK.axis, fontSize: 11 }} tickLine={false}
+                  <XAxis type="number" dataKey="x" domain={[xMin, xMax]} ticks={vachChia(xMin, xMax, bX)} tickFormatter={(v: number) => money(v)} tick={{ fill: CHART_INK.axis, fontSize: 11 }} tickLine={false}
                     label={{ value: 'Giá bán', position: 'insideBottom', offset: -14, fill: CHART_INK.axis, fontSize: 12 }} />
                   <YAxis type="number" dataKey="y" domain={[0, yMax]} ticks={vachChia(0, yMax, bY)} width={44} allowDecimals={false} tick={{ fill: CHART_INK.axis, fontSize: 11 }} tickLine={false}
                     label={{ value: 'Lượng bán 90 ngày', angle: -90, position: 'insideLeft', offset: 10, fill: CHART_INK.axis, fontSize: 12 }} />

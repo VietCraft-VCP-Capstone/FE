@@ -58,6 +58,7 @@ export function SeasonalPage() {
 
   // Quản lý trạng thái đánh dấu hoàn thành các mốc kế hoạch (đồng bộ database shop)
   const [checkedMilestones, setCheckedMilestones] = useState<Record<string, boolean>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Quản lý mở Drawer hồ sơ tiềm năng 5 lớp & tính hòa vốn
   const [selectedProfile, setSelectedProfile] = useState<PotentialProfile | null>(null);
@@ -119,11 +120,18 @@ export function SeasonalPage() {
   }, [state]);
 
   const toggleSaveIdea = async (key: string) => {
+    const prevSnapshot = { ...savedIdeas };
+    setSaveError(null);
     setSavedIdeas(prev => ({ ...prev, [key]: !prev[key] }));
     try {
-      await analyticsApi.saveSeasonalIdea(key);
-    } catch (e) {
-      console.error('Lỗi khi lưu ý tưởng theo dịp vào CSDL shop:', e);
+      const res = await analyticsApi.saveSeasonalIdea(key);
+      if (!res?.success) {
+        setSavedIdeas(prevSnapshot);
+        setSaveError('Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.');
+      }
+    } catch {
+      setSavedIdeas(prevSnapshot);
+      setSaveError('Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.');
     }
   };
 
@@ -131,22 +139,36 @@ export function SeasonalPage() {
     const campId = currentCampaignId || '';
     const key = campId ? `${campId}_${idx}` : String(idx);
     const nextVal = !checkedMilestones[key];
+    const prevSnapshot = { ...checkedMilestones };
+    setSaveError(null);
     setCheckedMilestones(prev => ({ ...prev, [key]: nextVal, [String(idx)]: nextVal }));
     try {
-      await analyticsApi.toggleSeasonalMilestone(idx, nextVal, campId || undefined);
-    } catch (e) {
-      console.error('Lỗi khi cập nhật mốc thời gian theo dịp vào CSDL shop:', e);
+      const res = await analyticsApi.toggleSeasonalMilestone(idx, nextVal, campId || undefined);
+      if (!res?.success) {
+        setCheckedMilestones(prevSnapshot);
+        setSaveError('Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.');
+      }
+    } catch {
+      setCheckedMilestones(prevSnapshot);
+      setSaveError('Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.');
     }
   };
 
   const handleToggleCampMilestone = async (campId: string, stageIdx: number) => {
     const key = `${campId}_${stageIdx}`;
     const nextVal = !checkedMilestones[key];
+    const prevSnapshot = { ...checkedMilestones };
+    setSaveError(null);
     setCheckedMilestones(prev => ({ ...prev, [key]: nextVal }));
     try {
-      await analyticsApi.toggleSeasonalMilestone(stageIdx, nextVal, campId);
-    } catch (e) {
-      console.error('Lỗi khi cập nhật mốc thời gian theo dịp vào CSDL shop:', e);
+      const res = await analyticsApi.toggleSeasonalMilestone(stageIdx, nextVal, campId);
+      if (!res?.success) {
+        setCheckedMilestones(prevSnapshot);
+        setSaveError('Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.');
+      }
+    } catch {
+      setCheckedMilestones(prevSnapshot);
+      setSaveError('Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.');
     }
   };
 
@@ -507,8 +529,27 @@ export function SeasonalPage() {
               return { id, title: id, subtitle: 'Ý tưởng đã chọn' };
             });
 
+          const isRefreshing = state.kind === 'loading' && Boolean(lastReadyDataRef.current);
+
           return (
-            <div className="space-y-6">
+            <div className={`space-y-6 transition-opacity ${isRefreshing ? 'opacity-70' : 'opacity-100'}`}>
+              {isRefreshing && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                  Đang cập nhật dữ liệu mới cho dịp đã chọn...
+                </div>
+              )}
+              {saveError && (
+                <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800">
+                  <span>{saveError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSaveError(null)}
+                    className="ml-3 rounded px-2 py-0.5 text-xs font-semibold hover:bg-rose-100"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              )}
               {/* 1. THANH THÔNG TIN GIAN HÀNG & HEADER CHIẾN DỊCH (GỘP CÙNG TIẾN TRÌNH 4 BƯỚC) */}
               <SeasonalHeader
                 shopName={data.seller_shop_name}

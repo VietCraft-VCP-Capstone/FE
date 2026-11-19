@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+﻿import { ArrowRight } from 'lucide-react';
 import type { SeasonalStoryChapter } from '../../types';
 
 interface Props {
@@ -20,7 +20,7 @@ export function StoryChapter({ chapter, step, onNavigate }: Props) {
           {STEPS.map((label, i) => (
             <li key={label} className="flex items-center gap-1">
               <span
-                className={`inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
+                className={`inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
                   i + 1 === step
                     ? 'bg-[#007700] text-white'
                     : i + 1 < step

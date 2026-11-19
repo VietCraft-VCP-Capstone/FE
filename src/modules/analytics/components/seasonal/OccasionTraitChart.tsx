@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Calendar, CheckCircle2, ChevronDown, Info } from 'lucide-react';
 import type { OccasionTraitItem } from '../../types/evidence';
 import { EvidenceTrigger } from '../evidence/EvidenceTrigger';
@@ -370,7 +370,7 @@ export const OccasionTraitChart: React.FC<Props> = ({
                         <ChevronDown size={12} className={`text-stone-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                       </button>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${act.badgeClass}`}>
+                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${act.badgeClass}`}>
                           {act.priority}
                         </span>
                         {act.evidence && (
@@ -398,7 +398,7 @@ export const OccasionTraitChart: React.FC<Props> = ({
                   Lịch chuẩn bị
                 </h4>
                 {daysToEvent != null && (
-                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-[#007700]">
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[11px] font-semibold text-[#007700]">
                     Còn {daysToEvent} ngày
                   </span>
                 )}
@@ -427,10 +427,10 @@ export const OccasionTraitChart: React.FC<Props> = ({
                     }`}
                     title={st.note}
                   >
-                    <div className="flex items-center justify-between gap-1 text-[10px]">
+                    <div className="flex items-center justify-between gap-1 text-[11px]">
                       <span className="font-mono text-stone-500">{st.range}</span>
                       {isCurrent && (
-                        <span className="rounded bg-[#007700] px-1 py-0.2 text-[9px] font-bold text-white">
+                        <span className="rounded bg-[#007700] px-1 py-0.2 text-[11px] font-bold text-white">
                           Hiện tại
                         </span>
                       )}
@@ -442,7 +442,7 @@ export const OccasionTraitChart: React.FC<Props> = ({
                       <ChevronDown size={11} className={`text-stone-400 shrink-0 transition-transform ${isStageOpen ? 'rotate-180' : ''}`} />
                     </div>
                     {isStageOpen && (
-                      <div className="mt-1 text-[10px] text-stone-500 leading-snug">{st.note}</div>
+                      <div className="mt-1 text-[11px] text-stone-500 leading-snug">{st.note}</div>
                     )}
                   </button>
                 );

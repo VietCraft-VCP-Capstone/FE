@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Kiểu dữ liệu của 16 tính năng Product Analytics (F26–F41).
  *
  * Dựng theo JSON THẬT mà service AI trả qua cổng BE /api/seller/analytics, không theo
@@ -270,11 +270,13 @@ export interface CompetitorShop {
   price_vnd: { p25: number; median: number; p75: number };
   units_90d: number;
   share_pct: number;
-  /** Sao đã co ngót theo số lượt; null khi chưa có đánh giá. */
+  /** Sao đã co ngót theo số lượt (dùng xếp hạng); null khi chưa có đánh giá. */
   rating: number | null;
+  /** Sao thật: trung bình mọi lượt đánh giá, để hiện như trang shop. */
+  rating_real: number | null;
   n_reviews: number;
   favorites: number;
-  /** Trung vị phút từ lúc khách hỏi tới tin trả lời đầu tiên, đo từ chat 90 ngày; null = dưới 5 lượt hỏi. */
+  /** Trung vị phút từ lúc khách hỏi tới tin trả lời đầu tiên, đo từ chat 90 ngày; null = dưới 6 lượt hỏi. */
   response_minutes: number | null;
   /** % lượt khách hỏi được trả lời; null như trên. */
   reply_rate: number | null;
@@ -289,6 +291,10 @@ export interface CompetitorShop {
   shared_types: string[];
   /** Cùng phân khúc giá với bạn mà bán gấp nhiều lần: shop nên tham khảo. */
   is_peer: boolean;
+  /** Ai trả lời nhanh hơn, chỉ khi Mann–Whitney trên từng lượt hỏi cho p < 0,05. */
+  response_better: 'them' | 'me' | null;
+  /** Đối thủ đăng nhiều sản phẩm mới hơn bạn, kiểm định Poisson p < 0,05. */
+  more_new: boolean;
 }
 
 /** Mỗi sản phẩm trong danh mục một điểm, để vẽ biểu đồ giá theo loại hàng và chất liệu. Chỉ shop thật. */
@@ -519,14 +525,13 @@ export interface PricingAnalysis {
 
 /** AI chấm mức đe doạ của một sản phẩm mới của đối thủ. */
 export interface Threat {
-  score: number;
+  /** high: gần như trùng và rẻ hơn; medium: gần như trùng, hoặc tương tự và rẻ hơn; low: còn lại. */
   level: 'high' | 'medium' | 'low';
   similarity: number;
   matched_product_id: string | null;
   matched_title: string | null;
   /** > 0: đối thủ rẻ hơn sản phẩm khớp của bạn bao nhiêu %. */
   price_gap_pct: number | null;
-  shop_strength: number;
   near_identical?: boolean;
 }
 
@@ -552,6 +557,8 @@ export interface CompetitorTracking {
       threat: Threat | null;
       /** Giá sản phẩm của bạn giống nó nhất. */
       matched_price_vnd: number | null;
+      /** Từ khoá của shop bạn mà sản phẩm này trùng (vì sao nó thuộc ngách của bạn). */
+      matched_tags?: string[];
     }[];
   }[];
   slots_used: number;
@@ -858,15 +865,32 @@ export interface OpportunityKeywordItem {
   id: string;
   tag: string;
   volume: number;
+  sold_count_real?: number;
+  etsy_favorers?: number;
+  etsy_listings?: number;
+  sales_per_shop?: number | null;
+  trend_index?: number | null;
+  trend_index_raw?: number | null;
   volume_level: 'high' | 'medium' | 'low';
   competition: number;
   competition_level: 'high' | 'medium' | 'low';
-  keyword_score: number;
+  keyword_score: number | null;
+  score_basis?: 'sales+trends' | 'sales_only' | 'etsy+trends' | 'etsy_engagement' | 'trends_only' | 'insufficient';
+  score_breakdown?: {
+    demand: number | null;
+    headroom: number | null;
+    momentum: number | null;
+    etsy_signal?: number | null;
+    sales_per_shop?: number | null;
+    applied_caps?: string[];
+    formula_text?: string;
+  };
+  platforms?: string[];
   listing_type?: 'physical' | 'pod' | 'custom' | string;
   customizable?: boolean;
   when_made?: string;
-  avg_price_vnd?: number;
-  conversion_rate_pct?: number;
+  avg_price_vnd?: number | null;
+  conversion_rate_pct?: number | null;
   is_starred?: boolean;
   is_in_shop?: boolean;
   matched_product?: {
@@ -878,7 +902,7 @@ export interface OpportunityKeywordItem {
   search_wow_pct?: number | null;
   trend_match?: 'exact' | 'partial' | 'proxy' | 'none';
   trend_series_used?: string | null;
-  volume_basis?: 'listing_sales+trends' | 'trends_only';
+  volume_basis?: 'listing_sales' | 'etsy_engagement' | 'trends_index' | 'insufficient' | 'listing_sales+trends' | 'trends_only';
   shop_coverage?: { matching: number; total: number; gap: boolean; product_ids: string[] };
   action?: { type: 'create_listing' | 'optimize_tags' | 'copy_tag'; label: string; priority: 'high' | 'normal' };
 }

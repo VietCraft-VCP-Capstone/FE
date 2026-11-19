@@ -52,8 +52,8 @@ export function LandingHeader({
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-100 px-6 py-4">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-100 px-4 sm:px-6 py-3 sm:py-4">
+      <div className="max-w-7xl mx-auto flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-4 gap-y-3">
         
         {/* Logo */}
         <div className="flex items-center gap-1.5 cursor-pointer" onClick={onHome}>
@@ -74,7 +74,7 @@ export function LandingHeader({
           </Link>
         </nav>
 
-        <div className="flex-1 max-w-lg min-w-[160px] relative group" ref={searchBox.containerRef}>
+        <div className="order-last basis-full sm:order-none sm:basis-auto flex-1 max-w-lg min-w-0 sm:min-w-[160px] relative group" ref={searchBox.containerRef}>
           <Search
             className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#007700] transition-colors cursor-pointer"
             onClick={() => searchBox.onExecuteSearch()}
@@ -89,7 +89,7 @@ export function LandingHeader({
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1 sm:gap-4">
           <Link to="/favorites" className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all" title="Yêu thích">
             <Heart className="h-5.5 w-5.5" />
           </Link>
@@ -106,7 +106,7 @@ export function LandingHeader({
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => onDashboard(user.name)}
-                className="bg-[#007700] hover:bg-[#006000] text-white text-sm font-semibold px-5 py-2 rounded-full transition-all shadow-sm"
+                className="max-w-[10rem] truncate sm:max-w-none bg-[#007700] hover:bg-[#006000] text-white text-sm font-semibold px-4 sm:px-5 py-2 rounded-full transition-all shadow-sm"
               >
                 Bảng điều khiển ({user.name})
               </button>
@@ -120,7 +120,7 @@ export function LandingHeader({
           ) : (
             <button 
               onClick={onLogin}
-              className="bg-[#007700] hover:bg-[#006000] text-white text-sm font-semibold px-5 py-2 rounded-full transition-all shadow-sm active:scale-95"
+              className="whitespace-nowrap bg-[#007700] hover:bg-[#006000] text-white text-sm font-semibold px-4 sm:px-5 py-2 rounded-full transition-all shadow-sm active:scale-95"
             >
               Đăng nhập
             </button>

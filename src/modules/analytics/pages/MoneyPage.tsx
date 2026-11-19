@@ -11,11 +11,11 @@ import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { SourceFooter } from '../components/SourceFooter';
 import { CustomRange, rangeProblem } from '../components/money/CustomRange';
-import { MoneyDaily } from '../components/money/MoneyDaily';
 import { MoneyHero } from '../components/money/MoneyHero';
+import { MoneyDaily } from '../components/money/MoneyDaily';
 import { MoneyProducts } from '../components/money/MoneyProducts';
 import { MoneySkeleton } from '../components/money/MoneySkeleton';
-import { MoneyVerdicts } from '../components/money/MoneyVerdicts';
+import { VoucherStock } from '../components/money/VoucherStock';
 import { VoucherTable } from '../components/money/VoucherTable';
 import { useInsight } from '../hooks/useInsight';
 import { INSIGHTS_ROOT } from '../nav';
@@ -79,11 +79,11 @@ export function MoneyPage() {
             className={`space-y-5 transition-opacity duration-200 motion-reduce:transition-none ${refreshing ? 'pointer-events-none opacity-50' : ''}`}
           >
             <MoneyHero data={data} />
-            <MoneyVerdicts data={data} tips={refreshing ? {} : tips} aiLoading={!refreshing && aiLoading} />
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
               <div className="min-w-0 lg:col-span-7"><MoneyProducts data={data} /></div>
               <div className="min-w-0 lg:col-span-5"><VoucherTable data={data} /></div>
             </div>
+            {data.voucher_stock && <VoucherStock stock={data.voucher_stock} tip={refreshing ? undefined : tips.next_voucher} aiLoading={!refreshing && aiLoading} />}
             <MoneyDaily data={data} onPick={pick} />
             <SourceFooter meta={meta} />
             <p className="m-0 text-xs text-stone-500">

@@ -28,6 +28,11 @@ import { DeltaBadge, Skeleton } from '../components/ui';
 import { fullDate, pct, RANGE_OPTIONS, shortDate } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import type { ShopOverview, TimeRange } from '../types';
+import { INSIGHTS_ROOT } from '../nav';
+
+const today = () => new Date().toLocaleDateString('sv-SE');
+const moneyLink = (from: string, to: string) =>
+  `${INSIGHTS_ROOT}/money?range=custom&from=${from}&to=${to < today() ? to : today()}`;
 
 const RANGES: TimeRange[] = ['7d', '30d', '90d', '180d', '365d', 'year'];
 
@@ -439,7 +444,11 @@ export function OverviewPage() {
                 </div>
 
                 {/* 3. DOANH THU */}
-                <div className="relative flex flex-col justify-between rounded-2xl border border-stone-200/80 bg-white p-5 shadow-sm transition-all hover:border-stone-300">
+                <Link
+                  to={moneyLink(data.from, data.to)}
+                  title="Xem thực nhận sau phí sàn, voucher và hoàn tiền"
+                  className="relative flex flex-col justify-between rounded-2xl border border-stone-200/80 bg-white p-5 shadow-sm transition-all hover:border-[#005B00]"
+                >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold tracking-wider text-stone-500 uppercase">Doanh thu</span>
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ecfccb] text-lime-800">
@@ -460,8 +469,9 @@ export function OverviewPage() {
                       )}
                     </div>
                     <div className="mt-1 text-xs text-stone-400">{revenueHint}</div>
+                    <div className="mt-1 text-xs font-semibold text-[#005B00]">Xem thực nhận →</div>
                   </div>
-                </div>
+                </Link>
 
                 {/* 4. TỈ LỆ CHUYỂN ĐỔI */}
                 <div className="relative flex flex-col justify-between rounded-2xl border border-stone-200/80 bg-white p-5 shadow-sm transition-all hover:border-stone-300">

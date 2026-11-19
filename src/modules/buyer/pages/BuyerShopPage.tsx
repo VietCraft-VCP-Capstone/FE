@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Star,
   Store,
@@ -59,7 +59,10 @@ export function BuyerShopPage() {
   const isSeller = user?.role?.toLowerCase() === 'seller';
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
+  // Seller mở ở tab mới (không có lịch sử) thì mới về Quản lý đối thủ; còn lại lùi đúng trang trước.
+  const veQuanLyDoiThu = isSeller && location.key === 'default';
   const productsSectionRef = useRef<HTMLDivElement>(null);
 
   // Shop & Product Data
@@ -135,7 +138,7 @@ export function BuyerShopPage() {
             address: detail.address,
             city: detail.city,
             province: detail.province,
-            rating: typeof detail.averageRating === 'number' ? detail.averageRating : (detail.rating || 5),
+            rating: Number(detail.averageRating ?? detail.rating ?? 0),
             ratingCount: detail.ratingCount || 0,
             followersCount: detail.followersCount || 0,
             isFollowing: Boolean(detail.isFollowing),
@@ -149,7 +152,8 @@ export function BuyerShopPage() {
           setShop(info ? {
             name: info.name,
             logo: info.logo,
-            rating: info.rating ?? 5,
+            rating: info.rating ?? 0,
+            ratingCount: info.ratingCount ?? 0,
             followersCount: 0,
             isFollowing: false
           } : null);
@@ -312,7 +316,7 @@ export function BuyerShopPage() {
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 font-sans">
       <SeoMeta
         title={shop?.name ? `${shop.name} - Nghệ nhân VietCraft` : 'Gian hàng VietCraft'}
-        description={shop?.description || shop?.slogan || `Gian hàng thủ công chính hãng ${shop?.name || ''} trên sàn VietCraft. Đánh giá ${shop?.rating || 5} sao.`}
+        description={shop?.description || shop?.slogan || `Gian hàng thủ công chính hãng ${shop?.name || ''} trên sàn VietCraft.${shop?.ratingCount ? ` Đánh giá ${shop.rating.toFixed(1)} sao.` : ''}`}
         ogImage={shop?.banner || shop?.logo}
         schema={shop ? {
           "@context": "https://schema.org",
@@ -320,27 +324,24 @@ export function BuyerShopPage() {
           "name": shop.name,
           "description": shop.description || shop.slogan,
           "image": shop.logo || shop.banner,
-          "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": shop.rating || 5,
-            "reviewCount": shop.ratingCount || 1
-          }
+          // Chỉ khai báo điểm khi có đánh giá thật
+          ...(shop.ratingCount ? {
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": shop.rating,
+              "reviewCount": shop.ratingCount
+            }
+          } : {})
         } : undefined}
       />
       {/* Nút quay lại & Banner thông báo nếu là seller */}
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <button
-          onClick={() => {
-            if (isSeller) {
-              navigate('/seller/competitors');
-            } else {
-              navigate(-1);
-            }
-          }}
+          onClick={() => (veQuanLyDoiThu ? navigate('/seller/competitors') : navigate(-1))}
           className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-stone-600 transition-colors hover:text-[#15803d]"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>{isSeller ? 'Quay lại Quản lý đối thủ' : 'Quay lại'}</span>
+          <span>{veQuanLyDoiThu ? 'Quay lại Quản lý đối thủ' : 'Quay lại'}</span>
         </button>
 
         {isSeller && (
@@ -462,10 +463,14 @@ export function BuyerShopPage() {
           <div className="mt-5 pt-4 border-t border-stone-100 flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm font-medium text-stone-600">
             <div className="flex items-center gap-1.5 bg-amber-50/80 text-amber-900 px-3 py-1.5 rounded-xl border border-amber-200/60 font-semibold">
               <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              <span>{(shop?.rating ?? 5).toFixed(1)} / 5.0</span>
-              <span className="text-amber-700/80 font-normal">
-                ({shop?.ratingCount || 0} đánh giá)
-              </span>
+              {shop?.ratingCount ? (
+                <>
+                  <span>{shop.rating.toFixed(1)} / 5.0</span>
+                  <span className="text-amber-700/80 font-normal">({shop.ratingCount} đánh giá)</span>
+                </>
+              ) : (
+                <span className="font-normal">Chưa có đánh giá</span>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 bg-stone-50 px-3 py-1.5 rounded-xl text-stone-700">
@@ -698,15 +703,15 @@ export function BuyerShopPage() {
         </div>
       ) : (
         <div>
-          {/* Vùng sản phẩm kết hợp 2 nút điều hướng bên trái và bên phải (không bao giờ đè lên sản phẩm) */}
+          {/* Vùng sản phẩm kết hợp 2 nút điều hướng bên trái và bên phải (từ sm trở lên) */}
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4 lg:gap-5">
-            {/* Nút mũi tên chuyển trang bên TRÁI */}
+            {/* Nút mũi tên chuyển trang bên TRÁI (từ sm trở lên, trên mobile chuyển xuống cụm phân trang dưới để không đè/ép sản phẩm) */}
             {totalPages > 1 && (
               <button
                 type="button"
                 disabled={currentPage === 1}
                 onClick={() => handlePageChange(currentPage - 1)}
-                className={`shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                className={`hidden sm:flex shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border items-center justify-center transition-all duration-200 ${
                   currentPage === 1
                     ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
                     : 'bg-white text-stone-700 border-stone-200 shadow-md hover:bg-[#15803d] hover:text-white hover:border-[#15803d] hover:scale-105 active:scale-95 cursor-pointer shadow-stone-200/50'
@@ -767,13 +772,17 @@ export function BuyerShopPage() {
                           </h3>
 
                           {/* Đánh giá sao & Đã bán */}
-                          <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-1.5">
-                            <div className="flex items-center gap-0.5 text-amber-500">
-                              <Star className="w-3.5 h-3.5 fill-current" />
-                              <span className="font-semibold text-stone-700 ml-0.5">
-                                {(p.rating || 5).toFixed(1)}
-                              </span>
-                            </div>
+                          <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-stone-500 mt-1.5">
+                            {(p.ratingCount ?? 0) > 0 ? (
+                              <div className="flex items-center gap-0.5 text-amber-500">
+                                <Star className="w-3.5 h-3.5 fill-current" />
+                                <span className="font-semibold text-stone-700 ml-0.5">
+                                  {(p.rating ?? 0).toFixed(1)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="italic text-stone-400">Chưa có đánh giá</span>
+                            )}
                             <span>•</span>
                             <span>Đã bán {soldCount}</span>
                           </div>
@@ -797,13 +806,13 @@ export function BuyerShopPage() {
               </div>
             </div>
 
-            {/* Nút mũi tên chuyển trang bên PHẢI */}
+            {/* Nút mũi tên chuyển trang bên PHẢI (từ sm trở lên) */}
             {totalPages > 1 && (
               <button
                 type="button"
                 disabled={currentPage === totalPages}
                 onClick={() => handlePageChange(currentPage + 1)}
-                className={`shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                className={`hidden sm:flex shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border items-center justify-center transition-all duration-200 ${
                   currentPage === totalPages
                     ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
                     : 'bg-white text-stone-700 border-stone-200 shadow-md hover:bg-[#15803d] hover:text-white hover:border-[#15803d] hover:scale-105 active:scale-95 cursor-pointer shadow-stone-200/50'
@@ -818,23 +827,55 @@ export function BuyerShopPage() {
 
           {/* Dấu chấm chuyển trang tinh tế và chỉ số trang phía dưới */}
           {totalPages > 1 && (
-            <div className="mt-8 flex flex-col items-center justify-center gap-2">
-              <div className="flex items-center gap-2">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => handlePageChange(p)}
-                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                      currentPage === p
-                        ? 'w-7 bg-[#15803d]'
-                        : 'w-2 bg-stone-300 hover:bg-stone-400'
-                    }`}
-                    aria-label={`Trang ${p}`}
-                    title={`Trang ${p}`}
-                  />
-                ))}
+            <div className="mt-8 flex flex-col items-center justify-center gap-3">
+              <div className="flex items-center gap-3">
+                {/* Trên màn hình nhỏ: nút chuyển trang đặt ở đây để không che hay ép sản phẩm */}
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={`sm:hidden w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                    currentPage === 1
+                      ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
+                      : 'bg-white text-stone-700 border-stone-200 shadow-sm active:scale-95 cursor-pointer'
+                  }`}
+                  aria-label="Trang trước"
+                >
+                  <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => handlePageChange(p)}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                        currentPage === p
+                          ? 'w-7 bg-[#15803d]'
+                          : 'w-2 bg-stone-300 hover:bg-stone-400'
+                      }`}
+                      aria-label={`Trang ${p}`}
+                      title={`Trang ${p}`}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={`sm:hidden w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                    currentPage === totalPages
+                      ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
+                      : 'bg-white text-stone-700 border-stone-200 shadow-sm active:scale-95 cursor-pointer'
+                  }`}
+                  aria-label="Trang sau"
+                >
+                  <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
               </div>
+
               <span className="text-xs text-stone-400 font-medium">
                 Trang {currentPage} / {totalPages} ({totalItems} sản phẩm)
               </span>

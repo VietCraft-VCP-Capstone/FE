@@ -43,18 +43,14 @@ export function xepDoiThu(shops: CompetitorShop[], trackedIds: Set<string>) {
       || (b.rivalry ?? 0) - (a.rivalry ?? 0) || b.units_90d - a.units_90d);
 }
 
-/** Họ hơn / bạn hơn ở từng tiêu chí; ngưỡng chênh lệch rõ ghi ở ⓘ của phần. */
+/** Họ hơn / bạn hơn ở từng tiêu chí; trả lời khách và sản phẩm mới theo kiểm định của AI, ngưỡng ghi ở ⓘ của phần. */
 function soVoiBan(s: CompetitorShop, me: CompetitorShop) {
-  const a = s.response_minutes;
-  const b = me.response_minutes;
   const banHon = s.units_90d >= 1.5 * me.units_90d && s.units_90d - me.units_90d >= 5;
   const banKem = me.units_90d >= 1.5 * s.units_90d && me.units_90d - s.units_90d >= 5;
-  const tlHon = a !== null && b !== null && b >= 1.3 * a && b - a >= 5;
-  const tlKem = a !== null && b !== null && a >= 1.3 * b && a - b >= 5;
   return {
     ban: (banHon ? 'ho' : banKem ? 'ban' : null) as Tong,
-    tl: (tlHon ? 'ho' : tlKem ? 'ban' : null) as Tong,
-    moi: (s.new_8w - me.new_8w >= 2 ? 'ho' : null) as Tong,
+    tl: (s.response_better === 'them' ? 'ho' : s.response_better === 'me' ? 'ban' : null) as Tong,
+    moi: (s.more_new ? 'ho' : null) as Tong,
     xh: (s.trend.kind === 'surge' || s.trend.kind === 'up' ? 'ho' : null) as Tong,
   };
 }
@@ -351,19 +347,20 @@ function BangSoSanh({ me, ds, chon, onChon, canTrack, trackedIds, pendingShop, k
                 </O>
               ))}
             </Dong>
-            <Dong ten="Điểm đánh giá" goiY="Đã hiệu chỉnh theo số lượt đánh giá. Khi mỗi shop còn ít lượt, chênh 0,1 điểm chưa có ý nghĩa thống kê.">
+            <Dong ten="Điểm đánh giá" goiY="Trung bình sao thật của mọi lượt đánh giá, giống trang shop. Shop ít lượt thì điểm còn dễ dao động, nên đọc kèm số lượt.">
               {cot.map(s => (
                 <O key={s.shop_id}>
                   <span className="flex flex-wrap items-center gap-x-1.5">
-                    {s.rating === null ? so('Chưa có') : (
-                      <span className="inline-flex items-center gap-1">{so(decimal(s.rating, 1))}<Star size={13} className="fill-amber-500 text-amber-500" aria-hidden /></span>
+                    {/* AI chưa cập nhật (FE lên trước) thì chưa có rating_real: tạm hiện sao co ngót như trước. */}
+                    {(s.rating_real ?? s.rating) === null ? so('Chưa có') : (
+                      <span className="inline-flex items-center gap-1">{so(decimal(s.rating_real ?? s.rating, 1))}<Star size={13} className="fill-amber-500 text-amber-500" aria-hidden /></span>
                     )}
                     <span className="text-stone-500">· {count(s.n_reviews)} lượt</span>
                   </span>
                 </O>
               ))}
             </Dong>
-            <Dong ten="Trả lời khách" phu="từ tin nhắn chat · 90 ngày" goiY="Trung vị thời gian từ lúc khách hỏi tới tin trả lời đầu tiên của chủ shop, và tỉ lệ lượt hỏi được trả lời. Cần ít nhất 5 lượt hỏi.">
+            <Dong ten="Trả lời khách" phu="từ tin nhắn chat · 90 ngày" goiY="Trung vị thời gian từ lúc khách hỏi tới tin trả lời đầu tiên của chủ shop, và tỉ lệ lượt hỏi được trả lời. Cần ít nhất 6 lượt hỏi.">
               {cot.map(s => (
                 <O key={s.shop_id} tong={sv.get(s.shop_id)?.tl}>
                   {s.reply_rate === null ? (

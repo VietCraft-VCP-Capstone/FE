@@ -1023,15 +1023,63 @@ body:has(.seller-layout) {
     }
 }
 
+.buyer-nav-strip {
+    display: none;
+}
+
+/* Dưới 960px menu không đủ chỗ trong thanh đầu trang: chuyển xuống hàng cuộn ngang để vẫn vào được mọi mục. */
 @media (max-width: 960px) {
-    .buyer-nav-optional {
-        display: none !important;
+    .buyer-nav-menu {
+        display: none;
+    }
+
+    .buyer-nav-strip {
+        display: flex;
+        gap: 22px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        background: #fff;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 0 clamp(12px, 2vw, 32px);
+    }
+
+    .buyer-nav-strip::-webkit-scrollbar {
+        display: none;
+    }
+
+    .buyer-nav-strip a {
+        flex-shrink: 0;
+        padding: 10px 0 8px;
+        border-bottom: 2px solid transparent;
+        font-size: 14px;
+        font-weight: 600;
+        color: #4b5563;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .buyer-nav-strip a.nav-active {
+        color: #15803d;
+        border-bottom-color: #15803d;
     }
 }
 
-@media (max-width: 600px) {
-    .buyer-nav-menu {
-        display: none !important;
+/* Điện thoại: logo + nút ở hàng trên, ô tìm kiếm xuống hàng riêng để không đẩy nút ra ngoài màn hình. */
+@media (max-width: 640px) {
+    .buyer-header-container {
+        flex-wrap: wrap;
+        row-gap: 10px;
+    }
+
+    .buyer-search-bar {
+        order: 3;
+        flex: 1 1 100%;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .buyer-actions {
+        gap: 8px;
     }
 }
 
@@ -1176,6 +1224,60 @@ body:has(.seller-layout) {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
+}
+
+/* Giảm số cột theo bề rộng: thẻ sản phẩm không hẹp hơn ~150px, tên và giá không bị cắt. */
+@media (max-width: 1024px) {
+    .buyer-grid-5 {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .buyer-grid-5,
+    .buyer-grid-4 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .buyer-grid-5,
+    .buyer-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .buyer-grid-3 {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    /* Thẻ shop / phong cách: cuộn ngang thay vì xếp dọc từng thẻ cao cả màn hình. */
+    .buyer-grid-3.buyer-scroll-row {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: 80%;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+    }
+
+    .buyer-scroll-row > * {
+        scroll-snap-align: start;
+    }
+
+    .buyer-wrapper {
+        padding: 16px;
+    }
+
+    /* Tiêu đề mục trang chủ đặt cỡ chữ inline 20px, phải dùng !important để thu nhỏ trên điện thoại. */
+    .buyer-section .section-head h2 {
+        font-size: 17px !important;
+    }
+
+    .buyer-scroll-row .style-overlay h3 {
+        font-size: 17px;
+    }
 }
 
 /* Card representations */
@@ -1508,6 +1610,18 @@ body:has(.seller-layout) {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+/* Màn hẹp: khối thương hiệu một hàng, các cột link chia 2 cột thay vì 4 cột bị bóp còn một chữ mỗi dòng. */
+@media (max-width: 768px) {
+    .footer-layout {
+        grid-template-columns: 1fr 1fr;
+        gap: 28px 20px;
+    }
+
+    .footer-layout .brand-col {
+        grid-column: 1 / -1;
+    }
 }
 
 .footer-col h3 {
@@ -3316,4 +3430,36 @@ body:has(.seller-layout) {
     align-items: center;
     font-size: 11px;
     color: #a498a4;
+}
+/* Điện thoại: chân trang gọn, 3 cột link một hàng thay vì kéo dài gần một màn hình. */
+@media (max-width: 640px) {
+    .buyer-footer-block {
+        padding: 28px 16px 20px;
+    }
+
+    .footer-layout {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px 12px;
+    }
+
+    .footer-layout .footer-col {
+        gap: 8px;
+    }
+
+    .footer-layout .footer-col h3 {
+        font-size: 11px;
+    }
+
+    .footer-layout .footer-col ul {
+        gap: 6px;
+    }
+
+    .brand-col h2 {
+        font-size: 20px;
+    }
+
+    .footer-bottom-row {
+        margin-top: 20px;
+        padding-top: 14px;
+    }
 }
