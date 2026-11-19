@@ -10,7 +10,6 @@ import { DetailHeader } from '../components/health/DetailHeader';
 import { ImpactCard } from '../components/health/ImpactCard';
 import { Recommendations } from '../components/health/Recommendations';
 import { ScoreHero } from '../components/health/ScoreHero';
-import { PriceCompare } from '../components/health/PriceCompare';
 import { SearchInsightsCard } from '../components/health/SearchInsightsCard';
 import { WhyScore } from '../components/health/WhyScore';
 import { PartTabs } from '../components/intel/PartTabs';
@@ -58,7 +57,7 @@ function ListingDetail({ id }: { id: string }) {
                 </div>
               </section>
 
-              <Recommendations items={data.recommendations} productId={id} />
+              <Recommendations data={data} productId={id} />
 
               <ActionPlan productId={id} />
 
@@ -76,11 +75,6 @@ function ListingDetail({ id }: { id: string }) {
                       key: 'traffic',
                       label: 'Lượt xem và đơn hàng',
                       children: id ? <ListingTraffic id={id} conversionDetail={null} /> : null,
-                    },
-                    {
-                      key: 'price',
-                      label: 'So sánh giá',
-                      children: <div className={CARD}><PriceCompare data={data} /></div>,
                     },
                     {
                       key: 'parts',

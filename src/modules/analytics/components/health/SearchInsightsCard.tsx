@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Check, ChevronRight, X } from 'lucide-react';
+import { Check, ChevronRight, Info, Search, X } from 'lucide-react';
+import { Tooltip } from 'antd';
 import { useInsight } from '../../hooks/useInsight';
 import type { SearchInsights, SearchQueryInsight, ZeroResultQuery } from '../../healthTypes';
 import { InsightBlock } from '../InsightBlock';
@@ -10,7 +11,8 @@ const CARD = 'rounded-2xl border border-stone-200/90 bg-white p-5 shadow-2xs sm:
 const LIMIT = 'Vị trí là chỗ sản phẩm của bạn đang hiện khi khách gõ đúng từ đó trên ô tìm kiếm của sàn. Thêm từ vào tên hoặc tag thì sản phẩm được xếp cao hơn, nhưng lên đến vị trí nào còn tuỳ sản phẩm của các shop khác, nên không đoán trước được.';
 const TITLE_GAIN = 5;
 
-const rankText = (rank: number | null) => (rank === null ? 'Chưa nằm trong 48 kết quả đầu' : `Đang ở vị trí #${rank}`);
+const TOP_RANK = 3;
+const rankText = (rank: number | null) => (rank === null ? 'Ngoài 48 kết quả đầu' : `Vị trí #${rank}`);
 const gainText = (gain: number) => (gain >= TITLE_GAIN ? 'Thêm vào tên để được xếp cao hơn' : 'Thêm vào tag để được xếp cao hơn');
 
 function QueryRow({ q }: { q: SearchQueryInsight }) {
@@ -21,7 +23,7 @@ function QueryRow({ q }: { q: SearchQueryInsight }) {
       <Chip tone={q.covered ? 'good' : 'warn'} icon={q.covered ? <Check size={12} aria-hidden /> : <X size={12} aria-hidden />}>
         {q.covered ? 'Có trong tên/tag' : 'Chưa có trong tên/tag'}
       </Chip>
-      <span className="text-xs tabular-nums text-stone-600">{rankText(q.actual_rank)}</span>
+      <Chip tone={q.actual_rank !== null && q.actual_rank <= TOP_RANK ? 'good' : 'neutral'}>{rankText(q.actual_rank)}</Chip>
       {q.match_gain > 0 && <span className="text-xs font-semibold text-[#005B00]">{gainText(q.match_gain)}</span>}
     </li>
   );
@@ -64,16 +66,28 @@ function SearchBody({ data, productId }: { data: SearchInsights; productId: stri
           <ChevronRight size={14} aria-hidden />
         </Link>
       )}
-      <p className="m-0 mt-4 text-xs leading-relaxed text-stone-500">{LIMIT}</p>
     </>
   );
 }
 
 export function SearchInsightsCard({ productId }: { productId: string }) {
   const { state, reload } = useInsight<SearchInsights>(`/listings/${productId}/search-insights`);
+  const queries = state.kind === 'ready' ? state.data.queries ?? [] : [];
+  const covered = queries.filter(q => q.covered).length;
   return (
     <section className={CARD}>
-      <h2 className="m-0 text-base font-bold text-stone-900">Giúp khách tìm thấy</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="m-0 inline-flex items-center gap-2 text-base font-bold text-stone-900">
+          <Search size={18} className="text-[#007700]" aria-hidden />
+          Giúp khách tìm thấy
+          <Tooltip title={LIMIT}><Info size={14} className="cursor-help text-stone-400" aria-label="Vị trí là gì" /></Tooltip>
+        </h2>
+        {queries.length > 0 && (
+          <span className="text-sm text-stone-600">
+            <b className={`text-base font-bold ${covered === queries.length ? 'text-[#007700]' : 'text-amber-700'}`}>{covered}/{queries.length}</b> từ khoá khách hay tìm đã có trong tên/tag
+          </span>
+        )}
+      </div>
       <div className="mt-3">
         <InsightBlock state={state} onRetry={reload} compact>
           {data => <SearchBody data={data} productId={productId} />}
