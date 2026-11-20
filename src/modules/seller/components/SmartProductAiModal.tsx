@@ -83,6 +83,8 @@ export function SmartProductAiModal({
   const [costInput, setCostInput] = useState(initialCost);
   const unitCost = isPod ? blankCost : Number(costInput.replace(/\D/g, '')) || 0;
   const needsCost = !isPod && unitCost <= 0;
+  const [marginInput, setMarginInput] = useState('30');
+  const marginRatio = Math.min(300, Math.max(0, Number(marginInput.replace(/[^\d.]/g, '')) || 0)) / 100;
   // Hộp xác nhận khi "Áp dụng tất cả" sẽ thay tên/mô tả seller đã viết
   const [overwriteAsk, setOverwriteAsk] = useState(false);
 
@@ -117,6 +119,7 @@ export function SmartProductAiModal({
         blank_cost: unitCost,
         product_type: isPod ? 'pod' : 'general',
         commission_percent: commissionPercent ?? undefined,
+        target_margin: !isPod && unitCost > 0 && marginRatio > 0 ? marginRatio : undefined,
       }, controller.signal);
 
       if (result) {
@@ -162,7 +165,7 @@ export function SmartProductAiModal({
     } finally {
       if (inflightRef.current === controller) setLoading(false);
     }
-  }, [selectedCategory, keywordIdea, material, unitCost, commissionPercent, isPod, categories]);
+  }, [selectedCategory, keywordIdea, material, unitCost, marginRatio, commissionPercent, isPod, categories]);
 
   useEffect(() => {
     if (isOpen) {
@@ -558,6 +561,16 @@ export function SmartProductAiModal({
                         onKeyDown={e => { if (e.key === 'Enter' && unitCost > 0) fetchSuggestion(); }}
                         className="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-xs focus:outline-none focus:border-emerald-400"
                       />
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={marginInput}
+                        aria-label="Biên lãi mong muốn (%)"
+                        placeholder="Lãi %"
+                        onChange={e => setMarginInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && unitCost > 0) fetchSuggestion(); }}
+                        className="w-20 px-3 py-2 rounded-xl border border-stone-200 text-xs text-center focus:outline-none focus:border-emerald-400"
+                      />
                       <button
                         type="button"
                         onClick={() => fetchSuggestion()}
@@ -647,11 +660,15 @@ export function SmartProductAiModal({
                       {(() => {
                         const pi = data.pricing_insight;
                         const median = pi.price_range.median || pi.recommended_price;
+                        const ca = !isPod ? pi.cost_analysis : null;
+                        const profitSub = (k: 'low' | 'rec' | 'high') =>
+                          ca ? `Lãi ${ca.tiers[k].profit_vnd.toLocaleString('vi-VN')}đ (${Math.round(ca.tiers[k].margin_pct)}%)` : '';
+                        const demandSub = pi.demand_signal?.direction === 'up' ? 'Đang được tìm nhiều' : pi.demand_signal?.direction === 'down' ? 'Đang ít người tìm' : '';
                         const options: { key: 'p25' | 'rec' | 'p50' | 'p75'; label: string; sub: string; value: number }[] = [
-                          { key: 'p25', label: 'Dễ bán', sub: '', value: pi.price_range.low },
-                          { key: 'rec', label: 'Gợi ý', sub: pi.demand_signal?.direction === 'up' ? 'Đang được tìm nhiều' : pi.demand_signal?.direction === 'down' ? 'Đang ít người tìm' : '', value: pi.recommended_price },
+                          { key: 'p25', label: 'Dễ bán', sub: profitSub('low'), value: pi.price_range.low },
+                          { key: 'rec', label: 'Gợi ý', sub: [demandSub, profitSub('rec')].filter(Boolean).join(' · '), value: pi.recommended_price },
                           ...(median !== pi.recommended_price ? [{ key: 'p50' as const, label: 'Trung bình', sub: '', value: median }] : []),
-                          { key: 'p75', label: 'Cao cấp', sub: '', value: pi.price_range.high },
+                          { key: 'p75', label: 'Cao cấp', sub: profitSub('high'), value: pi.price_range.high },
                         ];
                         const shown = priceChoice === 'custom' ? (Number(customPrice) || 0) : chosenPrice;
                         // Lỗ khi số seller nhận (đã trừ phí sàn) không đủ trả giá phôi
