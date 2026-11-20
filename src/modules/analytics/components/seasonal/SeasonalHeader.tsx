@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  ArrowRight,
   BookmarkCheck,
   ChevronDown,
   Layers,
@@ -14,9 +13,9 @@ import { getCampaignLucideIcon } from './SeasonalMonthMatrix';
 
 export const CATEGORY_OPTIONS = [
   { value: 'thoi-trang', label: 'Thời trang & May mặc' },
-  { value: 'gia-dung', label: 'Gia dụng & Đồ uống' },
-  { value: 'phu-kien', label: 'Phụ kiện & Túi' },
-  { value: 'trang-tri', label: 'Trang trí nhà cửa' },
+  { value: 'phu-kien', label: 'Phụ kiện & Túi ví' },
+  { value: 'nha-cua', label: 'Nhà cửa & Đời sống' },
+  { value: 'thu-cong-qua-tang', label: 'Thủ công & Quà tặng' },
 ];
 
 export interface SavedIdeaSummaryItem {
@@ -29,7 +28,7 @@ interface SeasonalHeaderProps {
   shopName?: string;
   categoryName?: string;
   categorySlug: string;
-  onSelectCategory: (slug: string) => void;
+  onSelectCategory?: (slug: string) => void;
   activeCamp?: SeasonalCampaign;
   savedIdeasCount: number;
   savedIdeaItems?: SavedIdeaSummaryItem[];
@@ -45,15 +44,12 @@ export function SeasonalHeader({
   shopName,
   categoryName,
   categorySlug,
-  onSelectCategory,
   activeCamp,
   savedIdeasCount,
   savedIdeaItems = [],
   onRemoveSavedIdea,
   onEditSavedIdea,
   onReload,
-  storyChapter,
-  onNavigateTab,
 }: SeasonalHeaderProps) {
   const [showSavedMenu, setShowSavedMenu] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -67,27 +63,39 @@ export function SeasonalHeader({
     }, 800);
   };
 
+  const resolvedCategoryLabel =
+    categoryName ||
+    CATEGORY_OPTIONS.find(c => c.value === categorySlug)?.label ||
+    'Toàn ngành hàng TMĐT';
+
   return (
     <div className="relative overflow-visible rounded-2xl border border-stone-200/90 bg-white px-4 py-3 sm:px-5 shadow-2xs">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Trái: Tên tính năng + Shop + Dịp đang chọn */}
-        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+      <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3">
+        {/* Trái: Tên tính năng + Shop + Ngành hàng tự nhận diện + Dịp đang chọn (1 hàng gọn) */}
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#007700] text-white">
             <Store className="h-4 w-4" />
           </div>
-          <h1 className="m-0 font-vietnam text-base sm:text-lg font-bold tracking-tight text-stone-950">
+          <h1 className="m-0 font-vietnam text-base sm:text-lg font-bold tracking-tight text-stone-950 whitespace-nowrap">
             Kế hoạch Cao điểm
           </h1>
           {shopName && (
-            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-[#005B00] border border-emerald-200/80 font-vietnam">
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-[#005B00] border border-emerald-200/80 font-vietnam whitespace-nowrap">
               {shopName}
             </span>
           )}
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-stone-50 px-2.5 py-0.5 text-[11px] font-medium text-stone-600 border border-stone-200/80 font-vietnam whitespace-nowrap"
+            title="Ngành hàng tự động nhận diện từ sản phẩm của shop"
+          >
+            <Layers className="h-3 w-3 text-stone-400" />
+            <span>{resolvedCategoryLabel}</span>
+          </span>
 
           {activeCamp && (
             <>
               <span className="hidden sm:inline-block h-4 w-px bg-stone-200 mx-0.5" />
-              <div className="inline-flex items-center gap-1.5 rounded-xl bg-stone-50 border border-stone-200/80 px-2.5 py-1 text-xs">
+              <div className="inline-flex items-center gap-1.5 rounded-xl bg-stone-50 border border-stone-200/80 px-2.5 py-1 text-xs whitespace-nowrap">
                 <span className="text-[#007700] shrink-0">{getCampaignLucideIcon(activeCamp.id)}</span>
                 <strong className="font-semibold text-stone-900">{activeCamp.name}</strong>
                 {typeof activeCamp.timing?.days_diff === 'number' && (
@@ -98,12 +106,12 @@ export function SeasonalHeader({
           )}
         </div>
 
-        {/* Phải: Sổ tay + Đồng bộ + Ngành hàng + CTA */}
-        <div className="relative flex flex-wrap items-center gap-2 shrink-0">
+        {/* Phải: Sổ tay đã chọn + Đồng bộ */}
+        <div className="relative flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setShowSavedMenu(prev => !prev)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200/90 bg-stone-50/70 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-emerald-50/60 hover:border-emerald-200 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200/90 bg-stone-50/70 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-emerald-50/60 hover:border-emerald-200 transition-colors cursor-pointer whitespace-nowrap"
             title="Xem danh sách ý tưởng đã chọn"
           >
             <BookmarkCheck className="h-3.5 w-3.5 text-[#007700]" />
@@ -184,47 +192,11 @@ export function SeasonalHeader({
               type="button"
               onClick={handleReload}
               disabled={isSyncing}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium font-vietnam text-stone-700 transition-colors hover:border-[#007700] hover:text-[#007700] disabled:opacity-60 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium font-vietnam text-stone-700 transition-colors hover:border-[#007700] hover:text-[#007700] disabled:opacity-60 cursor-pointer whitespace-nowrap"
               title="Đồng bộ dữ liệu đơn hàng mới nhất"
             >
               <RotateCw className={`h-3.5 w-3.5 text-[#007700] ${isSyncing ? 'animate-spin' : ''}`} />
               <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ'}</span>
-            </button>
-          )}
-
-          <div className="relative inline-flex items-center font-vietnam" title={categoryName ? `Ngành hàng: ${categoryName}` : 'Chọn ngành hàng'}>
-            <Layers className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-stone-400" />
-            <select
-              aria-label="Chọn ngành hàng phân tích"
-              value={categorySlug}
-              onChange={e => onSelectCategory(e.target.value)}
-              className="cursor-pointer appearance-none rounded-xl border border-stone-200 bg-white pl-8 pr-7 py-1.5 text-xs font-medium text-stone-800 transition-colors hover:border-[#007700] focus:border-[#007700] focus:outline-none"
-            >
-              {CATEGORY_OPTIONS.map(c => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-stone-400" />
-          </div>
-
-          {storyChapter && onNavigateTab && (
-            <button
-              type="button"
-              onClick={() => onNavigateTab(storyChapter.cta_tab)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#007700] px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-colors hover:bg-[#005B00] cursor-pointer"
-            >
-              <span>
-                {storyChapter.cta_tab === 'act1'
-                  ? 'Xem ý tưởng'
-                  : storyChapter.cta_tab === 'act2'
-                  ? 'Sang Áp dụng'
-                  : storyChapter.cta_tab === 'act3'
-                  ? 'Xem thành quả'
-                  : 'Về tổng quan'}
-              </span>
-              <ArrowRight size={13} />
             </button>
           )}
         </div>

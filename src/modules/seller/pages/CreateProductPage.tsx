@@ -430,6 +430,7 @@ export function CreateProductPage() {
             !availableTags.some((t: any) => (t.name || '').trim().toLowerCase() === st.trim().toLowerCase())
         );
 
+        const sourceIdeaId = searchParams.get('source_idea_id') || undefined;
         try {
             await productsService.create({ 
                 title, 
@@ -444,7 +445,8 @@ export function CreateProductPage() {
                 images: finalImages,
                 thumbnail: coverImage || finalImages[0],
                 variants, 
-                designPlacements 
+                designPlacements,
+                ...(sourceIdeaId ? { source_idea_id: sourceIdeaId } : {})
             });
             navigate('/seller/products');
         } catch (e: any) {

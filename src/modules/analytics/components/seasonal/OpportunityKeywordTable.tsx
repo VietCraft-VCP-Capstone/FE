@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Check,
   Copy,
   ExternalLink,
   HelpCircle,
+  Info,
   Maximize2,
   Minimize2,
   Star,
@@ -24,6 +25,91 @@ interface Props {
   savedIdeas?: Record<string, boolean>;
   onToggleStar?: (tag: string) => void;
   className?: string;
+}
+
+interface ScoreTooltipState {
+  kind: 'row' | 'header';
+  kw?: OpportunityKeywordItem;
+  top: number;
+  left: number;
+  placeBelow: boolean;
+}
+
+function getScoreExplanation(kw: OpportunityKeywordItem) {
+  const hasScore = kw.keyword_score !== null && kw.keyword_score !== undefined;
+  const soldReal = kw.sold_count_real ?? 0;
+  const etsyFav = kw.etsy_favorers ?? 0;
+  const effectiveDemand =
+    kw.effective_demand ??
+    kw.score_breakdown?.effective_demand ??
+    Number((soldReal + etsyFav / 10).toFixed(1));
+  const salesPerShop =
+    kw.sales_per_shop ??
+    kw.score_breakdown?.sales_per_shop ??
+    (kw.competition > 0 && effectiveDemand > 0
+      ? Number((effectiveDemand / kw.competition).toFixed(1))
+      : null);
+
+  const demandPts =
+    kw.score_breakdown?.demand_pts ??
+    (kw.score_breakdown?.demand != null
+      ? Number((kw.score_breakdown.demand * 0.5).toFixed(1))
+      : null);
+  const headroomPts =
+    kw.score_breakdown?.headroom_pts ??
+    (kw.score_breakdown?.headroom != null
+      ? Number((kw.score_breakdown.headroom * 0.5).toFixed(1))
+      : null);
+
+  let demandSource = '';
+  if (soldReal > 0 && etsyFav > 0) {
+    demandSource = `${soldReal.toLocaleString('vi-VN')} lượt bán + ${etsyFav.toLocaleString('vi-VN')} thích Etsy ÷ 10 = ${effectiveDemand.toLocaleString('vi-VN')} cầu`;
+  } else if (soldReal > 0) {
+    demandSource = `${soldReal.toLocaleString('vi-VN')} lượt bán thực tế đo được`;
+  } else if (etsyFav > 0) {
+    demandSource = `${etsyFav.toLocaleString('vi-VN')} lượt thích Etsy ÷ 10 = ${effectiveDemand.toLocaleString('vi-VN')} cầu`;
+  } else if (effectiveDemand > 0) {
+    demandSource = `Tổng cầu quy đổi: ${effectiveDemand.toLocaleString('vi-VN')}`;
+  }
+
+  let headroomSource = '';
+  if (salesPerShop != null && kw.competition > 0) {
+    headroomSource = `~${salesPerShop.toLocaleString('vi-VN')} cầu/shop (${kw.competition.toLocaleString('vi-VN')} gian hàng)`;
+  } else if (kw.competition > 0) {
+    headroomSource = `Đang có ${kw.competition.toLocaleString('vi-VN')} gian hàng cạnh tranh`;
+  }
+
+  let takeaway = '';
+  if (!hasScore) {
+    takeaway = 'Chưa có lượt bán (Tiki/VietCraft) hoặc lượt thích trên Etsy trong 30 ngày qua.';
+  } else if (demandPts != null && headroomPts != null) {
+    if (demandPts >= 35 && headroomPts >= 35) {
+      takeaway = 'Sức mua lớn và mỗi gian hàng còn nhiều dư địa — rất đáng ưu tiên.';
+    } else if (demandPts >= 35 && headroomPts < 35) {
+      takeaway = 'Nhu cầu cao nhưng có nhiều gian hàng cạnh tranh nên điểm dư địa bị giảm.';
+    } else if (demandPts < 35 && headroomPts >= 35) {
+      takeaway = 'Ngách ít đối thủ, mỗi shop bán tốt dù tổng cầu thị trường chưa quá lớn.';
+    } else if (demandPts >= 20 && headroomPts >= 20) {
+      takeaway = 'Sức cầu và mức cạnh tranh ở mức khá, phù hợp để test sản phẩm.';
+    } else {
+      takeaway = 'Tổng sức cầu hiện còn nhỏ nên điểm cơ hội chưa cao.';
+    }
+  } else if (kw.keyword_score! >= 70) {
+    takeaway = 'Nhu cầu tốt và dư địa mỗi shop cao.';
+  } else if (kw.keyword_score! >= 45) {
+    takeaway = 'Cơ hội ở mức trung bình, cần chọn góc sản phẩm khác biệt.';
+  } else {
+    takeaway = 'Sức cầu còn thấp hoặc cạnh tranh dày.';
+  }
+
+  return {
+    hasScore,
+    demandPts,
+    headroomPts,
+    demandSource,
+    headroomSource,
+    takeaway,
+  };
 }
 
 export const OpportunityKeywordTable: React.FC<Props> = ({
@@ -48,6 +134,37 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
   const [attachingId, setAttachingId] = useState<string | null>(null);
   const [attachedTags, setAttachedTags] = useState<Record<string, boolean>>({});
   const [openProductsKwId, setOpenProductsKwId] = useState<string | null>(null);
+  const [scoreTooltip, setScoreTooltip] = useState<ScoreTooltipState | null>(null);
+
+  useEffect(() => {
+    if (!scoreTooltip) return;
+    const clear = () => setScoreTooltip(null);
+    window.addEventListener('scroll', clear, true);
+    window.addEventListener('resize', clear);
+    return () => {
+      window.removeEventListener('scroll', clear, true);
+      window.removeEventListener('resize', clear);
+    };
+  }, [scoreTooltip]);
+
+  const openScoreTooltip = (
+    el: HTMLElement,
+    kind: 'row' | 'header',
+    kw?: OpportunityKeywordItem
+  ) => {
+    const rect = el.getBoundingClientRect();
+    const tooltipWidth = 288;
+    const placeBelow = rect.top < 210;
+    const rawLeft = rect.left + rect.width / 2 - tooltipWidth / 2;
+    const clampedLeft = Math.max(12, Math.min(window.innerWidth - tooltipWidth - 12, rawLeft));
+    setScoreTooltip({
+      kind,
+      kw,
+      top: placeBelow ? rect.bottom + 8 : rect.top - 8,
+      left: clampedLeft,
+      placeBelow,
+    });
+  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => ({ ...prev, [id]: !prev[id] }));
@@ -194,7 +311,19 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
               <th className="py-2.5 px-3">Từ khóa / Thẻ Tag</th>
               <th className="py-2.5 px-3">Nhu cầu toàn ngành</th>
               <th className="py-2.5 px-3">Đối thủ toàn ngành</th>
-              <th className="py-2.5 px-3 text-center">Điểm cơ hội</th>
+              <th className="py-2.5 px-3 text-center">
+                <span
+                  tabIndex={0}
+                  onMouseEnter={e => openScoreTooltip(e.currentTarget, 'header')}
+                  onMouseLeave={() => setScoreTooltip(null)}
+                  onFocus={e => openScoreTooltip(e.currentTarget, 'header')}
+                  onBlur={() => setScoreTooltip(null)}
+                  className="inline-flex items-center gap-1 cursor-help"
+                >
+                  <span>Điểm cơ hội</span>
+                  <Info size={12} className="text-stone-400" />
+                </span>
+              </th>
               <th className="py-2.5 px-3 text-center">Trạng thái shop</th>
               <th className="py-2.5 px-3 w-40 text-center">Thao tác</th>
             </tr>
@@ -231,11 +360,6 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                 ? 'bg-amber-100 text-amber-800 font-bold'
                 : 'bg-stone-100 text-stone-600 font-medium';
 
-              const scoreTooltip = kw.score_breakdown?.formula_text
-                || (hasScore
-                  ? `Điểm cơ hội ${kw.keyword_score}/100`
-                  : 'Chưa đủ dữ liệu lượt bán, tín hiệu Etsy hay chuỗi Google Trends khớp chính xác');
-
               return (
                 <React.Fragment key={kw.id}>
                   <tr
@@ -260,6 +384,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => setExpandedRowId(isRowExpanded ? null : kw.id)}
+                          title="Nhấn để xem tỉ lệ POD, cá nhân hóa và phân bố sản phẩm theo sàn"
                           className="font-bold text-stone-900 hover:text-[#007700] text-left transition-colors flex items-center gap-1.5"
                         >
                           <span>{kw.tag}</span>
@@ -269,16 +394,6 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                             <ChevronDown size={13} className="text-stone-400" />
                           )}
                         </button>
-                        {kw.listing_type === 'pod' && (
-                          <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-bold text-sky-700 border border-sky-200">
-                            Phôi POD
-                          </span>
-                        )}
-                        {kw.customizable && (
-                          <span className="rounded bg-purple-50 px-1.5 py-0.5 text-[11px] font-bold text-purple-700 border border-purple-200">
-                            In tên riêng
-                          </span>
-                        )}
                       </div>
                     </td>
 
@@ -347,8 +462,12 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                     {/* Score */}
                     <td className="py-3 px-3 text-center">
                       <span
-                        title={scoreTooltip}
-                        className={`inline-block rounded-md px-2.5 py-1 text-xs cursor-help ${scoreBadgeClass}`}
+                        tabIndex={0}
+                        onMouseEnter={e => openScoreTooltip(e.currentTarget, 'row', kw)}
+                        onMouseLeave={() => setScoreTooltip(null)}
+                        onFocus={e => openScoreTooltip(e.currentTarget, 'row', kw)}
+                        onBlur={() => setScoreTooltip(null)}
+                        className={`inline-block rounded-md px-2.5 py-1 text-xs cursor-help transition-shadow hover:ring-2 hover:ring-stone-300/70 focus:outline-none focus:ring-2 focus:ring-[#007700]/40 ${scoreBadgeClass}`}
                       >
                         {hasScore ? kw.keyword_score : 'N/A'}
                       </span>
@@ -500,28 +619,56 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                     </td>
                   </tr>
 
-                  {/* Chi tiết mở rộng của dòng (Collapsible More Details - Học hỏi Ảnh 1) */}
-                  {isRowExpanded && (
+                  {/* Chi tiết mở rộng của dòng (Collapsible More Details) */}
+                  {isRowExpanded && (() => {
+                    const sb = kw.source_breakdown;
+                    const totalListings = sb?.total_listings ?? 0;
+                    const byPlatform = sb?.by_platform ?? [];
+                    return (
                     <tr className="bg-stone-50/60 border-b border-stone-200">
                       <td colSpan={7} className="p-3.5 pl-12 text-xs text-stone-600 space-y-2">
                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-stone-200/80">
                           <div>
                             <span className="text-[11px] uppercase font-bold text-stone-400 block">
-                              Mô hình phân phối
+                              Tỉ lệ phôi POD
                             </span>
-                            <span className="font-semibold text-stone-800">
-                              {kw.listing_type === 'pod'
-                                ? 'In phôi POD theo đơn (Vốn 0đ)'
-                                : 'Hàng thủ công xưởng / Có sẵn'}
-                            </span>
+                            {sb && totalListings > 0 ? (
+                              <>
+                                <span className="font-bold text-stone-800">
+                                  {sb.pod_pct.toLocaleString('vi-VN')}%
+                                </span>
+                                <span className="block text-[10px] font-medium text-stone-500">
+                                  {sb.pod_count > 0
+                                    ? `${sb.pod_count}/${totalListings} sản phẩm là phôi POD`
+                                    : `0/${totalListings} SP (Hàng có sẵn / Thủ công)`}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="font-semibold text-stone-800">
+                                {kw.listing_type === 'pod' ? 'Có phôi POD' : 'Hàng có sẵn / Thủ công'}
+                              </span>
+                            )}
                           </div>
                           <div>
                             <span className="text-[11px] uppercase font-bold text-stone-400 block">
-                              Cá nhân hóa theo tên
+                              Tỉ lệ SP cá nhân hóa
                             </span>
-                            <span className="font-semibold text-stone-800">
-                              {kw.customizable ? 'Có (Khách thích khắc tên)' : 'Không bắt buộc'}
-                            </span>
+                            {sb && totalListings > 0 ? (
+                              <>
+                                <span className="font-bold text-stone-800">
+                                  {sb.customizable_pct.toLocaleString('vi-VN')}%
+                                </span>
+                                <span className="block text-[10px] font-medium text-stone-500">
+                                  {sb.customizable_count > 0
+                                    ? `${sb.customizable_count}/${totalListings} SP cho tùy chỉnh / in tên`
+                                    : `0/${totalListings} SP không bật tùy chỉnh`}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="font-semibold text-stone-800">
+                                {kw.customizable ? 'Có SP hỗ trợ tùy chỉnh' : 'Không bật tùy chỉnh'}
+                              </span>
+                            )}
                           </div>
                           <div>
                             <span className="text-[11px] uppercase font-bold text-stone-400 block">
@@ -533,22 +680,56 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                           </div>
                           <div>
                             <span className="text-[11px] uppercase font-bold text-stone-400 block">
-                              Dư địa &amp; Nguồn đo
+                              Dư địa / Shop
                             </span>
                             <span className="font-bold text-stone-800">
                               {kw.sales_per_shop != null
-                                ? `~${kw.sales_per_shop.toLocaleString('vi-VN')} bán/shop`
+                                ? `~${kw.sales_per_shop.toLocaleString('vi-VN')} ${(kw.etsy_favorers ?? 0) > 0 && (kw.sold_count_real ?? 0) === 0 ? 'cầu/shop' : 'bán/shop'}`
                                 : (kw.etsy_favorers ?? 0) > 0
                                 ? `${Number(kw.etsy_favorers).toLocaleString('vi-VN')} thích Etsy`
                                 : 'Chưa đủ dữ liệu'}
                             </span>
-                            {kw.platforms && kw.platforms.length > 0 && (
-                              <span className="block text-[10px] font-medium text-stone-500">
-                                Nguồn: {kw.platforms.join(', ')}
-                              </span>
-                            )}
                           </div>
                         </div>
+
+                        {(byPlatform.length > 0 || (kw.platforms && kw.platforms.length > 0)) && (
+                          <div className="bg-white border border-stone-200/80 rounded-lg px-3 py-2 text-[11px] text-stone-700 flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-stone-500 uppercase text-[10px]">
+                              SP theo sàn dùng từ khóa này{totalListings > 0 ? ` (${totalListings} SP)` : ''}:
+                            </span>
+                            {byPlatform.length > 0
+                              ? byPlatform.map(item => {
+                                  const isPodPlat = item.platform.toLowerCase() === 'printify';
+                                  const isEtsy = item.platform.toLowerCase() === 'etsy';
+                                  const isTiki = item.platform.toLowerCase() === 'tiki';
+                                  const pillCls = isPodPlat
+                                    ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                    : isEtsy
+                                    ? 'bg-orange-50 text-orange-800 border-orange-200'
+                                    : isTiki
+                                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                                  return (
+                                    <span
+                                      key={item.platform}
+                                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${pillCls}`}
+                                    >
+                                      <span>{isPodPlat ? 'Printify (POD)' : item.platform}:</span>
+                                      <strong>{item.count.toLocaleString('vi-VN')} SP</strong>
+                                      <span className="opacity-75">({item.pct.toLocaleString('vi-VN')}%)</span>
+                                    </span>
+                                  );
+                                })
+                              : kw.platforms?.map(p => (
+                                  <span
+                                    key={p}
+                                    className="inline-flex items-center rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[11px] font-medium text-stone-700"
+                                  >
+                                    {p}
+                                  </span>
+                                ))}
+                          </div>
+                        )}
 
                         {kw.score_breakdown && (
                           <div className="bg-stone-100/80 border border-stone-200/80 rounded-lg px-3 py-2 text-[11px] text-stone-700 space-y-1">
@@ -594,7 +775,8 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                         )}
                       </td>
                     </tr>
-                  )}
+                    );
+                  })()}
                 </React.Fragment>
               );
             })}
@@ -620,6 +802,105 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
           </button>
         )}
       </div>
+
+      {/* Popover giải thích nhanh khi rê chuột vào Điểm cơ hội */}
+      {scoreTooltip && (
+        <div
+          role="tooltip"
+          style={{
+            top: scoreTooltip.top,
+            left: scoreTooltip.left,
+            transform: scoreTooltip.placeBelow ? 'translateY(0)' : 'translateY(-100%)',
+          }}
+          className="fixed z-50 w-72 pointer-events-none rounded-xl border border-stone-200 bg-white p-3 text-left shadow-xl ring-1 ring-black/5"
+        >
+          {scoreTooltip.kind === 'header' ? (
+            <div className="space-y-1.5 text-[11px] leading-relaxed text-stone-600">
+              <div className="font-bold text-stone-900">
+                Cách tính Điểm cơ hội (0–100)
+              </div>
+              <p>
+                <strong className="text-stone-800">50% Sức cầu</strong> (tối đa 50đ): Lượt bán Tiki/VietCraft + Lượt thích Etsy ÷ 10.
+              </p>
+              <p>
+                <strong className="text-stone-800">50% Dư địa / Shop</strong> (tối đa 50đ): Tổng cầu chia đều cho số gian hàng đang bán.
+              </p>
+              <p className="text-[10px] text-stone-400 pt-0.5">
+                Rê chuột vào từng con số bên dưới để xem lý do chi tiết.
+              </p>
+            </div>
+          ) : scoreTooltip.kw ? (() => {
+            const kw = scoreTooltip.kw;
+            const info = getScoreExplanation(kw);
+            const statusBadge = !info.hasScore
+              ? { label: 'Chưa đủ dữ liệu', cls: 'bg-stone-100 text-stone-500' }
+              : kw.keyword_score! >= 70
+              ? { label: 'Cơ hội cao', cls: 'bg-emerald-100 text-emerald-800' }
+              : kw.keyword_score! >= 45
+              ? { label: 'Mức khá', cls: 'bg-amber-100 text-amber-800' }
+              : { label: 'Còn thấp', cls: 'bg-stone-100 text-stone-600' };
+
+            return (
+              <div className="space-y-2 text-[11px]">
+                <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-1.5">
+                  <span className="font-bold text-stone-900">
+                    {info.hasScore ? `Điểm cơ hội: ${kw.keyword_score}/100` : 'Chưa có điểm (N/A)'}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusBadge.cls}`}>
+                    {statusBadge.label}
+                  </span>
+                </div>
+
+                {info.hasScore && (info.demandPts != null || info.headroomPts != null) && (
+                  <div className="space-y-2">
+                    {/* Sức cầu 50% */}
+                    {info.demandPts != null && (
+                      <div className="space-y-0.5">
+                        <div className="flex items-center justify-between text-stone-700">
+                          <span className="font-semibold">Sức cầu (50%)</span>
+                          <span className="font-bold text-stone-900">{info.demandPts}/50đ</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+                          <div
+                            className="h-full rounded-full bg-emerald-500"
+                            style={{ width: `${Math.min(100, Math.max(4, (info.demandPts / 50) * 100))}%` }}
+                          />
+                        </div>
+                        {info.demandSource && (
+                          <div className="text-[10px] text-stone-500">{info.demandSource}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Dư địa / Shop 50% */}
+                    {info.headroomPts != null && (
+                      <div className="space-y-0.5">
+                        <div className="flex items-center justify-between text-stone-700">
+                          <span className="font-semibold">Dư địa / Shop (50%)</span>
+                          <span className="font-bold text-stone-900">{info.headroomPts}/50đ</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+                          <div
+                            className="h-full rounded-full bg-amber-500"
+                            style={{ width: `${Math.min(100, Math.max(4, (info.headroomPts / 50) * 100))}%` }}
+                          />
+                        </div>
+                        {info.headroomSource && (
+                          <div className="text-[10px] text-stone-500">{info.headroomSource}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <p className="rounded-lg bg-stone-50 px-2 py-1.5 text-[11px] leading-snug text-stone-700 border border-stone-100">
+                  {info.takeaway}
+                </p>
+              </div>
+            );
+          })() : null}
+        </div>
+      )}
     </div>
   );
 };

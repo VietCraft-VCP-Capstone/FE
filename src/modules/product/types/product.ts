@@ -111,6 +111,8 @@ export interface ProductFormData {
   sizes?: string[];
   /** Có mảng này (kể cả rỗng) = đang dùng bảng phân loại thay cho màu. */
   skus?: ProductSkuRow[];
+  /** ID ý tưởng mùa vụ (F38 Seasonal) nếu tạo sản phẩm từ gợi ý mùa vụ. */
+  source_idea_id?: string;
 }
 
 export type ProductSortOption = 

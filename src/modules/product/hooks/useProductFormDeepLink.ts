@@ -9,6 +9,7 @@ export interface ProductPrefillDraft {
   price?: number;
   description?: string;
   tags?: string[];
+  source_idea_id?: string;
 }
 
 type OpenForm = (product: ProductItem | null, focusField?: string | null, prefill?: ProductPrefillDraft | null) => void;
@@ -38,9 +39,10 @@ export function useProductFormDeepLink(openForm: OpenForm, showToast: ShowToast)
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);
+    const rawSourceIdeaId = searchParams.get('source_idea_id') || undefined;
     const prefill: ProductPrefillDraft | null =
-      rawTitle || rawPrice || rawDesc || rawTags.length > 0
-        ? { title: rawTitle, price: rawPrice, description: rawDesc, tags: rawTags }
+      rawTitle || rawPrice || rawDesc || rawTags.length > 0 || rawSourceIdeaId
+        ? { title: rawTitle, price: rawPrice, description: rawDesc, tags: rawTags, source_idea_id: rawSourceIdeaId }
         : null;
     openFormRef.current(null, null, prefill);
     const next = new URLSearchParams(searchParams);
@@ -49,6 +51,7 @@ export function useProductFormDeepLink(openForm: OpenForm, showToast: ShowToast)
     next.delete('price');
     next.delete('description');
     next.delete('tags');
+    next.delete('source_idea_id');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 

@@ -138,8 +138,8 @@ export const analyticsApi = {
   },
 
   /** Cập nhật tiến độ checklist mốc thời gian vào database gian hàng */
-  async toggleSeasonalMilestone(milestoneIdx: number, isDone: boolean, campId?: string): Promise<{ success: boolean; checked_milestones: Record<string, boolean> }> {
-    const res = await api.post(`${BASE}/forecast/seasonal/milestone`, { milestone_idx: milestoneIdx, is_done: isDone, camp_id: campId });
+  async toggleSeasonalMilestone(milestoneIdx: number, isDone: boolean, campId?: string, ideaId?: string): Promise<{ success: boolean; checked_milestones: Record<string, boolean> }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/milestone`, { milestone_idx: milestoneIdx, is_done: isDone, camp_id: campId, idea_id: ideaId });
     return res.data;
   },
 

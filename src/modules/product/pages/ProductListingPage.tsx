@@ -163,7 +163,10 @@ export function ProductListingPage() {
         await productsService.update(editingProduct.id, formData);
         showToast(`Đã cập nhật sản phẩm "${formData.title}" thành công!`, 'success');
       } else {
-        await productsService.create(formData);
+        await productsService.create({
+          ...formData,
+          ...(prefillDraft?.source_idea_id ? { source_idea_id: prefillDraft.source_idea_id } : {}),
+        });
         showToast(`Đã thêm mới sản phẩm "${formData.title}" thành công!`, 'success');
       }
       setIsFormOpen(false);
