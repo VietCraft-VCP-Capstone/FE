@@ -102,6 +102,8 @@ export const analyticsApi = {
     keywords?: string;
     material?: string;
     blank_cost?: number;
+    /** Biên lãi mong muốn trên giá vốn, dạng tỉ lệ (0,3 = 30%) */
+    target_margin?: number;
     /** % hoa hồng sàn: AI dùng để tính giá sàn không bán lỗ và tiền lời sau phí */
     commission_percent?: number;
   }, signal?: AbortSignal) {
@@ -215,6 +217,13 @@ export interface SmartProductSuggestionResult {
       segment?: string;
     }>;
     market_signals?: string[];
+    /** Có giá vốn: lãi và biên của từng mức giá, vị thế so với thị trường */
+    cost_analysis?: {
+      tiers: Record<'low' | 'rec' | 'high' | 'premium', { price: number; profit_vnd: number; margin_pct: number }>;
+      position: 'below_p25' | 'p25_p50' | 'p50_p75' | 'above_p75' | null;
+      verdict: 'ok' | 'tight' | 'uncompetitive' | 'loss' | 'no_market';
+      verdict_text: string;
+    } | null;
     demand_signal?: { keyword: string; momentum: number; direction: 'up' | 'down' | 'flat' } | null;
     evidence_stats?: {
       sample_size?: number;
