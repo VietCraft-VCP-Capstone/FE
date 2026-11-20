@@ -1,18 +1,36 @@
-import { HelpCircle } from 'lucide-react';
-import type { HealthFactorV3 } from '../../healthTypes';
+import { Banknote, FileText, HelpCircle, Image, Star, Tag, type LucideIcon } from 'lucide-react';
+import type { HealthFactorKey, HealthFactorV3 } from '../../healthTypes';
+import { TIER_COLOR } from '../intel/intelLabels';
 import { Chip } from '../ui';
 import { factorStateChip, isExcluded } from './factorState';
 
+const ICON: Record<HealthFactorKey, LucideIcon> = { image: Image, description: FileText, tags: Tag, review: Star, price: Banknote };
+
 function FactorRow({ f }: { f: HealthFactorV3 }) {
   const chip = factorStateChip(f);
+  const Icon = ICON[f.key] ?? FileText;
+  const excluded = isExcluded(f);
+  const share = excluded || !f.weight ? 0 : Math.min(100, (f.points / f.weight) * 100);
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-3">
-      <span className="w-24 shrink-0 text-sm font-semibold text-stone-900">{f.label}</span>
-      <Chip tone={chip.tone}>{chip.label}</Chip>
-      <span className="min-w-0 flex-1 truncate text-xs text-stone-500" title={f.reason}>{f.reason}</span>
-      <span className="shrink-0 text-sm tabular-nums text-stone-500">
-        {isExcluded(f) ? 'Chưa tính' : <><b className="font-bold text-stone-900">{Math.round(f.points)}</b>/{f.weight}</>}
+    <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-2.5">
+      <span className="flex size-9 items-center justify-center rounded-lg" style={{ background: `${TIER_COLOR[chip.tone]}14`, color: TIER_COLOR[chip.tone] }}>
+        <Icon size={17} aria-hidden />
       </span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-sm font-semibold text-stone-900">{f.label}</span>
+          <Chip tone={chip.tone}>{chip.label}</Chip>
+        </div>
+        <p className="m-0 mt-0.5 truncate text-xs text-stone-500" title={f.reason}>{f.reason}</p>
+      </div>
+      <div className="w-24 text-right sm:w-32">
+        <span className="text-sm tabular-nums text-stone-500">
+          {excluded ? 'Chưa tính' : <>Đạt <b className="font-bold text-stone-900">{Math.round(share)}%</b></>}
+        </span>
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-stone-100">
+          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${share}%`, background: TIER_COLOR[chip.tone] }} />
+        </div>
+      </div>
     </li>
   );
 }

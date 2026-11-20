@@ -34,9 +34,9 @@ const CRITERIA: [string, string][] = [
 
 const SCORE_HELP = (
   <div className="space-y-1.5">
-    <p className="m-0"><b>Điểm = 5 tiêu chí, mỗi tiêu chí tối đa 20 điểm</b> (tổng 100):</p>
+    <p className="m-0"><b>Điểm = 5 tiêu chí, mỗi tiêu chí có trọng số riêng</b> (tổng 100, xem ở từng sản phẩm):</p>
     <ul className="m-0 list-disc space-y-0.5 pl-4">
-      {CRITERIA.map(([name, rule]) => <li key={name}><b>{name} 20</b>: {rule}</li>)}
+      {CRITERIA.map(([name, rule]) => <li key={name}><b>{name}</b>: {rule}</li>)}
     </ul>
     <p className="m-0">Chưa điền một tiêu chí thì được 0 điểm. Chưa có đánh giá, không áp dụng hoặc chưa đánh giá được thì không tính: điểm quy về thang 100 trên các tiêu chí còn lại, hiện "Đánh giá x/5 tiêu chí".</p>
     <p className="m-0">Tốt từ 80 điểm · Cần cải thiện 50–79 · Kém dưới 50. Bị chặn bán là lỗi phải sửa ngay, được đếm riêng.</p>

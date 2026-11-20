@@ -1,3 +1,4 @@
+import { Clock } from 'lucide-react';
 import { useInsight } from '../../hooks/useInsight';
 import { decimal, pct, shortDate } from '../../format';
 import type { ImpactRevision, ListingImpact } from '../../healthTypes';
@@ -63,6 +64,14 @@ function ImpactBody({ data }: { data: ListingImpact }) {
 
 export function ImpactCard({ productId }: { productId: string }) {
   const { state, reload } = useInsight<ListingImpact>(`/listings/${productId}/impact`);
+  if (state.kind === 'ready' && state.data.status === 'no_revision') {
+    return (
+      <p className="m-0 flex items-center gap-2 rounded-2xl border border-dashed border-stone-200 bg-white px-5 py-3 text-sm text-stone-500">
+        <Clock size={15} aria-hidden />
+        Hiệu quả sau khi sửa: chưa có lần sửa nào trong 60 ngày. Sửa theo "Nên làm trước", sau 7 ngày sẽ có so sánh trước và sau.
+      </p>
+    );
+  }
   return (
     <section className={CARD}>
       <h2 className="m-0 text-base font-bold text-stone-900">Hiệu quả sau khi sửa</h2>

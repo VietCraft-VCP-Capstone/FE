@@ -17,7 +17,7 @@ export const AI_HINT = 'AI thấy ảnh có thể không đúng sản phẩm. AI
 export function factorStateChip(f: HealthFactorV3): { label: string; tone: Tone } {
   switch (f.state) {
     case 'scored':
-      return f.sub_score === 100 ? { label: 'Đạt', tone: 'good' } : { label: 'Chưa đạt', tone: 'warn' };
+      return f.sub_score === 100 ? { label: 'Đạt yêu cầu', tone: 'good' } : { label: 'Chưa đạt yêu cầu', tone: 'warn' };
     case 'seller_missing':
       return { label: 'Chưa điền', tone: 'warn' };
     case 'not_applicable':

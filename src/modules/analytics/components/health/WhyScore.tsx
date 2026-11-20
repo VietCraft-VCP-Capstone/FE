@@ -16,7 +16,7 @@ export function WhyScore({ data }: { data: ListingHealth }) {
   return (
     <div className="space-y-5 pt-1">
       <div>
-        <p className="m-0 mb-2 text-xs text-stone-500">100 điểm chia đều cho 5 tiêu chí, mỗi tiêu chí 20 điểm · rê chuột để xem lý do</p>
+        <p className="m-0 mb-2 text-xs text-stone-500">100 điểm chia cho 5 tiêu chí theo trọng số bên dưới · rê chuột để xem lý do</p>
         <ul className="m-0 list-none space-y-1.5 p-0">
           {(data.factors ?? []).map(f => (
             <Tooltip key={f.key} title={PART[f.key]?.why} placement="right">
