@@ -868,6 +868,7 @@ export interface OpportunityKeywordItem {
   sold_count_real?: number;
   etsy_favorers?: number;
   etsy_listings?: number;
+  effective_demand?: number;
   sales_per_shop?: number | null;
   trend_index?: number | null;
   trend_index_raw?: number | null;
@@ -875,11 +876,14 @@ export interface OpportunityKeywordItem {
   competition: number;
   competition_level: 'high' | 'medium' | 'low';
   keyword_score: number | null;
-  score_basis?: 'sales+trends' | 'sales_only' | 'etsy+trends' | 'etsy_engagement' | 'trends_only' | 'insufficient';
+  score_basis?: 'sales+etsy' | 'sales_only' | 'etsy_only' | 'insufficient' | string;
   score_breakdown?: {
     demand: number | null;
+    demand_pts?: number | null;
     headroom: number | null;
-    momentum: number | null;
+    headroom_pts?: number | null;
+    effective_demand?: number;
+    momentum?: number | null;
     etsy_signal?: number | null;
     sales_per_shop?: number | null;
     applied_caps?: string[];
@@ -888,6 +892,18 @@ export interface OpportunityKeywordItem {
   platforms?: string[];
   listing_type?: 'physical' | 'pod' | 'custom' | string;
   customizable?: boolean;
+  source_breakdown?: {
+    total_listings: number;
+    pod_count: number;
+    pod_pct: number;
+    customizable_count: number;
+    customizable_pct: number;
+    by_platform: Array<{
+      platform: string;
+      count: number;
+      pct: number;
+    }>;
+  };
   when_made?: string;
   avg_price_vnd?: number | null;
   conversion_rate_pct?: number | null;
@@ -910,8 +926,8 @@ export interface OpportunityKeywordItem {
 export interface FunnelDiagnosticStage {
   stage: number;
   title: string;
-  dropoff_rate_pct: number;
-  target_rate_pct?: number;
+  dropoff_rate_pct: number | null;
+  target_rate_pct?: number | null;
   badge_label?: string;
   metric_label: string;
   status: 'healthy' | 'warning' | 'critical';
@@ -930,25 +946,30 @@ export interface RevenueScenarioItem {
 }
 
 export interface CampaignFunnel {
-  impressions: number;
-  clicks: number;
-  ctr_pct: number;
-  ctr_vs_baseline_pct?: number;
-  cart_adds: number;
-  cart_rate_pct: number;
+  impressions?: number | null;
+  clicks?: number | null;
+  views?: number | null;
+  ctr_pct?: number | null;
+  ctr_vs_baseline_pct?: number | null;
+  cart_adds?: number | null;
+  cart_rate_pct?: number | null;
   orders: number;
-  conversion_rate_pct: number;
-  cvr_multiplier?: number;
-  real_ctr_pct?: number;
-  real_cart_rate_pct?: number;
-  real_order_rate_pct?: number;
-  pv_uv_ratio?: number;
+  conversion_rate_pct?: number | null;
+  view_to_order_pct?: number | null;
+  cvr_multiplier?: number | null;
+  real_ctr_pct?: number | null;
+  real_cart_rate_pct?: number | null;
+  real_order_rate_pct?: number | null;
+  real_view_to_order_pct?: number | null;
+  pv_uv_ratio?: number | null;
+  tracking_stages?: string[];
   actual?: {
     orders: number;
     gmv_vnd?: number;
     orders_progress_pct?: number;
     remaining_orders?: number;
-    impressions?: number;
+    impressions?: number | null;
+    views?: number;
     clicks?: number;
     cart_adds?: number;
     window_label?: string;
@@ -963,11 +984,11 @@ export interface CampaignFunnel {
     method: string;
     method_display_name?: string;
     validated_deep_model?: boolean;
-    empirical_coverage_pct?: number;
-    improvement_pct?: number;
-    uplift_p10?: number;
-    uplift_p50?: number;
-    uplift_p90?: number;
+    empirical_coverage_pct?: number | null;
+    improvement_pct?: number | null;
+    uplift_p10?: number | null;
+    uplift_p50?: number | null;
+    uplift_p90?: number | null;
   };
 }
 
@@ -990,7 +1011,7 @@ export interface ChannelBreakdownItem {
   aov_vnd: number;
   growth_pct?: number | null;
   action_tip: string;
-  source_type?: 'shop_actual' | 'industry_benchmark';
+  source_type?: 'shop_actual' | 'industry_benchmark' | 'insufficient';
   is_target_plan?: boolean;
   criteria_rule?: string;
   sample_orders?: ChannelSampleOrder[];
@@ -998,10 +1019,10 @@ export interface ChannelBreakdownItem {
 }
 
 export interface MotivationBreakdown {
-  gift_purchases_pct: number;
-  self_purchases_pct: number;
+  gift_purchases_pct: number | null;
+  self_purchases_pct: number | null;
   top_reasons: { reason: string; pct: number }[];
-  source_type?: 'shop_actual' | 'industry_benchmark';
+  source_type?: 'shop_actual' | 'industry_benchmark' | 'insufficient';
   sample_size?: number;
   source_description?: string;
 }

@@ -4,17 +4,33 @@ import type { SeasonalImpact } from '../../types';
 import { money } from '../../../../shared/utils/format';
 import { analyticsApi } from '../../services/analyticsApi';
 
+export interface IdeaProgressItem {
+  id: string;
+  title: string;
+  matchedProductsCount: number;
+  ordersCount: number;
+  inStockCount: number;
+  step1Done: boolean;
+  completedStepsCount: number;
+  totalStepsCount: number;
+}
+
+export interface AppliedSummary {
+  selectedIdeasCount: number;
+  implementedIdeasCount?: number;
+  completedMilestonesCount: number;
+  totalMilestonesCount: number;
+  matchingProductsCount: number;
+  ideaProductsCount?: number;
+  ideasDetail?: IdeaProgressItem[];
+}
+
 interface Props {
   impact?: SeasonalImpact;
   occasionName: string;
   campId?: string;
   savedIdeaTitles?: string[];
-  appliedSummary?: {
-    selectedIdeasCount: number;
-    completedMilestonesCount: number;
-    totalMilestonesCount: number;
-    matchingProductsCount: number;
-  };
+  appliedSummary?: AppliedSummary;
   initialReview?: { rating?: 'good' | 'neutral' | 'poor'; note?: string; updated_at?: string };
 }
 
@@ -88,21 +104,79 @@ export function SeasonalImpactCard({
       </div>
 
       {appliedSummary && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 rounded-xl border border-stone-200 bg-stone-50/60 p-3 text-xs">
-          <div>
-            <span className="text-[11px] text-stone-500 block">Ý tưởng đã chọn (Bước Ý tưởng)</span>
-            <strong className="text-sm text-stone-900">{appliedSummary.selectedIdeasCount} ý tưởng</strong>
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 rounded-xl border border-stone-200 bg-stone-50/60 p-3 text-xs">
+            <div>
+              <span className="text-[11px] text-stone-500 block">Ý tưởng đã chọn (Bước Ý tưởng)</span>
+              <strong className="text-sm text-stone-900">{appliedSummary.selectedIdeasCount} ý tưởng</strong>
+            </div>
+            <div>
+              <span className="text-[11px] text-stone-500 block">Tiến độ đưa vào thực tế</span>
+              <strong className="text-sm text-[#007700]">
+                {appliedSummary.selectedIdeasCount > 0
+                  ? `${appliedSummary.implementedIdeasCount ?? (appliedSummary.completedMilestonesCount > 0 ? 1 : 0)}/${appliedSummary.selectedIdeasCount} ý tưởng đã ra SP`
+                  : 'Chưa chọn ý tưởng'}
+              </strong>
+            </div>
+            <div>
+              <span className="text-[11px] text-stone-500 block">Sản phẩm sẵn sàng cho dịp</span>
+              <strong className="text-sm text-stone-900">
+                {appliedSummary.matchingProductsCount} sản phẩm
+                {(appliedSummary.ideaProductsCount ?? 0) > 0 && (
+                  <span className="ml-1 text-[11px] font-semibold text-[#007700]">
+                    ({appliedSummary.ideaProductsCount} từ ý tưởng)
+                  </span>
+                )}
+              </strong>
+            </div>
           </div>
-          <div>
-            <span className="text-[11px] text-stone-500 block">Tiến độ thực thi (Bước Áp dụng)</span>
-            <strong className="text-sm text-[#007700]">
-              {appliedSummary.completedMilestonesCount}/{appliedSummary.totalMilestonesCount} mốc hoàn thành
-            </strong>
-          </div>
-          <div>
-            <span className="text-[11px] text-stone-500 block">Sản phẩm sẵn sàng cho dịp</span>
-            <strong className="text-sm text-stone-900">{appliedSummary.matchingProductsCount} sản phẩm</strong>
-          </div>
+
+          {/* Chi tiết tiến độ thực thi từng ý tưởng độc lập */}
+          {appliedSummary.ideasDetail && appliedSummary.ideasDetail.length > 0 && (
+            <div className="rounded-xl border border-stone-200/90 bg-stone-50/40 p-3 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
+                <span className="font-bold text-stone-800">
+                  Chi tiết tiến độ thực thi theo từng ý tưởng riêng biệt:
+                </span>
+                <span className="text-[11px] text-stone-500">
+                  (Mỗi ý tưởng theo dõi độc lập 5 mốc: Đăng listing → Thử nhỏ → Quyết định → Nhập hàng → Hạn chốt)
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {appliedSummary.ideasDetail.map(item => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs shadow-2xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-stone-900 truncate" title={item.title}>
+                        {item.title}
+                      </div>
+                      <div className="text-[11px] text-stone-500 mt-0.5">
+                        {item.step1Done ? (
+                          <span className="text-[#007700] font-medium">
+                            Đã tạo {item.matchedProductsCount} SP · Đạt {item.completedStepsCount}/{item.totalStepsCount} mốc
+                            {item.ordersCount > 0 ? ` · ${item.ordersCount} đơn` : ''}
+                          </span>
+                        ) : (
+                          <span className="text-amber-700">Chưa tạo SP cho ý tưởng này · 0/{item.totalStepsCount} mốc</span>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        item.step1Done
+                          ? 'bg-emerald-100 text-[#007700]'
+                          : 'bg-stone-100 text-stone-500'
+                      }`}
+                    >
+                      {item.step1Done ? 'Đã lên SP' : 'Chưa lên SP'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

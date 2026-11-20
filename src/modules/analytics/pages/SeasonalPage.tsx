@@ -135,15 +135,24 @@ export function SeasonalPage() {
     }
   };
 
-  const toggleMilestone = async (idx: number) => {
+  const toggleMilestone = async (idx: number, nextVal?: boolean, ideaId?: string) => {
     const campId = currentCampaignId || '';
-    const key = campId ? `${campId}_${idx}` : String(idx);
-    const nextVal = !checkedMilestones[key];
+    const keyParts = [];
+    if (campId) keyParts.push(campId);
+    if (ideaId) keyParts.push(ideaId);
+    keyParts.push(idx);
+    const key = keyParts.join('_');
+    const val = nextVal !== undefined ? nextVal : !checkedMilestones[key];
     const prevSnapshot = { ...checkedMilestones };
     setSaveError(null);
-    setCheckedMilestones(prev => ({ ...prev, [key]: nextVal, [String(idx)]: nextVal }));
+    setCheckedMilestones(prev => ({
+      ...prev,
+      [key]: val,
+      ...(ideaId ? { [`${ideaId}_${idx}`]: val } : {}),
+      [String(idx)]: val,
+    }));
     try {
-      const res = await analyticsApi.toggleSeasonalMilestone(idx, nextVal, campId || undefined);
+      const res = await analyticsApi.toggleSeasonalMilestone(idx, val, campId || undefined, ideaId);
       if (!res?.success) {
         setCheckedMilestones(prevSnapshot);
         setSaveError('Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.');
@@ -529,6 +538,71 @@ export function SeasonalPage() {
               return { id, title: id, subtitle: 'Ý tưởng đã chọn' };
             });
 
+          const stopWords = new Set(['cho', 'dịp', 'mùa', 'tặng', 'quà', 'set', 'bộ', 'mẫu', 'sản', 'phẩm', 'và', 'của', 'theo', 'phong', 'cách', 'phiên', 'bản', 'siêu', 'sale']);
+          const campPrefix = activeCamp?.id ? `${activeCamp.id}_` : '';
+
+          const ideaProgressList = savedIdeaItems.map(idea => {
+            const iTitleLower = (idea.title || '').toLowerCase().trim();
+            const tokens = iTitleLower
+              .split(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/i)
+              .filter((w: string) => w.length >= 3 && !stopWords.has(w));
+
+            const matched = allShopProducts.filter((p: any) => {
+              if (p.source_idea_id && p.source_idea_id === idea.id) return true;
+              const pName = String(p.name || p.title || '').toLowerCase().trim();
+              if (iTitleLower && (pName === iTitleLower || pName.includes(iTitleLower))) return true;
+              if (tokens.length < 3) return false;
+              const hits = tokens.filter((tk: string) => pName.includes(tk)).length;
+              return hits >= Math.max(4, Math.ceil(tokens.length * 0.65));
+            });
+
+            const matchedProductsCount = matched.length;
+            const inStockCount = matched.filter((p: any) => (p.stock ?? 1) > 0).length;
+            const ordersCount = matched.reduce((sum: number, p: any) => sum + Number(p.sold_count ?? p.orders_count ?? 0), 0);
+
+            const step1Done = matchedProductsCount > 0;
+            const step2Done = ordersCount > 0 || Boolean(checkedMilestones[`${campPrefix}${idea.id}_1`] ?? checkedMilestones[`${campPrefix}1`]);
+            const step3Done = Boolean(checkedMilestones[`${campPrefix}${idea.id}_2`] ?? checkedMilestones[`${campPrefix}2`]);
+            const step4Done = Boolean(checkedMilestones[`${campPrefix}${idea.id}_3`] ?? checkedMilestones[`${campPrefix}3`]);
+            const step5Done = Boolean(checkedMilestones[`${campPrefix}${idea.id}_4`] ?? checkedMilestones[`${campPrefix}4`]);
+            const completedStepsCount = [step1Done, step2Done, step3Done, step4Done, step5Done].filter(Boolean).length;
+
+            return {
+              id: idea.id,
+              title: idea.title,
+              matchedProductsCount,
+              inStockCount,
+              ordersCount,
+              step1Done,
+              completedStepsCount,
+              totalStepsCount: 5,
+            };
+          });
+
+          const implementedIdeasCount = ideaProgressList.filter(item => item.step1Done).length;
+          const ideaMatchedProducts = savedIdeaItems.length === 0
+            ? []
+            : allShopProducts.filter((p: any) => {
+                if (p.source_idea_id && savedIdeaItems.some(i => i.id === p.source_idea_id)) return true;
+                const pName = String(p.name || p.title || '').toLowerCase().trim();
+                return savedIdeaItems.some(idea => {
+                  const iTitle = (idea.title || '').toLowerCase().trim();
+                  if (iTitle && (pName === iTitle || pName.includes(iTitle))) return true;
+                  const tokens = iTitle
+                    .split(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/i)
+                    .filter((w: string) => w.length >= 3 && !stopWords.has(w));
+                  if (tokens.length < 3) return false;
+                  const hits = tokens.filter((tk: string) => pName.includes(tk)).length;
+                  return hits >= Math.max(4, Math.ceil(tokens.length * 0.65));
+                });
+              });
+
+          const ideaInStockCount = ideaMatchedProducts.filter((p: any) => (p.stock ?? 1) > 0).length;
+          const ideaOrdersCount = ideaMatchedProducts.reduce(
+            (sum: number, p: any) => sum + Number(p.sold_count ?? p.orders_count ?? 0),
+            0
+          );
+
           const isRefreshing = state.kind === 'loading' && Boolean(lastReadyDataRef.current);
 
           return (
@@ -574,7 +648,7 @@ export function SeasonalPage() {
               <SeasonalNavbar
                 activeTab={activeDetailTab}
                 onSelectTab={handleSelectTab}
-                ideasCount={readyIdeas.length + podBlanks.length}
+                ideasCount={aiIdeas.length + readyIdeas.length + podBlanks.length}
               />
 
               {/* 3. NỘI DUNG CHI TIẾT THEO CỐT TRUYỆN 4 CHƯƠNG */}
@@ -738,64 +812,23 @@ export function SeasonalPage() {
               {/* TAB 2: ÁP DỤNG (Gọn, không lặp lại timeline hay số liệu thử nghiệm fix cứng) */}
               {(activeDetailTab === 'act2' || activeDetailTab === 'readiness' || activeDetailTab === 'trial' || activeDetailTab === 'timeline') && activeCamp && (
                 <div className="space-y-6">
-                  {(() => {
-                    const activeMilestones: Record<number, boolean> = {};
-                    const campPrefix = activeCamp.id ? `${activeCamp.id}_` : '';
-                    for (let i = 0; i < 15; i++) {
-                      if (checkedMilestones[`${campPrefix}${i}`] !== undefined) {
-                        activeMilestones[i] = checkedMilestones[`${campPrefix}${i}`];
-                      } else if (checkedMilestones[String(i)] !== undefined) {
-                        activeMilestones[i] = checkedMilestones[String(i)];
-                      } else {
-                        activeMilestones[i] = false;
-                      }
-                    }
-                    const stopWords = new Set(['cho', 'dịp', 'mùa', 'tặng', 'quà', 'set', 'bộ', 'mẫu', 'sản', 'phẩm', 'và', 'của', 'theo', 'phong', 'cách', 'phiên', 'bản', 'siêu', 'sale']);
-                    const ideaTokensList = savedIdeaItems.map(item => ({
-                      id: item.id,
-                      titleLower: (item.title || '').toLowerCase().trim(),
-                      tokens: (item.title || '')
-                        .toLowerCase()
-                        .split(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/i)
-                        .filter((w: string) => w.length >= 3 && !stopWords.has(w)),
-                    }));
-                    const ideaMatchedProducts = savedIdeaItems.length === 0
-                      ? []
-                      : allShopProducts.filter((p: any) => {
-                          if (p.source_idea_id && savedIdeaItems.some(i => i.id === p.source_idea_id)) return true;
-                          const pName = String(p.name || p.title || '').toLowerCase().trim();
-                          return ideaTokensList.some(it => {
-                            if (it.titleLower && (pName === it.titleLower || pName.includes(it.titleLower))) return true;
-                            if (it.tokens.length < 3) return false;
-                            const hits = it.tokens.filter((tk: string) => pName.includes(tk)).length;
-                            return hits >= Math.max(4, Math.ceil(it.tokens.length * 0.65));
-                          });
-                        });
-                    const ideaInStockCount = ideaMatchedProducts.filter((p: any) => (p.stock ?? 1) > 0).length;
-                    const ideaOrdersCount = ideaMatchedProducts.reduce(
-                      (sum: number, p: any) => sum + Number(p.sold_count ?? p.orders_count ?? 0),
-                      0
-                    );
-                    return (
-                      <ApplyPlaybookCard
-                        playbooks={data.apply_playbooks}
-                        savedIdeas={savedIdeas}
-                        savedIdeaItems={savedIdeaItems}
-                        aiIdeas={aiIdeas}
-                        allShopProducts={allShopProducts}
-                        matchingProductsCount={ideaMatchedProducts.length}
-                        inStockMatchingCount={ideaInStockCount}
-                        actualOrdersCount={ideaOrdersCount}
-                        checkedMilestones={activeMilestones}
-                        onToggleMilestone={toggleMilestone}
-                        onEditSavedIdea={id => {
-                          setFocusIdeaId(id);
-                          handleSelectTab('act1');
-                        }}
-                        occasionName={activeCamp.name}
-                      />
-                    );
-                  })()}
+                  <ApplyPlaybookCard
+                    playbooks={data.apply_playbooks}
+                    savedIdeas={savedIdeas}
+                    savedIdeaItems={savedIdeaItems}
+                    aiIdeas={aiIdeas}
+                    allShopProducts={allShopProducts}
+                    matchingProductsCount={ideaMatchedProducts.length}
+                    inStockMatchingCount={ideaInStockCount}
+                    actualOrdersCount={ideaOrdersCount}
+                    checkedMilestones={checkedMilestones}
+                    onToggleMilestone={toggleMilestone}
+                    onEditSavedIdea={id => {
+                      setFocusIdeaId(id);
+                      handleSelectTab('act1');
+                    }}
+                    occasionName={activeCamp.name}
+                  />
 
                   {/* Rà soát sản phẩm hiện có của shop cho dịp */}
                   <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
@@ -819,11 +852,12 @@ export function SeasonalPage() {
                     savedIdeaTitles={savedIdeaItems.map(x => x.title)}
                     appliedSummary={{
                       selectedIdeasCount: savedIdeaItems.length,
-                      completedMilestonesCount: Object.entries(checkedMilestones).filter(
-                        ([k, v]) => v && (activeCamp.id ? k.startsWith(`${activeCamp.id}_`) : true)
-                      ).length,
-                      totalMilestonesCount: 4,
+                      implementedIdeasCount,
+                      completedMilestonesCount: ideaProgressList.reduce((acc, curr) => acc + curr.completedStepsCount, 0),
+                      totalMilestonesCount: Math.max(1, savedIdeaItems.length) * 5,
                       matchingProductsCount: matchingProducts.length,
+                      ideaProductsCount: ideaMatchedProducts.length,
+                      ideasDetail: ideaProgressList,
                     }}
                     initialReview={occasionReviews[activeCamp.id]}
                   />

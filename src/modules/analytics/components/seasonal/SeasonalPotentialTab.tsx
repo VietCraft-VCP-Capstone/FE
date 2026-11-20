@@ -179,16 +179,37 @@ export function SeasonalPotentialTab({
     }
   };
 
-  const handleCreateProductFromIdea = () => {
+  const handleCreateProductFromIdea = async () => {
     if (!editingIdea) return;
+    // Tự động khóa bản chụp ý tưởng vào MongoDB (`idea_drafts` + `saved_ideas`) trước khi chuyển trang tạo sản phẩm
+    const parsedTags = editingIdea.tagsText
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    try {
+      await analyticsApi.saveSeasonalIdeaDraft({
+        idea_id: editingIdea.id,
+        title: editingIdea.title,
+        concept: editingIdea.concept,
+        price_vnd: editingIdea.price_vnd,
+        tags: parsedTags,
+      });
+    } catch {
+      // Không chặn seller tạo sản phẩm nếu lưu nháp lỗi mạng
+    }
+
     if (editingIdea.isPod) {
-      const qs = new URLSearchParams({ title: editingIdea.title });
+      const qs = new URLSearchParams({
+        title: editingIdea.title,
+        source_idea_id: editingIdea.id,
+      });
       window.location.assign(`/seller/products/new?${qs.toString()}`);
       return;
     }
     const qs = new URLSearchParams({
       new: '1',
       title: editingIdea.title,
+      source_idea_id: editingIdea.id,
       ...(editingIdea.price_vnd > 0 ? { price: String(editingIdea.price_vnd) } : {}),
       ...(editingIdea.concept ? { description: editingIdea.concept } : {}),
       ...(editingIdea.tagsText ? { tags: editingIdea.tagsText } : {}),
@@ -364,7 +385,30 @@ export function SeasonalPotentialTab({
 
                     <button
                       type="button"
-                      onClick={() => onToggleSaveIdea(ai.id)}
+                      onClick={() => {
+                        if (!isSaved) {
+                          // Tự động lưu bản chụp (snapshot) để ý tưởng đã chọn không bị mất/đè khi restart server
+                          setLocalDrafts(prev => ({
+                            ...prev,
+                            [ai.id]: {
+                              title: displayTitle,
+                              concept: displayConcept,
+                              price_vnd: displayPrice,
+                              tags: displayTags,
+                            },
+                          }));
+                          analyticsApi
+                            .saveSeasonalIdeaDraft({
+                              idea_id: ai.id,
+                              title: displayTitle,
+                              concept: displayConcept,
+                              price_vnd: displayPrice,
+                              tags: displayTags,
+                            })
+                            .catch(() => {});
+                        }
+                        onToggleSaveIdea(ai.id);
+                      }}
                       className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
                         isSaved
                           ? 'bg-[#007700] text-white shadow-xs'

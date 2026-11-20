@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { CalendarClock, CheckCircle2, AlertTriangle, ArrowUpRight, HelpCircle, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ApplyPlaybook } from '../../types';
@@ -15,8 +15,8 @@ interface Props {
   inStockMatchingCount?: number;
   actualOrdersCount?: number;
   onEditSavedIdea?: (ideaId: string) => void;
-  checkedMilestones?: Record<number, boolean>;
-  onToggleMilestone?: (idx: number, nextVal: boolean) => void;
+  checkedMilestones?: Record<string | number, boolean>;
+  onToggleMilestone?: (idx: number, nextVal: boolean, ideaId?: string) => void;
   occasionName: string;
 }
 
@@ -85,6 +85,8 @@ export function ApplyPlaybookCard({
     : (isUsingSavedIdea ? actualOrdersCount : 0);
 
   // Tự động xác nhận hoàn thành từng bước dựa trên dữ liệu thực tế của ý tưởng đang chọn
+  // Lưu ý: KHÔNG tự đánh dấu xong Bước "Chốt sản xuất / nhập hàng" chỉ vì SP mới đăng có stock > 0
+  // (vì mọi SP mới tạo đều có tồn kho ban đầu; bước chốt nhập hàng cần seller tự xác nhận sau khi qua bước thử nhỏ).
   const getAutoStepStatus = (task: string): { autoDone: boolean; note?: string } => {
     const t = task.toLowerCase();
     if (t.includes('listing') || t.includes('tag') || t.includes('đăng')) {
@@ -92,14 +94,14 @@ export function ApplyPlaybookCard({
         return { autoDone: true, note: `Đã có ${activeMatchingCount} SP khớp` };
       }
     }
-    if (t.includes('chốt sản xuất') || t.includes('nhập hàng') || t.includes('tồn')) {
-      if (activeInStockCount > 0) {
-        return { autoDone: true, note: `${activeInStockCount} SP còn tồn` };
-      }
-    }
-    if (t.includes('thử nhỏ') || t.includes('đơn đầu') || t.includes('nhân rộng')) {
+    if (t.includes('thử nhỏ') || t.includes('đơn đầu')) {
       if (activeOrdersCount > 0) {
         return { autoDone: true, note: `Đã có ${activeOrdersCount} đơn` };
+      }
+    }
+    if (t.includes('chốt sản xuất') || t.includes('nhập hàng') || t.includes('tồn')) {
+      if (activeInStockCount > 0) {
+        return { autoDone: false, note: `Hiện có ${activeInStockCount} SP đang sẵn tồn` };
       }
     }
     return { autoDone: false };
@@ -112,17 +114,21 @@ export function ApplyPlaybookCard({
     if (autoDone) return true;
     const localVal = localCheckedSteps[stepKey(idx, task)];
     if (localVal !== undefined) return localVal;
-    return checkedMilestones && activeIdea?.id === displayPlanIdeas[0]?.id ? Boolean(checkedMilestones[idx]) : false;
+    const ideaKey = activeIdea?.id ? `${activeIdea.id}_${idx}` : undefined;
+    if (ideaKey && checkedMilestones && checkedMilestones[ideaKey] !== undefined) {
+      return Boolean(checkedMilestones[ideaKey]);
+    }
+    return checkedMilestones ? Boolean(checkedMilestones[idx]) : false;
   };
 
   const toggleStep = (idx: number, task: string) => {
     if (getAutoStepStatus(task).autoDone) return;
-    if (onToggleMilestone && activeIdea?.id === displayPlanIdeas[0]?.id) {
-      onToggleMilestone(idx, !isStepDone(idx, task));
-      return;
-    }
+    const nextVal = !isStepDone(idx, task);
     const k = stepKey(idx, task);
-    setLocalCheckedSteps(prev => ({ ...prev, [k]: !prev[k] }));
+    setLocalCheckedSteps(prev => ({ ...prev, [k]: nextVal }));
+    if (onToggleMilestone) {
+      onToggleMilestone(idx, nextVal, activeIdea?.id);
+    }
   };
 
   return (
