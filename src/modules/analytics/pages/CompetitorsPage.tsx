@@ -447,7 +447,7 @@ export function CompetitorsPage() {
                 <Top20 key={`top-${data.category_id}`} data={data} canTrack={canTrack} trackedIds={trackedIds} pendingShop={pendingShop} khoa={khoa} full={full} onTrack={track} />
                 {(data.price_points?.length ?? 0) > 0 && (
                   // Có ?loai= thì mỗi lần bấm "Xem" (key điều hướng mới) chọn lại loại hàng và mở sẵn biểu đồ.
-                  <PriceDistribution key={`gia-${data.category_id}-${loaiUrl ? key : ''}`} points={data.price_points!} loaiBanDau={loaiUrl} moSan={Boolean(loaiUrl)} />
+                  <PriceDistribution key={`gia-${data.category_id}-${loaiUrl ? key : ''}`} points={data.price_points!} khac={data.price_points_other} tenDm={tenDm} loaiBanDau={loaiUrl} moSan={Boolean(loaiUrl)} />
                 )}
               </div>
             )}
@@ -476,6 +476,7 @@ export function CompetitorsPage() {
             comparison={comparison}
             canTrack={canTrack}
             trackedIds={trackedIds}
+            theoDoi={tracking.state.kind === 'ready' ? tracking.state.data.tracked : []}
             pendingShop={pendingShop}
             khoa={khoa}
             full={full}

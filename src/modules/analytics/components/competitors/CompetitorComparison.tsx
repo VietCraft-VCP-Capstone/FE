@@ -13,7 +13,7 @@ import { count, money } from '../../../../shared/utils/format';
 import { decimal } from '../../format';
 import type { InsightState } from '../../hooks/useInsight';
 import { MSG } from '../../services/analyticsApi';
-import type { CompetitorShop, ShopComparison } from '../../types';
+import type { CompetitorShop, CompetitorTracking, ShopComparison } from '../../types';
 import { InsightCard, Note, SelectField } from '../ui';
 import { RadarSRS } from './BenchmarkSection';
 import { CongTac } from './controls';
@@ -107,11 +107,14 @@ export function Sparkline({ tuan, max, mau }: { tuan: number[]; max: number; mau
   );
 }
 
+const GOI_Y_NGOAI = 'Bảng chỉ so shop có sản phẩm đang bán, có giá trong danh mục này. AI quét sàn mỗi ngày một lần, sản phẩm đăng hôm nay sẽ có từ ngày mai.';
+
 /** "Đổi shop": hộp chọn có tìm kiếm, tối đa 4 shop; chỉ áp dụng khi bấm Áp dụng. */
-function DoiShop({ xep, ds, trackedIds, tenDm, onApDung }: {
+function DoiShop({ xep, ds, trackedIds, theoDoi, tenDm, onApDung }: {
   xep: CompetitorShop[];
   ds: CompetitorShop[];
   trackedIds: Set<string>;
+  theoDoi: CompetitorTracking['tracked'];
   tenDm: string;
   onApDung: (ids: string[] | null) => void;
 }) {
@@ -143,11 +146,13 @@ function DoiShop({ xep, ds, trackedIds, tenDm, onApDung }: {
   }, [mo]);
 
   const macDinh = xep.slice(0, SO_COT).map(s => s.shop_id);
-  const khop = (s: CompetitorShop) => boDau(s.shop_name ?? '').includes(boDau(tim.trim()));
+  const khop = (ten: string | null) => boDau(ten ?? '').includes(boDau(tim.trim()));
+  // Shop đang theo dõi mà AI không thấy hàng trong danh mục này vẫn hiện, làm mờ kèm lý do, để người bán biết vì sao không chọn được.
+  const ngoai = theoDoi.filter(t => !xep.some(s => s.shop_id === t.shop_id) && khop(t.shop_name));
   const nhom = [
-    { ten: 'Bạn đang theo dõi', ds: xep.filter(s => trackedIds.has(s.shop_id) && khop(s)) },
-    { ten: `Giống bạn nhất trong danh mục ${tenDm}`, ds: xep.filter(s => !trackedIds.has(s.shop_id) && khop(s)) },
-  ].filter(g => g.ds.length > 0);
+    { ten: 'Bạn đang theo dõi', ds: xep.filter(s => trackedIds.has(s.shop_id) && khop(s.shop_name)), ngoai },
+    { ten: `Giống bạn nhất trong danh mục ${tenDm}`, ds: xep.filter(s => !trackedIds.has(s.shop_id) && khop(s.shop_name)), ngoai: [] },
+  ].filter(g => g.ds.length + g.ngoai.length > 0);
   const du = nhap.length >= SO_COT;
   const bat = (sid: string) => setNhap(n => (n.includes(sid) ? n.filter(x => x !== sid) : n.length >= SO_COT ? n : [...n, sid]));
   const apDung = () => {
@@ -217,6 +222,19 @@ function DoiShop({ xep, ds, trackedIds, tenDm, onApDung }: {
                     </label>
                   );
                 })}
+                {g.ngoai.map(t => (
+                  <label key={t.shop_id} title={GOI_Y_NGOAI} className="flex cursor-not-allowed items-center gap-3 px-4 py-2 text-sm text-stone-400">
+                    <input type="checkbox" disabled className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 flex-1 lg:flex lg:items-baseline lg:justify-between lg:gap-3">
+                      <span className="block truncate font-semibold">{t.shop_name || 'Shop chưa đặt tên'}</span>
+                      <span className="block shrink-0 text-xs text-stone-500">
+                        {t.listings_total
+                          ? `Chưa có hàng ${tenDm} để so${t.category_name ? ` · chủ yếu bán ${t.category_name}` : ''}`
+                          : 'Chưa có sản phẩm đang bán để so'}
+                      </span>
+                    </span>
+                  </label>
+                ))}
               </div>
             ))}
           </div>
@@ -405,7 +423,7 @@ function BangSoSanh({ me, ds, chon, onChon, canTrack, trackedIds, pendingShop, k
 
 /** Thanh công cụ (tập shop đang so + kiểu xem) và nội dung theo kiểu xem. Tập shop do trang giữ, vì dòng Phạm vi cũng đọc nó. */
 export function CompetitorComparison({
-  shops, xep, ds, laMacDinh, onDoiTap, xem, onXem, chon, onChon, tenDm, comparison, canTrack, trackedIds, pendingShop, khoa, full, onTrack,
+  shops, xep, ds, laMacDinh, onDoiTap, xem, onXem, chon, onChon, tenDm, comparison, canTrack, trackedIds, theoDoi, pendingShop, khoa, full, onTrack,
 }: {
   shops: CompetitorShop[];
   /** Mọi đối thủ trong danh mục, đã xếp theo xepDoiThu. */
@@ -421,6 +439,8 @@ export function CompetitorComparison({
   comparison: { state: InsightState<ShopComparison>; reload: () => void };
   canTrack: boolean;
   trackedIds: Set<string>;
+  /** Danh sách theo dõi (F36): shop không có hàng trong danh mục này vẫn hiện mờ trong hộp Đổi shop. */
+  theoDoi: CompetitorTracking['tracked'];
   pendingShop: string | null;
   khoa: boolean;
   full: boolean;
@@ -442,7 +462,7 @@ export function CompetitorComparison({
               <strong className="font-bold">Đang so với {count(ds.length)} shop</strong>
               {lyDo && <span className="text-stone-600"> · {lyDo}</span>}
             </span>
-            <DoiShop xep={xep} ds={ds} trackedIds={trackedIds} tenDm={tenDm} onApDung={onDoiTap} />
+            <DoiShop xep={xep} ds={ds} trackedIds={trackedIds} theoDoi={theoDoi} tenDm={tenDm} onApDung={onDoiTap} />
           </div>
         ) : <span />}
         <CongTac<KieuXem>
