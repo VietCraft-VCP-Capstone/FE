@@ -157,7 +157,14 @@ export function SellerRefundRequestDrawer({
       ) : null}
     >
       <div className="space-y-6">
-        {execution === 'FAILED' || execution === 'NOT_STARTED' ? (
+        {cod && execution === 'NOT_STARTED' ? (
+          <Alert
+            type="info"
+            showIcon
+            title="Chờ bạn chuyển khoản hoàn cho khách"
+            description={`Đơn COD không hoàn tự động. Chuyển ${refundAmountText(item)} vào tài khoản khách bên dưới rồi nhập mã giao dịch.`}
+          />
+        ) : execution === 'FAILED' || execution === 'NOT_STARTED' ? (
           <Alert
             type="warning"
             showIcon
