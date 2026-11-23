@@ -8,7 +8,8 @@ export type EvidenceKind = 'IMAGE' | 'VIDEO';
 export type ReturnAction = 'APPROVE' | 'REJECT' | 'REQUEST_EVIDENCE' | 'PROPOSE_FAULT_CHANGE';
 export type FaultParty = 'BUYER' | 'SELLER' | 'PRINTER' | 'CARRIER' | 'PLATFORM';
 export interface ReturnEvidence { id: string; kind: EvidenceKind; uri: string }
-export interface ReturnRequestInput { orderId: string; orderItemId: string; quantity: number; reasonCode: string; description: string; resolution: ReturnResolution; evidence: ReturnEvidence[] }
+export interface ReturnRequestInput { orderId: string; orderItemId: string; quantity: number; reasonCode: string; description: string; resolution: ReturnResolution; evidence: ReturnEvidence[]; refundBankInfo?: ReturnBankInfo }
+export interface ReturnBankInfo { bank_name: string; account_holder: string; account_number: string }
 export type ReturnRequestStatus = 'SUBMITTED' | 'PENDING_PRINTER' | 'PRINTER_PROPOSED_FAULT_CHANGE' | 'APPROVED' | 'REJECTED' | 'DISPUTED' | 'AWAITING_ADMIN_REFUND' | 'ADMIN_REJECTED' | 'CONVERTED_TO_REFUND' | 'WAITING_BUYER_CHOICE' | 'WAITING_STOCK' | 'REPLACEMENT_CREATED' | 'COMPLETED' | 'EXPIRED' | 'CANCELLED';
 export interface ReturnRequest {
   id?: string;
@@ -27,6 +28,7 @@ export interface ReturnRequest {
   status: ReturnRequestStatus;
   deadline_at: string | null;
   linked_refund_status?: string | null;
+  refund_bank_info?: ReturnBankInfo | null;
   evidence_requested_at?: string | null;
   evidence_deadline_at?: string | null;
   buyer_evidence_submitted_at?: string | null;
@@ -121,6 +123,7 @@ export const returnService = {
   printerDecision: async (id: string, payload: PrinterDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/printer-decision`, payload)),
   requestEvidence: async (id: string, reason: string): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/printer-evidence-request`, { reason })),
   adminDecision: async (id: string, payload: AdminDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/admin/decision`, payload)),
+  updateBankInfo: async (id: string, bank: ReturnBankInfo): Promise<ReturnBankInfo> => unwrap(await api.put(`/returns/requests/${encodeURIComponent(id)}/bank-info`, bank)),
   adminManualRefund: async (id: string, reference: string, note?: string): Promise<{ id: string; status: string }> => unwrap(await api.post(`/returns/requests/${encodeURIComponent(id)}/admin/manual-refund`, { reference, note })),
   adminConfirmRefund: async (id: string, payload: { amountMinor: number; currency: string; faultParty: FaultParty }): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/admin/confirm-refund`, payload)),
   clock: async (): Promise<{ now: string }> => (await api.get('/returns/clock')).data,

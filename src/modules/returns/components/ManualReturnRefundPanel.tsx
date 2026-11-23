@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
-import { returnService } from '../services/returnService';
+import { returnService, type ReturnBankInfo } from '../services/returnService';
 
 const VALID_REF = /^[A-Za-z0-9-]{6,40}$/;
 
-export function ManualReturnRefundPanel({ requestId, amount, onDone }: { requestId: string; amount?: number | null; onDone: () => Promise<void> }) {
+export function ManualReturnRefundPanel({ requestId, amount, bank, onDone }: { requestId: string; amount?: number | null; bank?: ReturnBankInfo | null; onDone: () => Promise<void> }) {
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -17,7 +17,9 @@ export function ManualReturnRefundPanel({ requestId, amount, onDone }: { request
   };
   return <section className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
     <p className="font-semibold">Hoàn thủ công {amount ? `${amount.toLocaleString('vi-VN')}đ` : ''}</p>
-    <p>Đơn này không hoàn tự động được. Liên hệ khách lấy số tài khoản, chuyển khoản rồi nhập mã giao dịch ngân hàng.</p>
+    {bank
+      ? <p>Chuyển khoản tới <b>{bank.bank_name}</b> · {bank.account_holder} · <b className="tabular-nums">{bank.account_number}</b>, rồi nhập mã giao dịch ngân hàng.</p>
+      : <p>Khách chưa cung cấp tài khoản nhận tiền. Liên hệ khách hoặc chờ khách bổ sung trên trang yêu cầu.</p>}
     <input maxLength={40} disabled={busy} value={reference} onChange={e => setReference(e.target.value)} placeholder="Mã giao dịch" className="w-full rounded border p-2" />
     <p className="text-xs text-slate-500">6–40 ký tự chữ, số hoặc dấu gạch ngang. Mỗi mã chỉ dùng một lần.</p>
     <input disabled={busy} value={note} onChange={e => setNote(e.target.value)} placeholder="Ghi chú (không bắt buộc)" className="w-full rounded border p-2" />
