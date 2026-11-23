@@ -28,6 +28,7 @@ export interface ReturnRequest {
   status: ReturnRequestStatus;
   deadline_at: string | null;
   linked_refund_status?: string | null;
+  refund_payable_minor?: number | null;
   refund_bank_info?: ReturnBankInfo | null;
   evidence_requested_at?: string | null;
   evidence_deadline_at?: string | null;

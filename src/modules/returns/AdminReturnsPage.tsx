@@ -148,7 +148,7 @@ export function AdminReturnsPage() {
           {canConfirm && <button disabled={busy || (!savedRefund && !amountValid)} onClick={() => void confirmRefund()} className="rounded bg-amber-700 px-4 py-2 text-white disabled:opacity-50">{request?.linked_refund_status === 'PENDING' ? 'Kiểm tra kết quả hoàn tiền' : request?.linked_refund_status === 'FAILED' ? 'Thử lại hoàn tiền' : 'Xác nhận hoàn tiền'}</button>}
         </>}
         {(request?.status === 'CONVERTED_TO_REFUND' || request?.linked_refund_status) && <p role="status" className="rounded bg-amber-50 p-3">{returnRefundMessage(request.linked_refund_status)}</p>}
-        {request && ['PENDING_INTEGRATION', 'FAILED'].includes(request.linked_refund_status || '') && <ManualReturnRefundPanel bank={request.refund_bank_info} requestId={returnService.idOf(selected)} amount={request.refund_amount_minor} onDone={async () => { await refreshDetail(returnService.idOf(selected)); await load(); }} />}
+        {request && ['PENDING_INTEGRATION', 'FAILED'].includes(request.linked_refund_status || '') && <ManualReturnRefundPanel bank={request.refund_bank_info} requestId={returnService.idOf(selected)} amount={request.refund_payable_minor ?? request.refund_amount_minor} onDone={async () => { await refreshDetail(returnService.idOf(selected)); await load(); }} />}
       </>}
     </section>}
   </main>;
