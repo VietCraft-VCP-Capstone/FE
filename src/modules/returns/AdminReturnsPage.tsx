@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../../infrastructure/api/interceptors';
 import { DisputeAuditCard } from './components/DisputeAuditCard';
+import { ManualReturnRefundPanel } from './components/ManualReturnRefundPanel';
+import { reasonLabel } from './components/returnDisplay';
 import { returnService, type ReturnDetail, type ReturnRequest, type ReturnResolution, type FaultParty, type DisputeAuditProfile } from './services/returnService';
 import { canConfirmReturnRefund, canDecideReturn, canRejectReturn, returnRefundMessage } from './return-workflow-policy';
 
@@ -22,6 +24,8 @@ const reasonTranslations: Record<string, string> = {
   'Deadline expired; notify Admin, no automatic decision.': 'Đã hết hạn thời gian; chuyển Quản trị viên phân xử thủ công.',
   'Printer evidence request opened under P16.': 'Xưởng in yêu cầu khách bổ sung thêm video/ảnh minh chứng.',
   'Buyer submitted evidence requested under P16.': 'Khách hàng đã tải lên minh chứng bổ sung.',
+  'Admin-confirmed Refund bridge dispatch started.': 'Admin xác nhận hoàn tiền, bắt đầu gửi lệnh hoàn.',
+  'Persisted idempotent linked Refund bridge reference.': 'Đã tạo lệnh hoàn tiền.',
 };
 const translateReason = (r: string) => reasonTranslations[r] || r;
 
@@ -128,7 +132,7 @@ export function AdminReturnsPage() {
       <button disabled={busy} onClick={() => { setSelected(null); setDetail(null); setAuditProfile(null); }} className="text-sm font-semibold text-emerald-700">← Danh sách</button>
       <h2 className="text-lg font-bold">Chi tiết · {returnService.idOf(selected)}</h2>
       {!detail ? <p role="status">Đang tải chi tiết…</p> : <>
-        <p>Trạng thái: {labels[detail.request.status] || detail.request.status}</p><p>Lý do: {detail.request.reason_code} — {detail.request.reason_description}</p><p>{detail.request.quantity} sản phẩm · phương án yêu cầu: {detail.request.requested_resolution === 'EXCHANGE' ? 'Đổi hàng (In bù 0đ)' : 'Hoàn tiền'}</p>
+        <p>Trạng thái: {labels[detail.request.status] || detail.request.status}</p><p>Lý do: {reasonLabel(detail.request.reason_code)} — {detail.request.reason_description}</p><p>{detail.request.quantity} sản phẩm · phương án yêu cầu: {detail.request.requested_resolution === 'EXCHANGE' ? 'Đổi hàng (In bù 0đ)' : 'Hoàn tiền'}</p>
 
         {auditProfile && <DisputeAuditCard profile={auditProfile} />}
 
@@ -143,7 +147,8 @@ export function AdminReturnsPage() {
           {canDecide && <><label className="block text-sm">Lý do quyết định<textarea required disabled={busy} className={field} value={reason} onChange={e => setReason(e.target.value)} /></label><button disabled={busy || !reason.trim() || (resolution === 'REFUND' && !amountValid)} onClick={() => void decide()} className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-50">Lưu quyết định</button></>}
           {canConfirm && <button disabled={busy || (!savedRefund && !amountValid)} onClick={() => void confirmRefund()} className="rounded bg-amber-700 px-4 py-2 text-white disabled:opacity-50">{request?.linked_refund_status === 'PENDING' ? 'Kiểm tra kết quả hoàn tiền' : request?.linked_refund_status === 'FAILED' ? 'Thử lại hoàn tiền' : 'Xác nhận hoàn tiền'}</button>}
         </>}
-        {(request?.status === 'CONVERTED_TO_REFUND' || request?.linked_refund_status) && <p role="status" className="rounded bg-amber-50 p-3">{returnRefundMessage(request.linked_refund_status)}{request.linked_refund_status === 'PENDING_INTEGRATION' && ' Phương thức thanh toán này chưa hỗ trợ hoàn tiền tự động; liên hệ bộ phận thanh toán để xử lý.'}</p>}
+        {(request?.status === 'CONVERTED_TO_REFUND' || request?.linked_refund_status) && <p role="status" className="rounded bg-amber-50 p-3">{returnRefundMessage(request.linked_refund_status)}</p>}
+        {request && ['PENDING_INTEGRATION', 'FAILED'].includes(request.linked_refund_status || '') && <ManualReturnRefundPanel requestId={returnService.idOf(selected)} amount={request.refund_amount_minor} onDone={async () => { await refreshDetail(returnService.idOf(selected)); await load(); }} />}
       </>}
     </section>}
   </main>;

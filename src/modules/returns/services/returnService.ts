@@ -121,6 +121,7 @@ export const returnService = {
   printerDecision: async (id: string, payload: PrinterDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/printer-decision`, payload)),
   requestEvidence: async (id: string, reason: string): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/printer-evidence-request`, { reason })),
   adminDecision: async (id: string, payload: AdminDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/admin/decision`, payload)),
+  adminManualRefund: async (id: string, reference: string, note?: string): Promise<{ id: string; status: string }> => unwrap(await api.post(`/returns/requests/${encodeURIComponent(id)}/admin/manual-refund`, { reference, note })),
   adminConfirmRefund: async (id: string, payload: { amountMinor: number; currency: string; faultParty: FaultParty }): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>(`/returns/requests/${encodeURIComponent(id)}/admin/confirm-refund`, payload)),
   clock: async (): Promise<{ now: string }> => (await api.get('/returns/clock')).data,
   devPrinterAction: async (requestId: string, payload: PrinterDecision): Promise<ReturnRequest> => unwrap(await api.post<ReturnRequest>('/returns/requests/dev/printer-action', { requestId, ...payload })),

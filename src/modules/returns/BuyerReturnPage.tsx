@@ -4,7 +4,7 @@ import { getApiErrorMessage } from '../../infrastructure/api/interceptors';
 import { ArrowLeft, CalendarClock, Check, FileText, ImagePlus, Loader2, PackageCheck, Scale, ShieldAlert, UploadCloud, Video } from 'lucide-react';
 import { returnService, type ReturnDetail, type ReturnEvidence, type ReturnResolution } from './services/returnService';
 import { allowedReturnResolutions } from './return-workflow-policy';
-import { BADGE_CLASS, labels, reasons, statusTone } from './components/returnDisplay';
+import { BADGE_CLASS, labels, reasonLabel, reasons, statusTone } from './components/returnDisplay';
 import { ReturnStatusBanners } from './components/ReturnStatusBanners';
 import { ReturnTimeline } from './components/ReturnTimeline';
 import { EvidenceGallery } from './components/EvidenceGallery';
@@ -113,7 +113,7 @@ export function BuyerReturnPage() {
           <section className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><FileText size={15} /> Mã yêu cầu</div><p className="mt-3 break-all font-mono text-sm font-semibold text-slate-900">{returnService.idOf(request)}</p></div>
             {request.deadline_at && <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><CalendarClock size={15} /> Hạn xử lý</div><p className="mt-3 text-sm font-semibold text-slate-900">{new Date(request.deadline_at).toLocaleString('vi-VN')}</p></div>}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><PackageCheck size={15} /> Phương án</div><p className="mt-3 text-sm font-semibold text-slate-900">{request.requested_resolution === 'EXCHANGE' ? 'Đổi hàng' : 'Hoàn tiền'}</p><p className="mt-1 text-xs text-slate-500">Lý do {request.reason_code || '—'} · Số lượng {request.quantity ?? '—'}</p></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><PackageCheck size={15} /> Phương án</div><p className="mt-3 text-sm font-semibold text-slate-900">{request.requested_resolution === 'EXCHANGE' ? 'Đổi hàng' : 'Hoàn tiền'}</p><p className="mt-1 text-xs text-slate-500">Lý do: {reasonLabel(request.reason_code)} · Số lượng {request.quantity ?? '—'}</p></div>
           </section>
 
           {/* Product Snapshot & Details Card */}
@@ -147,7 +147,7 @@ export function BuyerReturnPage() {
                 onClick={() => navigate(`/orders/${encodeURIComponent(request.order_id)}`)}
                 className="text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition border border-emerald-200 flex-shrink-0 flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Xem đơn hàng #{request.order_id}</span>
+                <span>Xem đơn hàng</span>
                 <ArrowLeft size={13} className="rotate-180" />
               </button>
             )}
