@@ -377,6 +377,7 @@ export const SellerRevenuePage: React.FC = () => {
                                     { id: 'SETTLED', label: 'Đã giải ngân' },
                                     { id: 'PENDING', label: 'Đang giữ tiền' },
                                     { id: 'CANCELLED', label: 'Đã hủy' },
+                                    { id: 'REFUNDED', label: 'Đã hoàn tiền' },
                                 ].map((tab) => (
                                     <button
                                         key={tab.id}
@@ -469,9 +470,13 @@ export const SellerRevenuePage: React.FC = () => {
                                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-stone-100 text-stone-500 border border-stone-200">
                                                             Đơn hủy
                                                         </span>
+                                                    ) : item.settlementStatus === 'REFUNDED' ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                                            Đã hoàn tiền buyer
+                                                        </span>
                                                     ) : (
                                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                                            <Clock size={11} /> Chờ giao xong
+                                                            <Clock size={11} /> Đang giữ (hạn đổi trả)
                                                         </span>
                                                     )}
                                                 </td>
