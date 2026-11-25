@@ -216,7 +216,7 @@ export function BuyerFavoritesPage() {
               <Heart className="w-5 h-5 fill-rose-500" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight">Sản phẩm yêu thích</h1>
+              <h1 className="font-heading text-base sm:text-lg font-semibold leading-[1.25] tracking-tight text-gray-900">Sản phẩm yêu thích</h1>
               <p className="text-xs text-stone-500 mt-0.5">
                 {loading ? 'Đang tải danh sách...' : `${cards.length} sản phẩm đã lưu`}
               </p>

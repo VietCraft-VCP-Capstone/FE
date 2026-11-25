@@ -282,7 +282,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
 
   return (
-    <div className="buyer-wrapper" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div className="buyer-wrapper" style={{ fontFamily: "'Epilogue Variable', system-ui, -apple-system, sans-serif" }}>
       {/* Toast Notification */}
       {toast && (
         <div style={{
@@ -312,7 +312,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       <section id="vouchers-section" className="buyer-section" style={{ marginTop: 20 }}>
         <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+            <h2 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
               <Ticket className="text-[#008000]" size={22} />
               Ưu Đãi & Voucher Dành Cho Bạn
             </h2>
@@ -411,7 +411,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Flame size={22} className="text-amber-500 fill-amber-500 animate-pulse" />
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: 0 }}>
+            <h2 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033', margin: 0 }}>
               ⚡ Ưu Đãi Chớp Nhoáng & Flash Sale
             </h2>
             {flashDeals.length > 0 && (
@@ -528,7 +528,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       {/* Main Discover Grid */}
       <section id="kham-pha" className="buyer-section" style={{ marginTop: 40 }}>
         <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Tiếp tục khám phá</h2>
+          <h2 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033' }}>Tiếp tục khám phá</h2>
           <span style={{ fontSize: 13, color: '#888', fontWeight: 500 }}>
             {displayProducts.length} kết quả
           </span>
@@ -665,7 +665,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       {/* Followed Shop Updates Section */}
       <section className="buyer-section" style={{ marginTop: 40 }}>
         <div className="section-head" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Cập nhật từ gian hàng bạn theo dõi</h2>
+          <h2 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033' }}>Cập nhật từ gian hàng bạn theo dõi</h2>
         </div>
         {subbedShops.length === 0 ? (
           <>
@@ -794,7 +794,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       {/* Styles Discovery Section */}
       <section id="collections-section" className="buyer-section" style={{ marginTop: 40, marginBottom: 40 }}>
         <div className="section-head" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Khám phá các phong cách mới</h2>
+          <h2 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033' }}>Khám phá các phong cách mới</h2>
         </div>
         <div className="buyer-grid-3 buyer-scroll-row">
           <div className="style-card text-card-1" onClick={() => navigate('/')}>

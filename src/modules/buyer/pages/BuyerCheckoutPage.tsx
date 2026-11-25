@@ -381,7 +381,7 @@ export function BuyerCheckoutPage() {
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-xl font-black text-gray-900">Thanh toán đơn hàng</h1>
+                        <h1 className="font-heading text-lg font-semibold leading-[1.2] tracking-tight text-gray-900">Thanh toán đơn hàng</h1>
                         <p className="text-xs text-gray-500">Kiểm tra thông tin giao hàng, áp dụng voucher và hoàn tất đơn</p>
                     </div>
                 </div>

@@ -374,7 +374,7 @@ export function BuyerCartPage() {
                 </button>
             </div>
 
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Giỏ hàng của bạn</h1>
+            <h1 className="font-heading text-xl font-semibold leading-[1.2] tracking-tight text-gray-900 mb-6">Giỏ hàng của bạn</h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Cart Items List */}

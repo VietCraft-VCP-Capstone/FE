@@ -21,7 +21,7 @@ export function LandingFooter({
           {/* Cột 1: Logo & Newsletter - Tăng diện tích chiếm 5/12 cột */}
           <div className="lg:col-span-5 space-y-5">
             <div className="flex items-center gap-2">
-              <h3 className="text-white text-3xl font-extrabold tracking-tight">
+              <h3 className="font-heading text-white text-2xl font-semibold tracking-tight">
                 VietCraft<span className="text-emerald-500">.</span>
               </h3>
             </div>

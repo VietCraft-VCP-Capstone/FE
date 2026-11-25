@@ -41,7 +41,7 @@ export function ProductPreviewModal({ product, onClose }: { product: ProductItem
           </button>
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-9 px-5 py-6 md:grid-cols-2" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+        <div className="grid grid-cols-1 items-start gap-9 px-5 py-6 md:grid-cols-2" style={{ fontFamily: "'Epilogue Variable', system-ui, sans-serif" }}>
           <div>
             <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }}>
               <img src={product.images[image] || product.thumbnail} alt={product.title} style={S.mainImg} className="cursor-zoom-in transition-transform duration-200 hover:scale-150 motion-reduce:transition-none" />

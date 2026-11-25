@@ -21,8 +21,8 @@ export function LandingShops({ shops, onSelectShop }: LandingShopsProps) {
     <section id="shop-noi-bat" className="py-20 px-6">
       <div className="max-w-7xl mx-auto space-y-10">
         
-        <h2 className="text-3xl font-extrabold text-[#330033] text-left tracking-tight">
-          Shop Nổi Bật
+        <h2 className="font-heading text-2xl sm:text-[26px] font-semibold leading-[1.2] text-[#330033] text-left tracking-tight">
+          Shop nổi bật
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

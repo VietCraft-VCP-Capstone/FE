@@ -25,8 +25,8 @@ export function LandingTrending({ products, onSelectProduct, onViewAll }: Landin
         
         {/* Section Header */}
         <div className="flex justify-between items-end">
-          <h2 className="text-3xl font-extrabold text-[#330033] tracking-tight">
-            Đang Thịnh Hành
+          <h2 className="font-heading text-2xl sm:text-[26px] font-semibold leading-[1.2] text-[#330033] tracking-tight">
+            Đang thịnh hành
           </h2>
           <span 
             onClick={() => onViewAll?.()}
@@ -83,7 +83,7 @@ export function LandingTrending({ products, onSelectProduct, onViewAll }: Landin
                   )}
                 </div>
 
-                <span className="text-[#007700] font-bold text-base block pt-1">
+                <span className="font-heading text-[#007700] font-semibold text-sm block pt-1">
                   {p.price.toLocaleString('vi-VN')}đ
                 </span>
               </div>

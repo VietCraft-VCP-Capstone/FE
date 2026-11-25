@@ -10,30 +10,30 @@ export function LandingHero({ onExplore }: LandingHeroProps) {
         
         {/* Left Content */}
         <div className="lg:col-span-6 space-y-6 text-left z-10">
-          <h1 className="text-[#330033] leading-[1.1] tracking-wide">
-            <span className="block font-black text-5xl sm:text-6xl lg:text-[65px] uppercase tracking-wider text-[#330033] mb-1">
-              Sản Phẩm
+          <h1 className="font-heading text-[#330033] leading-[1.18] tracking-tight">
+            <span className="block font-semibold text-3xl sm:text-5xl lg:text-[52px] text-[#330033] mb-1">
+              Sản phẩm
             </span>
-            <span className="block font-black text-5xl sm:text-6xl lg:text-[65px] uppercase tracking-wider text-[#007700] mb-3">
-              Độc Đáo
+            <span className="block font-semibold text-3xl sm:text-5xl lg:text-[52px] text-[#007700] mb-3">
+              Độc đáo
             </span>
-            <span className="block font-black text-5xl sm:text-6xl lg:text-[30px] uppercase tracking-wider text-[#330033]">
-              AI Phân Tích Thị Trường
+            <span className="block font-medium text-lg sm:text-2xl lg:text-[24px] leading-[1.25] text-[#330033]">
+              AI phân tích thị trường
             </span>
           </h1>
-          <p className="text-stone-500 text-base sm:text-lg max-w-lg leading-relaxed font-normal pt-4">
+          <p className="font-body text-stone-500 text-base sm:text-lg max-w-lg leading-relaxed font-normal pt-4">
             Khám phá các sản phẩm độc đáo từ những shop độc lập tại Việt Nam.
           </p>
           <div className="flex flex-wrap gap-4 pt-2">
             <button 
               onClick={onExplore}
-              className="bg-[#330033] hover:bg-[#220022] text-white font-semibold px-8 py-3.5 rounded-full shadow-md hover:shadow-lg transition-all active:scale-97"
+              className="font-heading bg-[#330033] hover:bg-[#220022] text-white text-sm font-medium px-7 py-3.5 rounded-full shadow-md hover:shadow-lg transition-all active:scale-97"
             >
-              Khám Phá Ngay
+              Khám phá ngay
             </button>
             <a 
               href="#shop-noi-bat"
-              className="bg-white hover:bg-stone-50 text-stone-800 font-semibold px-8 py-3.5 rounded-full border border-stone-200 shadow-sm hover:shadow transition-all text-center flex items-center justify-center"
+              className="font-body bg-white hover:bg-stone-50 text-stone-800 text-sm font-semibold px-7 py-3.5 rounded-full border border-stone-200 shadow-sm hover:shadow transition-all text-center flex items-center justify-center"
             >
               Xem Shop Nổi Bật
             </a>

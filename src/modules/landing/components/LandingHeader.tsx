@@ -57,7 +57,7 @@ export function LandingHeader({
         
         {/* Logo */}
         <div className="flex items-center gap-1.5 cursor-pointer" onClick={onHome}>
-          <span className="text-2xl font-bold select-none">
+          <span className="font-heading text-xl font-semibold tracking-tight select-none">
             <span className="text-[#007700]">Viet</span>
             <span className="text-[#330033]">Craft</span>
           </span>

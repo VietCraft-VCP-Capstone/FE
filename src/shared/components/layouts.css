@@ -28,7 +28,7 @@ body:has(.seller-layout) {
     height: 100vh;
     height: 100dvh;
     background: #f8fafb;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: var(--font-body);
     overflow: hidden;
 }
 
@@ -171,9 +171,10 @@ body:has(.seller-layout) {
 }
 
 .seller-logo-text {
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -0.01em;
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
 }
 
 .seller-header-center {
@@ -933,9 +934,10 @@ body:has(.seller-layout) {
 }
 
 .buyer-logo {
-    font-size: 24px;
-    font-weight: 800;
-    letter-spacing: -0.3px;
+    font-family: var(--font-heading);
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
     flex-shrink: 0;
     white-space: nowrap;
 }
@@ -1158,8 +1160,10 @@ body:has(.seller-layout) {
 }
 
 .buyer-intro-banner h1 {
-    font-size: 26px;
-    font-weight: 800;
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.2;
     margin: 0;
 }
 
@@ -1202,8 +1206,10 @@ body:has(.seller-layout) {
 }
 
 .buyer-section .section-head h2 {
-    font-size: 18px;
-    font-weight: 800;
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.25;
     color: #330033;
     margin: 0;
 }
@@ -1270,9 +1276,9 @@ body:has(.seller-layout) {
         padding: 16px;
     }
 
-    /* Tiêu đề mục trang chủ đặt cỡ chữ inline 20px, phải dùng !important để thu nhỏ trên điện thoại. */
+    /* Tiêu đề mục trang chủ đặt cỡ chữ inline 18px, phải dùng !important để thu nhỏ trên điện thoại. */
     .buyer-section .section-head h2 {
-        font-size: 17px !important;
+        font-size: 15px !important;
     }
 
     .buyer-scroll-row .style-overlay h3 {
@@ -1653,8 +1659,9 @@ body:has(.seller-layout) {
 }
 
 .brand-col h2 {
-    font-size: 24px;
-    font-weight: 800;
+    font-family: var(--font-heading);
+    font-size: 21px;
+    font-weight: 600;
     color: #fff;
     margin: 0;
 }

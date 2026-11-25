@@ -170,7 +170,7 @@ export function BuyerVouchersPage() {
               <Sparkles size={14} className="text-amber-300" />
               Ưu đãi & Khuyến mãi độc quyền
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-3">
+            <h1 className="font-heading text-xl sm:text-2xl font-semibold leading-[1.2] tracking-tight flex items-center gap-3">
               <Ticket className="text-emerald-300" size={32} />
               Kho Voucher VietCraft & Gian Hàng
             </h1>

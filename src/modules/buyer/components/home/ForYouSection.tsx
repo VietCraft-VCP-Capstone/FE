@@ -60,7 +60,7 @@ export function ForYouSection({ deals }: { deals: Map<string, any> }) {
   return (
     <section ref={ref} className="buyer-section" style={{ marginTop: 40 }}>
       <div className="section-head" style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>✨ Gợi ý từ AI dựa trên sở thích của bạn</h2>
+        <h2 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033' }}>✨ Gợi ý từ AI dựa trên sở thích của bạn</h2>
       </div>
       <div className="buyer-grid-4">
         {loading
