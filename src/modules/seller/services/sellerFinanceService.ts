@@ -24,7 +24,7 @@ export interface SellerSettlementItem {
     platformFee: number;
     commissionRate: number;
     netPayout: number;
-    settlementStatus: 'SETTLED' | 'PENDING' | 'CANCELLED';
+    settlementStatus: 'SETTLED' | 'PENDING' | 'CANCELLED' | 'REFUNDED';
     itemsCount: number;
 }
 

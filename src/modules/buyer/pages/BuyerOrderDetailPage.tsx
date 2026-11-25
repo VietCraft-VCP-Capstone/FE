@@ -556,6 +556,8 @@ export function BuyerOrderDetailPage() {
             {!awaitingPayment && <RefundRequestPanel
                 orderId={order.id}
                 refundOrderId={order._id}
+                orderCode={order.id}
+                paymentMethod={order.paymentMethod}
                 formOpen={refundFormOpen}
                 onFormClose={() => setRefundFormOpen(false)}
                 onCreated={() => { setRefundFormOpen(false); setHasLegacyRefund(true); }}
