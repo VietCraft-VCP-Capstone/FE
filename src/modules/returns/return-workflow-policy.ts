@@ -6,7 +6,7 @@ export const allowedReturnResolutions: Record<string, readonly ('REFUND' | 'EXCH
 
 export function canConfirmReturnRefund(status: string, executionStatus?: string | null): boolean {
   return ['AWAITING_ADMIN_REFUND', 'CONVERTED_TO_REFUND'].includes(status)
-    && !['PROCESSING', 'REFUNDED'].includes(executionStatus || '');
+    && !['PROCESSING', 'REFUNDED', 'PENDING_INTEGRATION'].includes(executionStatus || '');
 }
 
 export function canDecideReturn(status: string): boolean {
@@ -18,7 +18,8 @@ export function canRejectReturn(status: string): boolean {
 }
 
 export function returnRefundMessage(status?: string | null): string {
-  if (status === 'REFUNDED') return 'Khoản hoàn tiền đã được cổng thanh toán xác nhận thành công.';
+  if (status === 'REFUNDED') return 'Đã hoàn tiền xong.';
+  if (status === 'PENDING_INTEGRATION') return 'Đơn không hỗ trợ hoàn tự động; cần chuyển khoản thủ công cho khách.';
   if (status === 'FAILED') return 'Hoàn tiền chưa thành công. Quản trị viên cần kiểm tra và thử lại.';
   if (status === 'PROCESSING' || status === 'PENDING') return 'Cổng thanh toán đang xử lý khoản hoàn tiền. Chưa có xác nhận tiền đã được chuyển.';
   return 'Yêu cầu đã được duyệt. Khoản tiền chưa được cổng thanh toán xác nhận hoàn thành.';

@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertCircle, ImagePlus, Loader2, RotateCcw, Video, X } from 'lucide-react';
 import { getApiErrorMessage } from '../../../../infrastructure/api/interceptors';
-import { refundService, type RefundRequest } from '../../../order/services/refundService';
+import { refundService, type RefundBankInfo, type RefundRequest } from '../../../order/services/refundService';
+import { EMPTY_BANK_INFO, RefundBankFields, isValidBankInfo } from './RefundBankFields';
 
 const reasons = [
   ['DAMAGED', 'Sản phẩm bị hư hỏng'],
@@ -16,6 +17,7 @@ interface RefundFormModalProps {
   isOpen: boolean;
   orderId: string;
   orderCode?: string;
+  paymentMethod?: string;
   onClose: () => void;
   onSuccess: (request: RefundRequest) => void;
 }
@@ -24,9 +26,12 @@ export function RefundFormModal({
   isOpen,
   orderId,
   orderCode,
+  paymentMethod,
   onClose,
   onSuccess,
 }: RefundFormModalProps) {
+  const isCod = String(paymentMethod || '').toUpperCase() === 'COD';
+  const [bankInfo, setBankInfo] = useState<RefundBankInfo>(EMPTY_BANK_INFO);
   const [reason, setReason] = useState('');
   const [partial, setPartial] = useState(false);
   const [amount, setAmount] = useState('');
@@ -120,6 +125,10 @@ export function RefundFormModal({
       setError('Vui lòng nhập số tiền đề nghị hoàn hợp lệ.');
       return;
     }
+    if (isCod && !isValidBankInfo(bankInfo)) {
+      setError('Nhập đủ thông tin tài khoản nhận tiền hoàn (số tài khoản 6–20 chữ số).');
+      return;
+    }
 
     setBusy(true);
     try {
@@ -129,6 +138,7 @@ export function RefundFormModal({
         evidence: evidence.map(item => item.url),
         refund_type: partial ? 'PARTIAL' : 'FULL',
         refund_amount: partial ? Number(amount) : undefined,
+        refund_bank_info: isCod ? { bank_name: bankInfo.bank_name.trim(), account_holder: bankInfo.account_holder.trim(), account_number: bankInfo.account_number.trim() } : undefined,
       });
       onSuccess(result);
     } catch (e) {
@@ -278,6 +288,8 @@ export function RefundFormModal({
               </div>
             </div>
           )}
+
+          {isCod && <RefundBankFields value={bankInfo} onChange={setBankInfo} />}
 
           {/* Description */}
           <div className="space-y-1.5">

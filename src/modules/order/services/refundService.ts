@@ -26,6 +26,13 @@ export interface RefundRequest {
   created_at: string;
 }
 
+/** Tài khoản buyer cung cấp để nhận tiền hoàn, bắt buộc với đơn COD. */
+export interface RefundBankInfo {
+  bank_name: string;
+  account_holder: string;
+  account_number: string;
+}
+
 /** Thông tin để người bán tự chuyển khoản hoàn cho khách. */
 export interface ManualRefundInfo {
   amount: number;
@@ -43,7 +50,7 @@ export const refundService = {
     const url = response.data.url as string;
     return url.startsWith('/uploads/') ? new URL(url, api.defaults.baseURL || window.location.origin).toString() : url;
   },
-  create: async (orderId: string, payload: { reason_category: string; description: string; evidence: string[]; refund_type: 'FULL' | 'PARTIAL'; refund_amount?: number }) => unwrap<RefundRequest>(await api.post(`/orders/${encodeURIComponent(orderId)}/refund-requests`, payload)),
+  create: async (orderId: string, payload: { reason_category: string; description: string; evidence: string[]; refund_type: 'FULL' | 'PARTIAL'; refund_amount?: number; refund_bank_info?: RefundBankInfo }) => unwrap<RefundRequest>(await api.post(`/orders/${encodeURIComponent(orderId)}/refund-requests`, payload)),
   get: async (id: string) => unwrap<RefundRequest>(await api.get(`/refund-requests/${encodeURIComponent(id)}`)),
   getForOrder: async (orderId: string) => unwrap<RefundRequest | null>(await api.get(`/orders/${encodeURIComponent(orderId)}/refund-requests`)),
   dispute: async (id: string, reason: string) => unwrap<RefundRequest>(await api.post(`/refund-requests/${encodeURIComponent(id)}/dispute`, { reason })),

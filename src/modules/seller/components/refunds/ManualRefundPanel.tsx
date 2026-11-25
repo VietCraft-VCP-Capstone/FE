@@ -6,6 +6,8 @@ import { refundService, type ManualRefundInfo, type RefundRequest } from '../../
 import { getApiErrorMessage } from '../../../../infrastructure/api/interceptors';
 import { money } from './refundMeta';
 
+const REFERENCE_PATTERN = /^[A-Za-z0-9-]{6,40}$/;
+
 /**
  * Người bán tự chuyển khoản hoàn cho khách khi cổng thanh toán không chi được, rồi xác
  * nhận bằng mã giao dịch ngân hàng. BE chỉ nhận xác nhận khi chắc cổng CHƯA chi, để khách
@@ -51,6 +53,7 @@ export function ManualRefundPanel({ item, onDone }: { item: RefundRequest; onDon
   }
 
   const dest = info?.destination;
+  const validReference = REFERENCE_PATTERN.test(reference.trim());
   return (
     <section className="space-y-3 rounded-2xl border border-stone-200 p-4">
       <p className="m-0 text-[13.5px] font-semibold text-stone-900">Hoàn tiền thủ công</p>
@@ -66,7 +69,7 @@ export function ManualRefundPanel({ item, onDone }: { item: RefundRequest; onDon
               colon={false}
               styles={{ label: { width: 120, color: '#78716c' }, content: { color: '#1c1917', fontWeight: 500 } }}
               items={[
-                { key: 'bank', label: 'Ngân hàng', children: dest.bankName ? `${dest.bankName} (BIN ${dest.bin})` : `BIN ${dest.bin}` },
+                { key: 'bank', label: 'Ngân hàng', children: dest.bankName || (dest.bin ? `BIN ${dest.bin}` : '') },
                 { key: 'acc', label: 'Số tài khoản', children: <Typography.Text copyable className="tabular-nums">{dest.accountNo}</Typography.Text> },
                 ...(dest.accountName ? [{ key: 'name', label: 'Chủ tài khoản', children: dest.accountName }] : []),
                 { key: 'amount', label: 'Số tiền', children: <Typography.Text copyable={{ text: String(info.amount) }} className="tabular-nums">{money(info.amount)}</Typography.Text> },
@@ -78,7 +81,7 @@ export function ManualRefundPanel({ item, onDone }: { item: RefundRequest; onDon
               type="info"
               showIcon
               title="Chưa có tài khoản nhận của khách"
-              description={`Cổng thanh toán không cung cấp tài khoản của khách. Nhắn khách để lấy số tài khoản, chuyển ${money(info.amount)} với nội dung "${info.transferContent}".`}
+              description={`Khách chưa cung cấp tài khoản nhận. Nhắn khách để lấy số tài khoản, chuyển ${money(info.amount)} với nội dung "${info.transferContent}".`}
             />
           )}
 
@@ -88,8 +91,10 @@ export function ManualRefundPanel({ item, onDone }: { item: RefundRequest; onDon
               value={reference}
               onChange={event => { setReference(event.target.value); if (error) setError(''); }}
               placeholder="Ví dụ FT26281177083040"
-              maxLength={100}
+              maxLength={40}
+              status={reference && !validReference ? 'error' : undefined}
             />
+            <span className="mt-1 block text-xs text-stone-500">6–40 ký tự chữ, số hoặc dấu gạch ngang</span>
           </label>
         </>
       )}
@@ -100,13 +105,13 @@ export function ManualRefundPanel({ item, onDone }: { item: RefundRequest; onDon
         <Button onClick={() => { setOpen(false); setError(''); }} disabled={saving}>Đóng</Button>
         <Popconfirm
           title="Xác nhận đã chuyển khoản?"
-          description="Hệ thống kiểm tra với cổng thanh toán rồi ghi nhận đơn đã hoàn tiền. Không hoàn tác được."
+          description="Ghi nhận đơn đã hoàn với mã giao dịch này. Mỗi mã chỉ dùng được một lần và không hoàn tác được."
           okText="Xác nhận"
           cancelText="Quay lại"
-          disabled={!reference.trim() || !info}
+          disabled={!validReference || !info}
           onConfirm={() => settle()}
         >
-          <Button type="primary" loading={saving} disabled={!reference.trim() || !info}>Xác nhận đã hoàn</Button>
+          <Button type="primary" loading={saving} disabled={!validReference || !info}>Xác nhận đã hoàn</Button>
         </Popconfirm>
       </div>
     </section>
