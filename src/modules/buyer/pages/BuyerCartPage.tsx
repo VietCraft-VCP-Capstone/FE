@@ -22,7 +22,7 @@ interface CartItem {
 }
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
-export const DEFAULT_PRODUCT_IMG = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=300';
+export const DEFAULT_PRODUCT_IMG = '/image-not-found.jpg';
 
 const absImg = (u: any): string => {
     if (!u || typeof u !== 'string') return '';
@@ -274,7 +274,7 @@ export function BuyerCartPage() {
                     price: p.variants?.[0]?.retail_price 
                         ? parseMongooseDecimal(p.variants[0].retail_price) 
                         : (p.price || 0),
-                    image: p.images?.[0] || p.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=300'
+                    image: p.images?.[0] || p.image || '/image-not-found.jpg'
                 }));
                 setRecommendations(mapped);
             } catch (err) {

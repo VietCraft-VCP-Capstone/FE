@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, ArrowRight, CheckCircle2, Info, Ticket, Flame, UserPlus, Store } from 'lucide-react';
-import { productsService } from '../../product/services/productsService';
+import { productsService, FeaturedCategory } from '../../product/services/productsService';
 import { shopService } from '../../product/services/shopService';
 import { promotionService } from '../../promotion/services/promotionService';
 import { favoritesService } from '../../product/services/favoritesService';
@@ -9,12 +9,14 @@ import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import { ForYouSection } from '../components/home/ForYouSection';
 import { buildDeals } from '../components/deals/buildDeals';
 import '../../../shared/components/layouts.css';
+import { useVoucherWallet } from '../../promotion/hooks/useVoucherWallet';
 
 // Bộ nhớ đệm cấp module: giữ lại sản phẩm và voucher khi người dùng chuyển trang
 let homeDataCache: {
   products: any[];
   shops: any[];
   suggestedShops: any[];
+  categories?: FeaturedCategory[];
   coupons: any[];
   timestamp: number;
 } | null = null;
@@ -30,8 +32,8 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
   const [suggestedShopList, setSuggestedShopList] = useState<any[]>(() => homeDataCache?.suggestedShops || []);
   const [followingShopId, setFollowingShopId] = useState<string | null>(null);
   const [couponList, setCouponList] = useState<any[]>(() => homeDataCache?.coupons || []);
+  const [styleCategories, setStyleCategories] = useState<FeaturedCategory[]>(() => homeDataCache?.categories || []);
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
-  const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [isLoading, setIsLoading] = useState(() => !homeDataCache);
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,10 +71,6 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
           } catch {}
         });
     }
-    const vls = localStorage.getItem('vietcraft_saved_vouchers');
-    if (vls) {
-      try { setSavedVouchers(JSON.parse(vls)); } catch (e) {}
-    }
 
     // Chỉ bật loading spinner nếu chưa có cache sẵn trong RAM
     if (!homeDataCache) {
@@ -87,7 +85,8 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         : Promise.resolve([]),
       productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
       promotionService.getAll().catch((err) => { console.error('Failed to fetch coupons', err); return []; }),
-    ]).then(([products, followed, featured, coupons]) => {
+      productsService.getFeaturedCategories(3).catch((err) => { console.error('Failed to fetch categories', err); return [] as FeaturedCategory[]; }),
+    ]).then(([products, followed, featured, coupons, categories]) => {
       const productList = Array.isArray(products) ? products : (products as any)?.items || [];
       const followedShops = Array.isArray(followed) ? followed : [];
       const followedIds = new Set(followedShops.map((s: any) => (s._id || s.id)?.toString()));
@@ -99,7 +98,9 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       setShopList(followedShops);
       setSuggestedShopList(suggestedShops);
       setCouponList(coupons || []);
+      setStyleCategories(categories);
       homeDataCache = {
+        categories,
         products: productList,
         shops: followedShops,
         suggestedShops,
@@ -110,6 +111,9 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
       setIsLoading(false);
     });
   }, []);
+
+  const wallet = useVoucherWallet((msg, type) => triggerToast(msg, type === 'success' ? 'success' : 'info'));
+  const savedVouchers = wallet.savedCodes;
 
   const triggerToast = (message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
@@ -168,17 +172,8 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
 
   const toggleVoucher = (voucherCode: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    let updated: string[];
-    if (savedVouchers.includes(voucherCode)) {
-      updated = savedVouchers.filter(code => code !== voucherCode);
-      triggerToast(`Đã hủy lưu mã ${voucherCode}`, 'info');
-    } else {
-      updated = [...savedVouchers, voucherCode];
-      navigator.clipboard?.writeText(voucherCode);
-      triggerToast(`Lưu mã ưu đãi ${voucherCode} thành công! Đã sao chép mã.`, 'success');
-    }
-    setSavedVouchers(updated);
-    localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
+    const coupon = couponList.find((c: any) => c.code === voucherCode);
+    if (coupon) wallet.toggle(coupon);
   };
 
   const vouchers = useMemo(() => {
@@ -243,18 +238,17 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         return pSeller && sId && pSeller === sId;
       }).slice(0, 3);
 
-      const thumbnails = shopProds.map((p: any) => p.images?.[0] || p.thumbnail || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=150');
-      while (thumbnails.length < 3) {
-        thumbnails.push('https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=150');
-      }
+      // Chỉ ảnh sản phẩm thật của shop; shop ít sản phẩm thì hiện ít ảnh, không lấp bằng ảnh mẫu.
+      const thumbnails = shopProds.map((p: any) => p.images?.[0] || p.thumbnail).filter(Boolean);
+      const productCount = Number(shop.listing_count ?? shop.listingCount) || 0;
 
       return {
         id: targetShop,
         shopId: sId,
         slug: sSlug,
         name: shop.shop_name || shop.name || shop.shopName || 'Gian hàng',
-        caption: `Đã thêm ${shop.listing_count || shop.listingCount || (shopProds.length > 0 ? shopProds.length : 1)} sản phẩm mới`,
-        image: shop.logo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200',
+        caption: productCount > 0 ? `${productCount.toLocaleString('vi-VN')} sản phẩm` : 'Chưa có sản phẩm',
+        image: shop.logo || '/placeholder-shop.svg',
         thumbnails
       };
     });
@@ -553,7 +547,7 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
                 return (
                   <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`, { state: { initialProduct: p } })}>
                     <div className="card-media">
-                      <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} />
+                      <img src={p.images?.[0] || '/image-not-found.jpg'} alt={p.title} />
                       {isFlashSale && (
                         <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 3 }}>
                           <span className="flash-sale-badge">
@@ -779,9 +773,9 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
                     gap: 6,
                     cursor: 'pointer'
                   }}
-                  title={`Xem bộ sưu tập mới của ${shop.name}`}
+                  title={`Xem gian hàng ${shop.name}`}
                 >
-                  <span>Xem bộ sưu tập mới</span>
+                  <span>Xem gian hàng</span>
                   <ArrowRight size={12} />
                 </button>
               </div>
@@ -796,26 +790,25 @@ export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => v
         <div className="section-head" style={{ marginBottom: 16 }}>
           <h2 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033' }}>Khám phá các phong cách mới</h2>
         </div>
+        {styleCategories.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#888' }}>Chưa có danh mục nào đang bán.</p>
+        ) : (
         <div className="buyer-grid-3 buyer-scroll-row">
-          <div className="style-card text-card-1" onClick={() => navigate('/')}>
-            <img src="https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=400" alt="Vẻ Đẹp Đương Đại" />
-            <div className="style-overlay">
-              <h3>Vẻ Đẹp Đương Đại</h3>
+          {styleCategories.map((cat, i) => (
+            <div
+              key={cat._id}
+              className={`style-card text-card-${(i % 3) + 1}`}
+              onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
+              title={`${cat.product_count} sản phẩm`}
+            >
+              <img src={cat.cover_image || '/image-not-found.jpg'} alt={cat.name} loading="lazy" />
+              <div className="style-overlay">
+                <h3>{cat.name}</h3>
+              </div>
             </div>
-          </div>
-          <div className="style-card text-card-2" onClick={() => navigate('/')}>
-            <img src="https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=400" alt="Góc Làm Việc Tối Giản" />
-            <div className="style-overlay">
-              <h3>Góc Làm Việc Tối Giản</h3>
-            </div>
-          </div>
-          <div className="style-card text-card-3" onClick={() => navigate('/')}>
-            <img src="https://images.unsplash.com/photo-1608156639585-b3a032ef9689?auto=format&fit=crop&w=400" alt="Nghệ Thuật Đường Phố" />
-            <div className="style-overlay">
-              <h3>Nghệ Thuật Đường Phố</h3>
-            </div>
-          </div>
+          ))}
         </div>
+        )}
       </section>
     </div>
   );

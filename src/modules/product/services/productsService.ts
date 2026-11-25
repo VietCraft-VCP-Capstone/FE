@@ -89,6 +89,12 @@ export const productsService = {
     }
   },
 
+  /** Như `search` nhưng ném lỗi khi API lỗi, để trang hiện "thử lại" thay vì giả như không có sản phẩm. */
+  searchStrict: async (params: Record<string, any>): Promise<PaginatedProductsResult> => {
+    const res = await api.get('/products/search', { params });
+    return toPaginated(res.data);
+  },
+
   trackSearchClick: (logId: string, productId: string, position: number): void => {
     api.post('/products/search/click', { logId, productId, position }).catch(() => {});
   },

@@ -4,7 +4,7 @@ import { productsService } from '../../product/services/productsService';
 import api from '../../../infrastructure/api/interceptors';
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
-const DEFAULT_IMG = 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400';
+const DEFAULT_IMG = '/image-not-found.jpg';
 
 const absImg = (u: any): string => {
   if (!u || typeof u !== 'string') return '';

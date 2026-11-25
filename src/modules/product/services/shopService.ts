@@ -18,6 +18,7 @@ export interface ShopDetail {
   ratingCount: number;
   listingCount: number;
   followersCount: number;
+  returnPolicy?: string;
   isFollowing: boolean;
   reputation_score?: number;
   reputation_tier?: string;

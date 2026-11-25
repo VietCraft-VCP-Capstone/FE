@@ -10,7 +10,7 @@ export interface Deal {
   couponTitle?: string;
 }
 
-const FALLBACK_IMG = 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300';
+const FALLBACK_IMG = '/image-not-found.jpg';
 
 const num = (v: any) => parseFloat(typeof v === 'object' && v?.$numberDecimal ? v.$numberDecimal : v || 0);
 const idOf = (v: any): string | null => (typeof v === 'string' ? v : v?._id?.toString() || v?.id?.toString() || null);

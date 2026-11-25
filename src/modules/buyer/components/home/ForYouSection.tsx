@@ -7,7 +7,7 @@ import { isLoggedIn } from '../../../../infrastructure/api/interceptors';
 import { getRecentSearches } from '../search/recentSearchStorage';
 
 const LIMIT = 8;
-const FALLBACK_IMG = 'https://images.unsplash.com/photo-1603006905393-c910e859b89f?auto=format&fit=crop&w=300';
+const FALLBACK_IMG = '/image-not-found.jpg';
 
 const BADGE_POS = { position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', zIndex: 3 } as const;
 const PCT_STYLE = { backgroundColor: 'rgba(0, 0, 0, 0.75)', color: '#fef08a', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, backdropFilter: 'blur(4px)' };

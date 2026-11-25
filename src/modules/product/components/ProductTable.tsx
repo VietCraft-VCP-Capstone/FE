@@ -73,15 +73,9 @@ export function ProductTable({
   };
 
   const renderSparkline = (data?: number[], index: number = 0) => {
-    const trendPresets = [
-      [15, 25, 35, 45, 55, 70, 85],
-      [40, 38, 45, 55, 65, 75, 90],
-      [35, 32, 38, 42, 40, 48, 52],
-      [50, 48, 52, 58, 62, 68, 75],
-      [20, 22, 28, 30, 32, 35, 40],
-    ];
-    const fallback = trendPresets[index % trendPresets.length];
-    const chartData = data && data.length >= 2 ? data : fallback;
+    // Chỉ vẽ dữ liệu tương tác thật từ backend; không có thì để đường phẳng 0 (không tự bịa xu hướng).
+    void index;
+    const chartData = data && data.length >= 2 ? data : [0, 0, 0, 0, 0, 0, 0];
 
     const startVal = chartData[0];
     const endVal = chartData[chartData.length - 1];

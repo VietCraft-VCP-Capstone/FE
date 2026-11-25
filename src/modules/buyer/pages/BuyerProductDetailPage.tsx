@@ -12,6 +12,8 @@ import { promotionService, CouponDTO } from '../../promotion/services/promotionS
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 import { getSessionId, recordProductViewEvent } from '../services/eventService';
 import { getRecentSearches } from '../components/search/recentSearchStorage';
+import { useAuth } from '../../auth/hooks/useAuth';
+import { useVoucherWallet } from '../../promotion/hooks/useVoucherWallet';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Variant { id: string; name: string; color?: string; size?: string; material?: string; price: number; stock: number; mockupImage?: string; }
@@ -22,7 +24,13 @@ interface Product {
   /** 'SKU' = phân loại theo mẫu (set/lẻ/combo): nhóm `color` hiện thành "Mẫu" có ảnh nhỏ. */
   variantMode?: 'SKU';
   colors?: Array<{ name: string; hex: string }>;
-  shopInfo?: { id: string; name: string; logo?: string; rating: number; ratingCount?: number };
+  shopInfo?: { id: string; name: string; logo?: string; rating: number; ratingCount?: number; returnPolicy?: string };
+  stock?: number;
+  status?: string;
+  /** Số ngày khách được gửi yêu cầu đổi trả sau khi nhận hàng — chính sách của sàn, BE trả về. */
+  returnWindowDays?: number;
+  /** Người đang xem là chủ gian hàng bán sản phẩm này (BE tính theo phiên đăng nhập). */
+  isOwner?: boolean;
   rating?: number;
   reviews_count?: number;
   reviews?: Array<{ id: string; name: string; date: string; rating: number; avatar?: string; text: string; images?: string[] }>;
@@ -96,6 +104,8 @@ const suggestionsDetailCache = new Map<string, any[]>();
 
 export function BuyerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
   const navigate = useNavigate();
   const location = useLocation();
   const initialProduct = (location.state as any)?.initialProduct;
@@ -138,13 +148,6 @@ export function BuyerProductDetailPage() {
   const [isFav, setIsFav] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
   const [availableCoupons, setAvailableCoupons] = useState<CouponDTO[]>([]);
-  const [savedVouchers, setSavedVouchers] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('vietcraft_saved_vouchers') || '[]');
-    } catch {
-      return [];
-    }
-  });
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
@@ -157,18 +160,12 @@ export function BuyerProductDetailPage() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  const wallet = useVoucherWallet((msg, type) => triggerToast(msg, type === 'success' ? 'success' : 'info'));
+  const savedVouchers = wallet.savedCodes;
   const handleSaveVoucher = (code: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    let updated: string[];
-    if (savedVouchers.includes(code)) {
-      updated = savedVouchers.filter(c => c !== code);
-      triggerToast(`Đã bỏ lưu mã ${code}`, 'info');
-    } else {
-      updated = [...savedVouchers, code];
-      triggerToast(`Đã lưu mã ${code}! Mã sẽ tự động gợi ý khi thanh toán.`, 'success');
-    }
-    setSavedVouchers(updated);
-    localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
+    const coupon = availableCoupons.find((c: any) => c.code === code);
+    if (coupon) wallet.toggle(coupon as any);
   };
 
   useEffect(() => {
@@ -202,7 +199,7 @@ export function BuyerProductDetailPage() {
         } else {
           setReviewCount(items.length);
           if (items.length > 0) {
-            const sum = items.reduce((acc: number, cur: any) => acc + (Number(cur.rating) || 5), 0);
+            const sum = items.reduce((acc: number, cur: any) => acc + (Number(cur.rating) || 0), 0);
             setAvgRating(sum / items.length);
           }
         }
@@ -290,12 +287,7 @@ export function BuyerProductDetailPage() {
     } else {
       favoritesService.getFavoriteIds()
         .then((ids) => setIsFav(ids.includes(id!)))
-        .catch(() => {
-          try {
-            const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
-            setIsFav(favs.includes(id!));
-          } catch { }
-        });
+        .catch(() => setIsFav(false));
     }
   }, [id]);
 
@@ -444,7 +436,7 @@ export function BuyerProductDetailPage() {
     });
 
     if (flashSale) {
-      return { type: 'FLASH_SALE' as const, coupon: flashSale, discountVal: parseVal(flashSale.discount_value) };
+      return { type: 'FLASH_SALE' as const, coupon: flashSale, discountVal: parseVal(flashSale.discount_value), maxDiscount: parseVal((flashSale as any).max_discount_amount) };
     }
 
     return null;
@@ -461,9 +453,12 @@ export function BuyerProductDetailPage() {
     const val = activePromotion.discountVal;
     isFlashSale = true;
     if (val <= 100) {
-      // val là % giảm
-      finalPrice = Math.round(basePrice * (1 - val / 100));
-      discountPct = Math.round(val);
+      // val là % giảm, có trần max_discount_amount — cùng công thức calcCouponDiscount ở BE để giá hiển thị = giá thanh toán
+      let off = basePrice * (val / 100);
+      if (activePromotion.maxDiscount > 0) off = Math.min(off, activePromotion.maxDiscount);
+      off = Math.min(Math.round(off), basePrice);
+      finalPrice = basePrice - off;
+      discountPct = Math.round((off / basePrice) * 100);
       discountBadgeText = `-${discountPct}%`;
     } else {
       // val là số tiền giảm (VNĐ)
@@ -474,6 +469,14 @@ export function BuyerProductDetailPage() {
   }
 
   const hasDiscount = strikePrice > finalPrice;
+  // Tồn kho thật: theo phân loại đang chọn, hoặc tổng tồn của sản phẩm khi không có phân loại.
+  const availableStock = activeVariant ? activeVariant.stock : Number(product?.stock) || 0;
+  const discontinued = product?.status === 'INACTIVE';
+  const outOfStock = discontinued || availableStock <= 0;
+  // Đổi phân loại có tồn ít hơn số lượng đang chọn thì kéo số lượng về mức còn hàng.
+  useEffect(() => {
+    setQty(q => Math.max(1, Math.min(q, availableStock || 1)));
+  }, [availableStock]);
   const displayPrice = finalPrice;
 
   // Danh sách voucher áp dụng được cho sản phẩm hoặc shop này
@@ -498,11 +501,7 @@ export function BuyerProductDetailPage() {
 
 
   // Images list
-  const images = product?.images?.length ? product.images : [
-    'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600',
-    'https://images.unsplash.com/photo-1556821840-3a63f15732ce?auto=format&fit=crop&w=600',
-    'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?auto=format&fit=crop&w=600',
-  ];
+  const images = product?.images?.length ? product.images : ['/image-not-found.jpg'];
 
   // ── Validation chọn phân loại ───────────────────────────────────────────────
   const validateVariantSelection = (): boolean => {
@@ -559,7 +558,7 @@ export function BuyerProductDetailPage() {
     }
 
     const targetVariantId = activeVariant?.id || (activeVariant as any)?._id || selectedVariant?.id || (selectedVariant as any)?._id;
-    const currentImg = (product.images && product.images[selectedImage]) || (product.variants && selectedVariant?.mockupImage) || (product as any)?.thumbnail || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600';
+    const currentImg = (product.images && product.images[selectedImage]) || (product.variants && selectedVariant?.mockupImage) || (product as any)?.thumbnail || '';
     const variantName = [selectedColor, selectedSize, selectedMaterial].filter(Boolean).join(' - ') || activeVariant?.name || 'Tiêu chuẩn';
 
     const checkoutItem = {
@@ -584,8 +583,9 @@ export function BuyerProductDetailPage() {
         quantity: qty,
         customNotes: customText || undefined
       });
-    } catch (e) {
-      console.warn('Sync buy-now item into cart background:', e);
+    } catch (err) {
+      triggerToast(getApiErrorMessage(err, 'Không thể mua sản phẩm này lúc này, vui lòng thử lại.'), 'info');
+      return;
     }
 
     localStorage.setItem('vietcraft_checkout', JSON.stringify([checkoutItem]));
@@ -616,7 +616,7 @@ export function BuyerProductDetailPage() {
     if (!product) return;
     // Yêu thích cần tài khoản: đưa khách sang /login thay vì gọi API rồi dính 401.
     if (!isLoggedIn()) {
-      navigate('/login');
+      navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
     try {
@@ -624,15 +624,8 @@ export function BuyerProductDetailPage() {
       setIsFav(res.isFavorite);
       triggerToast(res.isFavorite ? 'Đã thêm vào yêu thích!' : 'Đã xóa khỏi yêu thích', res.isFavorite ? 'success' : 'info');
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
-    } catch {
-      // Fallback: toggle locally
-      try {
-        const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
-        const next = isFav ? favs.filter(i => i !== product.id) : [...favs, product.id];
-        localStorage.setItem('vietcraft_favorites', JSON.stringify(next));
-        setIsFav(!isFav);
-        window.dispatchEvent(new CustomEvent('wishlist-updated'));
-      } catch { }
+    } catch (err) {
+      triggerToast(getApiErrorMessage(err, 'Không thể cập nhật danh sách yêu thích, vui lòng thử lại.'), 'info');
     }
   };
 
@@ -766,8 +759,8 @@ export function BuyerProductDetailPage() {
 
             {/* Tags (category) */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-              <span style={S.tag('#fff', '#008000')}>{product.category}</span>
-              {product.tags.map((t, i) => (
+              {product.category && <span style={S.tag('#fff', '#008000')}>{product.category}</span>}
+              {(product.tags || []).map((t, i) => (
                 <span key={i} style={S.tag('#555', '#f0f0f0')}>{t}</span>
               ))}
             </div>
@@ -960,24 +953,41 @@ export function BuyerProductDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #ddd', borderRadius: 8, overflow: 'hidden' }}>
                 <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>−</button>
                 <span style={{ width: 36, textAlign: 'center', fontWeight: 700 }}>{qty}</span>
-                <button onClick={() => setQty(q => Math.max(1, Math.min(99, activeVariant?.stock ?? 99, q + 1)))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>+</button>
+                <button disabled={outOfStock || qty >= availableStock} onClick={() => setQty(q => Math.max(1, Math.min(availableStock, q + 1)))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>+</button>
               </div>
-              <span style={{ fontSize: 12, color: '#888' }}>Còn {activeVariant?.stock ?? 100} sản phẩm</span>
+              <span style={{ fontSize: 12, color: outOfStock ? '#dc2626' : '#888', fontWeight: outOfStock ? 700 : 400 }}>
+                {discontinued ? 'Sản phẩm đã ngừng bán' : outOfStock ? 'Hết hàng' : `Còn ${availableStock.toLocaleString('vi-VN')} sản phẩm`}
+              </span>
             </div>
 
             {/* Action Buttons */}
-            {/* Dưới 1024px: Chat và Thêm giỏ ở hàng trên, Mua ngay rộng hết dòng ở hàng dưới. */}
+            {product.isOwner ? (
+              <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+                <p className="m-0 font-bold text-emerald-900">Đây là sản phẩm của gian hàng bạn</p>
+                <p className="mt-1 mb-3 text-emerald-800/80">Người bán không thể tự mua hoặc tự chat với sản phẩm của mình.</p>
+                <button type="button" onClick={() => navigate('/seller/products')} style={S.btnFill}>
+                  <Store size={18} /> Quản lý sản phẩm
+                </button>
+              </div>
+            ) : isAdmin ? (
+              <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">
+                Tài khoản quản trị chỉ xem sản phẩm, không mua hàng.
+              </div>
+            ) : (
+            // Dưới 1024px: Chat và Thêm giỏ ở hàng trên, Mua ngay rộng hết dòng ở hàng dưới.
             <div className="mt-6 flex flex-wrap gap-2.5">
               <button className="flex-1 sm:flex-initial" style={S.btnChat} onClick={handleChatWithSeller} title="Chat với người bán">
                 <MessageCircle size={18} /> Chat ngay
               </button>
-              <button className="flex-1" style={S.btnOutline} onClick={addToCart}>
+              <button className="flex-1" disabled={outOfStock} style={{ ...S.btnOutline, ...(outOfStock ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} onClick={addToCart}>
                 <ShoppingCart size={18} /> Thêm vào giỏ
               </button>
-              <button className="w-full basis-full lg:w-auto lg:basis-auto lg:flex-1" style={{ ...S.btnFill, flex: undefined }} onClick={buyNow}>
+              <button className="w-full basis-full lg:w-auto lg:basis-auto lg:flex-1" disabled={outOfStock} style={{ ...S.btnFill, flex: undefined, ...(outOfStock ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} onClick={buyNow}>
                 <Zap size={18} /> Mua ngay
               </button>
             </div>
+
+            )}
 
             {/* Delivery accordion */}
             <div style={S.accordion}>
@@ -987,20 +997,25 @@ export function BuyerProductDetailPage() {
               </div>
               {descOpen && (
                 <div style={S.accordionBody}>
-                  {product.description || 'Sản phẩm chất lượng cao, được làm thủ công từ nguyên liệu tự nhiên. Phù hợp làm quà tặng hoặc dùng cá nhân.'}
+                  {product.description?.trim()
+                    ? <span style={{ whiteSpace: 'pre-line' }}>{product.description}</span>
+                    : <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Người bán chưa cập nhật mô tả cho sản phẩm này.</span>}
                 </div>
               )}
             </div>
             <div style={S.accordion}>
               <div style={S.accordionHead} onClick={() => setShippingOpen(o => !o)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Shield size={15} color="#008000" /> Hướng dẫn bảo quản & đổi trả</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Shield size={15} color="#008000" /> Chính sách đổi trả</span>
                 {shippingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </div>
               {shippingOpen && (
                 <div style={S.accordionBody}>
-                  <p style={{ margin: '0 0 6px' }}>• Giặt tay hoặc máy ở 30°C, không tẩy.</p>
-                  <p style={{ margin: '0 0 6px' }}>• Phơi bóng râm, tránh ánh nắng trực tiếp.</p>
-                  <p style={{ margin: '0 0 6px' }}>• Đổi trả trong 7 ngày nếu sản phẩm lỗi do nhà sản xuất.</p>
+                  {product.returnWindowDays ? (
+                    <p style={{ margin: '0 0 6px' }}>• Gửi yêu cầu đổi trả trong {product.returnWindowDays} ngày kể từ khi nhận hàng, tại trang Đơn hàng của tôi.</p>
+                  ) : null}
+                  {product.shopInfo?.returnPolicy?.trim() ? (
+                    <p style={{ margin: '0 0 6px', whiteSpace: 'pre-line' }}>• Chính sách của shop: {product.shopInfo.returnPolicy}</p>
+                  ) : null}
                   <p style={{ margin: 0 }}>• Liên hệ shop qua chat để được hỗ trợ.</p>
                 </div>
               )}
@@ -1051,15 +1066,21 @@ export function BuyerProductDetailPage() {
             <div style={{ marginTop: 8 }}>
               {reviews.map((rv, idx) => {
                 const authorName = rv.name || rv.buyer?.name || 'Khách hàng ẩn danh';
-                const authorAvatar = rv.avatar || rv.buyer?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100';
+                const authorAvatar: string = rv.avatar || rv.buyer?.avatar || '';
                 const reviewDate = rv.date || (rv.createdAt ? new Date(rv.createdAt).toLocaleDateString('vi-VN') : '');
                 const reviewText = rv.text || rv.comment || '';
                 const reviewImages = Array.isArray(rv.images) ? rv.images : [];
-                const ratingVal = typeof rv.rating === 'number' ? rv.rating : 5;
+                const ratingVal = typeof rv.rating === 'number' ? rv.rating : 0;
 
                 return (
                   <div key={rv.id || rv._id || idx} style={S.reviewCard}>
-                    <img src={authorAvatar} alt={authorName} style={S.avatar} />
+                    {authorAvatar ? (
+                      <img src={authorAvatar} alt={authorName} style={S.avatar} />
+                    ) : (
+                      <div aria-hidden style={{ ...S.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#330033', color: '#fff', fontWeight: 700, fontSize: 14 }}>
+                        {authorName.trim().charAt(0).toUpperCase() || '?'}
+                      </div>
+                    )}
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                         <span style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{authorName}</span>
@@ -1092,7 +1113,7 @@ export function BuyerProductDetailPage() {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
                   onClick={() => navigate(`/product/${p.id}`)}>
-                  <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=300'} alt={p.title} style={S.cardImg} />
+                  <img src={p.images?.[0] || '/image-not-found.jpg'} alt={p.title} style={S.cardImg} />
                   <div style={S.cardInfo}>
                     <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 13, color: '#222', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
                     <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#008000' }}>{fmtPrice(p.price || 0)}</p>
@@ -1114,7 +1135,7 @@ export function BuyerProductDetailPage() {
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
                   onClick={() => navigate(`/product/${p.id}`)}>
                   <div style={{ position: 'relative' }}>
-                    <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} style={S.cardImg} />
+                    <img src={p.images?.[0] || '/image-not-found.jpg'} alt={p.title} style={S.cardImg} />
                   </div>
                   <div style={S.cardInfo}>
                     <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 13, color: '#222', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>

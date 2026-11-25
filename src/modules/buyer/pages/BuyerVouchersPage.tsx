@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { useToast } from '../../../shared/components/Toast';
+import { useVoucherWallet } from '../../promotion/hooks/useVoucherWallet';
 
 export function BuyerVouchersPage() {
   const navigate = useNavigate();
@@ -15,20 +16,10 @@ export function BuyerVouchersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'ALL' | 'PLATFORM' | 'SHOP' | 'FLASH_SALE' | 'FREESHIP' | 'SAVED'>('ALL');
-  const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
+  const wallet = useVoucherWallet((msg, type) => showToast(msg, type));
+  const savedVouchers = wallet.savedCodes;
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  // Load saved vouchers from localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('vietcraft_saved_vouchers');
-      if (stored) {
-        setSavedVouchers(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error('Failed to load saved vouchers', e);
-    }
-  }, []);
 
   const fetchCoupons = async () => {
     setLoading(true);
@@ -49,17 +40,8 @@ export function BuyerVouchersPage() {
 
   const toggleSaveVoucher = (code: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    let updated: string[];
-    if (savedVouchers.includes(code)) {
-      updated = savedVouchers.filter(c => c !== code);
-      showToast(`Đã hủy lưu mã ${code}`, 'info');
-    } else {
-      updated = [...savedVouchers, code];
-      navigator.clipboard?.writeText(code);
-      showToast(`Đã lưu và sao chép mã ${code} vào kho voucher!`, 'success');
-    }
-    setSavedVouchers(updated);
-    localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
+    const coupon = coupons.find((c: any) => c.code === code);
+    if (coupon) wallet.toggle(coupon);
   };
 
   const handleCopyCode = (code: string, e?: React.MouseEvent) => {

@@ -30,7 +30,7 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
     >
       <div className="card-media">
         <img
-          src={product.thumbnail || product.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400'}
+          src={product.thumbnail || product.images?.[0] || '/image-not-found.jpg'}
           alt={product.title}
           loading="lazy"
         />

@@ -7,7 +7,7 @@ import { SelectVariantModal } from '../components/SelectVariantModal';
 import api, { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
-const DEFAULT_FAV_IMG = 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400';
+const DEFAULT_FAV_IMG = '/image-not-found.jpg';
 
 const absImg = (u: any): string => {
   if (!u || typeof u !== 'string') return '';

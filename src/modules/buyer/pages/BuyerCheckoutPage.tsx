@@ -14,6 +14,7 @@ import { promotionService, CouponDTO, ApplyCouponResponse } from '../../promotio
 
 type CouponSlot = 'PRODUCT' | 'SHIPPING';
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { useVoucherWallet } from '../../promotion/hooks/useVoucherWallet';
 
 interface CheckoutItem {
     id?: string;
@@ -158,6 +159,7 @@ export function BuyerCheckoutPage() {
     const productDiscount = Math.min(applied.PRODUCT?.discount ?? 0, subtotal);
     const finalTotal = Math.max(0, subtotal - productDiscount + shippingFee - shippingDiscount);
 
+    const { savedCodes: walletCodes } = useVoucherWallet();
     const slotCoupons = availableCoupons.filter(c => (c.discount_type === 'FREE_SHIPPING') === (couponSlot === 'SHIPPING'));
 
     const hasPodItem = items.some(it => it.productType === 'POD_TEMPLATE');
@@ -757,9 +759,11 @@ export function BuyerCheckoutPage() {
 
                                 // Sắp xếp eligible theo ước lượng giảm giá cao nhất
                                 eligibleCoupons.sort((a, b) => estimateDiscount(b) - estimateDiscount(a));
-                                const sortedCoupons = [...eligibleCoupons, ...eligibleButNoDiscount, ...ineligibleCoupons];
-
                                 const bestCoupon = eligibleCoupons.length > 0 ? eligibleCoupons[0] : null;
+                                // Trong mỗi nhóm, mã đã lưu trong ví đứng trước (sort ổn định giữ thứ tự giảm giá).
+                                const savedFirst = (list: CouponDTO[]) => [...list].sort((a, b) => Number(walletCodes.includes(b.code)) - Number(walletCodes.includes(a.code)));
+                                const sortedCoupons = [...savedFirst(eligibleCoupons), ...savedFirst(eligibleButNoDiscount), ...savedFirst(ineligibleCoupons)];
+
                                 const bestDiscount = bestCoupon ? estimateDiscount(bestCoupon) : 0;
 
                                 return (
@@ -826,6 +830,9 @@ export function BuyerCheckoutPage() {
                                                         <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                                                             <Package size={10} /> {c.scope_message || 'SP chỉ định'}
                                                         </span>
+                                                    )}
+                                                    {walletCodes.includes(c.code) && (
+                                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Đã lưu</span>
                                                     )}
                                                     {isBest && (
                                                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border border-amber-300">

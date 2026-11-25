@@ -8,7 +8,7 @@ import { KeywordSuggestions } from './search/KeywordSuggestions';
 
 export const FALLBACK_KEYWORDS = ['Quà Tặng', 'Áo Đồng Phục', 'Áo Thun', 'Quà Sinh Nhật', 'Móc Khóa', 'Túi Tote', 'Áo Lớp', 'Áo Anime'];
 
-const SHOP_PLACEHOLDER = 'https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?auto=format&fit=crop&q=80&w=100';
+const SHOP_PLACEHOLDER = '/placeholder-shop.svg';
 const sectionTitle = 'mb-2 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-[#78716c]';
 
 interface SearchPopoverProps {
