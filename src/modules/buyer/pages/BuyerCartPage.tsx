@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Plus, Minus, Sparkles, Check, ArrowLeft } from 'lucide-react';
-import { productsService } from '../../product/services/productsService';
+import { Trash2, Plus, Minus, Sparkles, Check, ArrowLeft, Zap } from 'lucide-react';
+import { productsService, couponDiscount, type ProductDeal } from '../../product/services/productsService';
+import { useProductDeals } from '../hooks/useDealLookup';
 import { cartService } from '../../order/services/cartService';
-import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import api, { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 
 interface CartItem {
@@ -68,86 +68,15 @@ const parseMongooseDecimal = (val: any): number => {
     return isNaN(num) ? 0 : num;
 };
 
-const computeItemDiscount = (item: CartItem, coupons: CouponDTO[]) => {
-    const basePrice = item.price;
-    if (!coupons || coupons.length === 0 || basePrice <= 0) {
-        return { finalPrice: basePrice, strikePrice: 0, discountPct: 0, badgeText: '', isFlashSale: false };
-    }
-
-    const now = new Date();
-    const isActive = (c: CouponDTO) =>
-        c.is_active &&
-        new Date(c.start_date) <= now &&
-        new Date(c.end_date) >= now;
-
-    const parseVal = (raw: any) =>
-        typeof raw === 'object' && raw?.$numberDecimal
-            ? parseFloat(raw.$numberDecimal)
-            : parseFloat(raw || 0);
-
-    const getCouponShopId = (c: CouponDTO): string | null => {
-        const s: any = c.shop_id;
-        if (!s) return null;
-        return typeof s === 'object' ? (s._id || s.id)?.toString() || null : String(s);
-    };
-
-    // 1. Flash Sale: ưu tiên SPECIFIC_PRODUCTS trước, sau đó ALL (yêu cầu basePrice >= min_order_value nếu có)
-    const flashSale = coupons.find(c => {
-        if (!isActive(c) || c.discount_type !== 'FLASH_SALE') return false;
-        const minVal = parseVal(c.min_order_value);
-        if (minVal > 0 && basePrice < minVal) return false;
-        if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
-            return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === item.productId);
-        }
-        // Flash Sale toàn shop chỉ áp dụng cho sản phẩm của chính shop tạo ra nó
-        const couponShopId = getCouponShopId(c);
-        return !couponShopId || couponShopId === item.shopId;
-    });
-
-    if (flashSale) {
-        const val = parseVal(flashSale.discount_value);
-        let finalPrice = basePrice;
-        let discountPct = 0;
-        let badgeText = '';
-        if (val <= 100) {
-            finalPrice = Math.round(basePrice * (1 - val / 100));
-            discountPct = Math.round(val);
-            badgeText = `-${discountPct}%`;
-        } else {
-            finalPrice = Math.max(0, basePrice - val);
-            discountPct = Math.round((val / basePrice) * 100);
-            badgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
-        }
-        return { finalPrice, strikePrice: basePrice, discountPct, badgeText, isFlashSale: true };
-    }
-
-    // 2. Coupon chỉ định sản phẩm cụ thể (PERCENTAGE / FIXED_AMOUNT) đủ điều kiện đơn tối thiểu
-    const specificCoupon = coupons.find(c => {
-        if (!isActive(c) || c.discount_type === 'FLASH_SALE' || c.discount_type === 'FREE_SHIPPING') return false;
-        if (c.applicable_scope !== 'SPECIFIC_PRODUCTS') return false;
-        const minVal = parseVal(c.min_order_value);
-        if (minVal > 0 && basePrice < minVal) return false;
-        return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === item.productId);
-    });
-
-    if (specificCoupon) {
-        const val = parseVal(specificCoupon.discount_value);
-        let finalPrice = basePrice;
-        let discountPct = 0;
-        let badgeText = '';
-        if (specificCoupon.discount_type === 'PERCENTAGE') {
-            finalPrice = Math.round(basePrice * (1 - val / 100));
-            discountPct = Math.round(val);
-            badgeText = `-${discountPct}%`;
-        } else {
-            finalPrice = Math.max(0, basePrice - val);
-            discountPct = Math.round((val / basePrice) * 100);
-            badgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
-        }
-        return { finalPrice, strikePrice: basePrice, discountPct, badgeText, isFlashSale: false };
-    }
-
-    return { finalPrice: basePrice, strikePrice: 0, discountPct: 0, badgeText: '', isFlashSale: false };
+/**
+ * Gợi ý giá sau mã cho một dòng giỏ hàng, theo đúng giá phân loại trong giỏ (cùng công thức thanh toán).
+ * Chỉ là gợi ý: mã được chọn và trừ ở bước thanh toán, mỗi đơn một mã giảm tiền hàng.
+ */
+const unitDealPrice = (item: CartItem, deal?: ProductDeal) => {
+    if (!deal || item.price <= 0) return null;
+    if (deal.minOrder > 0 && item.price < deal.minOrder) return null;
+    const off = couponDiscount(deal.discountType, deal.discountValue, deal.maxDiscount, item.price);
+    return off > 0 ? { price: item.price - off, code: deal.couponCode, isFlash: deal.badge === 'FLASH_SALE' } : null;
 };
 
 const mapBackendCart = (cartData: any): CartItem[] => {
@@ -226,7 +155,6 @@ export function BuyerCartPage() {
     const navigate = useNavigate();
 
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
-    const [availableCoupons, setAvailableCoupons] = useState<CouponDTO[]>([]);
     const [recommendations, setRecommendations] = useState<any[]>([]);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -254,15 +182,6 @@ export function BuyerCartPage() {
 
         syncAndFetchCart();
 
-        const fetchCoupons = async () => {
-            try {
-                const data = await promotionService.getAll();
-                setAvailableCoupons(Array.isArray(data) ? data : []);
-            } catch (err) {
-                console.warn('Could not fetch coupons for cart:', err);
-            }
-        };
-        fetchCoupons();
 
         const fetchRecs = async () => {
             try {
@@ -343,14 +262,30 @@ export function BuyerCartPage() {
         }
     };
 
+    const productDeals = useProductDeals(cartItems.map((item: CartItem) => item.productId));
     const checkedItems = cartItems.filter((item: CartItem) => item.checked);
     const totalSelectedQty = checkedItems.reduce((acc: number, item: CartItem) => acc + item.quantity, 0);
-    const totalPrice = checkedItems.reduce((acc: number, item: CartItem) => {
-        const d = computeItemDiscount(item, availableCoupons);
-        return acc + (d.finalPrice * item.quantity);
-    }, 0);
-    const totalOriginalPrice = checkedItems.reduce((acc: number, item: CartItem) => acc + (item.price * item.quantity), 0);
-    const totalSaved = Math.max(0, totalOriginalPrice - totalPrice);
+    // Tổng tiền hàng thật — đúng số tiền bước thanh toán dùng trước khi áp mã.
+    const totalPrice = checkedItems.reduce((acc: number, item: CartItem) => acc + (item.price * item.quantity), 0);
+    // Mỗi đơn chỉ áp 1 mã giảm tiền hàng và mã trừ một lần trên phần tiền hàng đủ điều kiện:
+    // ước tính mức giảm của mã tốt nhất trong các sản phẩm đang chọn, không cộng dồn từng dòng.
+    const bestVoucherHint = (() => {
+        const byCoupon = new Map<string, { deal: ProductDeal; subtotal: number }>();
+        checkedItems.forEach((item: CartItem) => {
+            const d = productDeals.get(item.productId);
+            if (!d) return;
+            const row = byCoupon.get(d.couponId) || { deal: d, subtotal: 0 };
+            row.subtotal += item.price * item.quantity;
+            byCoupon.set(d.couponId, row);
+        });
+        let best: { code: string; saving: number } | null = null;
+        byCoupon.forEach(({ deal, subtotal }) => {
+            if (deal.minOrder > 0 && subtotal < deal.minOrder) return;
+            const saving = couponDiscount(deal.discountType, deal.discountValue, deal.maxDiscount, subtotal);
+            if (saving > 0 && (!best || saving > best.saving)) best = { code: deal.couponCode, saving };
+        });
+        return best as { code: string; saving: number } | null;
+    })();
     const allChecked = cartItems.length > 0 && cartItems.every((item: CartItem) => item.checked);
 
     const handleCheckout = () => {
@@ -391,9 +326,7 @@ export function BuyerCartPage() {
                         </div>
                     ) : (
                         cartItems.map((item: CartItem) => {
-                            const itemDiscount = computeItemDiscount(item, availableCoupons);
-                            const itemFinalPrice = itemDiscount.finalPrice;
-                            const hasDiscount = itemDiscount.strikePrice > itemDiscount.finalPrice;
+                            const dealHint = unitDealPrice(item, productDeals.get(item.productId));
 
                             return (
                                 <div key={item.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shadow-sm hover:shadow-md transition-shadow">
@@ -426,17 +359,15 @@ export function BuyerCartPage() {
                                     <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 pl-7 sm:pl-0 sm:pr-2">
                                         <div className="sm:text-right flex flex-col sm:items-end sm:min-w-[120px]">
                                             <span className="font-extrabold text-gray-900 text-lg leading-tight">
-                                                {(itemFinalPrice * item.quantity).toLocaleString('vi-VN')}đ
+                                                {(item.price * item.quantity).toLocaleString('vi-VN')}đ
                                             </span>
-                                            {hasDiscount && (
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <span className="text-xs text-gray-400 line-through">
-                                                        {(item.price * item.quantity).toLocaleString('vi-VN')}đ
-                                                    </span>
-                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200 whitespace-nowrap">
-                                                        {itemDiscount.isFlashSale ? '⚡ ' : ''}{itemDiscount.badgeText}
-                                                    </span>
-                                                </div>
+                                            {item.quantity > 1 && (
+                                                <span className="text-[11px] text-gray-400 mt-0.5">{item.price.toLocaleString('vi-VN')}đ / sản phẩm</span>
+                                            )}
+                                            {dealHint && (
+                                                <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 whitespace-nowrap">
+                                                    <Zap size={11} /> Còn {dealHint.price.toLocaleString('vi-VN')}đ với mã {dealHint.code}
+                                                </span>
                                             )}
                                         </div>
 
@@ -536,15 +467,17 @@ export function BuyerCartPage() {
                         <div className="flex items-center gap-3 sm:gap-6">
                             <div className="text-right">
                                 <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end sm:gap-2">
-                                    <span className="text-xs sm:text-sm text-gray-500 font-medium">Tổng thanh toán ({totalSelectedQty} sản phẩm):</span>
+                                    <span className="text-xs sm:text-sm text-gray-500 font-medium">Tổng tiền hàng ({totalSelectedQty} sản phẩm):</span>
                                     <span className="text-lg sm:text-xl font-black text-[#10b981]">
                                         {totalPrice.toLocaleString('vi-VN')}đ
                                     </span>
                                 </div>
-                                {totalSaved > 0 && (
+                                {bestVoucherHint ? (
                                     <p className="text-xs text-rose-600 font-bold mt-0.5">
-                                        Tiết kiệm {totalSaved.toLocaleString('vi-VN')}đ
+                                        Giảm đến {bestVoucherHint.saving.toLocaleString('vi-VN')}đ với mã {bestVoucherHint.code} ở bước thanh toán
                                     </p>
+                                ) : (
+                                    <p className="text-[11px] text-gray-400 mt-0.5">Chưa gồm phí vận chuyển và mã giảm giá</p>
                                 )}
                             </div>
                             <button

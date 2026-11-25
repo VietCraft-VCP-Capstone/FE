@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Star, ShoppingCart, Zap,
-  ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store, MessageCircle, Ticket
+  ChevronDown, ChevronUp, Shield, CheckCircle2, Info, Store, MessageCircle, Ticket, FileText
 } from 'lucide-react';
-import { productsService } from '../../product/services/productsService';
+import { productsService, couponDiscount, type ProductDeal } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { reviewService } from '../../product/services/reviewService';
 import { cartService } from '../../order/services/cartService';
@@ -143,11 +143,11 @@ export function BuyerProductDetailPage() {
   const [hasPickedVariant, setHasPickedVariant] = useState(false);
   const [customText, setCustomText] = useState('');
   const [qty, setQty] = useState(1);
-  const [descOpen, setDescOpen] = useState(true);
-  const [shippingOpen, setShippingOpen] = useState(false);
+  const [descOpen, setDescOpen] = useState(false);
   const [isFav, setIsFav] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
   const [availableCoupons, setAvailableCoupons] = useState<CouponDTO[]>([]);
+  const [productDeal, setProductDeal] = useState<ProductDeal | null>(null);
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
@@ -177,6 +177,9 @@ export function BuyerProductDetailPage() {
   // ── Load product ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
+
+    setProductDeal(null);
+    productsService.lookupDeals([id]).then((m) => setProductDeal(m[id] || null));
 
     // Load real reviews from API
     setIsLoadingReviews(true);
@@ -387,97 +390,41 @@ export function BuyerProductDetailPage() {
     return min < max ? { min, max } : null;
   }, [product?.variants]);
 
-  // Active promotion: CHỈ áp dụng Flash Sale trực tiếp nếu đủ điều kiện đơn tối thiểu
-  const activePromotion = useMemo(() => {
-    if (!id || !availableCoupons.length || basePrice <= 0) return null;
-    const now = new Date();
-
-    const isActive = (c: any) => {
-      if (!c.is_active) return false;
-      if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
-      return true;
+  // Giá tốt với mã: BE chọn mã tiết kiệm nhất (cùng nguồn với trang chủ / tìm kiếm). Trang này chỉ tính
+  // lại số tiền theo đúng phân loại khách đang chọn, bằng công thức thanh toán.
+  const variantDeal = useMemo(() => {
+    if (!productDeal || basePrice <= 0) return null;
+    if (productDeal.minOrder > 0 && basePrice < productDeal.minOrder) return null;
+    const off = couponDiscount(productDeal.discountType, productDeal.discountValue, productDeal.maxDiscount, basePrice);
+    if (off <= 0) return null;
+    const percent = productDeal.discountType === 'PERCENTAGE'
+      || ((productDeal.discountType === 'FLASH_SALE' || productDeal.discountType === 'BUNDLE') && productDeal.discountValue <= 100);
+    return {
+      code: productDeal.couponCode,
+      isFlash: productDeal.badge === 'FLASH_SALE',
+      finalPrice: basePrice - off,
+      label: percent ? `-${Math.max(1, Math.round((off / basePrice) * 100))}%` : off >= 1000 ? `-${Math.round(off / 1000)}K` : `-${off}đ`,
     };
+  }, [productDeal, basePrice]);
 
-    const getShopId = (obj: any): string | null => {
-      if (!obj) return null;
-      if (typeof obj === 'string') return obj;
-      if (typeof obj === 'object') {
-        return obj._id?.toString() || obj.id?.toString() || null;
-      }
-      return null;
-    };
-
-    const pAny = product as any;
-    const currentProductShopId = getShopId(pAny?.shopInfo?.id) || getShopId(pAny?.shop_id) || getShopId(pAny?.sellerId);
-
-    const appliesToProduct = (c: any): boolean => {
-      if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
-        return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
-      }
-      if (c.applicable_scope === 'ALL') {
-        const cShopId = getShopId(c.shop_id);
-        if (cShopId) return currentProductShopId === cShopId;
-        return true; // platform-wide
-      }
-      return false;
-    };
-
-    const parseVal = (raw: any) =>
-      typeof raw === 'object' && raw?.$numberDecimal
-        ? parseFloat(raw.$numberDecimal)
-        : parseFloat(raw || 0);
-
-    // Chỉ áp dụng Flash Sale trực tiếp vào giá sản phẩm nếu đạt đơn tối thiểu
-    const flashSale = availableCoupons.find(c => {
-      if (!isActive(c) || c.discount_type !== 'FLASH_SALE' || !appliesToProduct(c)) return false;
-      const minVal = parseVal(c.min_order_value);
-      if (minVal > 0 && basePrice < minVal) return false;
-      return true;
-    });
-
-    if (flashSale) {
-      return { type: 'FLASH_SALE' as const, coupon: flashSale, discountVal: parseVal(flashSale.discount_value), maxDiscount: parseVal((flashSale as any).max_discount_amount) };
-    }
-
-    return null;
-  }, [id, availableCoupons, product, basePrice]);
-
-  let finalPrice = basePrice;
-  let strikePrice = 0;
-  let discountPct = 0;
-  let discountBadgeText = '';
-  let isFlashSale = false;
-
-  if (activePromotion) {
-    strikePrice = basePrice;
-    const val = activePromotion.discountVal;
-    isFlashSale = true;
-    if (val <= 100) {
-      // val là % giảm, có trần max_discount_amount — cùng công thức calcCouponDiscount ở BE để giá hiển thị = giá thanh toán
-      let off = basePrice * (val / 100);
-      if (activePromotion.maxDiscount > 0) off = Math.min(off, activePromotion.maxDiscount);
-      off = Math.min(Math.round(off), basePrice);
-      finalPrice = basePrice - off;
-      discountPct = Math.round((off / basePrice) * 100);
-      discountBadgeText = `-${discountPct}%`;
-    } else {
-      // val là số tiền giảm (VNĐ)
-      finalPrice = Math.max(0, basePrice - val);
-      discountPct = Math.round((val / basePrice) * 100);
-      discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
-    }
-  }
+  const finalPrice = variantDeal ? variantDeal.finalPrice : basePrice;
+  const strikePrice = variantDeal ? basePrice : 0;
+  const discountBadgeText = variantDeal?.label || '';
 
   const hasDiscount = strikePrice > finalPrice;
+  // Giá gốc người bán khai (gạch ngang), khác với flash sale là mã phải nhập khi thanh toán.
+  const listOriginal = Number((activeVariant as any)?.originalPrice ?? product?.originalPrice) || 0;
   // Tồn kho thật: theo phân loại đang chọn, hoặc tổng tồn của sản phẩm khi không có phân loại.
   const availableStock = activeVariant ? activeVariant.stock : Number(product?.stock) || 0;
   const discontinued = product?.status === 'INACTIVE';
   const outOfStock = discontinued || availableStock <= 0;
+  // Mô tả dài thì thu gọn kèm "Xem thêm", ngắn thì hiện hết.
+  const descLong = (product?.description || '').length > 600 || (product?.description || '').split('\n').length > 14;
   // Đổi phân loại có tồn ít hơn số lượng đang chọn thì kéo số lượng về mức còn hàng.
   useEffect(() => {
     setQty(q => Math.max(1, Math.min(q, availableStock || 1)));
   }, [availableStock]);
-  const displayPrice = finalPrice;
+  const displayPrice = basePrice;
 
   // Danh sách voucher áp dụng được cho sản phẩm hoặc shop này
   const productVouchers = useMemo(() => {
@@ -630,13 +577,16 @@ export function BuyerProductDetailPage() {
   };
 
   // ── Styles ────────────────────────────────────────────────────────────────────
+  const ACTION_BTN: React.CSSProperties = { height: 48, padding: '0 12px', fontSize: 13.5, whiteSpace: 'nowrap', flex: 'none', width: '100%', boxSizing: 'border-box', minWidth: 0 };
+  const DISABLED_BTN: React.CSSProperties = { opacity: 0.5, cursor: 'not-allowed' };
+
   const S = {
     page: { fontFamily: "'Epilogue Variable', system-ui, sans-serif", background: '#fcfcfc', minHeight: '100vh' } as React.CSSProperties,
-    container: { maxWidth: 1100, margin: '0 auto', padding: '24px 20px' } as React.CSSProperties,
+    container: { maxWidth: 1200, margin: '0 auto', padding: '24px 20px' } as React.CSSProperties,
     backBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, fontWeight: 600, marginBottom: 20, padding: '6px 0' } as React.CSSProperties,
     mainImg: { width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 12, background: '#f0f0f0', display: 'block' } as React.CSSProperties,
-    thumbRail: { display: 'flex', gap: 8, marginTop: 12 } as React.CSSProperties,
-    thumb: (active: boolean) => ({ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: active ? '2px solid #008000' : '2px solid transparent', flexShrink: 0 } as React.CSSProperties),
+    thumbRail: { display: 'flex', gap: 8, marginTop: 12, overflowX: 'auto', paddingBottom: 4 } as React.CSSProperties,
+    thumb: (active: boolean) => ({ width: 68, height: 68, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: active ? '2px solid #008000' : '1px solid #e7e5e4', opacity: active ? 1 : 0.85, flexShrink: 0, display: 'block', background: '#f5f5f4' } as React.CSSProperties),
     tag: (color: string, bg: string) => ({ display: 'inline-block', padding: '2px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, color, background: bg } as React.CSSProperties),
     shopRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 } as React.CSSProperties,
     price: { fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 24, fontWeight: 600, color: '#008000', lineHeight: 1.15 } as React.CSSProperties,
@@ -711,9 +661,9 @@ export function BuyerProductDetailPage() {
 
         {/* ── Top: Gallery + Info ────────────────────────────────────────────── */}
         {/* Điện thoại và máy tính bảng: ảnh nằm trên thông tin; từ 768px hai cột. */}
-        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 md:gap-9">
-          {/* Gallery */}
-          <div>
+        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:gap-10">
+          {/* Gallery: dính theo khi cuộn để cột trái không bỏ trống lúc phần thông tin dài */}
+          <div className="md:sticky md:top-24">
             <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }}>
               <img src={images[selectedImage]} alt={product.title} style={S.mainImg} />
               <button
@@ -727,8 +677,10 @@ export function BuyerProductDetailPage() {
               </button>
             </div>
             <div style={S.thumbRail}>
-              {images.slice(0, 4).map((img, i) => (
-                <img key={i} src={img} alt={`thumb-${i}`} style={S.thumb(selectedImage === i)} onClick={() => setSelectedImage(i)} />
+              {images.length > 1 && images.map((img, i) => (
+                <button key={i} type="button" onClick={() => setSelectedImage(i)} aria-label={`Ảnh ${i + 1}`} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                  <img src={img} alt="" loading="lazy" style={S.thumb(selectedImage === i)} />
+                </button>
               ))}
             </div>
           </div>
@@ -765,34 +717,35 @@ export function BuyerProductDetailPage() {
               ))}
             </div>
 
-            {/* Price: chưa chọn mẫu thì hiện khoảng giá, chọn 1 mẫu rồi thì chốt đúng giá mẫu đó (kiểu Shopee) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-              {variantPriceRange && !hasPickedVariant ? (
-                <span style={S.price}>{fmtPrice(variantPriceRange.min)} - {fmtPrice(variantPriceRange.max)}</span>
-              ) : (
-                <>
-                  <span style={S.price}>{fmtPrice(displayPrice)}</span>
-                  {hasDiscount && (
-                    <>
-                      <span style={S.strike}>{fmtPrice(strikePrice)}</span>
-                      {isFlashSale ? (
-                        <span className="flash-sale-badge">
-                          ⚡ FLASH SALE {discountBadgeText}
-                        </span>
-                      ) : (
-                        <span style={S.tag('#fff', '#e11d48')}>{discountBadgeText}</span>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-              {activePromotion?.coupon?.code && (
-                <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 6 }}>
-                  ⚡ Áp dụng mã: {activePromotion.coupon.code}
-                </span>
+            {/* Giá: đúng số tiền tính khi thanh toán. Chưa chọn mẫu thì hiện khoảng giá (kiểu Shopee). */}
+            <div style={{ background: '#fafaf9', border: '1px solid #f0efed', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                {variantPriceRange && !hasPickedVariant ? (
+                  <span style={S.price}>{fmtPrice(variantPriceRange.min)} - {fmtPrice(variantPriceRange.max)}</span>
+                ) : (
+                  <>
+                    <span style={S.price}>{fmtPrice(basePrice)}</span>
+                    {listOriginal > basePrice && (
+                      <>
+                        <span style={{ ...S.strike, marginLeft: 0 }}>{fmtPrice(listOriginal)}</span>
+                        <span style={S.tag('#fff', '#e11d48')}>-{Math.round(((listOriginal - basePrice) / listOriginal) * 100)}%</span>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+              {hasDiscount && variantDeal && (
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: '#9a3412' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#e11d48', color: '#fff', fontWeight: 800, fontSize: 11, padding: '3px 8px', borderRadius: 6, letterSpacing: 0.3 }}>
+                    <Zap size={12} /> {variantDeal.isFlash ? 'FLASH SALE' : 'Mã giảm'} {discountBadgeText}
+                  </span>
+                  <span>
+                    Còn <b style={{ color: '#e11d48' }}>{fmtPrice(finalPrice)}</b> khi dùng mã{' '}
+                    <b>{variantDeal.code}</b> lúc thanh toán
+                  </span>
+                </div>
               )}
             </div>
-            <p style={{ fontSize: 12, color: '#888', margin: '4px 0 0' }}>Giá đã bao gồm VAT</p>
 
             {/* Vouchers applicable */}
             {productVouchers.length > 0 && (
@@ -805,25 +758,27 @@ export function BuyerProductDetailPage() {
                     onClick={() => navigate('/vouchers')}
                     style={{ fontSize: 11, fontWeight: 700, color: '#008000', background: 'none', border: 'none', cursor: 'pointer' }}
                   >
-                    Kho voucher &rarr;
+                    Kho voucher
                   </button>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {productVouchers.slice(0, 3).map(v => {
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {productVouchers.slice(0, 4).map(v => {
                     const isSaved = savedVouchers.includes(v.code);
                     return (
                       <div key={v.id || v.code} style={{
                         backgroundColor: '#fff',
                         border: isSaved ? '1px solid #86efac' : '1px solid #e7e5e4',
                         borderRadius: 8,
-                        padding: '6px 10px',
+                        padding: '8px 10px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 8
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        minWidth: 0
                       }}>
-                        <div>
+                        <div style={{ minWidth: 0 }}>
                           <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 900, color: '#1c1917' }}>{v.code}</span>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: '#008000' }}>{v.title || `Giảm ${v.discount_value}`}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#008000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || `Giảm ${v.discount_value}`}</div>
                           <div style={{ fontSize: 9, fontWeight: 600, color: '#78716c', display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
                             {v.is_platform || !v.shop_id
                               ? 'Toàn sàn VietCraft'
@@ -833,7 +788,9 @@ export function BuyerProductDetailPage() {
                         <button
                           onClick={(e) => handleSaveVoucher(v.code, e)}
                           style={{
-                            padding: '3px 8px',
+                            padding: '5px 10px',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap',
                             borderRadius: 6,
                             border: 'none',
                             fontSize: 10,
@@ -843,7 +800,7 @@ export function BuyerProductDetailPage() {
                             color: isSaved ? '#166534' : '#fff'
                           }}
                         >
-                          {isSaved ? '✓ Đã lưu' : 'Lưu'}
+                          {isSaved ? 'Đã lưu' : 'Lưu'}
                         </button>
                       </div>
                     );
@@ -951,9 +908,9 @@ export function BuyerProductDetailPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#555' }}>Số lượng:</span>
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #ddd', borderRadius: 8, overflow: 'hidden' }}>
-                <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>−</button>
-                <span style={{ width: 36, textAlign: 'center', fontWeight: 700 }}>{qty}</span>
-                <button disabled={outOfStock || qty >= availableStock} onClick={() => setQty(q => Math.max(1, Math.min(availableStock, q + 1)))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>+</button>
+                <button type="button" aria-label="Giảm số lượng" disabled={qty <= 1} onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 36, height: 36, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: qty <= 1 ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: qty <= 1 ? 0.4 : 1 }}>−</button>
+                <span style={{ width: 44, textAlign: 'center', fontWeight: 700 }}>{qty}</span>
+                <button type="button" aria-label="Tăng số lượng" disabled={outOfStock || qty >= availableStock} onClick={() => setQty(q => Math.max(1, Math.min(availableStock, q + 1)))} style={{ width: 36, height: 36, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: outOfStock || qty >= availableStock ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: outOfStock || qty >= availableStock ? 0.4 : 1 }}>+</button>
               </div>
               <span style={{ fontSize: 12, color: outOfStock ? '#dc2626' : '#888', fontWeight: outOfStock ? 700 : 400 }}>
                 {discontinued ? 'Sản phẩm đã ngừng bán' : outOfStock ? 'Hết hàng' : `Còn ${availableStock.toLocaleString('vi-VN')} sản phẩm`}
@@ -965,7 +922,7 @@ export function BuyerProductDetailPage() {
               <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
                 <p className="m-0 font-bold text-emerald-900">Đây là sản phẩm của gian hàng bạn</p>
                 <p className="mt-1 mb-3 text-emerald-800/80">Người bán không thể tự mua hoặc tự chat với sản phẩm của mình.</p>
-                <button type="button" onClick={() => navigate('/seller/products')} style={S.btnFill}>
+                <button type="button" onClick={() => navigate('/seller/products')} style={{ ...S.btnFill, ...ACTION_BTN, width: 'auto' }}>
                   <Store size={18} /> Quản lý sản phẩm
                 </button>
               </div>
@@ -974,53 +931,62 @@ export function BuyerProductDetailPage() {
                 Tài khoản quản trị chỉ xem sản phẩm, không mua hàng.
               </div>
             ) : (
-            // Dưới 1024px: Chat và Thêm giỏ ở hàng trên, Mua ngay rộng hết dòng ở hàng dưới.
-            <div className="mt-6 flex flex-wrap gap-2.5">
-              <button className="flex-1 sm:flex-initial" style={S.btnChat} onClick={handleChatWithSeller} title="Chat với người bán">
+            // Điện thoại: Chat + Thêm giỏ một hàng, Mua ngay rộng hết dòng; từ 640px ba nút cùng một hàng, cùng chiều cao.
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
+              <button type="button" style={{ ...S.btnChat, ...ACTION_BTN }} onClick={handleChatWithSeller} title="Chat với người bán">
                 <MessageCircle size={18} /> Chat ngay
               </button>
-              <button className="flex-1" disabled={outOfStock} style={{ ...S.btnOutline, ...(outOfStock ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} onClick={addToCart}>
+              <button type="button" disabled={outOfStock} style={{ ...S.btnOutline, ...ACTION_BTN, ...(outOfStock ? DISABLED_BTN : {}) }} onClick={addToCart}>
                 <ShoppingCart size={18} /> Thêm vào giỏ
               </button>
-              <button className="w-full basis-full lg:w-auto lg:basis-auto lg:flex-1" disabled={outOfStock} style={{ ...S.btnFill, flex: undefined, ...(outOfStock ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} onClick={buyNow}>
+              <button type="button" className="col-span-2 sm:col-span-1" disabled={outOfStock} style={{ ...S.btnFill, ...ACTION_BTN, ...(outOfStock ? DISABLED_BTN : {}) }} onClick={buyNow}>
                 <Zap size={18} /> Mua ngay
               </button>
             </div>
-
             )}
 
-            {/* Delivery accordion */}
-            <div style={S.accordion}>
-              <div style={S.accordionHead} onClick={() => setDescOpen(o => !o)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Truck size={15} color="#008000" /> Mô tả sản phẩm</span>
-                {descOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </div>
-              {descOpen && (
-                <div style={S.accordionBody}>
-                  {product.description?.trim()
-                    ? <span style={{ whiteSpace: 'pre-line' }}>{product.description}</span>
-                    : <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Người bán chưa cập nhật mô tả cho sản phẩm này.</span>}
-                </div>
-              )}
-            </div>
-            <div style={S.accordion}>
-              <div style={S.accordionHead} onClick={() => setShippingOpen(o => !o)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Shield size={15} color="#008000" /> Chính sách đổi trả</span>
-                {shippingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </div>
-              {shippingOpen && (
-                <div style={S.accordionBody}>
-                  {product.returnWindowDays ? (
-                    <p style={{ margin: '0 0 6px' }}>• Gửi yêu cầu đổi trả trong {product.returnWindowDays} ngày kể từ khi nhận hàng, tại trang Đơn hàng của tôi.</p>
-                  ) : null}
-                  {product.shopInfo?.returnPolicy?.trim() ? (
-                    <p style={{ margin: '0 0 6px', whiteSpace: 'pre-line' }}>• Chính sách của shop: {product.shopInfo.returnPolicy}</p>
-                  ) : null}
-                  <p style={{ margin: 0 }}>• Liên hệ shop qua chat để được hỗ trợ.</p>
-                </div>
-              )}
-            </div>
           </div>
+        </div>
+
+        {/* ── Chi tiết sản phẩm: rộng hết trang, dưới ảnh + thông tin (như các sàn lớn) ─────────── */}
+        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <section style={{ background: '#fff', border: '1px solid #eee', borderRadius: 14, padding: '20px 22px' }}>
+            <h2 style={{ ...S.sectionTitle, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FileText size={18} color="#008000" /> Mô tả sản phẩm
+            </h2>
+            {product.description?.trim() ? (
+              <>
+                <div style={{ position: 'relative', fontSize: 14, color: '#444', lineHeight: 1.75, whiteSpace: 'pre-line', maxHeight: descLong && !descOpen ? 320 : undefined, overflow: 'hidden' }}>
+                  {product.description}
+                  {descLong && !descOpen && (
+                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 80, background: 'linear-gradient(to bottom, rgba(255,255,255,0), #fff)' }} />
+                  )}
+                </div>
+                {descLong && (
+                  <button type="button" onClick={() => setDescOpen(o => !o)} style={{ marginTop: 10, background: 'none', border: 'none', color: '#008000', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0 }}>
+                    {descOpen ? <>Thu gọn <ChevronUp size={14} /></> : <>Xem thêm <ChevronDown size={14} /></>}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p style={{ margin: 0, color: '#9ca3af', fontStyle: 'italic', fontSize: 14 }}>Người bán chưa cập nhật mô tả cho sản phẩm này.</p>
+            )}
+          </section>
+
+          <section style={{ background: '#fff', border: '1px solid #eee', borderRadius: 14, padding: '20px 22px', alignSelf: 'start' }}>
+            <h2 style={{ ...S.sectionTitle, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Shield size={18} color="#008000" /> Chính sách đổi trả
+            </h2>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: '#555', lineHeight: 1.7, display: 'grid', gap: 6 }}>
+              {product.returnWindowDays ? (
+                <li>Gửi yêu cầu đổi trả trong {product.returnWindowDays} ngày kể từ khi nhận hàng, tại trang Đơn hàng của tôi.</li>
+              ) : null}
+              {product.shopInfo?.returnPolicy?.trim() ? (
+                <li style={{ whiteSpace: 'pre-line' }}>Chính sách của shop: {product.shopInfo.returnPolicy}</li>
+              ) : null}
+              <li>Liên hệ shop qua chat để được hỗ trợ.</li>
+            </ul>
+          </section>
         </div>
 
         {/* ── Reviews ───────────────────────────────────────────────────────── */}

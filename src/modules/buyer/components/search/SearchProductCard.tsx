@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Store, Star } from 'lucide-react';
+import { Heart, Store, Star, Zap } from 'lucide-react';
 import { ProductItem } from '../../../product/types/product';
 import { Deal } from '../deals/buildDeals';
 
@@ -18,8 +18,9 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
   onToggleFavorite,
   onClick
 }) => {
-  const price = deal ? deal.price : product.price || 0;
-  const oldPrice = deal ? deal.oldPrice : product.originalPrice;
+  // Giá chính = giá thanh toán khi chưa áp mã; giá sau mã hiện thành dòng riêng.
+  const price = Number(product.price) || 0;
+  const oldPrice = product.originalPrice;
   const shopName = product.shopInfo?.name || 'VietCraft Artisan';
 
   return (
@@ -37,14 +38,9 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
 
         {deal && (
           <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', zIndex: 3 }}>
-            {deal.badge === 'FLASH SALE'
-              ? <span className="flash-sale-badge">⚡ FLASH SALE</span>
-              : <span className="discount-tag" style={{ position: 'static' }}>{deal.badge}</span>}
-            {deal.discount && (
-              <span style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)', color: '#fef08a', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, backdropFilter: 'blur(4px)' }}>
-                {deal.discount}
-              </span>
-            )}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, backgroundColor: '#e11d48', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 6 }}>
+              <Zap size={11} /> {deal.discount}
+            </span>
           </div>
         )}
 
@@ -115,6 +111,11 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
             </span>
           )}
         </div>
+        {deal && (
+          <p style={{ margin: 0, fontSize: 11.5, color: '#9a3412', lineHeight: '16px' }}>
+            Còn <b style={{ color: '#e11d48' }}>{deal.price.toLocaleString('vi-VN')}đ</b> với mã {deal.couponCode}
+          </p>
+        )}
       </div>
     </div>
   );
