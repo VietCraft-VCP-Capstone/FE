@@ -27,7 +27,7 @@ export interface VideoAdJobResult {
 }
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
-const absImg = (u: any) => (typeof u === 'string' && u.startsWith('/') ? ORIGIN + u : u);
+export const absImg = (u: any) => (typeof u === 'string' && u.startsWith('/') ? ORIGIN + u : u);
 const resolveImages = (p: any) =>
   p && Array.isArray(p.images)
     ? { ...p, images: p.images.map(absImg), thumbnail: absImg(p.thumbnail) }
@@ -48,6 +48,14 @@ const toPaginated = (data: any): PaginatedProductsResult => {
   }
   return { items: [], total: 0, page: 1, limit: 6, totalPages: 1 };
 };
+
+export interface FeaturedCategory {
+  _id: string;
+  name: string;
+  slug: string;
+  product_count: number;
+  cover_image: string | null;
+}
 
 export interface MockupColorPreview {
   color: string;
@@ -129,6 +137,14 @@ export const productsService = {
     } catch (err) {
       return [];
     }
+  },
+
+  /** Danh mục nổi bật (theo số sản phẩm đang bán thật), kèm ảnh bìa. Ném lỗi để trang tự hiện trạng thái lỗi. */
+  getFeaturedCategories: async (limit = 6): Promise<FeaturedCategory[]> => {
+    const res = await api.get('/products/meta/featured-categories', { params: { limit } });
+    return Array.isArray(res.data)
+      ? res.data.map((c: any) => ({ ...c, cover_image: absImg(c.cover_image) || null }))
+      : [];
   },
 
   getById: async (id: string): Promise<ProductItem | any> => {
