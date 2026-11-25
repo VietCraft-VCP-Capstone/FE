@@ -6,11 +6,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { plainText, scoreText, cleanTitle } from '../../format';
 import type { HealthRow } from '../../healthTypes';
 import type { HealthStatus } from '../../types';
-import { detailLink } from '../health/HealthCells';
-import { STATUS_INFO } from '../health/factorState';
-import { cleanTodoText } from '../health/visibleTodos';
+import { detailLink } from './HealthCells';
+import { STATUS_INFO } from './factorState';
+import { cleanTodoText } from './visibleTodos';
 import { editLink } from '../HealthParts';
-import { Thumb } from '../health/Thumb';
+import { Thumb } from './Thumb';
 import { Chip, type Tone } from '../ui';
 
 export const TIERS = ['good', 'needs_improvement', 'poor', 'blocked'] as const;
