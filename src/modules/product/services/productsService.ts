@@ -92,10 +92,20 @@ export interface FeaturedCategory {
   cover_image: string | null;
 }
 
+/** Độ tin cậy của ảnh mockup: ảnh thật xưởng chụp > vùng phôi xưởng đã xác nhận > AI tự tách > ước lượng. */
+export type MockupLevel = 'photo' | 'verified' | 'auto' | 'estimated';
+
+export interface MockupImageMeta {
+  url: string;
+  area_key: string;
+  level: MockupLevel;
+}
+
 export interface MockupColorPreview {
   color: string;
   color_hex?: string;
   images: string[];
+  items: MockupImageMeta[];
 }
 
 export interface PreviewMockupResult {
@@ -327,19 +337,18 @@ export const productsService = {
   previewMockup: async (
     blankId: string,
     designPlacements: any[],
-    options?: { colorHex?: string; colors?: any[] }
+    options?: { colors?: { color: string; color_hex?: string }[] }
   ): Promise<PreviewMockupResult> => {
     const res = await api.post('/products/preview-mockup', { blankId, designPlacements, ...options });
-    const rawImages: string[] = Array.isArray(res.data?.images) ? res.data.images : [];
-    const images = rawImages.map(absImg);
     const byColor: MockupColorPreview[] = Array.isArray(res.data?.byColor)
-      ? res.data.byColor.map((c: any) => ({
-          color: c.color,
-          color_hex: c.color_hex,
-          images: (Array.isArray(c.images) ? c.images : []).map(absImg)
-        }))
+      ? res.data.byColor.map((c: any) => {
+          const items: MockupImageMeta[] = (Array.isArray(c.images) ? c.images : [])
+            .filter((i: any) => i && typeof i.url === 'string')
+            .map((i: any) => ({ url: absImg(i.url), area_key: i.area_key, level: i.level || 'auto' }));
+          return { color: c.color, color_hex: c.color_hex, items, images: items.map(i => i.url) };
+        })
       : [];
-    return { images, byColor };
+    return { images: byColor.flatMap(c => c.images), byColor };
   },
 
   getVideoAdQuota: async (): Promise<VideoAdQuota> => {
