@@ -5,6 +5,7 @@ import type { HealthDraft } from '../../healthTypes';
 import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap';
 import { InsightBlock } from '../InsightBlock';
 import { Note } from '../ui';
+import { AiInsights } from './AiInsights';
 import { CriteriaTable } from './CriteriaTable';
 import { Recommendations } from './Recommendations';
 import { ScoreHero } from './ScoreHero';
@@ -45,6 +46,7 @@ export function HealthDraftModal({ draft, onClose }: { draft: HealthDraft; onClo
                   <div className="sm:col-span-4"><ScoreHero data={data} /></div>
                   <div className="sm:col-span-8"><CriteriaTable factors={data.factors} /></div>
                 </section>
+                <AiInsights items={data.ai} />
                 <Recommendations data={data} />
               </div>
             )}

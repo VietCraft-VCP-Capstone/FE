@@ -86,7 +86,18 @@ export interface HealthCheck {
   mode: 'live' | 'hint' | 'shadow';
 }
 
+export interface AiFinding {
+  model: string;
+  title: string;
+  finding: string;
+  status: 'pass' | 'warn' | 'info' | 'na';
+  confidence: number | null;
+  trained_on: string;
+  metric: string;
+}
+
 export interface ListingHealth {
+  ai?: AiFinding[];
   product_id: string;
   title: string;
   thumbnail: string | null;

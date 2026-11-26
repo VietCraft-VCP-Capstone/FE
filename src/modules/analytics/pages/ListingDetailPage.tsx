@@ -4,6 +4,7 @@ import { Modal } from 'antd';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { HealthTheme } from '../components/health/HealthTheme';
+import { AiInsights } from '../components/health/AiInsights';
 import { ChecksCard } from '../components/health/ChecksCard';
 import { CriteriaTable } from '../components/health/CriteriaTable';
 import { DetailHeader } from '../components/health/DetailHeader';
@@ -52,6 +53,8 @@ function ListingDetail({ id }: { id: string }) {
                   <CriteriaTable factors={data.factors} onExplain={() => setShowWhyModal(true)} />
                 </div>
               </section>
+
+              <AiInsights items={data.ai} />
 
               <ChecksCard data={data} productId={id} />
 
