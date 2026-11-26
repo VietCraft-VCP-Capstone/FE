@@ -9,7 +9,7 @@ export const PREVIEW_PLACEHOLDER =
   'data:image/svg+xml;utf8,' +
   encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#f5f5f4"/>' +
-      '<text x="200" y="208" text-anchor="middle" font-family="Inter,sans-serif" font-size="20" fill="#a8a29e">Chưa có ảnh</text></svg>'
+      '<text x="200" y="208" text-anchor="middle" font-family="Epilogue Variable,sans-serif" font-size="20" fill="#a8a29e">Chưa có ảnh</text></svg>'
   );
 
 interface ProductFormPreviewProps {

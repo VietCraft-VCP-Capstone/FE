@@ -3,6 +3,7 @@ import { authService } from '../services/authService';
 import { cartService } from '../../order/services/cartService';
 import { userService } from '../../user/services/userService';
 import { User } from '../types';
+import { resetVoucherWallet } from '../../promotion/hooks/useVoucherWallet';
 
 export function useAuth() {
     const [user, setUser] = useState<User | null>(null);
@@ -66,6 +67,7 @@ export function useAuth() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(normalizedUser));
         setUser(normalizedUser);
+        resetVoucherWallet();
 
         try {
             localStorage.removeItem('vietcraft_seller_settings_cache');
@@ -117,6 +119,7 @@ export function useAuth() {
         } catch {}
 
         setUser(null);
+        resetVoucherWallet();
     };
 
     return { user, loading, login, signup, googleLogin, logout, isAuthenticated: !!user };

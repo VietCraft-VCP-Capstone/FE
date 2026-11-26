@@ -72,7 +72,7 @@ export function ShopOnboardingPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 space-y-8 font-sans">
+    <div className="space-y-8 font-sans">
       {/* Top Banner / Breadcrumb */}
       <div className="flex items-center justify-between">
         <Link

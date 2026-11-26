@@ -1,0 +1,98 @@
+/* Trang chủ người mua — chỉ các chi tiết Tailwind khó diễn đạt (răng cưa vé, nhịp xuất hiện của hero). */
+
+.vc-home {
+  --vc-plum: #330033;
+  --vc-plum-deep: #240024;
+  --vc-green: #007700;
+  --vc-green-subtle: #eaf0e2;
+  --vc-ink: #1c1917;
+  --vc-muted: #78716c;
+  --vc-line: #ece9e6;
+  /* Dùng đúng biến font chung của dự án (src/index.css), đổi font toàn dự án là trang này theo luôn. */
+  font-family: var(--font-body);
+  color: var(--vc-ink);
+}
+
+.vc-display {
+  font-family: var(--font-heading);
+}
+
+/* Hero: một lần xuất hiện duy nhất khi tải trang */
+@keyframes vc-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.vc-hero { animation: vc-rise 0.45s ease-out both; }
+/* Đổi sản phẩm trong hero (do người dùng chọn): ảnh mới hiện dần, để thấy rõ cái gì vừa đổi */
+@keyframes vc-fade { from { opacity: 0; } to { opacity: 1; } }
+.vc-fade { animation: vc-fade 0.25s ease-out both; }
+
+/* Vé voucher: phần cuống tách bằng đường răng cưa, hai lỗ khuyết như vé giấy */
+.vc-ticket {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 268px;
+  max-width: 300px;
+  background: #fff;
+  border: 1px solid var(--vc-line);
+  border-radius: 14px;
+  scroll-snap-align: start;
+}
+.vc-ticket[data-saved='true'] {
+  border-color: #b7dcb0;
+  background: #f6fbf4;
+}
+.vc-ticket-stub {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-left: 2px dashed var(--vc-line);
+}
+.vc-ticket-stub::before,
+.vc-ticket-stub::after {
+  content: '';
+  position: absolute;
+  left: -9px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fcfcfc;
+  border: 1px solid var(--vc-line);
+}
+.vc-ticket-stub::before { top: -9px; clip-path: inset(50% 0 0 0); }
+.vc-ticket-stub::after { bottom: -9px; clip-path: inset(0 0 50% 0); }
+.vc-ticket[data-saved='true'] .vc-ticket-stub { border-left-color: #b7dcb0; }
+.vc-ticket[data-saved='true'] .vc-ticket-stub::before,
+.vc-ticket[data-saved='true'] .vc-ticket-stub::after { border-color: #b7dcb0; }
+
+.vc-rail {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 4px 2px 10px;
+  scrollbar-width: thin;
+}
+
+.vc-card-img {
+  transition: transform 0.4s ease;
+}
+.vc-card:hover .vc-card-img {
+  transform: scale(1.04);
+}
+
+.vc-home :focus-visible {
+  outline: 2px solid var(--vc-green);
+  outline-offset: 2px;
+}
+/* Nửa trái nền tím mận: viền focus trắng cho dễ thấy; nửa phải nền sáng giữ viền xanh. */
+.vc-hero-dark :focus-visible { outline-color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-hero,
+  .vc-fade { animation: none; }
+  .vc-card-img { transition: none; }
+  .vc-card:hover .vc-card-img { transform: none; }
+}

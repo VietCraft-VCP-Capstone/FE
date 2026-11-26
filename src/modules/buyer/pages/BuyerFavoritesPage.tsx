@@ -1,522 +1,360 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Heart, ShoppingBag, ChevronLeft, ChevronRight, Search, Store, Star, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Heart, Search, ShoppingBag, Star, Store } from 'lucide-react';
 import { favoritesService } from '../../product/services/favoritesService';
 import { cartService } from '../../order/services/cartService';
 import { SelectVariantModal } from '../components/SelectVariantModal';
-import api, { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
-
-const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
-const DEFAULT_FAV_IMG = 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400';
-
-const absImg = (u: any): string => {
-  if (!u || typeof u !== 'string') return '';
-  const trimmed = u.trim();
-  if (!trimmed || trimmed.startsWith('#')) return '';
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) return trimmed;
-  if (trimmed.startsWith('/')) return ORIGIN + trimmed;
-  return trimmed;
-};
-
-const resolveProductImage = (product: any): string => {
-  const directImg = absImg(product.image || product.thumbnail);
-  if (directImg) return directImg;
-  const pImgs = Array.isArray(product.images) ? product.images : [];
-  for (const img of pImgs) {
-    const resolved = absImg(img);
-    if (resolved) return resolved;
-  }
-  const vImg = absImg(product.variants?.[0]?.mockupImage || product.variants?.[0]?.mockup_image);
-  if (vImg) return vImg;
-  return DEFAULT_FAV_IMG;
-};
-
-const getFavoriteItemId = (item: any): string => {
-  if (!item) return '';
-  if (typeof item === 'string') return item;
-  const directId = item.product_id || item.productId || item._id || item.id;
-  if (directId && typeof directId === 'string') return directId;
-  if (directId && typeof directId === 'object' && directId.toString) return directId.toString();
-
-  const nested = item.product;
-  if (nested) {
-    if (typeof nested === 'string') return nested;
-    const nestedId = nested._id || nested.id || nested.product_id || nested.productId;
-    if (nestedId && typeof nestedId === 'string') return nestedId;
-    if (nestedId && typeof nestedId === 'object' && nestedId.toString) return nestedId.toString();
-  }
-
-  return '';
-};
+import { useProductDeals } from '../hooks/useDealLookup';
+import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { CommerceToast, useCommerceToast } from '../components/commerce/CommerceToast';
+import { mediaUrl, onImgError, PLACEHOLDER_IMG, toNumber, vnd } from '../components/commerce/format';
+import '../components/commerce/commerce.css';
 
 type SortKey = 'newest' | 'oldest' | 'price_asc' | 'price_desc';
+type FilterKey = 'all' | 'available' | 'deal' | 'unavailable';
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: 'newest', label: 'Mới thêm gần đây' },
-  { value: 'oldest', label: 'Thêm lâu nhất' },
+const SORTS: { value: SortKey; label: string }[] = [
+  { value: 'newest', label: 'Mới lưu gần đây' },
+  { value: 'oldest', label: 'Lưu lâu nhất' },
   { value: 'price_asc', label: 'Giá thấp đến cao' },
   { value: 'price_desc', label: 'Giá cao đến thấp' },
 ];
 
-const PAGE_SIZE_OPTIONS = [10, 20, 40];
+const PAGE = 20;
 
-const formatPrice = (n: number) => `${new Intl.NumberFormat('vi-VN').format(n)}₫`;
+interface WishCard {
+  id: string;
+  order: number;
+  product: any;
+  title: string;
+  price: number;
+  shopId: string;
+  shopName: string;
+  image: string;
+  rating: number;
+  ratingCount: number;
+  isPod: boolean;
+  unavailable: string | null;
+}
+
+const productIdOf = (item: any): string => {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  const id = item.product_id || item.productId || item._id || item.id || item.product?._id || item.product?.id;
+  return id ? String(id) : '';
+};
+
+const toCard = (item: any, index: number): WishCard => {
+  const p = item?.product || (item && typeof item === 'object' ? item : {});
+  const variants: any[] = Array.isArray(p.variants) ? p.variants : [];
+  const stock = variants.reduce((s, v) => s + (Number(v.stock) || 0), 0);
+  const isPod = p.product_type === 'POD_TEMPLATE';
+  const discontinued = Boolean(p.listing_status) && p.listing_status !== 'ACTIVE';
+  // Hàng in theo yêu cầu không giữ tồn kho nên không coi là hết hàng.
+  const soldOut = !isPod && variants.length > 0 && stock <= 0;
+  const image = mediaUrl(p.image || p.thumbnail)
+    || (Array.isArray(p.images) ? p.images.map(mediaUrl).find(Boolean) : '')
+    || mediaUrl(variants[0]?.mockupImage || variants[0]?.mockup_image)
+    || PLACEHOLDER_IMG;
+  return {
+    id: productIdOf(item),
+    order: index,
+    product: p,
+    title: p.title || p.name || 'Sản phẩm thủ công',
+    price: toNumber(p.price ?? p.retail_price ?? variants[0]?.price ?? variants[0]?.retail_price),
+    shopId: p.shopInfo?.id || '',
+    shopName: p.shopInfo?.name || p.shopName || 'VietCraft Selection',
+    image,
+    rating: Number(p.average_rating) || 0,
+    ratingCount: Number(p.rating_count) || 0,
+    isPod,
+    unavailable: discontinued ? 'Ngừng bán' : soldOut ? 'Hết hàng' : null,
+  };
+};
 
 export function BuyerFavoritesPage() {
   const navigate = useNavigate();
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [favorites, setFavorites] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [variantModalOpen, setVariantModalOpen] = useState(false);
-  const [activeProductForCart, setActiveProductForCart] = useState<any>(null);
+  const authed = isLoggedIn();
+  const { toast, show: showToast, dismiss } = useCommerceToast();
+
+  const [items, setItems] = useState<any[] | null>(authed ? null : []);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('newest');
+  const [filter, setFilter] = useState<FilterKey>('all');
+  const [limit, setLimit] = useState(PAGE);
+  const [variantProduct, setVariantProduct] = useState<any>(null);
 
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const load = useCallback(async () => {
+    if (!authed) return;
+    setLoadError('');
+    try {
+      const res = await favoritesService.getFavorites();
+      setItems(Array.isArray(res?.product_ids) ? res.product_ids : []);
+    } catch (err) {
+      setLoadError(getApiErrorMessage(err, 'Không tải được danh sách yêu thích.'));
+      setItems((prev) => prev ?? []);
+    }
+  }, [authed]);
 
-  const cards = useMemo(() => favorites
-    .map((item, index) => {
-      const product = item?.product || (typeof item === 'object' && item !== null ? item : {});
-      const variants: any[] = Array.isArray(product.variants) ? product.variants : [];
-      const totalStock = variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
-      const isPod = product.product_type === 'POD_TEMPLATE';
-      const discontinued = Boolean(product.listing_status) && product.listing_status !== 'ACTIVE';
-      // Hàng in theo yêu cầu không giữ tồn kho nên không coi là hết hàng
-      const soldOut = !isPod && variants.length > 0 && totalStock <= 0;
-      return {
-        id: getFavoriteItemId(item),
-        addedOrder: index, // API trả theo thứ tự lưu ($addToSet nối vào cuối)
-        product,
-        title: product.title || product.name || 'Sản phẩm thủ công',
-        price: Number(product.price || product.retail_price || variants[0]?.price || variants[0]?.retail_price || 0),
-        shopId: product.shopInfo?.id || '',
-        shopName: product.shopInfo?.name || product.shopName || product.storeName || 'VietCraft Selection',
-        image: resolveProductImage(product),
-        rating: Number(product.average_rating) || 0,
-        ratingCount: Number(product.rating_count) || 0,
-        isPod,
-        discontinued,
-        soldOut,
-      };
-    })
-    .filter((card) => card.id), [favorites]);
+  useEffect(() => { void load(); }, [load]);
 
-  const visibleCards = useMemo(() => {
+  const cards = useMemo(() => (items ?? []).map(toCard).filter((c) => c.id), [items]);
+  const deals = useProductDeals(cards.map((c) => c.id));
+
+  const counts = useMemo(() => ({
+    all: cards.length,
+    available: cards.filter((c) => !c.unavailable).length,
+    deal: cards.filter((c) => !c.unavailable && deals.has(c.id)).length,
+    unavailable: cards.filter((c) => c.unavailable).length,
+  }), [cards, deals]);
+
+  const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const list = term
-      ? cards.filter((c) => c.title.toLowerCase().includes(term) || c.shopName.toLowerCase().includes(term))
-      : [...cards];
-    const compare: Record<SortKey, (a: typeof list[number], b: typeof list[number]) => number> = {
-      newest: (a, b) => b.addedOrder - a.addedOrder,
-      oldest: (a, b) => a.addedOrder - b.addedOrder,
+    let list = cards.filter((c) => {
+      if (filter === 'available' && c.unavailable) return false;
+      if (filter === 'deal' && (c.unavailable || !deals.has(c.id))) return false;
+      if (filter === 'unavailable' && !c.unavailable) return false;
+      return !term || c.title.toLowerCase().includes(term) || c.shopName.toLowerCase().includes(term);
+    });
+    const cmp: Record<SortKey, (a: WishCard, b: WishCard) => number> = {
+      newest: (a, b) => b.order - a.order,
+      oldest: (a, b) => a.order - b.order,
       price_asc: (a, b) => a.price - b.price,
       price_desc: (a, b) => b.price - a.price,
     };
-    return list.sort(compare[sortBy]);
-  }, [cards, search, sortBy]);
+    list = [...list].sort(cmp[sortBy]);
+    return list;
+  }, [cards, deals, filter, search, sortBy]);
 
-  const totalItems = visibleCards.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-  // Kẹp trang khi vừa bỏ yêu thích sản phẩm cuối cùng của trang cuối
-  const page = Math.min(currentPage, totalPages);
-  const paginatedCards = visibleCards.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  const shown = visible.slice(0, limit);
 
-  const handlePageChange = (next: number) => {
-    if (next < 1 || next > totalPages) return;
-    setCurrentPage(next);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    fetchFavorites();
-  }, []);
-
-  const fetchFavorites = async () => {
-    if (!isLoggedIn()) {
-      setFavorites([]);
-      setLoading(false);
-      return;
-    }
+  const removeFavorite = async (card: WishCard) => {
+    const previous = items;
+    setItems((prev) => (prev ?? []).filter((it) => productIdOf(it) !== card.id));
     try {
-      setLoading(true);
-      const res = await favoritesService.getFavorites();
-      const items = Array.isArray(res?.product_ids) ? res.product_ids : [];
-      setFavorites(items);
-    } catch (err) {
-      console.error('Lỗi khi tải danh sách yêu thích:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Toast cùng kiểu với trang chủ (BuyerHomePage)
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleRemoveFavorite = async (id: string, title: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (!isLoggedIn()) {
-      navigate('/login');
-      return;
-    }
-    // Optimistic Update: cập nhật giao diện ngay lập tức
-    const previous = favorites;
-    const next = favorites.filter((item) => getFavoriteItemId(item) !== id);
-    setFavorites(next);
-    try {
-      await favoritesService.removeFavorite(id);
-      setFavorites(prev => prev.filter(item => getFavoriteItemId(item) !== id));
+      await favoritesService.removeFavorite(card.id);
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
-      showToast(`Đã xóa "${title}" khỏi danh sách yêu thích`);
+      showToast(`Đã bỏ "${card.title}" khỏi yêu thích.`, 'success', {
+        label: 'Hoàn tác',
+        onClick: () => {
+          favoritesService.addFavorite(card.id)
+            .then(() => { window.dispatchEvent(new CustomEvent('wishlist-updated')); return load(); })
+            .catch((err) => showToast(getApiErrorMessage(err, 'Không khôi phục được.'), 'error'));
+        },
+      });
     } catch (err) {
-      // Revert lại nếu có lỗi
-      setFavorites(previous);
-      showToast(getApiErrorMessage(err, 'Không thể bỏ yêu thích sản phẩm này.'), 'error');
+      setItems(previous);
+      showToast(getApiErrorMessage(err, 'Không bỏ yêu thích được.'), 'error');
     }
   };
 
-  const handleOpenAddToCartModal = (product: any, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (!isLoggedIn()) {
-      navigate('/login');
-      return;
-    }
-    setActiveProductForCart(product);
-    setVariantModalOpen(true);
-  };
-
-  const handleConfirmAddToCart = async (payload: { productId: string; variantId?: string; quantity: number }) => {
-    try {
-      await cartService.addToCart(payload);
-      showToast('Đã thêm sản phẩm vào giỏ hàng!', 'success');
-    } catch (err) {
-      showToast(getApiErrorMessage(err, 'Không thể thêm sản phẩm vào giỏ hàng.'), 'error');
-      throw err;
-    }
-  };
+  const filters: { key: FilterKey; label: string }[] = [
+    { key: 'all', label: 'Tất cả' },
+    { key: 'available', label: 'Còn hàng' },
+    { key: 'deal', label: 'Đang có ưu đãi' },
+    { key: 'unavailable', label: 'Không còn bán' },
+  ];
 
   return (
-    <div className="w-full bg-stone-50 text-gray-900 font-sans min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="mb-4 text-xs text-stone-500">
-          <Link to="/" className="hover:text-[#15803d] transition-colors">Trang chủ</Link>
-          <span className="mx-1.5">/</span>
-          <span className="font-semibold text-stone-800">Sản phẩm yêu thích</span>
+    <div className="vc-commerce">
+      <div className="mx-auto max-w-[1200px] px-4 pb-20 pt-5 sm:px-6">
+        <nav aria-label="Breadcrumb" className="text-[13px] text-[var(--c-muted)]">
+          <Link to="/" className="hover:text-[var(--c-green)]">Trang chủ</Link>
+          <span className="mx-1.5" aria-hidden>/</span>
+          <span className="text-[var(--c-ink)]">Yêu thích</span>
         </nav>
 
-        {/* Header + công cụ tìm kiếm, sắp xếp */}
-        <div className="bg-white rounded-2xl border border-stone-200 p-4 sm:p-5 mb-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
-              <Heart className="w-5 h-5 fill-rose-500" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight">Sản phẩm yêu thích</h1>
-              <p className="text-xs text-stone-500 mt-0.5">
-                {loading ? 'Đang tải danh sách...' : `${cards.length} sản phẩm đã lưu`}
-              </p>
-            </div>
+        <header className="mb-5 mt-3 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="vc-display m-0 text-[28px] font-semibold leading-tight text-[var(--c-plum)] sm:text-[34px]">Yêu thích</h1>
+            {items !== null && cards.length > 0 && <p className="m-0 mt-1 text-sm text-[var(--c-muted)]">{cards.length} món bạn đã lưu</p>}
           </div>
-
           {cards.length > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
               <label className="relative block sm:w-72">
                 <span className="sr-only">Tìm trong danh sách yêu thích</span>
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+                <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--c-muted)]" />
                 <input
-                  id="favorites-search"
                   type="search"
                   value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Tìm theo tên sản phẩm hoặc shop"
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-stone-200 bg-stone-50 text-sm placeholder:text-stone-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#15803d]/30 focus:border-[#15803d] transition"
+                  onChange={(e) => { setSearch(e.target.value); setLimit(PAGE); }}
+                  placeholder="Tìm theo tên hoặc shop"
+                  className="h-11 w-full rounded-full border border-[var(--c-line-strong)] bg-white pl-10 pr-4 text-sm outline-none focus:border-[var(--c-green)]"
                 />
               </label>
-              <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
+              <label className="flex items-center gap-2 text-[13px] text-[var(--c-muted)]">
                 <span className="whitespace-nowrap">Sắp xếp</span>
                 <select
-                  id="favorites-sort"
                   value={sortBy}
-                  onChange={(e) => {
-                    setSortBy(e.target.value as SortKey);
-                    setCurrentPage(1);
-                  }}
-                  className="flex-1 sm:flex-none bg-white border border-stone-200 text-stone-800 text-sm font-medium rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#15803d]/30 focus:border-[#15803d] cursor-pointer"
+                  onChange={(e) => { setSortBy(e.target.value as SortKey); setLimit(PAGE); }}
+                  className="h-11 flex-1 cursor-pointer rounded-full border border-[var(--c-line-strong)] bg-white px-4 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-green)] sm:flex-none"
                 >
-                  {SORT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
+                  {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </label>
             </div>
           )}
-        </div>
+        </header>
 
-        {/* Trạng thái Loading / Danh sách sản phẩm */}
-        {loading && favorites.length === 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 animate-pulse">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <div key={n} className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-                <div className="w-full aspect-square bg-stone-100"></div>
-                <div className="p-3 space-y-2">
-                  <div className="h-4 bg-stone-100 rounded-md w-full"></div>
-                  <div className="h-3 bg-stone-100 rounded-md w-1/2"></div>
-                  <div className="h-5 bg-stone-100 rounded-md w-1/3"></div>
-                  <div className="h-8 bg-stone-100 rounded-xl w-full"></div>
-                </div>
-              </div>
+        {cards.length > 0 && (
+          <div className="vc-no-scrollbar -mx-4 mb-6 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="group" aria-label="Lọc danh sách yêu thích">
+            {filters.map((f) => {
+              const on = filter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => { setFilter(f.key); setLimit(PAGE); }}
+                  className={`shrink-0 rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors ${on ? 'border-[var(--c-plum)] bg-[var(--c-plum)] text-white' : 'border-[var(--c-line-strong)] bg-white text-[var(--c-body)] hover:border-[var(--c-ink)]'}`}
+                >
+                  {f.label} <span className={`vc-num ml-0.5 font-normal ${on ? 'text-white/70' : 'text-[var(--c-muted)]'}`}>{counts[f.key]}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {loadError && (
+          <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            <span>{loadError}</span>
+            <button type="button" onClick={() => void load()} className="font-semibold underline">Thử lại</button>
+          </div>
+        )}
+
+        {!authed ? (
+          <EmptyState
+            title="Đăng nhập để xem yêu thích"
+            body="Danh sách yêu thích được lưu theo tài khoản, để bạn xem lại trên mọi thiết bị."
+            cta={{ label: 'Đăng nhập', onClick: () => navigate(`/login?next=${encodeURIComponent('/favorites')}`) }}
+          />
+        ) : items === null ? (
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" aria-busy="true">
+            {Array.from({ length: 10 }, (_, i) => (
+              <div key={i} className="space-y-3"><div className="vc-skel aspect-[4/5] w-full rounded-2xl" /><div className="vc-skel h-4 w-4/5" /><div className="vc-skel h-4 w-1/3" /></div>
             ))}
           </div>
-        ) : cards.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-stone-200 py-20 px-6 text-center">
-            <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center mx-auto mb-4 text-rose-400">
-              <Heart className="w-8 h-8" />
-            </div>
-            <p className="text-base font-semibold text-gray-800">Chưa có sản phẩm yêu thích nào</p>
-            <p className="text-sm text-stone-500 mt-1 mb-5 max-w-sm mx-auto leading-relaxed">
-              Bấm vào biểu tượng trái tim ở sản phẩm bạn thích để lưu lại và mua sau.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="px-6 py-2.5 rounded-xl bg-[#15803d] text-white text-sm font-semibold hover:bg-[#166534] transition-colors cursor-pointer"
-            >
-              Khám phá sản phẩm
-            </button>
-          </div>
-        ) : totalItems === 0 ? (
-          <div className="bg-white rounded-2xl border border-stone-200 py-16 px-6 text-center">
-            <Search className="w-8 h-8 text-stone-300 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-gray-800">Không có sản phẩm nào khớp với “{search.trim()}”</p>
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              className="mt-4 px-4 py-2 rounded-xl border border-stone-200 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-colors cursor-pointer"
-            >
-              Xóa tìm kiếm
-            </button>
+        ) : cards.length === 0 && loadError ? null : cards.length === 0 ? (
+          <EmptyState
+            title="Chưa lưu món nào"
+            body="Chạm vào trái tim ở sản phẩm bạn thích để lưu lại. Khi có ưu đãi, bạn sẽ thấy ngay tại đây."
+            cta={{ label: 'Khám phá sản phẩm', onClick: () => navigate('/') }}
+          />
+        ) : visible.length === 0 ? (
+          <div className="vc-panel px-6 py-14 text-center">
+            <p className="m-0 text-[15px] font-semibold">Không có món nào khớp bộ lọc</p>
+            <button type="button" onClick={() => { setSearch(''); setFilter('all'); }} className="mt-4 rounded-full border border-[var(--c-line-strong)] px-5 py-2.5 text-sm font-semibold hover:border-[var(--c-ink)]">Xem tất cả</button>
           </div>
         ) : (
-          <div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-              {paginatedCards.map((card) => {
-                const inactive = card.discontinued || card.soldOut;
-                const productUrl = `/product/${card.id}`;
-
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {shown.map((card) => {
+                const deal = !card.unavailable ? deals.get(card.id) : undefined;
+                const url = `/product/${card.id}`;
                 return (
-                  <article
-                    key={card.id}
-                    className="group bg-white rounded-2xl border border-stone-200 overflow-hidden flex flex-col hover:shadow-lg hover:border-stone-300 transition-all duration-200"
-                  >
-                    {/* Ảnh + nhãn + nút bỏ yêu thích */}
-                    <div className="relative aspect-square bg-stone-100 overflow-hidden">
-                      <Link to={productUrl} aria-label={card.title} className="block w-full h-full">
-                        <img
-                          src={card.image}
-                          alt={card.title}
-                          loading="lazy"
-                          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${inactive ? 'opacity-60 grayscale' : ''}`}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = DEFAULT_FAV_IMG;
-                          }}
-                        />
+                  <article key={card.id} className="vc-card-box vc-wish flex flex-col">
+                    <div className="relative aspect-[4/5] overflow-hidden border-b border-[var(--c-line)] bg-stone-100">
+                      <Link to={url} aria-label={card.title} className="block h-full w-full">
+                        <img src={card.image} alt={card.title} loading="lazy" onError={onImgError} className={`vc-wish-img h-full w-full object-cover ${card.unavailable ? 'grayscale opacity-60' : ''}`} />
                       </Link>
-
-                      <div className="absolute top-2 left-2 flex flex-col items-start gap-1 pointer-events-none">
-                        {card.discontinued ? (
-                          <span className="bg-stone-800/85 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Ngừng bán</span>
-                        ) : card.soldOut ? (
-                          <span className="bg-stone-800/85 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Hết hàng</span>
-                        ) : null}
-                        {card.isPod && (
-                          <span className="inline-flex items-center gap-1 bg-emerald-700/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                            <Sparkles className="w-2.5 h-2.5" /> In theo yêu cầu
-                          </span>
-                        )}
-                      </div>
-
+                      {(card.unavailable || card.isPod || deal) && (
+                        <div className="pointer-events-none absolute left-2.5 top-2.5 flex flex-col items-start gap-1">
+                          {card.unavailable && <span className="rounded-full bg-stone-900/80 px-2.5 py-1 text-[11px] font-semibold text-white">{card.unavailable}</span>}
+                          {deal && <span className="rounded-full bg-[var(--c-rose)] px-2.5 py-1 text-[11px] font-semibold text-white">{deal.badge === 'FLASH_SALE' ? 'Flash sale' : `Giảm ${vnd(deal.savings)}`}</span>}
+                          {card.isPod && !card.unavailable && <span className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-[var(--c-plum)]">In theo yêu cầu</span>}
+                        </div>
+                      )}
                       <button
                         type="button"
-                        onClick={(e) => handleRemoveFavorite(card.id, card.title, e)}
-                        title="Bỏ yêu thích"
+                        onClick={() => void removeFavorite(card)}
                         aria-label={`Bỏ yêu thích ${card.title}`}
-                        className="absolute top-2 right-2 w-9 h-9 rounded-full bg-white/95 shadow-md flex items-center justify-center cursor-pointer hover:scale-110 transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#15803d]"
+                        title="Bỏ yêu thích"
+                        className="absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-[var(--c-rose)] shadow-sm hover:bg-white"
                       >
-                        <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
+                        <Heart size={17} className="fill-current" />
                       </button>
                     </div>
 
-                    {/* Thông tin sản phẩm */}
-                    <div className="p-3 flex flex-col flex-1 gap-1.5">
-                      <Link
-                        to={productUrl}
-                        title={card.title}
-                        className="text-sm text-gray-900 leading-5 line-clamp-2 min-h-[2.5rem] hover:text-[#15803d] transition-colors"
-                      >
-                        {card.title}
-                      </Link>
-
-                      {card.shopId ? (
-                        <Link
-                          to={`/shop/${card.shopId}`}
-                          className="inline-flex items-center gap-1 text-xs text-stone-500 hover:text-[#15803d] transition-colors min-w-0"
-                        >
-                          <Store className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{card.shopName}</span>
-                        </Link>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-stone-500 min-w-0">
-                          <Store className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{card.shopName}</span>
-                        </span>
-                      )}
-
-                      <div className="flex items-end justify-between gap-2 mt-auto pt-1">
-                        <span className={`text-base font-bold ${inactive ? 'text-stone-400' : 'text-[#15803d]'}`}>
-                          {formatPrice(card.price)}
-                        </span>
-                        {card.ratingCount > 0 && (
-                          <span className="inline-flex items-center gap-0.5 text-[11px] text-stone-500 shrink-0">
-                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                            {card.rating.toFixed(1)} ({card.ratingCount})
-                          </span>
+                    <div className="flex flex-1 flex-col p-3">
+                      <Link to={url} title={card.title} className="line-clamp-2 text-[14px] leading-5 text-[var(--c-ink)] hover:text-[var(--c-green)]">{card.title}</Link>
+                      <div className="mt-1 flex items-center justify-between gap-2 text-[12.5px] text-[var(--c-muted)]">
+                        {card.shopId ? (
+                          <Link to={`/shop/${card.shopId}`} className="inline-flex min-w-0 items-center gap-1 hover:text-[var(--c-green)]"><Store size={12} className="shrink-0" /><span className="truncate">{card.shopName}</span></Link>
+                        ) : <span className="inline-flex min-w-0 items-center gap-1"><Store size={12} className="shrink-0" /><span className="truncate">{card.shopName}</span></span>}
+                        {card.ratingCount > 0 && <span className="inline-flex shrink-0 items-center gap-0.5"><Star size={12} className="fill-amber-400 text-amber-400" />{card.rating.toFixed(1)}</span>}
+                      </div>
+                      <div className="mt-1.5">
+                        {deal ? (
+                          <p className="m-0 flex flex-wrap items-baseline gap-x-2">
+                            <span className="vc-num text-[16px] font-semibold text-[var(--c-rose)]">{vnd(deal.finalPrice)}</span>
+                            <span className="vc-num text-[12.5px] text-[var(--c-muted)] line-through">{vnd(deal.basePrice)}</span>
+                          </p>
+                        ) : (
+                          <span className={`vc-num text-[16px] font-semibold ${card.unavailable ? 'text-[var(--c-muted)]' : 'text-[var(--c-plum)]'}`}>{vnd(card.price)}</span>
+                        )}
+                        {deal && <p className="m-0 mt-0.5 text-[12px] text-[var(--c-muted)]">với mã {deal.couponCode}</p>}
+                      </div>
+                      <div className="mt-auto pt-3">
+                        {card.unavailable ? (
+                          <button type="button" onClick={() => void removeFavorite(card)} className="h-10 w-full rounded-full border border-[var(--c-line-strong)] text-[13px] font-semibold text-[var(--c-body)] hover:border-[var(--c-rose)] hover:text-[var(--c-rose)]">
+                            Bỏ khỏi danh sách
+                          </button>
+                        ) : (
+                          <button type="button" onClick={() => setVariantProduct(card.product)} className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[var(--c-green)] text-[13px] font-semibold text-white hover:bg-[var(--c-green-deep)]">
+                            <ShoppingBag size={14} /> Thêm vào giỏ
+                          </button>
                         )}
                       </div>
-
-                      <button
-                        type="button"
-                        disabled={inactive}
-                        onClick={(e) => handleOpenAddToCartModal(card.product, e)}
-                        className="mt-1.5 w-full py-2 px-3 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-[#15803d] text-white hover:bg-[#166534] disabled:bg-stone-100 disabled:text-stone-400 disabled:cursor-not-allowed"
-                      >
-                        <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
-                        <span>{card.discontinued ? 'Ngừng bán' : card.soldOut ? 'Hết hàng' : 'Thêm vào giỏ'}</span>
-                      </button>
                     </div>
                   </article>
                 );
               })}
             </div>
 
-            {/* Pagination */}
-            <div className="mt-8 pt-5 border-t border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-xs sm:text-sm text-stone-500">
-                Hiển thị{' '}
-                <span className="font-semibold text-gray-900">
-                  {(page - 1) * itemsPerPage + 1} - {Math.min(page * itemsPerPage, totalItems)}
-                </span>{' '}
-                trên <span className="font-semibold text-gray-900">{totalItems}</span> sản phẩm
-              </div>
-
-              {totalPages > 1 && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    disabled={page === 1}
-                    onClick={() => handlePageChange(page - 1)}
-                    aria-label="Trang trước"
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-stone-200 bg-white text-stone-700 text-xs font-semibold hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    <span className="hidden sm:inline">Trước</span>
-                  </button>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                    <button
-                      key={pageNum}
-                      type="button"
-                      onClick={() => handlePageChange(pageNum)}
-                      aria-current={page === pageNum ? 'page' : undefined}
-                      className={`w-9 h-9 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${page === pageNum
-                        ? 'bg-[#15803d] text-white'
-                        : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-50'
-                        }`}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-
-                  <button
-                    type="button"
-                    disabled={page === totalPages}
-                    onClick={() => handlePageChange(page + 1)}
-                    aria-label="Trang sau"
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-stone-200 bg-white text-stone-700 text-xs font-semibold hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                  >
-                    <span className="hidden sm:inline">Sau</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+            <div className="mt-10 flex flex-col items-center gap-3 text-[13px] text-[var(--c-muted)]">
+              <span className="vc-num">Đang xem {shown.length} trên {visible.length} món</span>
+              {shown.length < visible.length && (
+                <button type="button" onClick={() => setLimit((n) => n + PAGE)} className="rounded-full border border-[var(--c-line-strong)] bg-white px-6 py-3 text-sm font-semibold text-[var(--c-ink)] hover:border-[var(--c-ink)]">
+                  Xem thêm
+                </button>
               )}
-
-              <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
-                <span>Hiển thị</span>
-                <select
-                  id="favorites-page-size"
-                  value={itemsPerPage}
-                  onChange={(e) => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="bg-white border border-stone-200 text-stone-800 text-xs font-semibold rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#15803d]/30 cursor-pointer"
-                >
-                  {PAGE_SIZE_OPTIONS.map((n) => (
-                    <option key={n} value={n}>{n} / trang</option>
-                  ))}
-                </select>
-              </label>
             </div>
-          </div>
+          </>
         )}
       </div>
 
-      {toast && (
-        <div
-          role="status"
-          style={{
-            position: 'fixed',
-            bottom: 24,
-            right: 24,
-            maxWidth: 'calc(100vw - 48px)',
-            backgroundColor: '#fff',
-            borderLeft: `4px solid ${toast.type === 'success' ? '#008000' : '#dc2626'}`,
-            boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-            borderRadius: 8,
-            padding: '16px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            zIndex: 9999
-          }}
-        >
-          {toast.type === 'success'
-            ? <CheckCircle2 size={20} color="#008000" strokeWidth={2.5} className="shrink-0" />
-            : <AlertCircle size={20} color="#dc2626" strokeWidth={2.5} className="shrink-0" />
-          }
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#330033' }}>{toast.message}</span>
-        </div>
-      )}
-
-      {/* Modal Chọn Variant & Số Lượng */}
       <SelectVariantModal
-        isOpen={variantModalOpen}
-        productId={getFavoriteItemId(activeProductForCart) || null}
-        initialProduct={activeProductForCart}
-        onClose={() => {
-          setVariantModalOpen(false);
-          setActiveProductForCart(null);
+        isOpen={Boolean(variantProduct)}
+        productId={variantProduct ? productIdOf(variantProduct) || null : null}
+        initialProduct={variantProduct}
+        onClose={() => setVariantProduct(null)}
+        onAddToCart={async (payload) => {
+          try {
+            await cartService.addToCart(payload);
+            showToast('Đã thêm vào giỏ hàng.', 'success', { label: 'Xem giỏ', onClick: () => navigate('/cart') });
+          } catch (err) {
+            showToast(getApiErrorMessage(err, 'Không thêm được vào giỏ hàng.'), 'error');
+            throw err;
+          }
         }}
-        onAddToCart={handleConfirmAddToCart}
       />
+
+      <CommerceToast toast={toast} onDismiss={dismiss} />
     </div>
+  );
+}
+
+function EmptyState({ title, body, cta }: { title: string; body: string; cta: { label: string; onClick: () => void } }) {
+  return (
+    <section className="vc-panel mx-auto max-w-xl px-6 py-14 text-center">
+      <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border-[1.5px] border-dashed border-[var(--c-thread)] text-[var(--c-rose)]">
+        <Heart size={28} strokeWidth={1.6} />
+      </div>
+      <h2 className="vc-display m-0 text-xl font-semibold text-[var(--c-plum)]">{title}</h2>
+      <p className="mx-auto mb-6 mt-2 max-w-sm text-sm leading-relaxed text-[var(--c-muted)]">{body}</p>
+      <button type="button" onClick={cta.onClick} className="rounded-full bg-[var(--c-green)] px-6 py-3 text-sm font-semibold text-white hover:bg-[var(--c-green-deep)]">{cta.label}</button>
+    </section>
   );
 }
 

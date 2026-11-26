@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import api from '../../../../infrastructure/api/client';
 
-const API_ORIGIN = 'http://localhost:8080';
+// Gốc của backend lấy theo cấu hình API (không ghi cứng localhost)
+const API_ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
 
 export const abs = (u: string) => {
     if (!u) return '';
-    if (u.startsWith('http')) return u;
+    if (u.startsWith('http') || u.startsWith('data:') || u.startsWith('blob:')) return u;
     if (u.startsWith('/images/')) return u;
     return `${API_ORIGIN}${u}`;
 };

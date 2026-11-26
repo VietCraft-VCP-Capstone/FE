@@ -130,7 +130,7 @@ export const ReorderModal: React.FC<ReorderModalProps> = ({
                             {/* Image */}
                             <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
                                 <img
-                                    src={item.image || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=200'}
+                                    src={item.image || '/image-not-found.jpg'}
                                     alt={item.title}
                                     className="w-full h-full object-cover"
                                 />

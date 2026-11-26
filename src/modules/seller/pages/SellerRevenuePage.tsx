@@ -185,7 +185,7 @@ export const SellerRevenuePage: React.FC = () => {
     const presets = [500, 1000, 5000, 10000, 50000];
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 font-sans">
+        <div className="space-y-6 font-sans">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>

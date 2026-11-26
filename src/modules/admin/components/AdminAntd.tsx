@@ -30,7 +30,7 @@ export function AdminAntd({ children }: { children: React.ReactNode }) {
           borderRadius: 10,
           borderRadiusLG: 12,
           borderRadiusSM: 8,
-          fontFamily: '"Plus Jakarta Sans", Inter, system-ui, -apple-system, sans-serif',
+          fontFamily: '"Epilogue Variable", system-ui, -apple-system, sans-serif',
           fontSize: 13.5,
           controlHeight: 34,
           // Bóng nhuốm xanh như shadow-admin-* chứ không phải đen thuần.
