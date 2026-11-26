@@ -1,0 +1,336 @@
+/*
+ * Giỏ hàng, yêu thích, thanh toán, đơn hàng của người mua.
+ * Cùng bảng màu với trang chủ (tím mận + xanh VietCraft). Điểm nhấn duy nhất là "đường chỉ khâu":
+ * nét chỉ khâu chỉ xuất hiện khi mang thông tin (kiện hàng đang chọn để gửi, tiến độ đơn, mép hoá đơn).
+ */
+
+.vc-commerce {
+  --c-plum: #330033;
+  --c-plum-wash: #f7f0f7;
+  --c-green: #007700;
+  --c-green-deep: #005b00;
+  --c-green-wash: #eef6ea;
+  /* Cùng giá trị với .vc-home (home.css) để 4 trang này liền mạch với trang chủ */
+  --c-ink: #1c1917;
+  --c-body: #44403c;
+  --c-muted: #78716c;
+  --c-line: #ece9e6;        /* đường chia bên trong khối */
+  --c-edge: #e3dfda;        /* viền ngoài của khối: đậm hơn 1 bậc để khối không chìm vào nền trắng */
+  --c-line-strong: #d6d1cc; /* viền ô nhập, nút viền */
+  --c-band: #faf9f7;        /* dải đầu thẻ */
+  --c-thread: #cdb9cd;
+  --c-page: #ffffff;
+  --c-rose: #be123c;
+  --c-amber: #a16207;
+  font-family: var(--font-body);
+  color: var(--c-ink);
+  background: var(--c-page);
+  min-height: 70vh;
+}
+
+.vc-commerce .vc-display {
+  font-family: var(--font-heading);
+  letter-spacing: -0.01em;
+}
+
+.vc-commerce .vc-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.vc-commerce :focus-visible {
+  outline: 2px solid var(--c-green);
+  outline-offset: 2px;
+}
+
+/* Khung trắng chung: viền ngoài + bóng rất mảnh để tách khỏi nền trắng */
+.vc-panel {
+  background: #fff;
+  border: 1px solid var(--c-edge);
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(28, 25, 23, 0.04);
+}
+
+/* Dải đầu thẻ (tên shop, mã đơn...) tách phần đầu khỏi nội dung */
+.vc-band {
+  background: var(--c-band);
+  border-bottom: 1px solid var(--c-line);
+}
+
+/* Thẻ sản phẩm có viền, cùng kiểu thẻ ở trang chủ */
+.vc-card-box {
+  background: #fff;
+  border: 1px solid var(--c-edge);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.vc-card-box:hover {
+  border-color: var(--c-line-strong);
+  box-shadow: 0 10px 30px -12px rgba(51, 0, 51, 0.22);
+}
+
+/* Kiện hàng theo shop. Kiện đang được chọn để thanh toán thì "khâu" viền chỉ bên trong. */
+.vc-parcel {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--c-edge);
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(28, 25, 23, 0.04);
+  transition: border-color 0.2s ease;
+}
+.vc-parcel::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1.5px dashed var(--c-thread);
+  border-radius: 14px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.vc-parcel[data-active='true'] {
+  border-color: #d7c2d7;
+}
+.vc-parcel[data-active='true']::before {
+  opacity: 1;
+}
+
+/* Hoá đơn: mép dưới răng cưa như giấy xé, viền vẽ bằng drop-shadow để ôm theo răng cưa */
+.vc-receipt-wrap {
+  /* 2 lớp bóng mảnh xếp chồng tạo thành viền 1px ôm cả răng cưa và lỗ khuyết */
+  filter: drop-shadow(0 0 0.6px #bfb9b3) drop-shadow(0 0 0.6px #bfb9b3) drop-shadow(0 12px 22px rgba(51, 0, 51, 0.07));
+}
+.vc-receipt {
+  position: relative;
+  background: #fff;
+  border-radius: 18px 18px 0 0;
+}
+.vc-receipt::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -9px;
+  height: 9px;
+  background: conic-gradient(from 135deg at 50% 0, #fff 90deg, transparent 0) 0 0 / 14px 100% repeat-x;
+}
+
+/* Đường xé răng cưa nằm ngang, hai đầu khuyết tròn như cuống vé */
+.vc-perf {
+  position: relative;
+  height: 0;
+  border-top: 1.5px dashed var(--c-line-strong);
+  margin: 0 -1px;
+}
+.vc-perf::before,
+.vc-perf::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--c-page);
+}
+.vc-perf::before { left: -9px; }
+.vc-perf::after { right: -9px; }
+
+/* Ô voucher dạng vé */
+.vc-vslot {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border: 1px solid var(--c-edge);
+  border-radius: 12px;
+  background: #fff;
+}
+.vc-vslot[data-applied='true'] {
+  border-color: #b7dcb0;
+  background: #f6fbf4;
+}
+.vc-vslot-stub {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-left: 1.5px dashed var(--c-line-strong);
+}
+.vc-vslot[data-applied='true'] .vc-vslot-stub { border-left-color: #b7dcb0; }
+
+/* Tiến độ đơn hàng: mỗi chặng là một mũi chỉ; chặng đã qua khâu bằng chỉ xanh */
+.vc-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+}
+.vc-track-step {
+  position: relative;
+  padding-top: 18px;
+  padding-right: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--c-muted);
+}
+.vc-track-step::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 12px;
+  right: 0;
+  height: 2px;
+  background-image: repeating-linear-gradient(90deg, var(--c-thread) 0 6px, transparent 6px 10px);
+}
+.vc-track-step:last-child::before { display: none; }
+.vc-track-step::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--c-thread);
+  box-sizing: border-box;
+}
+.vc-track-step[data-state='done'] { color: var(--c-body); }
+.vc-track-step[data-state='done']::before {
+  background-image: repeating-linear-gradient(90deg, var(--c-green) 0 6px, transparent 6px 10px);
+}
+.vc-track-step[data-state='done']::after {
+  background: var(--c-green);
+  border-color: var(--c-green);
+}
+.vc-track-step[data-state='current'] {
+  color: var(--c-ink);
+  font-weight: 600;
+}
+.vc-track-step[data-state='current']::after {
+  border-color: var(--c-green);
+  box-shadow: 0 0 0 4px var(--c-green-wash);
+}
+
+/* Bộ tăng giảm số lượng */
+.vc-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 999px;
+  background: #fff;
+  height: 36px;
+}
+.vc-stepper button {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--c-body);
+}
+.vc-stepper button:hover:not(:disabled) { background: #f5f5f4; }
+.vc-stepper button:disabled { color: #c8c4c0; cursor: not-allowed; }
+.vc-stepper input {
+  width: 38px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 14px;
+  background: transparent;
+  border: 0;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.vc-stepper input::-webkit-outer-spin-button,
+.vc-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Ô chọn vuông bo nhẹ, đồng bộ màu thương hiệu */
+.vc-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--c-line-strong);
+  border-radius: 6px;
+  background: #fff;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.vc-check::after {
+  content: '';
+  width: 10px;
+  height: 6px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transition: transform 0.12s ease;
+}
+.vc-check:checked {
+  background: var(--c-green);
+  border-color: var(--c-green);
+}
+.vc-check:checked::after { transform: translateY(-1px) rotate(-45deg) scale(1); }
+.vc-check:indeterminate {
+  background: var(--c-green);
+  border-color: var(--c-green);
+}
+.vc-check:indeterminate::after {
+  width: 10px;
+  height: 0;
+  border-left: 0;
+  border-bottom: 2px solid #fff;
+  transform: none;
+}
+.vc-check:disabled {
+  background: #f5f5f4;
+  cursor: not-allowed;
+}
+
+/* Khung chờ tải */
+@keyframes vc-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.vc-skel {
+  background: linear-gradient(90deg, #efeeec 0%, #f7f6f5 50%, #efeeec 100%);
+  background-size: 200% 100%;
+  animation: vc-shimmer 1.3s linear infinite;
+  border-radius: 10px;
+}
+
+/* Toast: trượt nhẹ vào khi có kết quả của thao tác */
+@keyframes vc-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.vc-toast { animation: vc-toast-in 0.2s ease-out both; }
+
+/* Hộp thoại */
+@keyframes vc-sheet-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+.vc-sheet { animation: vc-sheet-in 0.22s ease-out both; }
+
+/* Ảnh sản phẩm trong thẻ yêu thích */
+.vc-wish-img { transition: transform 0.45s ease; }
+.vc-wish:hover .vc-wish-img { transform: scale(1.035); }
+
+.vc-no-scrollbar { scrollbar-width: none; }
+.vc-no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-parcel,
+  .vc-parcel::before,
+  .vc-check,
+  .vc-check::after { transition: none; }
+  .vc-skel,
+  .vc-toast,
+  .vc-sheet { animation: none; }
+  .vc-wish-img { transition: none; }
+  .vc-wish:hover .vc-wish-img { transform: none; }
+}

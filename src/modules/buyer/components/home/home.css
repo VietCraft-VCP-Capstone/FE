@@ -8,13 +8,13 @@
   --vc-ink: #1c1917;
   --vc-muted: #78716c;
   --vc-line: #ece9e6;
-  font-family: 'Epilogue Variable', system-ui, -apple-system, sans-serif;
+  /* Dùng đúng biến font chung của dự án (src/index.css), đổi font toàn dự án là trang này theo luôn. */
+  font-family: var(--font-body);
   color: var(--vc-ink);
 }
 
 .vc-display {
-  font-family: 'Unbounded Variable', system-ui, sans-serif;
-  letter-spacing: -0.01em;
+  font-family: var(--font-heading);
 }
 
 /* Hero: một lần xuất hiện duy nhất khi tải trang */

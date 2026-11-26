@@ -1,746 +1,603 @@
-import { useState, useEffect, useMemo } from 'react';
-import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowRightLeft, ChevronRight, CreditCard, Loader2, PackageCheck, RotateCcw, Search, ShoppingBag, Star, Store, X } from 'lucide-react';
+import { ordersService, type OrderItemResponse, type OrderResponse } from '../../order/services/ordersService';
 import { cartService } from '../../order/services/cartService';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-    Search, 
-    Store, 
-    ShoppingBag, 
-    Eye, 
-    RefreshCw, 
-    Star, 
-    Truck, 
-    Check, 
-    ArrowRightLeft, 
-    DollarSign, 
-    ExternalLink, 
-    RotateCcw,
-    XCircle
-} from 'lucide-react';
-import { ordersService } from '../../order/services/ordersService';
 import { returnService, type ReturnRequest } from '../../returns/services/returnService';
+import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import ReorderModal from '../components/profile/ReorderModal';
 import ReviewModal from '../components/profile/ReviewModal';
+import { CommerceToast, useCommerceToast } from '../components/commerce/CommerceToast';
+import { formatDateTime, mediaUrl, onImgError, PLACEHOLDER_IMG, vnd } from '../components/commerce/format';
+import '../components/commerce/commerce.css';
 
-interface OrderItem {
-    productId: string;
-    variantId: string;
-    quantity: number;
-    price: number;
-    title?: string;
-    color?: string;
-    size?: string;
-    image?: string;
-    is_reviewed?: boolean;
-}
-
-interface Order {
-    id: string;
-    _id?: string;
-    shopName: string;
-    shopLogo: string;
-    items: OrderItem[];
-    totalAmount: number;
-    status: 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled';
-    paymentMethod?: string;
-    paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED';
-    fulfillmentStatus?: string;
-    isPod?: boolean;
-    sellerApprovalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
-    createdAt: string;
-    is_reviewed?: boolean;
-}
-
+type Order = OrderResponse;
 type OrderTab = 'all' | 'pending' | 'paid' | 'shipping' | 'completed' | 'cancelled' | 'returns';
 
-const RETURN_STATUS_CONFIG: Record<string, { label: string; badgeClass: string }> = {
-    SUBMITTED: { label: 'Đã gửi yêu cầu', badgeClass: 'bg-blue-50 text-blue-700 border-blue-200' },
-    PENDING_PRINTER: { label: 'Chờ xưởng in thẩm định', badgeClass: 'bg-amber-50 text-amber-800 border-amber-200' },
-    PRINTER_PROPOSED_FAULT_CHANGE: { label: 'Chờ quản trị xem xét', badgeClass: 'bg-purple-50 text-purple-700 border-purple-200' },
-    APPROVED: { label: 'Đã duyệt yêu cầu', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    REJECTED: { label: 'Bị từ chối', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200' },
-    DISPUTED: { label: 'Đang khiếu nại / tranh chấp', badgeClass: 'bg-orange-50 text-orange-800 border-orange-200' },
-    AWAITING_ADMIN_REFUND: { label: 'Chờ hoàn tiền', badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-    CONVERTED_TO_REFUND: { label: 'Duyệt hoàn tiền', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    REPLACEMENT_CREATED: { label: 'Đã tạo đơn in bù', badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-    COMPLETED: { label: 'Hoàn tất', badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' },
-    CANCELLED: { label: 'Đã hủy', badgeClass: 'bg-slate-100 text-slate-500 border-slate-200' },
+const TABS: { id: OrderTab; label: string }[] = [
+  { id: 'all', label: 'Tất cả' },
+  { id: 'pending', label: 'Chờ xác nhận' },
+  { id: 'paid', label: 'Đang chuẩn bị' },
+  { id: 'shipping', label: 'Đang giao' },
+  { id: 'completed', label: 'Đã giao' },
+  { id: 'cancelled', label: 'Đã hủy' },
+  { id: 'returns', label: 'Đổi trả, hoàn tiền' },
+];
+
+const CANCEL_REASONS = [
+  'Đổi ý không muốn mua nữa',
+  'Muốn thay đổi địa chỉ hoặc số điện thoại nhận hàng',
+  'Muốn đổi phân loại, kích thước hoặc màu sắc',
+  'Tìm thấy giá tốt hơn ở nơi khác',
+  'Khác',
+];
+
+const RETURN_STATUS: Record<string, { label: string; tone: string }> = {
+  SUBMITTED: { label: 'Đã gửi yêu cầu', tone: 'text-sky-800 bg-sky-50' },
+  PENDING_PRINTER: { label: 'Chờ xưởng in thẩm định', tone: 'text-amber-800 bg-amber-50' },
+  PRINTER_PROPOSED_FAULT_CHANGE: { label: 'Chờ quản trị xem xét', tone: 'text-[var(--c-plum)] bg-[var(--c-plum-wash)]' },
+  APPROVED: { label: 'Đã duyệt yêu cầu', tone: 'text-[var(--c-green-deep)] bg-[var(--c-green-wash)]' },
+  REJECTED: { label: 'Bị từ chối', tone: 'text-rose-800 bg-rose-50' },
+  DISPUTED: { label: 'Đang khiếu nại', tone: 'text-orange-800 bg-orange-50' },
+  AWAITING_ADMIN_REFUND: { label: 'Chờ hoàn tiền', tone: 'text-[var(--c-plum)] bg-[var(--c-plum-wash)]' },
+  CONVERTED_TO_REFUND: { label: 'Đã duyệt hoàn tiền', tone: 'text-[var(--c-green-deep)] bg-[var(--c-green-wash)]' },
+  REPLACEMENT_CREATED: { label: 'Đã tạo đơn in bù', tone: 'text-[var(--c-green-deep)] bg-[var(--c-green-wash)]' },
+  COMPLETED: { label: 'Hoàn tất', tone: 'text-stone-700 bg-stone-100' },
+  CANCELLED: { label: 'Đã hủy', tone: 'text-stone-500 bg-stone-100' },
 };
 
-const RETURN_REASON_LABELS: Record<string, string> = {
-    R01: 'In sai, lệch, mờ hoặc sai màu',
-    R01A: 'Vấn đề chất lượng cần kiểm tra',
-    R02: 'Phôi sản phẩm bị lỗi',
-    R03: 'Giao sai size, màu hoặc số lượng',
-    R04: 'Thiếu sản phẩm trong kiện',
-    R05: 'Sản phẩm hư hỏng khi giao',
-    R06: 'Không nhận được hàng',
-    R07: 'Vấn đề kỹ thuật cần xem xét',
-    R08: 'Sai thông tin đơn hàng',
-    R09: 'Vấn đề khác cần hỗ trợ',
-    R13: 'Cần đội ngũ hỗ trợ phân loại',
+const RETURN_REASONS: Record<string, string> = {
+  R01: 'In sai, lệch, mờ hoặc sai màu',
+  R01A: 'Vấn đề chất lượng cần kiểm tra',
+  R02: 'Phôi sản phẩm bị lỗi',
+  R03: 'Giao sai size, màu hoặc số lượng',
+  R04: 'Thiếu sản phẩm trong kiện',
+  R05: 'Sản phẩm hư hỏng khi giao',
+  R06: 'Không nhận được hàng',
+  R07: 'Vấn đề kỹ thuật cần xem xét',
+  R08: 'Sai thông tin đơn hàng',
+  R09: 'Vấn đề khác cần hỗ trợ',
+  R13: 'Cần đội ngũ hỗ trợ phân loại',
 };
 
-function canCancelOrder(order: Order): boolean {
-    if (order.status === 'cancelled' || order.status === 'shipping' || order.status === 'completed') {
-        return false;
-    }
-    if (['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'].includes(order.fulfillmentStatus || '')) {
-        return false;
-    }
-    // Chưa thanh toán (COD hoặc pending): luôn có thể hủy
-    if (order.status === 'pending' || order.paymentStatus === 'PENDING') {
-        return true;
-    }
-    // Đơn POD: chưa chuyển xưởng in (chờ duyệt hoặc trong hàng đợi)
-    if (order.isPod && !['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED'].includes(order.fulfillmentStatus || '')) {
-        return true;
-    }
-    // Đơn hàng có sẵn: người bán chưa duyệt
-    if (!order.isPod && order.sellerApprovalStatus === 'PENDING_APPROVAL') {
-        return true;
-    }
-    return false;
+/** Ảnh mặc định BE gán khi shop chưa có logo (order/types PLACEHOLDER_SHOP_LOGO): không hiển thị như logo thật. */
+const PLACEHOLDER_SHOP_LOGO = 'photo-1513519245088-0e12902e5a38';
+
+const LOCKED_FULFILLMENT =['SUBMITTED', 'RECEIVED', 'PRINTING', 'PACKAGED', 'SHIPPED', 'DELIVERED'];
+
+const awaitingPayment = (o: Order) => o.status === 'pending' && o.paymentMethod === 'PAYOS' && o.paymentStatus === 'PENDING';
+
+/** Giống điều kiện BE cho phép người mua tự hủy (OrdersService.cancelOrderByBuyer). */
+function canCancel(o: Order): boolean {
+  if (o.status === 'cancelled' || o.status === 'shipping' || o.status === 'completed') return false;
+  if (LOCKED_FULFILLMENT.includes(o.fulfillmentStatus || '')) return false;
+  if (o.status === 'pending' || o.paymentStatus === 'PENDING') return true;
+  if (o.isPod) return true;
+  return o.sellerApprovalStatus === 'PENDING_APPROVAL';
+}
+
+function statusChip(o: Order): { label: string; tone: string } {
+  if (awaitingPayment(o)) return { label: 'Chờ thanh toán', tone: 'text-[var(--c-rose)] bg-rose-50' };
+  switch (o.status) {
+    case 'pending': return { label: 'Chờ xác nhận', tone: 'text-amber-800 bg-amber-50' };
+    case 'paid': return { label: 'Đang chuẩn bị', tone: 'text-[var(--c-plum)] bg-[var(--c-plum-wash)]' };
+    case 'shipping': return { label: 'Đang giao', tone: 'text-[var(--c-green-deep)] bg-[var(--c-green-wash)]' };
+    case 'completed': return { label: 'Đã giao', tone: 'text-[var(--c-green-deep)] bg-[var(--c-green-wash)]' };
+    default: return { label: 'Đã hủy', tone: 'text-stone-500 bg-stone-100' };
+  }
+}
+
+function OrderTrack({ order }: { order: Order }) {
+  const stage = { pending: 0, paid: 1, shipping: 2, completed: 4 }[order.status as 'pending'] ?? 0;
+  const labels = [awaitingPayment(order) ? 'Chờ thanh toán' : 'Chờ xác nhận', 'Đang chuẩn bị', 'Đang giao', 'Đã nhận hàng'];
+  return (
+    <ol className="vc-track m-0 list-none p-0" aria-label="Tiến độ đơn hàng">
+      {labels.map((label, i) => {
+        const state = i < stage ? 'done' : i === stage ? 'current' : 'todo';
+        return (
+          <li key={label} className="vc-track-step" data-state={state} aria-current={state === 'current' ? 'step' : undefined}>
+            {label}
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 export function BuyerOrdersPage() {
-    const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const { toast, show: showToast, dismiss } = useCommerceToast();
 
-    const paramTab = searchParams.get('tab') as OrderTab | null;
-    const [activeTab, setActiveTab] = useState<OrderTab>(
-        paramTab && ['all', 'pending', 'paid', 'shipping', 'completed', 'cancelled', 'returns'].includes(paramTab)
-            ? paramTab
-            : 'all'
-    );
+  const paramTab = params.get('tab') as OrderTab | null;
+  const activeTab: OrderTab = paramTab && TABS.some((t) => t.id === paramTab) ? paramTab : 'all';
 
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [returnsList, setReturnsList] = useState<ReturnRequest[]>([]);
-    const [returnsPage, setReturnsPage] = useState(1);
-    const [returnsError, setReturnsError] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [loadingReturns, setLoadingReturns] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-    const [reorderOrder, setReorderOrder] = useState<Order | null>(null);
-    const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
-    const [targetReviewProductId, setTargetReviewProductId] = useState<string | undefined>(undefined);
-    const [reviewedOrders, setReviewedOrders] = useState<Set<string>>(new Set());
+  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [ordersError, setOrdersError] = useState('');
+  const [returns, setReturns] = useState<ReturnRequest[] | null>(null);
+  const [returnsError, setReturnsError] = useState('');
+  const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<string | null>(null);
 
-    const handleOpenReview = (order: Order, productId?: string) => {
-        setReviewOrder(order);
-        setTargetReviewProductId(productId);
-    };
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
+  const [cancelOther, setCancelOther] = useState('');
+  const [deliveryTarget, setDeliveryTarget] = useState<Order | null>(null);
+  const [reorderOrder, setReorderOrder] = useState<Order | null>(null);
+  const [reviewOrder, setReviewOrder] = useState<Order | null>(null);
+  const [reviewProductId, setReviewProductId] = useState<string | undefined>();
 
-    const handleReviewSuccess = (orderId: string, productId: string) => {
-        setReviewedOrders(prev => new Set(prev).add(orderId));
-        setOrders(prev => prev.map(ord => {
-            if (ord.id === orderId) {
-                const updatedItems = ord.items.map(it => {
-                    if (it.productId === productId) {
-                        return { ...it, is_reviewed: true };
-                    }
-                    return it;
-                });
-                const allReviewed = updatedItems.every(it => it.is_reviewed);
-                return {
-                    ...ord,
-                    items: updatedItems,
-                    is_reviewed: allReviewed
-                };
-            }
-            return ord;
-        }));
-        showToast('Lưu đánh giá thành công! Cảm ơn bạn đã chia sẻ trải nghiệm.', 'success');
-        if (activeTab !== 'returns') {
-            ordersService.getByUser(activeTab).then(res => {
-                setOrders(Array.isArray(res) ? (res as Order[]) : ((res as any)?.items || []));
-            }).catch(() => {});
-        }
-    };
+  const loadOrders = useCallback(async () => {
+    setOrdersError('');
+    try {
+      const res = await ordersService.getByUser('all');
+      setOrders(Array.isArray(res) ? res : ((res as any)?.items || []));
+    } catch (err) {
+      setOrdersError(getApiErrorMessage(err, 'Không tải được danh sách đơn hàng.'));
+      setOrders((prev) => prev ?? []);
+    }
+  }, []);
 
-    const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-        setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
-    };
+  const loadReturns = useCallback(async () => {
+    setReturnsError('');
+    try {
+      const list = await returnService.list();
+      setReturns(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setReturnsError(getApiErrorMessage(err, 'Không tải được yêu cầu đổi trả.'));
+      setReturns((prev) => prev ?? []);
+    }
+  }, []);
 
-    const tabs = [
-        { id: 'all', label: 'Tất cả' },
-        { id: 'pending', label: 'Chờ xác nhận' },
-        { id: 'paid', label: 'Đang xử lý' },
-        { id: 'shipping', label: 'Đang giao' },
-        { id: 'completed', label: 'Đã giao' },
-        { id: 'cancelled', label: 'Đã hủy' },
-        { id: 'returns', label: 'Đổi trả / Hoàn tiền' }
-    ] as const;
+  useEffect(() => {
+    void loadOrders();
+    void loadReturns();
+    // Quay lại tab (vd. sau khi thanh toán ở payOS): làm mới trạng thái.
+    const onFocus = () => { void loadOrders(); void loadReturns(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadOrders, loadReturns]);
 
-    const handleTabChange = (tabId: OrderTab) => {
-        setActiveTab(tabId);
-        if (tabId === 'all') {
-            setSearchParams({});
-        } else {
-            setSearchParams({ tab: tabId });
-        }
-    };
+  const setTab = (id: OrderTab) => setParams(id === 'all' ? {} : { tab: id }, { replace: true });
 
-    // Tải danh sách đơn hàng
-    useEffect(() => {
-        if (activeTab === 'returns') return;
-        const fetchOrders = async () => {
-            setLoading(true);
-            try {
-                const res = await ordersService.getByUser(activeTab);
-                setOrders(Array.isArray(res) ? (res as Order[]) : ((res as any)?.items || []));
-            } catch (err) {
-                console.error('Failed to fetch orders', err);
-                setOrders([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchOrders();
-    }, [activeTab]);
+  const activeReturnByOrder = useMemo(() => {
+    const map = new Map<string, ReturnRequest>();
+    for (const r of returns ?? []) {
+      if (r.order_id && !map.has(String(r.order_id)) && !['COMPLETED', 'CANCELLED', 'EXPIRED', 'ADMIN_REJECTED'].includes(r.status)) {
+        map.set(String(r.order_id), r);
+      }
+    }
+    return map;
+  }, [returns]);
 
-    // Tải danh sách yêu cầu đổi trả / hoàn tiền
-    const fetchReturns = async () => {
-        setLoadingReturns(true);
-        setReturnsError('');
-        try {
-            const list = await returnService.list();
-            setReturnsList(Array.isArray(list) ? list : []);
-        } catch (err) {
-            console.error('Failed to fetch return requests', err);
-            setReturnsError(getApiErrorMessage(err, 'Không tải được yêu cầu đổi trả.'));
-        } finally {
-            setLoadingReturns(false);
-        }
-    };
+  const counts = useMemo(() => {
+    const c: Record<OrderTab, number> = { all: 0, pending: 0, paid: 0, shipping: 0, completed: 0, cancelled: 0, returns: returns?.length ?? 0 };
+    for (const o of orders ?? []) {
+      c.all += 1;
+      c[o.status as OrderTab] = (c[o.status as OrderTab] || 0) + 1;
+    }
+    return c;
+  }, [orders, returns]);
 
-    useEffect(() => {
-        void fetchReturns();
-        window.addEventListener('focus', fetchReturns);
-        return () => window.removeEventListener('focus', fetchReturns);
-    }, []);
+  const unpaid = (orders ?? []).filter(awaitingPayment);
 
-    useEffect(() => {
-        if (activeTab === 'returns') {
-            void fetchReturns();
-        }
-    }, [activeTab]);
+  const q = query.trim().toLowerCase();
+  const visibleOrders = (orders ?? []).filter((o) => {
+    if (activeTab !== 'all' && o.status !== activeTab) return false;
+    if (!q) return true;
+    return o.shopName?.toLowerCase().includes(q) || o.id?.toLowerCase().includes(q) || (o.items || []).some((it) => it.title?.toLowerCase().includes(q));
+  });
+  const visibleReturns = (returns ?? []).filter((r) => {
+    if (!q) return true;
+    const snap = (r.item_snapshot || {}) as any;
+    return [r.id, r._id, r.order_id, snap.title, r.reason_description, r.reason_code].some((v) => String(v || '').toLowerCase().includes(q));
+  });
 
-    // Map orderId -> ReturnRequest để hiển thị badge trên các đơn hàng thường
-    const activeReturnByOrderId = useMemo(() => {
-        const map = new Map<string, ReturnRequest>();
-        for (const req of returnsList) {
-            if (req.order_id && !map.has(String(req.order_id)) && !['COMPLETED', 'CANCELLED', 'EXPIRED', 'ADMIN_REJECTED'].includes(req.status)) {
-                map.set(String(req.order_id), req);
-            }
-        }
-        return map;
-    }, [returnsList]);
+  /* ---------- Hành động ---------- */
+  const payNow = async (o: Order) => {
+    setBusy(o.id);
+    try {
+      const { checkoutUrl } = await ordersService.createPayosPayment(o._id || o.id);
+      window.location.href = checkoutUrl;
+    } catch (err) {
+      showToast(getApiErrorMessage(err, 'Không mở được cổng thanh toán payOS.'), 'error');
+      setBusy(null);
+    }
+  };
 
-    const getStatusBadge = (order: Order) => {
-        // Đơn payOS chưa trả tiền: shop chưa xử lý, khách cần vào đơn để thanh toán lại.
-        if (order.status === 'pending' && order.paymentMethod === 'PAYOS' && order.paymentStatus === 'PENDING') {
-            return <span className="bg-orange-50 text-orange-700 font-bold border border-orange-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">CHỜ THANH TOÁN</span>;
-        }
-        switch (order.status) {
-            case 'pending':
-                return (
-                    <>
-                        {order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID' && (
-                            <span className="bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">ĐÃ THANH TOÁN</span>
-                        )}
-                        <span className="bg-amber-50 text-amber-700 font-bold border border-amber-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">CHỜ XÁC NHẬN</span>
-                    </>
-                );
-            case 'paid':
-                return <span className="bg-indigo-50 text-indigo-700 font-bold border border-indigo-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">ĐANG XỬ LÝ</span>;
-            case 'shipping':
-                return <span className="bg-blue-50 text-blue-700 font-bold border border-blue-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">ĐANG GIAO</span>;
-            case 'completed':
-                return <span className="bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 text-[10px] px-2.5 py-0.5 rounded-full uppercase">ĐÃ GIAO</span>;
-            case 'cancelled':
-                return <span className="bg-slate-50 text-slate-500 font-bold border border-slate-200 text-[10px] px-2.5 py-0.5 rounded-full uppercase">ĐÃ HỦY</span>;
-            default:
-                return null;
-        }
-    };
+  const submitCancel = async () => {
+    if (!cancelTarget) return;
+    const o = cancelTarget;
+    setBusy(o.id);
+    try {
+      const reason = cancelReason === 'Khác' ? (cancelOther.trim() || 'Lý do khác') : cancelReason;
+      await ordersService.cancelOrder(o.id, reason);
+      setCancelTarget(null);
+      const prepaid = o.paymentStatus === 'PAID' && o.paymentMethod !== 'COD';
+      showToast(prepaid ? 'Đã hủy đơn. Tiền sẽ được hoàn về tài khoản của bạn.' : 'Đã hủy đơn hàng.');
+      await loadOrders();
+    } catch (err) {
+      showToast(getApiErrorMessage(err, 'Không hủy được đơn hàng.'), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
 
-    const handleReorder = (order: Order) => {
-        setReorderOrder(order);
-    };
+  const submitDelivery = async () => {
+    if (!deliveryTarget) return;
+    const o = deliveryTarget;
+    setBusy(o.id);
+    try {
+      await ordersService.confirmDelivery(o.id);
+      setDeliveryTarget(null);
+      showToast('Đã xác nhận nhận hàng. Đơn đã hoàn tất.');
+      await loadOrders();
+    } catch (err) {
+      showToast(getApiErrorMessage(err, 'Không xác nhận được.'), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
 
-    const handleConfirmReorder = async (selectedItems: OrderItem[]) => {
-        if (!reorderOrder) return;
-        const failures: string[] = [];
-        for (const it of selectedItems) {
-            try {
-                await cartService.addToCart({
-                    productId: it.productId,
-                    variantId: it.variantId && it.variantId !== 'default' ? it.variantId : undefined,
-                    quantity: it.quantity,
-                });
-            } catch (err) {
-                failures.push(getApiErrorMessage(err));
-            }
-        }
+  const confirmReorder = async (selected: OrderItemResponse[]) => {
+    const failures: string[] = [];
+    for (const it of selected) {
+      try {
+        await cartService.addToCart({ productId: it.productId, variantId: it.variantId && it.variantId !== 'default' ? it.variantId : undefined, quantity: it.quantity });
+      } catch (err) {
+        failures.push(getApiErrorMessage(err));
+      }
+    }
+    setReorderOrder(null);
+    if (failures.length > 0 && failures.length === selected.length) {
+      showToast(failures[0], 'error');
+      return;
+    }
+    showToast(failures.length ? `Đã thêm ${selected.length - failures.length}/${selected.length} sản phẩm. ${failures[0]}` : 'Đã thêm vào giỏ hàng.', failures.length ? 'error' : 'success', { label: 'Xem giỏ', onClick: () => navigate('/cart') });
+  };
 
-        setReorderOrder(null);
-        if (failures.length > 0) {
-            showToast(failures[0], 'error');
-            return;
-        }
-        showToast('Đã thêm sản phẩm vào giỏ hàng!');
-        setTimeout(() => navigate('/cart'), 1200);
-    };
+  const onReviewed = () => {
+    showToast('Đã lưu đánh giá. Cảm ơn bạn đã chia sẻ.');
+    void loadOrders();
+  };
 
-    const filteredOrders = orders.filter(o => {
-        const query = searchQuery.toLowerCase().trim();
-        if (!query) return true;
-        const matchesShop = o.shopName?.toLowerCase().includes(query);
-        const matchesId = o.id?.toLowerCase().includes(query);
-        const matchesItem = (o.items || []).some(it => it.title?.toLowerCase().includes(query));
-        return matchesShop || matchesId || matchesItem;
-    });
+  const toggleExpanded = (id: string) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
-    const filteredReturns = useMemo(() => {
-        const query = searchQuery.toLowerCase().trim();
-        if (!query) return returnsList;
-        return returnsList.filter(req => {
-            const reqId = (req.id || req._id || '').toLowerCase();
-            const orderId = String(req.order_id || '').toLowerCase();
-            const title = String((req.item_snapshot as any)?.title || '').toLowerCase();
-            const desc = String(req.reason_description || '').toLowerCase();
-            const reasonCode = String(req.reason_code || '').toLowerCase();
-            return reqId.includes(query) || orderId.includes(query) || title.includes(query) || desc.includes(query) || reasonCode.includes(query);
-        });
-    }, [returnsList, searchQuery]);
+  const btn = 'inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[13px] font-semibold transition-colors disabled:opacity-50';
+  const btnGhost = `${btn} border border-[var(--c-line-strong)] bg-white text-[var(--c-ink)] hover:border-[var(--c-ink)]`;
+  const btnPrimary = `${btn} bg-[var(--c-green)] text-white hover:bg-[var(--c-green-deep)]`;
 
-    const returnsPageCount = Math.max(1, Math.ceil(filteredReturns.length / 20));
-    const currentReturnsPage = Math.min(returnsPage, returnsPageCount);
-    const visibleReturns = filteredReturns.slice((currentReturnsPage - 1) * 20, currentReturnsPage * 20);
-    useEffect(() => { setReturnsPage(1); }, [searchQuery]);
+  const loading = activeTab === 'returns' ? returns === null : orders === null;
+  const error = activeTab === 'returns' ? returnsError : ordersError;
 
-    return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-            {/* Tabs and Search row */}
-            <div className="border-b border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 md:pb-0">
-                {/* Filter Tabs */}
-                <nav className="flex space-x-6 overflow-x-auto no-scrollbar scroll-smooth">
-                    {tabs.map((tab) => {
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => handleTabChange(tab.id)}
-                                className={`pb-3 md:pb-4 font-semibold text-xs whitespace-nowrap transition-all border-b-2 -mb-[2px] flex items-center gap-1.5 cursor-pointer ${
-                                    isActive ? 'text-emerald-600 border-emerald-600' : 'text-gray-500 border-transparent hover:text-gray-900'
-                                }`}
-                            >
-                                <span>{tab.label}</span>
-                                {tab.id === 'returns' && returnsList.length > 0 && (
-                                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                                        isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
-                                    }`}>
-                                        {returnsList.length}
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
-                </nav>
+  return (
+    <div className="vc-commerce">
+      <div className="mx-auto max-w-[1200px] px-4 pb-20 pt-5 sm:px-6">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="vc-display m-0 text-[28px] font-semibold leading-tight text-[var(--c-plum)] sm:text-[34px]">Đơn hàng</h1>
+            {orders && orders.length > 0 && <p className="m-0 mt-1 text-sm text-[var(--c-muted)]">{orders.length} đơn đã đặt</p>}
+          </div>
+          <label className="relative block w-full sm:w-80">
+            <span className="sr-only">Tìm đơn hàng</span>
+            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--c-muted)]" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={activeTab === 'returns' ? 'Mã yêu cầu, mã đơn, tên sản phẩm' : 'Mã đơn, tên shop, tên sản phẩm'}
+              className="h-11 w-full rounded-full border border-[var(--c-line-strong)] bg-white pl-10 pr-4 text-sm outline-none focus:border-[var(--c-green)]"
+            />
+          </label>
+        </header>
 
-                {/* Search box */}
-                <div className="relative w-full md:w-80 md:mb-3">
-                    <Search className="absolute inset-y-0 left-3 my-auto text-gray-400" size={16} />
-                    <input
-                        type="text"
-                        placeholder={activeTab === 'returns' ? "Tìm theo mã yêu cầu, mã đơn, tên sản phẩm..." : "Tìm kiếm theo Tên Shop, ID Đơn hàng..."}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white border border-gray-200 rounded-lg py-2 pl-10 pr-4 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm"
-                    />
-                </div>
-            </div>
+        <nav className="vc-no-scrollbar -mx-4 mt-5 flex gap-1 overflow-x-auto border-b border-[var(--c-line)] px-4 sm:mx-0 sm:px-0" aria-label="Lọc theo trạng thái">
+          {TABS.map((t) => {
+            const on = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                aria-current={on ? 'page' : undefined}
+                className={`-mb-px shrink-0 border-b-2 px-3 pb-3 pt-2 text-[13.5px] font-semibold transition-colors ${on ? 'border-[var(--c-plum)] text-[var(--c-plum)]' : 'border-transparent text-[var(--c-muted)] hover:text-[var(--c-ink)]'}`}
+              >
+                {t.label}
+                {counts[t.id] > 0 && <span className={`vc-num ml-1.5 font-normal ${on ? 'text-[var(--c-plum)]/70' : ''}`}>{counts[t.id]}</span>}
+              </button>
+            );
+          })}
+        </nav>
 
-            {/* TAB: ĐỔI TRẢ & HOÀN TIỀN */}
-            {activeTab === 'returns' && returnsError && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">{returnsError} <button type="button" onClick={() => void fetchReturns()} className="font-bold underline">Thử lại</button></p>}
-            {activeTab === 'returns' ? (
-                loadingReturns ? (
-                    <div className="text-center py-16">
-                        <RefreshCw className="w-6 h-6 animate-spin text-emerald-600 mx-auto mb-2" />
-                        <p className="text-gray-400 font-semibold text-sm">Đang tải danh sách yêu cầu đổi trả / hoàn tiền...</p>
+        {unpaid.length > 0 && activeTab !== 'returns' && (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            <span className="flex items-center gap-2"><CreditCard size={16} /> {unpaid.length === 1 ? 'Có 1 đơn đang chờ thanh toán.' : `Có ${unpaid.length} đơn đang chờ thanh toán.`} Shop chỉ chuẩn bị hàng sau khi nhận tiền.</span>
+            {unpaid.length === 1 ? (
+              <button type="button" disabled={busy === unpaid[0].id} onClick={() => void payNow(unpaid[0])} className="font-semibold underline">Thanh toán ngay</button>
+            ) : activeTab !== 'pending' && (
+              <button type="button" onClick={() => setTab('pending')} className="font-semibold underline">Xem các đơn</button>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <div role="alert" className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            <span>{error}</span>
+            <button type="button" onClick={() => void (activeTab === 'returns' ? loadReturns() : loadOrders())} className="font-semibold underline">Thử lại</button>
+          </div>
+        )}
+
+        <div className="mt-5 space-y-4">
+          {loading ? (
+            [0, 1, 2].map((i) => (
+              <div key={i} className="vc-panel space-y-4 p-5" aria-busy="true">
+                <div className="flex justify-between"><div className="vc-skel h-4 w-40" /><div className="vc-skel h-4 w-20" /></div>
+                <div className="vc-skel h-3 w-full" />
+                <div className="flex gap-4"><div className="vc-skel h-16 w-16 rounded-xl" /><div className="flex-1 space-y-2"><div className="vc-skel h-4 w-2/3" /><div className="vc-skel h-3 w-1/4" /></div></div>
+              </div>
+            ))
+          ) : error && (activeTab === 'returns' ? !returns?.length : !orders?.length) ? null : activeTab === 'returns' ? (
+            visibleReturns.length === 0 ? (
+              <Empty
+                icon={<RotateCcw size={28} strokeWidth={1.6} />}
+                title={q ? 'Không có yêu cầu nào khớp tìm kiếm' : 'Chưa có yêu cầu đổi trả nào'}
+                body="Khi bạn gửi yêu cầu đổi hàng hoặc hoàn tiền, tiến độ xử lý sẽ hiển thị tại đây."
+                action={!q ? { label: 'Xem đơn đã giao', onClick: () => setTab('completed') } : undefined}
+              />
+            ) : visibleReturns.map((r) => {
+              const rid = r.id || r._id || '';
+              const snap = (r.item_snapshot || {}) as any;
+              const st = RETURN_STATUS[r.status] || { label: r.status, tone: 'text-stone-700 bg-stone-100' };
+              const exchange = (r.final_resolution || r.requested_resolution) === 'EXCHANGE';
+              return (
+                <article key={rid} className="vc-panel overflow-hidden">
+                  <header className="vc-band flex flex-wrap items-center justify-between gap-2 px-5 py-3.5">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+                      <span className="font-semibold">{exchange ? 'Đổi hàng (in bù)' : 'Hoàn tiền'}</span>
+                      <span className="vc-num text-[var(--c-muted)]">Yêu cầu {rid.slice(-8).toUpperCase()}</span>
+                      <Link to={`/orders/${encodeURIComponent(r.order_id)}`} className="text-[var(--c-muted)] underline-offset-2 hover:text-[var(--c-green)] hover:underline">Đơn {r.order_id}</Link>
                     </div>
-                ) : filteredReturns.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
-                        <RotateCcw size={48} className="text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-700 font-bold mb-1 text-sm">Chưa có yêu cầu đổi trả hoặc hoàn tiền nào</p>
-                        <p className="text-gray-400 text-xs max-w-md mx-auto mb-6 leading-relaxed">
-                            Khi bạn gửi yêu cầu đổi hàng in bù hoặc hoàn tiền cho các đơn hàng POD, tiến độ thẩm định từ xưởng in và sàn sẽ hiển thị đầy đủ tại đây.
-                        </p>
-                        <button
+                    <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${st.tone}`}>{st.label}</span>
+                  </header>
+                  <div className="flex gap-4 px-5 py-4">
+                    <img src={mediaUrl(snap.image) || PLACEHOLDER_IMG} alt="" onError={onImgError} className="h-16 w-16 shrink-0 rounded-xl border border-[var(--c-line)] object-cover" />
+                    <div className="min-w-0 flex-1 text-[13.5px]">
+                      <p className="m-0 line-clamp-1 font-medium">{snap.title || 'Sản phẩm'}</p>
+                      <p className="m-0 mt-1 text-[var(--c-muted)]">{[snap.color, snap.size].filter(Boolean).join(', ')}{snap.color || snap.size ? '. ' : ''}Số lượng {r.quantity || 1}</p>
+                      <p className="m-0 mt-1 text-[var(--c-body)]">{RETURN_REASONS[r.reason_code] || r.reason_code}</p>
+                      {r.reason_description && <p className="m-0 mt-1 line-clamp-2 text-[var(--c-muted)]">{r.reason_description}</p>}
+                    </div>
+                  </div>
+                  <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--c-line)] px-5 py-3.5">
+                    <p className="m-0 text-[12.5px] text-[var(--c-muted)]">
+                      Gửi lúc {formatDateTime(r.created_at)}
+                      {r.deadline_at && <span className="font-semibold text-[var(--c-amber)]">. Hạn xử lý {formatDateTime(r.deadline_at)}</span>}
+                    </p>
+                    <button type="button" onClick={() => navigate(`/returns/${encodeURIComponent(rid)}`)} className={btnPrimary}>Theo dõi yêu cầu</button>
+                  </footer>
+                </article>
+              );
+            })
+          ) : visibleOrders.length === 0 ? (
+            <Empty
+              icon={<ShoppingBag size={28} strokeWidth={1.6} />}
+              title={q ? 'Không có đơn nào khớp tìm kiếm' : activeTab === 'all' ? 'Bạn chưa có đơn hàng nào' : 'Không có đơn ở trạng thái này'}
+              body={activeTab === 'all' && !q ? 'Đơn bạn đặt sẽ hiển thị ở đây cùng tiến độ giao hàng.' : 'Thử chọn trạng thái khác hoặc đổi từ khoá tìm kiếm.'}
+              action={activeTab === 'all' && !q ? { label: 'Bắt đầu mua sắm', onClick: () => navigate('/') } : undefined}
+            />
+          ) : visibleOrders.map((o) => {
+            const chip = statusChip(o);
+            const items = o.items || [];
+            const open = expanded.has(o.id);
+            const shownItems = open ? items : items.slice(0, 2);
+            const activeReturn = activeReturnByOrder.get(o._id || o.id);
+            const reviewed = o.is_reviewed || (items.length > 0 && items.every((it) => it.is_reviewed));
+            const prepaid = o.status === 'pending' && o.paymentMethod !== 'COD' && o.paymentStatus === 'PAID';
+            const isBusy = busy === o.id;
+            const detail = `/orders/${encodeURIComponent(o.id)}`;
+
+            return (
+              <article key={o.id} className="vc-panel overflow-hidden">
+                <div className="vc-band px-5 py-3.5">
+                <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {o.shopLogo && !o.shopLogo.includes(PLACEHOLDER_SHOP_LOGO) ? (
+                      <img src={mediaUrl(o.shopLogo)} alt="" className="h-7 w-7 rounded-full border border-[var(--c-line)] object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    ) : <Store size={17} className="shrink-0 text-[var(--c-muted)]" />}
+                    {o.shopId ? (
+                      <Link to={`/shop/${o.shopId}`} className="truncate text-[15px] font-semibold hover:text-[var(--c-green)]">{o.shopName}</Link>
+                    ) : <span className="truncate text-[15px] font-semibold">{o.shopName}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {activeReturn && <span className="inline-flex items-center gap-1 rounded-full bg-[var(--c-plum-wash)] px-3 py-1 text-[12px] font-semibold text-[var(--c-plum)]"><ArrowRightLeft size={12} /> Đang đổi trả</span>}
+                    {prepaid && <span className="rounded-full bg-[var(--c-green-wash)] px-3 py-1 text-[12px] font-semibold text-[var(--c-green-deep)]">Đã thanh toán</span>}
+                    <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${chip.tone}`}>{chip.label}</span>
+                  </div>
+                </header>
+                <p className="vc-num m-0 mt-1 text-[12.5px] text-[var(--c-muted)]">Mã đơn {o.id}, đặt lúc {formatDateTime(o.createdAt)}</p>
+                </div>
+
+                {o.status !== 'cancelled' && (
+                  <div className="px-5 pt-5"><OrderTrack order={o} /></div>
+                )}
+
+                <ul className="m-0 mt-2 list-none divide-y divide-[var(--c-line)] px-5">
+                  {shownItems.map((it, idx) => (
+                    <li key={`${it.productId}-${it.variantId}-${idx}`} className="flex gap-4 py-3.5">
+                      <Link to={`/product/${it.productId}`} className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[var(--c-line)] bg-stone-50">
+                        <img src={mediaUrl(it.image) || PLACEHOLDER_IMG} alt={it.title || ''} loading="lazy" onError={onImgError} className="h-full w-full object-cover" />
+                      </Link>
+                      <div className="min-w-0 flex-1">
+                        <Link to={`/product/${it.productId}`} className="line-clamp-1 text-[14px] font-medium hover:text-[var(--c-green)]">{it.title}</Link>
+                        <p className="m-0 mt-0.5 text-[12.5px] text-[var(--c-muted)]">{[it.color, it.size].filter(Boolean).join(', ') || 'Tiêu chuẩn'}</p>
+                        <p className="vc-num m-0 mt-0.5 text-[12.5px] text-[var(--c-muted)]">{it.quantity} x {vnd(it.price)}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        <span className="vc-num text-[14px] font-semibold">{vnd(it.price * it.quantity)}</span>
+                        {o.status === 'completed' && (
+                          <button
                             type="button"
-                            onClick={() => handleTabChange('completed')}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 px-4 py-2.5 rounded-xl transition shadow-xs"
-                        >
-                            <span>Xem các đơn hàng đã giao</span>
-                        </button>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {visibleReturns.map(req => {
-                            const reqId = req.id || req._id || '';
-                            const isExchange = (req.final_resolution || req.requested_resolution) === 'EXCHANGE';
-                            const statusCfg = RETURN_STATUS_CONFIG[req.status] || { label: req.status, badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' };
-                            const reasonText = RETURN_REASON_LABELS[req.reason_code] || req.reason_code || 'Vấn đề sản phẩm';
-                            const snapshot = (req.item_snapshot || {}) as any;
+                            onClick={() => { setReviewOrder(o); setReviewProductId(it.productId); }}
+                            className="hidden items-center gap-1 text-[12.5px] font-semibold text-[var(--c-green)] hover:underline sm:inline-flex"
+                          >
+                            <Star size={12} className={it.is_reviewed ? 'fill-amber-400 text-amber-400' : ''} /> {it.is_reviewed ? 'Sửa đánh giá' : 'Đánh giá'}
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {items.length > 2 && (
+                  <button type="button" onClick={() => toggleExpanded(o.id)} className="mx-5 mb-1 text-[13px] font-semibold text-[var(--c-muted)] hover:text-[var(--c-ink)]">
+                    {open ? 'Thu gọn' : `Xem thêm ${items.length - 2} sản phẩm`}
+                  </button>
+                )}
 
-                            return (
-                                <div key={reqId} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                                    {/* Card Header: Request Code, Order Link, Resolution Badge, Status Badge */}
-                                    <div className="p-4 border-b border-gray-50 flex flex-wrap items-center justify-between gap-3 bg-gray-50/20">
-                                        <div className="flex flex-wrap items-center gap-2.5">
-                                            <span className="font-extrabold text-sm text-gray-900 font-mono">
-                                                Yêu cầu #{reqId.slice(-8)}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate(`/orders/${encodeURIComponent(req.order_id)}`)}
-                                                className="text-xs text-gray-500 hover:text-emerald-700 font-mono font-medium underline flex items-center gap-0.5 cursor-pointer"
-                                                title="Xem đơn hàng gốc"
-                                            >
-                                                (Đơn #{req.order_id})
-                                            </button>
-                                            {isExchange ? (
-                                                <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
-                                                    <ArrowRightLeft size={12} /> ĐỔI HÀNG (IN BÙ)
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-bold text-amber-800">
-                                                    <DollarSign size={12} /> HOÀN TIỀN
-                                                </span>
-                                            )}
-                                        </div>
-                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold ${statusCfg.badgeClass}`}>
-                                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                                            {statusCfg.label}
-                                        </span>
-                                    </div>
-
-                                    {/* Card Body: Product Snapshot, Reason, Description */}
-                                    <div className="p-4 flex flex-col md:flex-row items-start justify-between gap-4">
-                                        <div className="flex gap-4 flex-1 min-w-0">
-                                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                                <img
-                                                    src={snapshot.image || '/image-not-found.jpg'}
-                                                    alt={snapshot.title || 'Sản phẩm'}
-                                                    className="w-full h-full object-cover"
-                                                    onError={e => { (e.target as HTMLImageElement).src = '/image-not-found.jpg'; }}
-                                                />
-                                            </div>
-                                            <div className="flex-1 min-w-0 space-y-1">
-                                                <h4 className="font-extrabold text-gray-900 text-sm leading-snug line-clamp-1">
-                                                    {snapshot.title || 'Sản phẩm in ấn theo yêu cầu'}
-                                                </h4>
-                                                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                                                    {snapshot.color && <span>Màu: <b>{snapshot.color}</b></span>}
-                                                    {snapshot.size && <span>Size: <b>{snapshot.size}</b></span>}
-                                                    <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded">
-                                                        SL khiếu nại: {req.quantity || 1}
-                                                    </span>
-                                                </div>
-                                                <div className="pt-1 text-xs">
-                                                    <span className="font-bold text-gray-700">Lý do: </span>
-                                                    <span className="text-gray-900 font-semibold">{req.reason_code} - {reasonText}</span>
-                                                </div>
-                                                {req.reason_description && (
-                                                    <p className="text-xs text-gray-600 italic bg-gray-50 p-2.5 rounded-lg border border-gray-100 line-clamp-2 mt-1">
-                                                        "{req.reason_description}"
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Card Footer: Metadata (dates, SLA) & Actions */}
-                                    <div className="p-4 bg-gray-50/10 border-t border-gray-50 flex flex-col sm:flex-row items-end sm:items-center justify-between gap-3">
-                                        <div className="text-xs text-gray-400 space-y-0.5">
-                                            <p>Ngày gửi: {req.created_at ? new Date(req.created_at).toLocaleString('vi-VN') : 'Mới đây'}</p>
-                                            {req.deadline_at && (
-                                                <p className="text-amber-700 font-medium">
-                                                    Hạn xử lý: {new Date(req.deadline_at).toLocaleString('vi-VN')}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate(`/orders/${encodeURIComponent(req.order_id)}`)}
-                                                className="border border-gray-200 hover:bg-gray-50 font-bold text-xs text-gray-600 px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-                                            >
-                                                <ExternalLink size={13} />
-                                                <span>Xem đơn hàng gốc</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate(`/returns/${encodeURIComponent(reqId)}`)}
-                                                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
-                                            >
-                                                <Eye size={13} />
-                                                <span>Theo dõi tiến độ</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )
-            ) : (
-                /* TAB: ĐƠN HÀNG THƯỜNG */
-                loading ? (
-                    <div className="text-center py-16">
-                        <p className="text-gray-400 font-semibold text-sm">Đang tải danh sách đơn hàng...</p>
-                    </div>
-                ) : filteredOrders.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
-                        <ShoppingBag size={48} className="text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-500 font-semibold mb-2 text-sm">Không tìm thấy đơn hàng nào</p>
-                        <p className="text-gray-400 text-xs max-w-sm mx-auto mb-6">
-                            Hãy thử điều chỉnh bộ lọc trạng thái hoặc từ khóa tìm kiếm của bạn.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {filteredOrders.map((order) => {
-                            const activeReturn = activeReturnByOrderId.get(order._id || order.id);
-
-                            return (
-                                <div key={order.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                                    {/* Card Header (Shop, Status, Return Badge) */}
-                                    <div className="p-4 border-b border-gray-50 flex items-center justify-between gap-2 bg-gray-50/20">
-                                        <div className="flex min-w-0 items-center gap-2">
-                                            <Store size={16} className="shrink-0 text-gray-500" />
-                                            <span className="truncate font-extrabold text-sm text-gray-800">{order.shopName}</span>
-                                        </div>
-                                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-2.5 gap-y-1 whitespace-nowrap">
-                                            <span className="text-[10px] font-bold text-gray-400"><span className="hidden sm:inline">Mã đơn: </span>#{order.id}</span>
-                                            {activeReturn && (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                                                    <ArrowRightLeft size={10} /> Đang yêu cầu đổi/trả
-                                                </span>
-                                            )}
-                                            {getStatusBadge(order)}
-                                        </div>
-                                    </div>
-
-                                    {/* Card Items list */}
-                                    <div className="p-4 divide-y divide-gray-50">
-                                        {order.items.map((item, idx) => (
-                                            <div key={idx} className="flex gap-4 py-3 first:pt-0 last:pb-0">
-                                                <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
-                                                    <img
-                                                        src={item.image || '/image-not-found.jpg'}
-                                                        alt={item.title}
-                                                        className="w-full h-full object-cover"
-                                                        onError={(e) => {
-                                                            (e.target as HTMLImageElement).src = '/image-not-found.jpg';
-                                                        }}
-                                                    />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-extrabold text-gray-900 text-sm leading-snug line-clamp-1">{item.title}</h4>
-                                                    <p className="text-[11px] text-gray-400 mt-1">
-                                                        Phân loại: {`${item.color || ''} ${item.size || ''}`.trim() || 'Mặc định'}
-                                                    </p>
-                                                    <p className="text-xs font-semibold text-gray-500 mt-0.5">x{item.quantity}</p>
-                                                </div>
-                                                <div className="shrink-0 whitespace-nowrap text-right flex flex-col items-end justify-between">
-                                                    <span className="font-extrabold text-gray-900 text-sm">
-                                                        {(item.price * item.quantity).toLocaleString('vi-VN')}đ
-                                                    </span>
-                                                    {/* Điện thoại: ẩn nút đánh giá từng món (chân thẻ đã có) để tên sản phẩm không bị cắt. */}
-                                                    {order.status === 'completed' && (
-                                                        <div className="mt-2 hidden sm:block">
-                                                            {item.is_reviewed ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleOpenReview(order, item.productId);
-                                                                    }}
-                                                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-amber-200/70 shadow-2xs"
-                                                                    title="Xem và chỉnh sửa đánh giá cho sản phẩm này"
-                                                                >
-                                                                    <Star size={11} className="fill-amber-500 text-amber-500" />
-                                                                    <span>Chỉnh sửa đánh giá</span>
-                                                                </button>
-                                                            ) : (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleOpenReview(order, item.productId);
-                                                                    }}
-                                                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-emerald-200/70 shadow-2xs"
-                                                                    title="Đánh giá sản phẩm này"
-                                                                >
-                                                                    <Star size={11} />
-                                                                    <span>Đánh giá</span>
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Card Footer (Actions, Total) */}
-                                    <div className="p-4 bg-gray-50/10 border-t border-gray-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
-                                        <div className="flex items-baseline justify-between">
-                                            <span className="text-xs text-gray-500 font-bold">Tổng số tiền:</span>
-                                            <span className="font-black text-emerald-600 text-base ml-1.5">
-                                                {order.totalAmount.toLocaleString('vi-VN')}đ
-                                            </span>
-                                        </div>
-
-                                        {/* Điện thoại: nút giãn đều hàng, nút cuối (thường là Mua lại) xuống dòng chiếm cả hàng. */}
-                                        <div className="flex flex-wrap items-center justify-end gap-2 max-sm:[&>button]:flex-1 max-sm:[&>button]:justify-center [&>button]:whitespace-nowrap">
-                                            {activeReturn && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => navigate(`/returns/${encodeURIComponent(activeReturn.id || activeReturn._id || '')}`)}
-                                                    className="border border-indigo-300 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-800 font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-                                                >
-                                                    <ArrowRightLeft size={13} />
-                                                    <span>Xem yêu cầu đổi/trả</span>
-                                                </button>
-                                            )}
-
-                                            <button
-                                                type="button"
-                                                onClick={() => navigate(`/orders/${order.id}`)}
-                                                className="border border-gray-200 hover:bg-gray-50 font-bold text-xs text-gray-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
-                                            >
-                                                <Eye size={14} />
-                                                <span>Xem chi tiết</span>
-                                            </button>
-
-                                            {canCancelOrder(order) && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => navigate(`/orders/${order.id}`)}
-                                                    className="border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
-                                                >
-                                                    <XCircle size={14} />
-                                                    <span>Hủy đơn</span>
-                                                </button>
-                                            )}
-
-                                            {order.status === 'cancelled' && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleReorder(order)}
-                                                    className="bg-[#008000] hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm cursor-pointer active:scale-95"
-                                                >
-                                                    <RefreshCw size={14} />
-                                                    <span>Mua lại</span>
-                                                </button>
-                                            )}
-
-                                            {order.status === 'shipping' && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => navigate(`/orders/${order.id}`)}
-                                                    className="bg-[#008000] hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
-                                                >
-                                                    <Truck size={14} />
-                                                    <span>Theo dõi hành trình</span>
-                                                </button>
-                                            )}
-
-                                            {order.status === 'completed' && (
-                                                <>
-                                                    {order.is_reviewed || (order.items?.length > 0 && order.items.every(it => it.is_reviewed)) || reviewedOrders.has(order.id) ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleOpenReview(order)}
-                                                            className="border border-amber-500 text-amber-700 hover:bg-amber-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
-                                                            title="Xem và chỉnh sửa đánh giá của đơn hàng này"
-                                                        >
-                                                            <Star size={14} className="fill-amber-500 text-amber-500" />
-                                                            <span>Chỉnh sửa đánh giá</span>
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleOpenReview(order)}
-                                                            className="border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
-                                                            title="Đánh giá các sản phẩm trong đơn hàng"
-                                                        >
-                                                            <Star size={14} />
-                                                            <span>Đánh giá</span>
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleReorder(order)}
-                                                        className="bg-[#008000] hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
-                                                    >
-                                                        <RefreshCw size={14} />
-                                                        <span>Mua lại</span>
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )
-            )}
-
-            {/* Reorder Modal */}
-            {reorderOrder && (
-                <ReorderModal
-                    isOpen={!!reorderOrder}
-                    onClose={() => setReorderOrder(null)}
-                    shopName={reorderOrder.shopName}
-                    items={reorderOrder.items}
-                    onConfirm={handleConfirmReorder}
-                />
-            )}
-
-            {/* Review Modal */}
-            {reviewOrder && (
-                <ReviewModal
-                    isOpen={!!reviewOrder}
-                    onClose={() => {
-                        setReviewOrder(null);
-                        setTargetReviewProductId(undefined);
-                    }}
-                    order={reviewOrder}
-                    initialProductId={targetReviewProductId}
-                    onSuccess={handleReviewSuccess}
-                />
-            )}
-
-            {activeTab === 'returns' && !loadingReturns && returnsPageCount > 1 && <nav aria-label="Trang yêu cầu đổi trả" className="flex flex-wrap items-center justify-end gap-4 text-sm"><button type="button" disabled={currentReturnsPage <= 1} onClick={() => setReturnsPage(currentReturnsPage - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Trang trước</button><span>Trang {currentReturnsPage}/{returnsPageCount} · {filteredReturns.length} yêu cầu</span><button type="button" disabled={currentReturnsPage >= returnsPageCount} onClick={() => setReturnsPage(currentReturnsPage + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Trang sau</button></nav>}
-
-            {/* Toast Notification */}
-            {toast && (
-                <div className={`fixed top-5 right-5 z-[9999] bg-white border border-gray-100 shadow-2xl rounded-2xl p-4 flex items-center gap-3 max-w-sm border-l-4 ${toast.type === 'success' ? 'border-l-emerald-500' : 'border-l-red-500'} transition-all duration-300`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
-                        {toast.type === 'success' ? <Check size={18} /> : <span>⚠️</span>}
-                    </div>
-                    <p className="text-xs font-extrabold text-gray-900">{toast.message}</p>
-                </div>
-            )}
+                <footer className="flex flex-col gap-3 border-t border-[var(--c-line)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="m-0 flex items-baseline gap-2 text-sm">
+                    <span className="text-[var(--c-muted)]">Thành tiền</span>
+                    <span className="vc-display vc-num text-[19px] font-semibold text-[var(--c-plum)]">{vnd(o.totalAmount)}</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2 max-sm:[&>*]:flex-1">
+                    {activeReturn && (
+                      <button type="button" onClick={() => navigate(`/returns/${encodeURIComponent(activeReturn.id || activeReturn._id || '')}`)} className={btnGhost}>Xem đổi trả</button>
+                    )}
+                    {canCancel(o) && (
+                      <button type="button" disabled={isBusy} onClick={() => { setCancelReason(CANCEL_REASONS[0]); setCancelOther(''); setCancelTarget(o); }} className={`${btnGhost} hover:!border-[var(--c-rose)] hover:text-[var(--c-rose)]`}>Hủy đơn</button>
+                    )}
+                    <Link to={detail} className={btnGhost}>Chi tiết <ChevronRight size={14} /></Link>
+                    {awaitingPayment(o) && (
+                      <button type="button" disabled={isBusy} onClick={() => void payNow(o)} className={btnPrimary}>
+                        {isBusy ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />} Thanh toán ngay
+                      </button>
+                    )}
+                    {o.status === 'shipping' && (
+                      <button type="button" disabled={isBusy} onClick={() => setDeliveryTarget(o)} className={btnPrimary}><PackageCheck size={14} /> Đã nhận hàng</button>
+                    )}
+                    {o.status === 'completed' && (
+                      <button type="button" onClick={() => { setReviewOrder(o); setReviewProductId(undefined); }} className={btnGhost}>
+                        <Star size={14} className={reviewed ? 'fill-amber-400 text-amber-400' : ''} /> {reviewed ? 'Sửa đánh giá' : 'Đánh giá'}
+                      </button>
+                    )}
+                    {(o.status === 'completed' || o.status === 'cancelled') && (
+                      <button type="button" onClick={() => setReorderOrder(o)} className={btnPrimary}>Mua lại</button>
+                    )}
+                  </div>
+                </footer>
+              </article>
+            );
+          })}
         </div>
-    );
+      </div>
+
+      {/* Hủy đơn */}
+      {cancelTarget && (
+        <Dialog title="Hủy đơn hàng này?" onClose={() => setCancelTarget(null)}>
+          <p className="m-0 text-sm text-[var(--c-muted)]">
+            Đơn {cancelTarget.id} của {cancelTarget.shopName}.
+            {cancelTarget.paymentStatus === 'PAID' && cancelTarget.paymentMethod !== 'COD' ? ' Số tiền đã trả sẽ được hoàn tự động.' : ''}
+          </p>
+          <fieldset className="m-0 mt-4 space-y-2 border-0 p-0">
+            <legend className="mb-2 text-[13px] font-semibold">Lý do hủy</legend>
+            {CANCEL_REASONS.map((r) => (
+              <label key={r} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 text-[13.5px] ${cancelReason === r ? 'border-[var(--c-plum)] bg-[var(--c-plum-wash)]' : 'border-[var(--c-line)]'}`}>
+                <input type="radio" name="cancel-reason" checked={cancelReason === r} onChange={() => setCancelReason(r)} className="h-4 w-4 accent-[var(--c-plum)]" />
+                {r}
+              </label>
+            ))}
+          </fieldset>
+          {cancelReason === 'Khác' && (
+            <textarea
+              value={cancelOther}
+              onChange={(e) => setCancelOther(e.target.value.slice(0, 300))}
+              rows={3}
+              placeholder="Cho shop biết lý do của bạn"
+              aria-label="Lý do khác"
+              className="mt-3 w-full rounded-xl border border-[var(--c-line-strong)] p-3 text-sm outline-none focus:border-[var(--c-plum)]"
+            />
+          )}
+          <div className="mt-6 flex justify-end gap-2">
+            <button type="button" onClick={() => setCancelTarget(null)} className="rounded-full px-5 py-2.5 text-sm font-semibold hover:bg-stone-100">Giữ đơn</button>
+            <button type="button" disabled={busy === cancelTarget.id} onClick={() => void submitCancel()} className="inline-flex items-center gap-2 rounded-full bg-[var(--c-rose)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-60">
+              {busy === cancelTarget.id && <Loader2 size={14} className="animate-spin" />} Hủy đơn
+            </button>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Xác nhận đã nhận hàng */}
+      {deliveryTarget && (
+        <Dialog title="Bạn đã nhận được hàng?" onClose={() => setDeliveryTarget(null)}>
+          <p className="m-0 text-sm leading-relaxed text-[var(--c-muted)]">
+            Xác nhận khi bạn đã nhận đủ hàng và kiểm tra sản phẩm. Sau khi xác nhận, đơn {deliveryTarget.id} sẽ hoàn tất và tiền được chuyển cho shop.
+          </p>
+          <div className="mt-6 flex justify-end gap-2">
+            <button type="button" onClick={() => setDeliveryTarget(null)} className="rounded-full px-5 py-2.5 text-sm font-semibold hover:bg-stone-100">Chưa nhận</button>
+            <button type="button" disabled={busy === deliveryTarget.id} onClick={() => void submitDelivery()} className="inline-flex items-center gap-2 rounded-full bg-[var(--c-green)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--c-green-deep)] disabled:opacity-60">
+              {busy === deliveryTarget.id && <Loader2 size={14} className="animate-spin" />} Đã nhận hàng
+            </button>
+          </div>
+        </Dialog>
+      )}
+
+      {reorderOrder && (
+        <ReorderModal
+          isOpen
+          onClose={() => setReorderOrder(null)}
+          shopName={reorderOrder.shopName || ''}
+          items={reorderOrder.items as any}
+          onConfirm={(sel: any) => void confirmReorder(sel)}
+        />
+      )}
+
+      {reviewOrder && (
+        <ReviewModal
+          isOpen
+          onClose={() => { setReviewOrder(null); setReviewProductId(undefined); }}
+          order={reviewOrder as any}
+          initialProductId={reviewProductId}
+          onSuccess={onReviewed}
+        />
+      )}
+
+      <CommerceToast toast={toast} onDismiss={dismiss} />
+    </div>
+  );
+}
+
+function Empty({ icon, title, body, action }: { icon: React.ReactNode; title: string; body: string; action?: { label: string; onClick: () => void } }) {
+  return (
+    <section className="vc-panel px-6 py-14 text-center">
+      <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border-[1.5px] border-dashed border-[var(--c-thread)] text-[var(--c-plum)]">{icon}</div>
+      <h2 className="vc-display m-0 text-lg font-semibold text-[var(--c-plum)]">{title}</h2>
+      <p className="mx-auto mb-0 mt-2 max-w-sm text-sm leading-relaxed text-[var(--c-muted)]">{body}</p>
+      {action && <button type="button" onClick={action.onClick} className="mt-6 rounded-full bg-[var(--c-green)] px-6 py-3 text-sm font-semibold text-white hover:bg-[var(--c-green-deep)]">{action.label}</button>}
+    </section>
+  );
+}
+
+function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-stone-900/45 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
+      <div className="vc-sheet max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-6 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <h3 className="vc-display m-0 text-lg font-semibold text-[var(--c-plum)]">{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Đóng" className="rounded-full p-1.5 text-[var(--c-muted)] hover:bg-stone-100"><X size={18} /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export default BuyerOrdersPage;
