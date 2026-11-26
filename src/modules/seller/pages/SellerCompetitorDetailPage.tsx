@@ -171,7 +171,7 @@ export function SellerCompetitorDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-pulse font-sans">
+      <div className="space-y-6 animate-pulse font-sans">
         <div className="h-6 bg-stone-200 rounded w-48 mb-4" />
         <div className="h-64 bg-stone-200 rounded-3xl w-full" />
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -184,7 +184,7 @@ export function SellerCompetitorDetailPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in font-sans">
+    <div className="space-y-8 animate-fade-in font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-stone-500">
           <button

@@ -152,7 +152,7 @@ export function SellerSettingsPage() {
   ] as const;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-16 font-sans">
+    <div className="space-y-8 pb-16 font-sans">
       {/* Page Header */}
       <div>
         <h1 className="text-2xl font-extrabold text-[#330033] font-jakarta tracking-tight">

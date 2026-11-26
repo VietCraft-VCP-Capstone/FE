@@ -183,7 +183,7 @@ export function SellerCatalogPage() {
 
     if (loading) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div>
                 <div className="h-9 w-72 bg-stone-200 rounded-lg animate-pulse" />
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
                     {[0, 1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-stone-100 border border-stone-200 rounded-2xl animate-pulse" />)}
@@ -194,7 +194,7 @@ export function SellerCatalogPage() {
     }
 
     return (
-        <div className="space-y-6 animate-fade-in max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 font-sans">
+        <div className="space-y-6 animate-fade-in font-sans">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
