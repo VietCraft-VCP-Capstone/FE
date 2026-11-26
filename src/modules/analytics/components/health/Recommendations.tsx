@@ -23,11 +23,11 @@ function scoreGain(data: ListingHealth): (r: HealthRecommendation) => number {
   return r => (budget ? (r.gain_points * 100) / budget : 0);
 }
 
-function RecommendationRow({ r, index, gain, productId }: { r: HealthRecommendation; index: number; gain: number; productId: string }) {
+function RecommendationRow({ r, index, gain, productId }: { r: HealthRecommendation; index: number; gain: number; productId?: string }) {
   const first = index === 0;
   const blocker = r.kind === 'blocker';
   const onOpen = () => {
-    analyticsApi.recordHealthAction(productId, { recommendation_id: r.id, action: 'open', kind: r.kind }).catch(() => undefined);
+    if (productId) analyticsApi.recordHealthAction(productId, { recommendation_id: r.id, action: 'open', kind: r.kind }).catch(() => undefined);
   };
   return (
     <li className={`flex items-start gap-3 rounded-xl p-3 ${first ? 'border border-[#007700]/20 bg-[#007700]/[0.04]' : ''}`}>
@@ -44,19 +44,19 @@ function RecommendationRow({ r, index, gain, productId }: { r: HealthRecommendat
         <p className="m-0 mt-0.5 text-xs leading-relaxed text-stone-800">→ {r.action}</p>
         {r.method === 'ml_unvalidated' && <div className="mt-1.5"><Tooltip title={AI_HINT}><span className="cursor-help"><Chip>AI đoán, nên xem lại</Chip></span></Tooltip></div>}
       </div>
-      <Link
+      {productId && <Link
         to={editLink(productId, r.field)}
         onClick={onOpen}
         className={`inline-flex shrink-0 items-center gap-0.5 rounded-lg text-sm font-semibold no-underline ${first ? 'bg-[#007700] px-3 py-1.5 text-white hover:bg-[#006200]' : 'px-1 py-1.5 text-[#007700]'}`}
       >
         {first ? 'Sửa ngay' : 'Sửa'}
         <ChevronRight size={14} aria-hidden />
-      </Link>
+      </Link>}
     </li>
   );
 }
 
-export function Recommendations({ data, productId }: { data: ListingHealth; productId: string }) {
+export function Recommendations({ data, productId }: { data: ListingHealth; productId?: string }) {
   const top = (data.recommendations ?? []).slice(0, TOP);
   const gainOf = scoreGain(data);
   const total = potentialGain(data);

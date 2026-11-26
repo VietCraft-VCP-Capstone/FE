@@ -3,7 +3,7 @@ import { ProductImage } from './ProductImage';
 import { Link } from 'react-router-dom';
 import { BarChart2, Pencil, Trash2, PackageOpen, MapPin, Info } from 'lucide-react';
 import { Tooltip } from 'antd';
-import { healthTier } from '../../analytics/components/intel/intelLabels';
+import { healthTier } from '../../analytics/components/health/tier';
 import { INSIGHTS_ROOT } from '../../analytics/nav';
 import { scoreText } from '../../analytics/format';
 

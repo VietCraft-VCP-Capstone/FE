@@ -16,7 +16,7 @@ import { useToast } from '../../../../shared/components/Toast';
 import { CHART_INK, SERIES } from '../../../../shared/components/charts/chartTheme';
 import { count, money, timeAgo } from '../../../../shared/utils/format';
 import { InsightBlock } from '../InsightBlock';
-import { useFocusTrap } from '../intel/IntelPreviewModal';
+import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap';
 import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, type Tone } from '../ui';
 import { decimal } from '../../format';
 import { invalidateInsights, type InsightState } from '../../hooks/useInsight';

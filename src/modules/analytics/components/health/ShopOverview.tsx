@@ -1,10 +1,10 @@
 import { AlertCircle, ChevronRight, DollarSign, FileText, Image, Layers, Star, Tag, type LucideIcon } from 'lucide-react';
 import { scoreText } from '../../format';
 import type { HealthRow } from '../../healthTypes';
-import { URGENT, type ShopIssue } from '../health/commonIssues';
+import { URGENT, type ShopIssue } from './commonIssues';
 import { TIERS, TIER_INFO, inTier, tierOf, type Tier, type TierFilter } from './HealthList';
-import { TIER_COLOR } from './intelLabels';
-import { SCORE_MEANING } from '../health/factorState';
+import { TIER_COLOR } from './tier';
+import { SCORE_MEANING } from './factorState';
 import { InfoTip } from '../ui';
 
 const ISSUE_ICONS: Record<string, LucideIcon> = {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { scoreText } from '../../format';
-import { healthTier } from './intelLabels';
+import { healthTier } from './tier';
 
 const R = 44;
 const C = 2 * Math.PI * R;
