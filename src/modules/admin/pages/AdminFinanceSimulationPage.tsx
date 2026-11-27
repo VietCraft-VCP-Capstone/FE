@@ -12,7 +12,6 @@ import {
   TrendMonth,
 } from '../services/adminFinanceService';
 import { SCENARIOS, SimInput, profitBars, sensitivity, simulate } from '../services/financeSimulation';
-import { AdminAntd } from '../components/AdminAntd';
 import { Alert, SegmentedControl } from '../components/AdminPrimitives';
 import {
   BTN_PRIMARY,

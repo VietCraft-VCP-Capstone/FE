@@ -405,7 +405,7 @@ export function CostBarsChart({ costs }: { costs: { name: string; amount: number
 /* ------------------------------------------------------------------ Phí sàn so với sàn lớn */
 
 // Tham khảo 2026: tổng phí người bán trả mỗi đơn (nguồn tổng hợp, không phải bảng phí chính thức).
-const BENCHMARKS = [
+export const BENCHMARKS = [
   { name: 'Shopee', value: 16.3, text: '≈ 15–18%' },
   { name: 'Etsy', value: 9.5, text: '≈ 9,5%' },
 ];
