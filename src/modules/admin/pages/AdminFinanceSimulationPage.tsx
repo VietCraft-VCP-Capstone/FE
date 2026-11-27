@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Lock, Plus, RefreshCw, Save, Trash2, TrendingDown, TrendingUp, Undo2 } from 'lucide-react';
+import { Tooltip } from 'antd';
+import { HelpCircle, Loader2, Lock, Plus, RefreshCw, Save, Trash2, TrendingDown, TrendingUp, Undo2 } from 'lucide-react';
 
 import {
   adminFinanceService,
@@ -8,8 +9,10 @@ import {
   FinanceOverview,
   OverviewQuery,
   PaymentFee,
+  TrendMonth,
 } from '../services/adminFinanceService';
 import { SCENARIOS, SimInput, profitBars, sensitivity, simulate } from '../services/financeSimulation';
+import { AdminAntd } from '../components/AdminAntd';
 import { Alert, SegmentedControl } from '../components/AdminPrimitives';
 import {
   BTN_PRIMARY,
@@ -26,6 +29,7 @@ import {
   cx,
 } from '../components/adminUi';
 import {
+  BENCHMARKS,
   BenchmarkChart,
   CostBarsChart,
   OrderSplit,
@@ -139,7 +143,88 @@ function baselineOf(o: FinanceOverview): SimInput {
   };
 }
 
+/** Câu chốt của biểu đồ 6 tháng; lấy tháng đủ ngày gần nhất vì tháng đang chạy chưa trọn. */
+function trendSummary(trend: TrendMonth[]): string {
+  const n = trend.length;
+  if (!n) return '';
+  const good = trend.filter(t => t.net_profit >= 0).length;
+  const head = good === 0 ? `Cả ${n} tháng đều lỗ.` : good === n ? `Cả ${n} tháng đều có lãi.` : `${good}/${n} tháng có lãi.`;
+  const last = [...trend].reverse().find(t => !t.partial && t.fixed_costs > 0);
+  return last
+    ? `${head} Tháng ${monthLabel(last)} lãi góp bằng ${pct(last.contribution / last.fixed_costs)} chi phí cố định.`
+    : head;
+}
+
+function benchmarkSummary(rate: number): string {
+  const v = Math.round(rate * 1000) / 10;
+  const lower = BENCHMARKS.filter(b => v < b.value).map(b => b.name);
+  const higher = BENCHMARKS.filter(b => v >= b.value).map(b => b.name);
+  return [
+    `VietCraft thu ${v.toLocaleString('vi-VN')}% mỗi đơn`,
+    lower.length ? `thấp hơn ${lower.join(' và ')}` : '',
+    higher.length ? `cao hơn ${higher.join(' và ')}` : '',
+  ]
+    .filter(Boolean)
+    .join(', ')
+    .concat('.');
+}
+
+/** Báo ngay sau khi lưu: số nào đã đổi vì chi phí mới. */
+function savedNotice(before: FinanceOverview | null, after: FinanceOverview | null): string {
+  if (!before || !after) return 'Đã lưu cấu hình. Số liệu ở các tab đã tính lại.';
+  const be = (o: FinanceOverview) =>
+    o.monthly.break_even_orders === null ? 'không thể hòa vốn' : `${count(o.monthly.break_even_orders)} đơn/tháng`;
+  const parts: string[] = [];
+  if (before.monthly.break_even_orders !== after.monthly.break_even_orders) {
+    parts.push(`cần để hòa vốn ${be(before)} → ${be(after)}`);
+  }
+  if (before.pnl.net_profit !== after.pnl.net_profit) {
+    parts.push(`lãi/lỗ ${periodText(after.period)} ${signedMoney(before.pnl.net_profit)} → ${signedMoney(after.pnl.net_profit)}`);
+  }
+  if (after.monthly.runway_months !== null && before.monthly.runway_months !== after.monthly.runway_months) {
+    parts.push(`vốn dự phòng trụ được ${months(after.monthly.runway_months)}`);
+  }
+  return `Đã lưu cấu hình${parts.length ? `: ${parts.join(' · ')}` : ''}. Số liệu ở các tab đã tính lại.`;
+}
+
 /* ------------------------------------------------------------------ Thành phần nhỏ */
+
+const GLOSSARY: [string, string][] = [
+  ['Tổng tiền hàng (GMV)', 'Tổng giá trị hàng bán qua sàn. Đây là tiền của người bán, sàn chỉ giữ hộ.'],
+  ['Hoa hồng', 'Phần sàn thu trên mỗi đơn (mặc định 5% tiền người bán muốn nhận, cộng vào giá khách trả).'],
+  ['Doanh thu thuần', 'Hoa hồng trừ phần voucher sàn bù cho khách — phần thật sự thuộc về sàn.'],
+  ['Take rate', 'Doanh thu thuần chia tổng tiền hàng: sàn giữ được bao nhiêu % trên mỗi đồng hàng bán ra.'],
+  ['Biến phí', 'Chi phí sinh ra theo từng đơn: phí cổng thanh toán, tin nhắn, phí cổng mất ở đơn hoàn.'],
+  ['Chi phí cố định (định phí)', 'Trả mỗi tháng dù không bán được gì: server, tên miền, hosting…'],
+  ['Lãi góp', 'Doanh thu thuần trừ biến phí: mỗi đơn góp bao nhiêu để trả chi phí cố định.'],
+  ['Lãi/lỗ ròng', 'Lãi góp trừ chi phí cố định: sau mọi chi phí, sàn thật sự lãi hay lỗ bao nhiêu.'],
+  ['Hòa vốn', 'Số đơn (hoặc tiền hàng) mỗi tháng để tổng lãi góp vừa bằng chi phí cố định. Ít hơn là lỗ, nhiều hơn là lãi.'],
+  ['Biên an toàn', 'Đang vượt điểm hòa vốn bao nhiêu %. Càng cao càng an toàn.'],
+  ['Runway (số tháng trụ được)', 'Vốn dự phòng chia cho số lỗ mỗi tháng — nếu cứ lỗ như vậy thì vốn đủ bù trong bao lâu.'],
+];
+const TERMS = new Map(GLOSSARY);
+
+/** Nút "?" cạnh thuật ngữ: rê chuột, chạm hoặc Tab tới để đọc nghĩa ngay tại chỗ. */
+function Hint({ term }: { term: string }) {
+  const id = useId();
+  const text = TERMS.get(term);
+  if (!text) return null;
+  return (
+    <Tooltip title={text} trigger={['hover', 'focus']}>
+      <button
+        type="button"
+        aria-label={`${term} là gì?`}
+        aria-describedby={id}
+        className="ml-1 inline-flex cursor-help items-center rounded-sm align-[-2px] text-admin-muted transition-colors duration-150 hover:text-admin-ink focus-visible:text-admin-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-brand/30"
+      >
+        <HelpCircle size={13} aria-hidden />
+        <span id={id} className="sr-only">
+          {text}
+        </span>
+      </button>
+    </Tooltip>
+  );
+}
 
 function Delta({ value, format }: { value: number | null; format: (v: number) => string }) {
   if (value === null) return <span className="text-[12px] text-admin-muted">kỳ trước chưa có số liệu</span>;
@@ -155,12 +240,14 @@ function Delta({ value, format }: { value: number | null; format: (v: number) =>
 
 function Tile({
   label,
+  term,
   value,
   tone,
   delta,
   children,
 }: {
   label: string;
+  term?: string;
   value: string;
   tone?: 'good' | 'bad';
   delta?: React.ReactNode;
@@ -168,7 +255,10 @@ function Tile({
 }) {
   return (
     <div className={cx(CARD, 'px-[18px] py-4')}>
-      <div className="text-[12.5px] font-semibold text-admin-muted">{label}</div>
+      <div className="text-[12.5px] font-semibold text-admin-muted">
+        {label}
+        {term && <Hint term={term} />}
+      </div>
       <div
         className={cx(
           'mt-1.5 text-[23px] font-extrabold leading-none',
@@ -294,6 +384,7 @@ function SimField({
 
 interface FlowRow {
   label: string;
+  term?: string;
   note: string;
   value: number;
   kind: 'in' | 'out' | 'sum';
@@ -322,7 +413,10 @@ function MoneyFlow({ rows }: { rows: FlowRow[] }) {
             )}
           >
             <div className="min-w-0 [overflow-wrap:anywhere]">
-              <div className={cx('text-[13.5px] text-admin-ink', sum ? 'font-bold' : 'font-semibold')}>{r.label}</div>
+              <div className={cx('text-[13.5px] text-admin-ink', sum ? 'font-bold' : 'font-semibold')}>
+                {r.label}
+                {r.term && <Hint term={r.term} />}
+              </div>
               <div className="text-[12px] leading-[1.5] text-admin-muted">{r.note}</div>
             </div>
             <div
@@ -341,6 +435,13 @@ function MoneyFlow({ rows }: { rows: FlowRow[] }) {
   );
 }
 
+const VERDICT_TONE = {
+  good: { box: 'border-[#b7e0b7] bg-admin-brand-050', ink: 'text-admin-brand-700' },
+  warn: { box: 'border-[#fdba74] bg-[#fff7ed]', ink: 'text-[#9a3412]' },
+  bad: { box: 'border-[#f6caca] bg-admin-danger-050', ink: 'text-[#b91c1c]' },
+};
+
+/** Kết luận đầu trang: một câu kết quả, rồi vì sao, trụ được bao lâu và nên làm gì tiếp. */
 function Verdict({ o, cash }: { o: FinanceOverview; cash: number }) {
   const when = periodText(o.period);
   const When = when[0].toUpperCase() + when.slice(1);
@@ -349,70 +450,75 @@ function Verdict({ o, cash }: { o: FinanceOverview; cash: number }) {
   const perMonth = o.monthly.orders;
   const cpo = o.contribution_per_order ?? 0;
   const runway = o.monthly.runway_months;
-  const tail =
-    profit < 0 &&
-    (runway !== null ? (
+  const tab = (key: string, text: string) => (
+    <Link to={`/admin/finance?tab=${key}`} className="font-semibold text-admin-brand">
+      {text}
+    </Link>
+  );
+  const lasts =
+    runway !== null ? (
       <>
-        {' '}
-        Với vốn dự phòng {compactMoney(cash)}, nếu giữ mức lỗ này sàn trụ được khoảng <b>{months(runway)}</b>.
+        Với vốn dự phòng {compactMoney(cash)}, nếu cứ lỗ như vậy sàn trụ được khoảng <b>{months(runway)}</b>.
       </>
     ) : (
-      <>
-        {' '}
-        Nhập vốn dự phòng ở tab{' '}
-        <Link to="/admin/finance?tab=chi-phi" className="font-semibold text-current">
-          Chi phí vận hành
-        </Link>{' '}
-        để biết sàn trụ được bao lâu.
-      </>
-    ));
+      <>Chưa biết — nhập vốn dự phòng ở tab {tab('chi-phi', 'Chi phí vận hành')} để biết sàn trụ được bao lâu.</>
+    );
 
+  let tone: keyof typeof VERDICT_TONE = 'warn';
+  let headline: string;
+  const rows: [string, React.ReactNode][] = [];
   if (!o.orders.paid) {
-    return (
-      <Alert tone="warn">
-        Chưa có đơn đã thanh toán {when}. Bảng bên dưới chỉ còn chi phí cố định; phần mô phỏng đang dùng
-        giá trị giả định — hãy sửa cho sát thực tế.{tail}
-      </Alert>
-    );
+    headline = `Chưa có đơn đã thanh toán ${when}.`;
+    rows.push(['Lưu ý', 'Bảng bên dưới chỉ còn chi phí cố định; phần mô phỏng đang dùng giá trị giả định — hãy sửa cho sát thực tế.']);
+    if (profit < 0) rows.push(['Trụ được', lasts]);
+  } else if (profit >= 0) {
+    tone = 'good';
+    headline = `${When} sàn lãi ${money(profit)} sau mọi chi phí.`;
+    rows.push(['Vì sao', `Cần ${count(be ?? 0)} đơn/tháng để hòa vốn, hiện đạt khoảng ${count(perMonth)} đơn/tháng.`]);
+    rows.push(['Nên làm gì', <>Thử kịch bản Bi quan ở tab {tab('mo-phong', 'Mô phỏng')} để biết nếu đơn giảm thì sàn còn lãi không.</>]);
+  } else if (be === null) {
+    tone = 'bad';
+    headline = `${When} sàn lỗ ${money(-profit)}.`;
+    rows.push([
+      'Vì sao',
+      `${cpo < 0 ? `Mỗi đơn đang làm sàn lỗ thêm ${money(-cpo)}` : 'Mỗi đơn không góp được đồng nào'} vì phí cổng, voucher sàn và hoàn tiền lớn hơn hoa hồng — bán thêm cũng không hòa vốn được.`,
+    ]);
+    rows.push(['Trụ được', lasts]);
+    rows.push(['Nên làm gì', <>Tăng hoa hồng hoặc giảm voucher sàn; thử trước ở tab {tab('mo-phong', 'Mô phỏng')}.</>]);
+  } else {
+    headline = `${When} sàn lỗ ${money(-profit)}.`;
+    rows.push([
+      'Vì sao',
+      <>
+        Mỗi đơn góp {money(cpo)} để trả chi phí cố định {compactMoney(o.monthly.fixed_costs)}/tháng, nên cần{' '}
+        <b>{count(be)} đơn/tháng</b> để hòa vốn — hiện khoảng {count(perMonth)} đơn/tháng, còn thiếu{' '}
+        {count(Math.max(0, be - perMonth))}.
+      </>,
+    ]);
+    rows.push(['Trụ được', lasts]);
+    rows.push([
+      'Nên làm gì',
+      <>
+        Vào tab {tab('mo-phong', 'Mô phỏng')} thử tăng số đơn, tăng hoa hồng hoặc giảm voucher sàn, chi phí cố định —
+        xem cách nào giảm lỗ nhiều nhất.
+      </>,
+    ]);
   }
-  if (profit >= 0) {
-    return (
-      <Alert tone="success">
-        {When} sàn <b>lãi {money(profit)}</b> sau mọi chi phí. Cần {count(be ?? 0)} đơn/tháng để hòa vốn, hiện
-        đạt khoảng {count(perMonth)} đơn/tháng.
-      </Alert>
-    );
-  }
-  if (be === null) {
-    return (
-      <Alert tone="danger">
-        {When} sàn <b>lỗ {money(-profit)}</b>.{' '}
-        {cpo < 0 ? `Mỗi đơn đang làm sàn lỗ thêm ${money(-cpo)}` : 'Mỗi đơn không góp được đồng nào'} vì phí cổng, voucher
-        sàn và hoàn tiền lớn hơn hoa hồng — bán thêm cũng không hòa vốn được. Cần tăng hoa hồng hoặc giảm voucher sàn.
-        {tail}
-      </Alert>
-    );
-  }
+  const t = VERDICT_TONE[tone];
   return (
-    <Alert tone="warn">
-      {When} sàn <b>lỗ {money(-profit)}</b>. Mỗi đơn góp {money(cpo)}, nên cần <b>{count(be)} đơn/tháng</b> để
-      hòa vốn — hiện khoảng {count(perMonth)} đơn/tháng, còn thiếu {count(Math.max(0, be - perMonth))}.{tail}
-    </Alert>
+    <section aria-label="Kết luận" className={cx('mb-4 rounded-admin border px-[18px] py-3.5', t.box)}>
+      <p className={cx('m-0 text-[15px] font-bold', t.ink)}>{headline}</p>
+      <dl className="m-0 mt-2 grid grid-cols-1 gap-x-4 text-[13px] leading-[1.55] sm:grid-cols-[88px_minmax(0,1fr)] sm:gap-y-1">
+        {rows.map(([k, v]) => (
+          <React.Fragment key={k}>
+            <dt className={cx('font-bold', t.ink)}>{k}</dt>
+            <dd className="m-0 mb-1.5 text-admin-body sm:mb-0">{v}</dd>
+          </React.Fragment>
+        ))}
+      </dl>
+    </section>
   );
 }
-
-const GLOSSARY: [string, string][] = [
-  ['Tổng tiền hàng (GMV)', 'Tổng giá trị hàng bán qua sàn. Đây là tiền của người bán, sàn chỉ giữ hộ.'],
-  ['Hoa hồng', 'Phần sàn thu trên mỗi đơn (mặc định 5% tiền người bán muốn nhận, cộng vào giá khách trả).'],
-  ['Doanh thu thuần', 'Hoa hồng trừ phần voucher sàn bù cho khách — phần thật sự thuộc về sàn.'],
-  ['Take rate', 'Doanh thu thuần chia tổng tiền hàng: sàn giữ được bao nhiêu % trên mỗi đồng hàng bán ra.'],
-  ['Biến phí', 'Chi phí sinh ra theo từng đơn: phí cổng thanh toán, tin nhắn, phí cổng mất ở đơn hoàn.'],
-  ['Chi phí cố định (định phí)', 'Trả mỗi tháng dù không bán được gì: server, tên miền, hosting…'],
-  ['Lãi góp', 'Doanh thu thuần trừ biến phí: mỗi đơn góp bao nhiêu để trả chi phí cố định.'],
-  ['Hòa vốn', 'Số đơn (hoặc tiền hàng) mỗi tháng để tổng lãi góp vừa bằng chi phí cố định. Ít hơn là lỗ, nhiều hơn là lãi.'],
-  ['Biên an toàn', 'Đang vượt điểm hòa vốn bao nhiêu %. Càng cao càng an toàn.'],
-  ['Runway (số tháng trụ được)', 'Vốn dự phòng chia cho số lỗ mỗi tháng — nếu cứ lỗ như vậy thì vốn đủ bù trong bao lâu.'],
-];
 
 function Glossary() {
   return (
@@ -449,22 +555,24 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
   const [notice, setNotice] = useState('');
   const requestId = useRef(0);
 
-  const load = useCallback(async (q: OverviewQuery) => {
+  const load = useCallback(async (q: OverviewQuery): Promise<FinanceOverview | null> => {
     const id = ++requestId.current;
     setLoading(true);
     setError('');
     try {
       const [o, c] = await Promise.all([adminFinanceService.getOverview(q), adminFinanceService.getConfig()]);
-      if (id !== requestId.current) return;
+      if (id !== requestId.current) return null;
       setOverview(o);
       setConfig(c);
       setForm(c);
       setSim(baselineOf(o));
       setScenario('base');
+      return o;
     } catch (err: any) {
       if (id === requestId.current) {
         setError(err?.response?.data?.error || 'Không tải được số liệu tài chính. Bấm "Làm mới" để thử lại.');
       }
+      return null;
     } finally {
       if (id === requestId.current) setLoading(false);
     }
@@ -475,6 +583,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
   }, [query, load]);
 
   const base = useMemo(() => (overview ? baselineOf(overview) : null), [overview]);
+  const baseResult = useMemo(() => (base ? simulate(base) : null), [base]);
   const result = useMemo(() => (sim ? simulate(sim) : null), [sim]);
   const bars = useMemo(() => (sim ? profitBars(sim) : []), [sim]);
   const shocks = useMemo(() => (sim ? sensitivity(sim) : []), [sim]);
@@ -514,6 +623,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
 
   const save = async () => {
     if (!form) return;
+    const before = overview;
     setSaving(true);
     setError('');
     setNotice('');
@@ -522,8 +632,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
         ...form,
         monthly_costs: form.monthly_costs.map(c => ({ ...c, name: c.name.trim() })),
       });
-      await load(query);
-      setNotice('Đã lưu cấu hình. Số liệu ở các tab đã tính lại theo chi phí mới.');
+      setNotice(savedNotice(before, await load(query)));
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Lưu cấu hình thất bại.');
     } finally {
@@ -563,6 +672,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
     const flow: FlowRow[] = [
       {
         label: 'Hoa hồng thu được',
+        term: 'Hoa hồng',
         note: `${count(o.orders.paid)} đơn đã thanh toán. Tổng tiền hàng ${compactMoney(o.gmv)} là tiền của người bán — sàn chỉ giữ hộ.`,
         value: o.pnl.commission,
         kind: 'in',
@@ -573,7 +683,13 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
         value: o.pnl.platform_voucher,
         kind: 'out',
       },
-      { label: 'Doanh thu thuần của sàn', note: 'Phần thật sự thuộc về sàn.', value: o.pnl.net_revenue, kind: 'sum' },
+      {
+        label: 'Doanh thu thuần của sàn',
+        term: 'Doanh thu thuần',
+        note: '= Hoa hồng − voucher sàn. Phần thật sự thuộc về sàn.',
+        value: o.pnl.net_revenue,
+        kind: 'sum',
+      },
       {
         label: 'Phí cổng thanh toán',
         note:
@@ -601,14 +717,27 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
         value: o.pnl.notification,
         kind: 'out',
       },
-      { label: 'Lãi góp', note: 'Còn lại để trả chi phí cố định.', value: o.pnl.contribution, kind: 'sum' },
+      {
+        label: 'Lãi góp',
+        term: 'Lãi góp',
+        note: '= Doanh thu thuần − phí cổng − hoàn tiền − thông báo. Còn lại để trả chi phí cố định.',
+        value: o.pnl.contribution,
+        kind: 'sum',
+      },
       {
         label: 'Chi phí cố định',
+        term: 'Chi phí cố định (định phí)',
         note: `${money(o.monthly.fixed_costs)}/tháng, tính cho ${days} ngày.`,
         value: o.pnl.fixed_costs,
         kind: 'out',
       },
-      { label: 'Lãi/lỗ ròng', note: 'Sau mọi chi phí.', value: o.pnl.net_profit, kind: 'sum' },
+      {
+        label: 'Lãi/lỗ ròng',
+        term: 'Lãi/lỗ ròng',
+        note: '= Lãi góp − chi phí cố định. Sau mọi chi phí.',
+        value: o.pnl.net_profit,
+        kind: 'sum',
+      },
     ];
 
     return (
@@ -667,6 +796,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
           <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Tile
               label="Lãi/lỗ ròng"
+              term="Lãi/lỗ ròng"
               value={signedMoney(o.pnl.net_profit)}
               tone={o.pnl.net_profit < 0 ? 'bad' : 'good'}
               delta={<Delta value={o.pnl.net_profit - prev.net_profit} format={signedMoney} />}
@@ -675,6 +805,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
             </Tile>
             <Tile
               label="Doanh thu thuần của sàn"
+              term="Doanh thu thuần"
               value={money(o.pnl.net_revenue)}
               delta={<Delta value={changePercent(o.pnl.net_revenue, prev.net_revenue)} format={pctFormat} />}
             >
@@ -682,6 +813,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
             </Tile>
             <Tile
               label="Lãi góp mỗi đơn"
+              term="Lãi góp"
               value={cpo === null ? '—' : signedMoney(cpo)}
               tone={cpo !== null && cpo < 0 ? 'bad' : undefined}
               delta={
@@ -695,8 +827,9 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
             </Tile>
             <Tile
               label="Đơn mỗi tháng / cần để hòa vốn"
+              term="Hòa vốn"
               value={`${count(o.monthly.orders)} / ${be === null ? '—' : count(be)}`}
-              delta={<Delta value={changePercent(o.orders.paid, prev.orders)} format={pctFormat} />}
+              delta={<Delta value={changePercent(o.orders.paid, prev.orders)} format={v => `${pctFormat(v)} số đơn`} />}
             >
               <div className="mb-1.5 h-2 rounded-full bg-admin-line-soft" aria-hidden>
                 <div
@@ -708,7 +841,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                 ? 'Không thể hòa vốn ở mức phí hiện tại'
                 : o.monthly.orders >= be
                   ? `Vượt điểm hòa vốn, biên an toàn ${pct(o.monthly.margin_of_safety)}`
-                  : `Còn thiếu ${count(be - o.monthly.orders)} đơn/tháng`}
+                  : `Còn thiếu ${count(be - o.monthly.orders)} đơn/tháng (mới đạt ${Math.floor(reach)}%)`}
               {o.monthly.break_even_gmv !== null && (
                 <> · tức khoảng {compactMoney(o.monthly.break_even_gmv)} tiền hàng/tháng</>
               )}
@@ -717,7 +850,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
 
           <Panel
             title={`Tiền đi đâu ${periodText(o.period)}`}
-            sub="Cột xanh: tiền sàn thu · cột đỏ: các khoản chi · cột xám: phần còn lại sau khi trừ"
+            sub="Đọc từ trái sang phải: bắt đầu từ hoa hồng sàn thu, trừ dần từng khoản chi; cột cuối là lãi/lỗ."
           >
             <div className="px-[18px] pt-4">
               <WaterfallChart o={o} />
@@ -727,12 +860,24 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
 
           <Panel
             title="Xu hướng 6 tháng gần nhất"
-            sub="Tháng nào cột xanh lá (lãi góp) cao hơn cột xanh dương (chi phí cố định) là tháng đó có lãi"
+            sub={
+              <>
+                <b className="font-semibold text-admin-ink">{trendSummary(o.trend)}</b> Tháng nào cột xanh lá (lãi góp) cao
+                hơn cột xanh dương (chi phí cố định) là tháng đó có lãi.
+              </>
+            }
           >
             <div className="px-[18px] pt-4">
               <TrendBars trend={o.trend} />
             </div>
-            <div className="overflow-x-auto border-t border-admin-line">
+            <p className={cx(FIELD_HINT, 'm-0 px-[18px] pb-3')}>
+              * Tháng này tính đến hôm nay. Chi phí cố định của các tháng trước dùng mức đang cấu hình.
+            </p>
+            <details className="border-t border-admin-line">
+              <summary className="cursor-pointer select-none px-[18px] py-3 text-[13px] font-semibold text-admin-ink">
+                Xem bảng số theo tháng
+              </summary>
+              <div className="overflow-x-auto">
               <table className={TABLE}>
                 <thead>
                   <tr>
@@ -762,10 +907,8 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                   ))}
                 </tbody>
               </table>
-            </div>
-            <p className={cx(FIELD_HINT, 'm-0 px-[18px] pb-3')}>
-              * Tháng này tính đến hôm nay. Chi phí cố định của các tháng trước dùng mức đang cấu hình.
-            </p>
+              </div>
+            </details>
           </Panel>
 
           <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -774,7 +917,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                 <OrderSplit o={o} />
               </div>
             </Panel>
-            <Panel title="Phí sàn mỗi đơn so với các sàn lớn" className="mb-0">
+            <Panel title="Phí sàn mỗi đơn so với các sàn lớn" sub={benchmarkSummary(feeRate)} className="mb-0">
               <div className="px-[18px] pt-3">
                 <BenchmarkChart rate={feeRate} />
               </div>
@@ -794,6 +937,26 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
   /* ---------------------------------------------------------------- Tab Mô phỏng */
   const renderSimulation = (sim: SimInput, result: ReturnType<typeof simulate>) => {
     const runway = result.netProfit < 0 && cash > 0 ? cash / -result.netProfit : null;
+    const ref = o?.orders.paid ? 'số thật' : 'giả định ban đầu';
+    // Lệch so với điểm xuất phát: kéo thanh nào là thấy ngay lãi/lỗ đổi bao nhiêu.
+    const vsBase = (now: number, then: number | undefined, format: (v: number) => string) => {
+      const d = Math.round(now - (then ?? now));
+      if (!d) return <span>Bằng {ref}</span>;
+      return (
+        <span className={cx('font-semibold', d > 0 ? 'text-admin-brand-700' : 'text-[#b91c1c]')}>
+          {format(d)} <span className="font-normal text-admin-muted">so với {ref}</span>
+        </span>
+      );
+    };
+    const receipt: [string, number][] = [
+      ['Hoa hồng', result.commissionPerOrder],
+      ['Phí cổng thanh toán', -result.paymentFeePerOrder],
+      ['Voucher sàn', -sim.voucherPerOrder],
+      ['Thất thoát do hoàn tiền', -result.refundLossPerOrder],
+      ['Gửi thông báo', -sim.notificationPerOrder],
+    ];
+    const top = shocks[0];
+    const topDelta = top ? Math.round(top.profitDelta) : 0;
     return (
       <>
         <Panel
@@ -808,12 +971,17 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
             </>
           }
           actions={
-            <SegmentedControl
-              value={scenario}
-              onChange={pickScenario}
-              options={SCENARIOS.map(s => ({ value: s.key, label: s.label }))}
-              label="Kịch bản"
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[12.5px] font-semibold text-admin-muted" aria-hidden>
+                Kịch bản
+              </span>
+              <SegmentedControl
+                value={scenario}
+                onChange={pickScenario}
+                options={SCENARIOS.map(s => ({ value: s.key, label: s.label }))}
+                label="Kịch bản"
+              />
+            </div>
           }
         >
           <div className="grid grid-cols-1 gap-6 p-[18px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
@@ -905,12 +1073,45 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                   />
                 </div>
               </details>
+
+              <section aria-label="Mỗi đơn sàn còn lại bao nhiêu" className="rounded-admin border border-admin-line">
+                <h3 className="m-0 border-b border-admin-line bg-[#fafcfa] px-4 py-2.5 text-[13px] font-semibold text-admin-ink">
+                  Mỗi đơn sàn còn lại bao nhiêu
+                </h3>
+                <dl className="m-0 px-4 py-2 text-[13px]">
+                  {receipt.map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between gap-3 py-1">
+                      <dt className="text-admin-body">{k}</dt>
+                      <dd className="m-0 tabular-nums text-admin-ink">
+                        {Math.round(v) === 0 ? money(0) : v > 0 ? `+${money(Math.round(v))}` : `−${money(Math.round(-v))}`}
+                      </dd>
+                    </div>
+                  ))}
+                  <div className="mt-1 flex items-center justify-between gap-3 border-t border-admin-line pb-1 pt-2 font-bold">
+                    <dt className="text-admin-ink">
+                      = Lãi góp mỗi đơn
+                      <Hint term="Lãi góp" />
+                    </dt>
+                    <dd
+                      className={cx(
+                        'm-0 tabular-nums',
+                        result.contributionPerOrder < 0 ? 'text-[#b91c1c]' : 'text-admin-brand'
+                      )}
+                    >
+                      {signedMoney(Math.round(result.contributionPerOrder))}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
             </div>
 
             <div className="min-w-0">
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-admin border border-admin-line px-4 py-3">
-                  <div className="text-[12px] font-semibold text-admin-muted">Lãi/lỗ mỗi tháng</div>
+                  <div className="text-[12px] font-semibold text-admin-muted">
+                    Lãi/lỗ mỗi tháng
+                    <Hint term="Lãi/lỗ ròng" />
+                  </div>
                   <div
                     className={cx(
                       'mt-1 text-[20px] font-extrabold',
@@ -919,26 +1120,46 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                   >
                     {signedMoney(Math.round(result.netProfit))}
                   </div>
+                  <div className="mt-0.5 text-[12px] text-admin-muted">
+                    {vsBase(result.netProfit, baseResult?.netProfit, signedMoney)}
+                  </div>
                 </div>
                 <div className="rounded-admin border border-admin-line px-4 py-3">
-                  <div className="text-[12px] font-semibold text-admin-muted">Lãi góp mỗi đơn</div>
+                  <div className="text-[12px] font-semibold text-admin-muted">
+                    Lãi góp mỗi đơn
+                    <Hint term="Lãi góp" />
+                  </div>
                   <div className="mt-1 text-[20px] font-extrabold text-admin-ink">
                     {signedMoney(Math.round(result.contributionPerOrder))}
                   </div>
+                  <div className="mt-0.5 text-[12px] text-admin-muted">
+                    {vsBase(result.contributionPerOrder, baseResult?.contributionPerOrder, v => `${signedMoney(v)}/đơn`)}
+                  </div>
                 </div>
                 <div className="rounded-admin border border-admin-line px-4 py-3">
-                  <div className="text-[12px] font-semibold text-admin-muted">Cần để hòa vốn mỗi tháng</div>
+                  <div className="text-[12px] font-semibold text-admin-muted">
+                    Cần để hòa vốn mỗi tháng
+                    <Hint term="Hòa vốn" />
+                  </div>
                   <div className="mt-1 text-[20px] font-extrabold text-admin-ink">
                     {result.breakEvenOrders === null ? 'Không thể' : `${count(result.breakEvenOrders)} đơn`}
                   </div>
-                  {result.breakEvenGmv !== null && (
-                    <div className="mt-0.5 text-[12px] text-admin-muted">
-                      ≈ {compactMoney(result.breakEvenGmv)} tiền hàng
-                    </div>
-                  )}
+                  <div className="mt-0.5 text-[12px] text-admin-muted">
+                    {result.breakEvenGmv !== null && <>≈ {compactMoney(result.breakEvenGmv)} tiền hàng</>}
+                    {baseResult && result.breakEvenOrders !== baseResult.breakEvenOrders && (
+                      <>
+                        {result.breakEvenGmv !== null && ' · '}
+                        {ref}:{' '}
+                        {baseResult.breakEvenOrders === null ? 'không thể' : `${count(baseResult.breakEvenOrders)} đơn`}
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="rounded-admin border border-admin-line px-4 py-3">
-                  <div className="text-[12px] font-semibold text-admin-muted">Vốn dự phòng trụ được</div>
+                  <div className="text-[12px] font-semibold text-admin-muted">
+                    Vốn dự phòng trụ được
+                    <Hint term="Runway (số tháng trụ được)" />
+                  </div>
                   <div className="mt-1 text-[20px] font-extrabold text-admin-ink">
                     {result.netProfit >= 0 ? 'Không hao vốn' : runway !== null ? months(runway) : '—'}
                   </div>
@@ -959,14 +1180,13 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                 </div>
               </div>
 
-              <p className="mb-3 mt-0 text-[12.5px] leading-[1.6] text-admin-muted">
-                Mỗi đơn: hoa hồng {money(Math.round(result.commissionPerOrder))} − phí cổng{' '}
-                {money(Math.round(result.paymentFeePerOrder))} − voucher sàn {money(Math.round(sim.voucherPerOrder))} −
-                thất thoát hoàn tiền {money(Math.round(result.refundLossPerOrder))} − thông báo{' '}
-                {money(sim.notificationPerOrder)} ={' '}
-                <b className="text-admin-ink">{signedMoney(Math.round(result.contributionPerOrder))}</b>
+              <h3 className="m-0 text-[13.5px] font-bold text-admin-ink">Lãi/lỗ mỗi tháng theo số đơn</h3>
+              <p className={cx(FIELD_HINT, 'mb-2 mt-0.5')}>
+                Mỗi cột: bán được ngần ấy đơn/tháng thì lãi hay lỗ bao nhiêu; cột đậm là mức đang chọn.{' '}
+                {result.breakEvenOrders === null
+                  ? 'Ở mức phí này bán bao nhiêu cũng lỗ.'
+                  : `Từ ${count(result.breakEvenOrders)} đơn/tháng trở lên là có lãi.`}
               </p>
-
               <ProfitBarsChart bars={bars} />
             </div>
           </div>
@@ -976,6 +1196,13 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
           title="Yếu tố nào ảnh hưởng mạnh nhất?"
           sub="Đổi từng yếu tố một so với mô phỏng đang xem. Cột đỏ: làm lỗ thêm · cột xanh: làm lãi thêm."
         >
+          {top && topDelta !== 0 && (
+            <p className="m-0 px-[18px] pt-3 text-[13px] text-admin-body">
+              Mạnh nhất: nếu <b className="text-admin-ink">{top.label.charAt(0).toLowerCase() + top.label.slice(1)}</b>,
+              mỗi tháng sàn {topDelta < 0 ? 'mất thêm' : 'được thêm'}{' '}
+              <b className={topDelta < 0 ? 'text-[#b91c1c]' : 'text-admin-brand'}>{money(Math.abs(topDelta))}</b>.
+            </p>
+          )}
           <div className="px-[18px] pt-3">
             <SensitivityChart shocks={shocks} />
           </div>
