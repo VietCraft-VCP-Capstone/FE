@@ -22,7 +22,7 @@ export function InsightPage({ title, info, question, actions, breadcrumb, header
 }) {
   const ref = useEnterMotion<HTMLDivElement>([title]);
   return (
-    <div ref={ref} className="mx-auto w-full max-w-[1680px] space-y-4">
+    <div ref={ref} className="w-full space-y-4">
       {breadcrumb && breadcrumb.length > 0 && (
         <nav aria-label="Vị trí trang" className="flex flex-wrap items-center gap-1 text-xs text-stone-500">
           {breadcrumb.map((item, i) => (

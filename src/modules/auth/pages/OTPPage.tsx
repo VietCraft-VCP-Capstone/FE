@@ -120,7 +120,7 @@ export function OTPPage({ onVerified }: OTPPageProps) {
     : 'email của bạn';
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Epilogue Variable', system-ui, sans-serif" }}>
       {success && (
         <div style={{
           position: 'fixed',
@@ -136,7 +136,7 @@ export function OTPPage({ onVerified }: OTPPageProps) {
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          fontFamily: "'Inter', sans-serif",
+          fontFamily: "'Epilogue Variable', sans-serif",
           fontSize: '14px',
           fontWeight: 600,
         }}>
@@ -151,7 +151,7 @@ export function OTPPage({ onVerified }: OTPPageProps) {
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)' }} />
         <div style={{ position: 'absolute', bottom: 44, left: 36, right: 36 }}>
-          <p style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: '0 0 8px' }}>Bảo mật & An toàn.</p>
+          <p style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", color: '#fff', fontSize: 20, fontWeight: 600, lineHeight: 1.25, margin: '0 0 8px' }}>Bảo mật & An toàn.</p>
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: 0, lineHeight: 1.6 }}>Chúng tôi luôn đặt sự bảo mật tài khoản của bạn lên hàng đầu bằng hệ thống xác thực mã OTP tiêu chuẩn.</p>
         </div>
       </div>
@@ -161,10 +161,10 @@ export function OTPPage({ onVerified }: OTPPageProps) {
         <div style={{ width: '100%', maxWidth: 480, margin: 'auto' }}>
           <div style={{ marginBottom: 20 }}>
             <Link to="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontSize: 23, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
+              <span style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 21, fontWeight: 600, letterSpacing: '-0.02em' }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
             </Link>
           </div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#330033', margin: '0 0 8px', textAlign: 'left' }}>Nhập mã xác thực</h1>
+          <h1 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 24, fontWeight: 600, lineHeight: 1.22, color: '#330033', margin: '0 0 8px', textAlign: 'left' }}>Nhập mã xác thực</h1>
 
           {!email ? (
             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '16px', margin: '16px 0' }}>

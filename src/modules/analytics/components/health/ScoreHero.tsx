@@ -3,7 +3,7 @@ import { Popover } from 'antd';
 import { decimal, scoreText } from '../../format';
 import type { HealthBlocker, ListingHealth } from '../../healthTypes';
 import type { HealthStatus } from '../../types';
-import { ScoreRing } from '../intel/ScoreRing';
+import { ScoreRing } from './ScoreRing';
 import { Chip } from '../ui';
 import { isExcluded, statusInfo } from './factorState';
 import { potentialGain } from './Recommendations';
@@ -57,7 +57,7 @@ function Breakdown({ data }: { data: ListingHealth }) {
           </tr>
         </tbody>
       </table>
-      <p className="m-0">Mục quan trọng hơn có nhiều điểm hơn, nên thiếu mục đó thì điểm tụt nhiều hơn.</p>
+      <p className="m-0">Mỗi mục được so với các tin cùng loại. Trọng số do AI học: Ảnh, Mô tả, Giá từ dữ liệu bán Tiki; Tag, Đánh giá từ dữ liệu mô phỏng.</p>
       {skipped.length > 0 && <p className="m-0 text-stone-500">{skipped.map(f => f.label).join(', ')}: chưa đủ dữ liệu nên tạm chưa chấm, không bị trừ điểm.</p>}
     </div>
   );
@@ -76,6 +76,7 @@ export function ScoreHero({ data }: { data: ListingHealth }) {
       <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
         <Chip tone={info.tone}>{info.label}</Chip>
         {coverage && <span className="text-xs text-stone-500">Đánh giá {coverage.evaluated}/{coverage.total} tiêu chí</span>}
+        {data.confidence && <span className="text-xs text-stone-500">Độ tin cậy: {data.confidence.level} (so với {data.confidence.peers} tin)</span>}
       </div>
       <Popover content={<Breakdown data={data} />} placement="bottom">
         <span className="mt-2 inline-flex cursor-help items-center gap-1 text-xs font-semibold text-stone-500 underline decoration-dotted underline-offset-2 hover:text-[#007700]">

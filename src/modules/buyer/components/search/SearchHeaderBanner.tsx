@@ -32,7 +32,7 @@ export const SearchHeaderBanner: React.FC<SearchHeaderBannerProps> = ({
     }}>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 10px' }}>
-          <h1 style={{ fontSize: 'clamp(18px, 5vw, 24px)', fontWeight: 800, color: '#1c1917', margin: 0 }}>
+          <h1 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 'clamp(16px, 4.2vw, 21px)', fontWeight: 600, lineHeight: 1.25, color: '#1c1917', margin: 0 }}>
             {query ? (
               <>
                 Kết quả tìm kiếm cho <span style={{ color: '#007700' }}>"{query}"</span>

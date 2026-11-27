@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Star, ShoppingCart, Zap,
-  ChevronDown, ChevronUp, Truck, Shield, CheckCircle2, Info, Store, MessageCircle, Ticket
+  ChevronDown, ChevronUp, Shield, CheckCircle2, Info, Store, MessageCircle, Ticket, FileText
 } from 'lucide-react';
-import { productsService } from '../../product/services/productsService';
+import { productsService, couponDiscount, type ProductDeal } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { reviewService } from '../../product/services/reviewService';
 import { cartService } from '../../order/services/cartService';
@@ -12,6 +12,8 @@ import { promotionService, CouponDTO } from '../../promotion/services/promotionS
 import { getApiErrorMessage, isLoggedIn } from '../../../infrastructure/api/interceptors';
 import { getSessionId, recordProductViewEvent } from '../services/eventService';
 import { getRecentSearches } from '../components/search/recentSearchStorage';
+import { useAuth } from '../../auth/hooks/useAuth';
+import { useVoucherWallet } from '../../promotion/hooks/useVoucherWallet';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Variant { id: string; name: string; color?: string; size?: string; material?: string; price: number; stock: number; mockupImage?: string; }
@@ -22,7 +24,13 @@ interface Product {
   /** 'SKU' = phân loại theo mẫu (set/lẻ/combo): nhóm `color` hiện thành "Mẫu" có ảnh nhỏ. */
   variantMode?: 'SKU';
   colors?: Array<{ name: string; hex: string }>;
-  shopInfo?: { id: string; name: string; logo?: string; rating: number; ratingCount?: number };
+  shopInfo?: { id: string; name: string; logo?: string; rating: number; ratingCount?: number; returnPolicy?: string };
+  stock?: number;
+  status?: string;
+  /** Số ngày khách được gửi yêu cầu đổi trả sau khi nhận hàng — chính sách của sàn, BE trả về. */
+  returnWindowDays?: number;
+  /** Người đang xem là chủ gian hàng bán sản phẩm này (BE tính theo phiên đăng nhập). */
+  isOwner?: boolean;
   rating?: number;
   reviews_count?: number;
   reviews?: Array<{ id: string; name: string; date: string; rating: number; avatar?: string; text: string; images?: string[] }>;
@@ -96,6 +104,8 @@ const suggestionsDetailCache = new Map<string, any[]>();
 
 export function BuyerProductDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
   const navigate = useNavigate();
   const location = useLocation();
   const initialProduct = (location.state as any)?.initialProduct;
@@ -133,18 +143,11 @@ export function BuyerProductDetailPage() {
   const [hasPickedVariant, setHasPickedVariant] = useState(false);
   const [customText, setCustomText] = useState('');
   const [qty, setQty] = useState(1);
-  const [descOpen, setDescOpen] = useState(true);
-  const [shippingOpen, setShippingOpen] = useState(false);
+  const [descOpen, setDescOpen] = useState(false);
   const [isFav, setIsFav] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null);
   const [availableCoupons, setAvailableCoupons] = useState<CouponDTO[]>([]);
-  const [savedVouchers, setSavedVouchers] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('vietcraft_saved_vouchers') || '[]');
-    } catch {
-      return [];
-    }
-  });
+  const [productDeal, setProductDeal] = useState<ProductDeal | null>(null);
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
@@ -157,18 +160,12 @@ export function BuyerProductDetailPage() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  const wallet = useVoucherWallet((msg, type) => triggerToast(msg, type === 'success' ? 'success' : 'info'));
+  const savedVouchers = wallet.savedCodes;
   const handleSaveVoucher = (code: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    let updated: string[];
-    if (savedVouchers.includes(code)) {
-      updated = savedVouchers.filter(c => c !== code);
-      triggerToast(`Đã bỏ lưu mã ${code}`, 'info');
-    } else {
-      updated = [...savedVouchers, code];
-      triggerToast(`Đã lưu mã ${code}! Mã sẽ tự động gợi ý khi thanh toán.`, 'success');
-    }
-    setSavedVouchers(updated);
-    localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
+    const coupon = availableCoupons.find((c: any) => c.code === code);
+    if (coupon) wallet.toggle(coupon as any);
   };
 
   useEffect(() => {
@@ -180,6 +177,9 @@ export function BuyerProductDetailPage() {
   // ── Load product ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
+
+    setProductDeal(null);
+    productsService.lookupDeals([id]).then((m) => setProductDeal(m[id] || null));
 
     // Load real reviews from API
     setIsLoadingReviews(true);
@@ -202,7 +202,7 @@ export function BuyerProductDetailPage() {
         } else {
           setReviewCount(items.length);
           if (items.length > 0) {
-            const sum = items.reduce((acc: number, cur: any) => acc + (Number(cur.rating) || 5), 0);
+            const sum = items.reduce((acc: number, cur: any) => acc + (Number(cur.rating) || 0), 0);
             setAvgRating(sum / items.length);
           }
         }
@@ -290,12 +290,7 @@ export function BuyerProductDetailPage() {
     } else {
       favoritesService.getFavoriteIds()
         .then((ids) => setIsFav(ids.includes(id!)))
-        .catch(() => {
-          try {
-            const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
-            setIsFav(favs.includes(id!));
-          } catch { }
-        });
+        .catch(() => setIsFav(false));
     }
   }, [id]);
 
@@ -395,86 +390,41 @@ export function BuyerProductDetailPage() {
     return min < max ? { min, max } : null;
   }, [product?.variants]);
 
-  // Active promotion: CHỈ áp dụng Flash Sale trực tiếp nếu đủ điều kiện đơn tối thiểu
-  const activePromotion = useMemo(() => {
-    if (!id || !availableCoupons.length || basePrice <= 0) return null;
-    const now = new Date();
-
-    const isActive = (c: any) => {
-      if (!c.is_active) return false;
-      if (new Date(c.start_date) > now || new Date(c.end_date) < now) return false;
-      return true;
+  // Giá tốt với mã: BE chọn mã tiết kiệm nhất (cùng nguồn với trang chủ / tìm kiếm). Trang này chỉ tính
+  // lại số tiền theo đúng phân loại khách đang chọn, bằng công thức thanh toán.
+  const variantDeal = useMemo(() => {
+    if (!productDeal || basePrice <= 0) return null;
+    if (productDeal.minOrder > 0 && basePrice < productDeal.minOrder) return null;
+    const off = couponDiscount(productDeal.discountType, productDeal.discountValue, productDeal.maxDiscount, basePrice);
+    if (off <= 0) return null;
+    const percent = productDeal.discountType === 'PERCENTAGE'
+      || ((productDeal.discountType === 'FLASH_SALE' || productDeal.discountType === 'BUNDLE') && productDeal.discountValue <= 100);
+    return {
+      code: productDeal.couponCode,
+      isFlash: productDeal.badge === 'FLASH_SALE',
+      finalPrice: basePrice - off,
+      label: percent ? `-${Math.max(1, Math.round((off / basePrice) * 100))}%` : off >= 1000 ? `-${Math.round(off / 1000)}K` : `-${off}đ`,
     };
+  }, [productDeal, basePrice]);
 
-    const getShopId = (obj: any): string | null => {
-      if (!obj) return null;
-      if (typeof obj === 'string') return obj;
-      if (typeof obj === 'object') {
-        return obj._id?.toString() || obj.id?.toString() || null;
-      }
-      return null;
-    };
-
-    const pAny = product as any;
-    const currentProductShopId = getShopId(pAny?.shopInfo?.id) || getShopId(pAny?.shop_id) || getShopId(pAny?.sellerId);
-
-    const appliesToProduct = (c: any): boolean => {
-      if (c.applicable_scope === 'SPECIFIC_PRODUCTS') {
-        return (c.applicable_product_ids || []).some((pid: any) => (pid?._id || pid)?.toString() === id);
-      }
-      if (c.applicable_scope === 'ALL') {
-        const cShopId = getShopId(c.shop_id);
-        if (cShopId) return currentProductShopId === cShopId;
-        return true; // platform-wide
-      }
-      return false;
-    };
-
-    const parseVal = (raw: any) =>
-      typeof raw === 'object' && raw?.$numberDecimal
-        ? parseFloat(raw.$numberDecimal)
-        : parseFloat(raw || 0);
-
-    // Chỉ áp dụng Flash Sale trực tiếp vào giá sản phẩm nếu đạt đơn tối thiểu
-    const flashSale = availableCoupons.find(c => {
-      if (!isActive(c) || c.discount_type !== 'FLASH_SALE' || !appliesToProduct(c)) return false;
-      const minVal = parseVal(c.min_order_value);
-      if (minVal > 0 && basePrice < minVal) return false;
-      return true;
-    });
-
-    if (flashSale) {
-      return { type: 'FLASH_SALE' as const, coupon: flashSale, discountVal: parseVal(flashSale.discount_value) };
-    }
-
-    return null;
-  }, [id, availableCoupons, product, basePrice]);
-
-  let finalPrice = basePrice;
-  let strikePrice = 0;
-  let discountPct = 0;
-  let discountBadgeText = '';
-  let isFlashSale = false;
-
-  if (activePromotion) {
-    strikePrice = basePrice;
-    const val = activePromotion.discountVal;
-    isFlashSale = true;
-    if (val <= 100) {
-      // val là % giảm
-      finalPrice = Math.round(basePrice * (1 - val / 100));
-      discountPct = Math.round(val);
-      discountBadgeText = `-${discountPct}%`;
-    } else {
-      // val là số tiền giảm (VNĐ)
-      finalPrice = Math.max(0, basePrice - val);
-      discountPct = Math.round((val / basePrice) * 100);
-      discountBadgeText = val >= 1000 ? `-${Math.round(val / 1000)}K` : `-${val}đ`;
-    }
-  }
+  const finalPrice = variantDeal ? variantDeal.finalPrice : basePrice;
+  const strikePrice = variantDeal ? basePrice : 0;
+  const discountBadgeText = variantDeal?.label || '';
 
   const hasDiscount = strikePrice > finalPrice;
-  const displayPrice = finalPrice;
+  // Giá gốc người bán khai (gạch ngang), khác với flash sale là mã phải nhập khi thanh toán.
+  const listOriginal = Number((activeVariant as any)?.originalPrice ?? product?.originalPrice) || 0;
+  // Tồn kho thật: theo phân loại đang chọn, hoặc tổng tồn của sản phẩm khi không có phân loại.
+  const availableStock = activeVariant ? activeVariant.stock : Number(product?.stock) || 0;
+  const discontinued = product?.status === 'INACTIVE';
+  const outOfStock = discontinued || availableStock <= 0;
+  // Mô tả dài thì thu gọn kèm "Xem thêm", ngắn thì hiện hết.
+  const descLong = (product?.description || '').length > 600 || (product?.description || '').split('\n').length > 14;
+  // Đổi phân loại có tồn ít hơn số lượng đang chọn thì kéo số lượng về mức còn hàng.
+  useEffect(() => {
+    setQty(q => Math.max(1, Math.min(q, availableStock || 1)));
+  }, [availableStock]);
+  const displayPrice = basePrice;
 
   // Danh sách voucher áp dụng được cho sản phẩm hoặc shop này
   const productVouchers = useMemo(() => {
@@ -498,11 +448,7 @@ export function BuyerProductDetailPage() {
 
 
   // Images list
-  const images = product?.images?.length ? product.images : [
-    'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600',
-    'https://images.unsplash.com/photo-1556821840-3a63f15732ce?auto=format&fit=crop&w=600',
-    'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?auto=format&fit=crop&w=600',
-  ];
+  const images = product?.images?.length ? product.images : ['/image-not-found.jpg'];
 
   // ── Validation chọn phân loại ───────────────────────────────────────────────
   const validateVariantSelection = (): boolean => {
@@ -559,7 +505,7 @@ export function BuyerProductDetailPage() {
     }
 
     const targetVariantId = activeVariant?.id || (activeVariant as any)?._id || selectedVariant?.id || (selectedVariant as any)?._id;
-    const currentImg = (product.images && product.images[selectedImage]) || (product.variants && selectedVariant?.mockupImage) || (product as any)?.thumbnail || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600';
+    const currentImg = (product.images && product.images[selectedImage]) || (product.variants && selectedVariant?.mockupImage) || (product as any)?.thumbnail || '';
     const variantName = [selectedColor, selectedSize, selectedMaterial].filter(Boolean).join(' - ') || activeVariant?.name || 'Tiêu chuẩn';
 
     const checkoutItem = {
@@ -584,8 +530,9 @@ export function BuyerProductDetailPage() {
         quantity: qty,
         customNotes: customText || undefined
       });
-    } catch (e) {
-      console.warn('Sync buy-now item into cart background:', e);
+    } catch (err) {
+      triggerToast(getApiErrorMessage(err, 'Không thể mua sản phẩm này lúc này, vui lòng thử lại.'), 'info');
+      return;
     }
 
     localStorage.setItem('vietcraft_checkout', JSON.stringify([checkoutItem]));
@@ -616,7 +563,7 @@ export function BuyerProductDetailPage() {
     if (!product) return;
     // Yêu thích cần tài khoản: đưa khách sang /login thay vì gọi API rồi dính 401.
     if (!isLoggedIn()) {
-      navigate('/login');
+      navigate(`/login?next=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
     try {
@@ -624,29 +571,25 @@ export function BuyerProductDetailPage() {
       setIsFav(res.isFavorite);
       triggerToast(res.isFavorite ? 'Đã thêm vào yêu thích!' : 'Đã xóa khỏi yêu thích', res.isFavorite ? 'success' : 'info');
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
-    } catch {
-      // Fallback: toggle locally
-      try {
-        const favs: string[] = JSON.parse(localStorage.getItem('vietcraft_favorites') || '[]');
-        const next = isFav ? favs.filter(i => i !== product.id) : [...favs, product.id];
-        localStorage.setItem('vietcraft_favorites', JSON.stringify(next));
-        setIsFav(!isFav);
-        window.dispatchEvent(new CustomEvent('wishlist-updated'));
-      } catch { }
+    } catch (err) {
+      triggerToast(getApiErrorMessage(err, 'Không thể cập nhật danh sách yêu thích, vui lòng thử lại.'), 'info');
     }
   };
 
   // ── Styles ────────────────────────────────────────────────────────────────────
+  const ACTION_BTN: React.CSSProperties = { height: 48, padding: '0 12px', fontSize: 13.5, whiteSpace: 'nowrap', flex: 'none', width: '100%', boxSizing: 'border-box', minWidth: 0 };
+  const DISABLED_BTN: React.CSSProperties = { opacity: 0.5, cursor: 'not-allowed' };
+
   const S = {
-    page: { fontFamily: "'Inter', system-ui, sans-serif", background: '#fcfcfc', minHeight: '100vh' } as React.CSSProperties,
-    container: { maxWidth: 1100, margin: '0 auto', padding: '24px 20px' } as React.CSSProperties,
+    page: { fontFamily: "'Epilogue Variable', system-ui, sans-serif", background: '#fcfcfc', minHeight: '100vh' } as React.CSSProperties,
+    container: { maxWidth: 1200, margin: '0 auto', padding: '24px 20px' } as React.CSSProperties,
     backBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, fontWeight: 600, marginBottom: 20, padding: '6px 0' } as React.CSSProperties,
     mainImg: { width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 12, background: '#f0f0f0', display: 'block' } as React.CSSProperties,
-    thumbRail: { display: 'flex', gap: 8, marginTop: 12 } as React.CSSProperties,
-    thumb: (active: boolean) => ({ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: active ? '2px solid #008000' : '2px solid transparent', flexShrink: 0 } as React.CSSProperties),
+    thumbRail: { display: 'flex', gap: 8, marginTop: 12, overflowX: 'auto', paddingBottom: 4 } as React.CSSProperties,
+    thumb: (active: boolean) => ({ width: 68, height: 68, objectFit: 'cover', borderRadius: 8, cursor: 'pointer', border: active ? '2px solid #008000' : '1px solid #e7e5e4', opacity: active ? 1 : 0.85, flexShrink: 0, display: 'block', background: '#f5f5f4' } as React.CSSProperties),
     tag: (color: string, bg: string) => ({ display: 'inline-block', padding: '2px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, color, background: bg } as React.CSSProperties),
     shopRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 } as React.CSSProperties,
-    price: { fontSize: 28, fontWeight: 900, color: '#008000', lineHeight: 1 } as React.CSSProperties,
+    price: { fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 24, fontWeight: 600, color: '#008000', lineHeight: 1.15 } as React.CSSProperties,
     strike: { fontSize: 15, color: '#aaa', textDecoration: 'line-through', marginLeft: 8 } as React.CSSProperties,
     sectionLabel: { fontSize: 13, fontWeight: 700, color: '#330033', marginBottom: 8, marginTop: 16 } as React.CSSProperties,
     optionGroup: { display: 'flex', gap: 8, flexWrap: 'wrap' as const },
@@ -664,17 +607,17 @@ export function BuyerProductDetailPage() {
       flexShrink: 0
     } as React.CSSProperties),
     btnChat: { padding: '13px 18px', border: '2px solid #008000', borderRadius: 10, background: '#f0fdf4', color: '#008000', fontWeight: 800, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s', whiteSpace: 'nowrap' as const } as React.CSSProperties,
-    btnOutline: { flex: 1, padding: '13px 0', border: '2px solid #008000', borderRadius: 10, background: '#fff', color: '#008000', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
-    btnFill: { flex: 1, padding: '13px 0', border: 'none', borderRadius: 10, background: '#008000', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
+    btnOutline: { flex: 1, padding: '13px 0', border: '2px solid #008000', borderRadius: 10, background: '#fff', color: '#008000', fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontWeight: 500, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
+    btnFill: { flex: 1, padding: '13px 0', border: 'none', borderRadius: 10, background: '#008000', color: '#fff', fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontWeight: 500, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' } as React.CSSProperties,
     accordion: { border: '1px solid #eee', borderRadius: 10, marginTop: 12 } as React.CSSProperties,
     accordionHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: '#330033' } as React.CSSProperties,
     accordionBody: { padding: '0 16px 14px', fontSize: 13.5, color: '#555', lineHeight: 1.7 } as React.CSSProperties,
     reviewSection: { marginTop: 48 } as React.CSSProperties,
     reviewSummary: { display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 } as React.CSSProperties,
-    ratingBig: { fontSize: 52, fontWeight: 900, color: '#330033', lineHeight: 1 } as React.CSSProperties,
+    ratingBig: { fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 44, fontWeight: 600, color: '#330033', lineHeight: 1.1 } as React.CSSProperties,
     reviewCard: { display: 'flex', gap: 14, padding: '20px 0', borderBottom: '1px solid #f0f0f0' } as React.CSSProperties,
     avatar: { width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 } as React.CSSProperties,
-    sectionTitle: { fontSize: 20, fontWeight: 800, color: '#330033', marginBottom: 20 } as React.CSSProperties,
+    sectionTitle: { fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033', marginBottom: 20 } as React.CSSProperties,
     card: { background: '#fff', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', transition: 'transform 0.2s, box-shadow 0.2s' } as React.CSSProperties,
     cardImg: { width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block' } as React.CSSProperties,
     cardInfo: { padding: '10px 12px 14px' } as React.CSSProperties,
@@ -718,9 +661,9 @@ export function BuyerProductDetailPage() {
 
         {/* ── Top: Gallery + Info ────────────────────────────────────────────── */}
         {/* Điện thoại và máy tính bảng: ảnh nằm trên thông tin; từ 768px hai cột. */}
-        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2 md:gap-9">
-          {/* Gallery */}
-          <div>
+        <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:gap-10">
+          {/* Gallery: dính theo khi cuộn để cột trái không bỏ trống lúc phần thông tin dài */}
+          <div className="md:sticky md:top-24">
             <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }}>
               <img src={images[selectedImage]} alt={product.title} style={S.mainImg} />
               <button
@@ -734,8 +677,10 @@ export function BuyerProductDetailPage() {
               </button>
             </div>
             <div style={S.thumbRail}>
-              {images.slice(0, 4).map((img, i) => (
-                <img key={i} src={img} alt={`thumb-${i}`} style={S.thumb(selectedImage === i)} onClick={() => setSelectedImage(i)} />
+              {images.length > 1 && images.map((img, i) => (
+                <button key={i} type="button" onClick={() => setSelectedImage(i)} aria-label={`Ảnh ${i + 1}`} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                  <img src={img} alt="" loading="lazy" style={S.thumb(selectedImage === i)} />
+                </button>
               ))}
             </div>
           </div>
@@ -766,40 +711,41 @@ export function BuyerProductDetailPage() {
 
             {/* Tags (category) */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-              <span style={S.tag('#fff', '#008000')}>{product.category}</span>
-              {product.tags.map((t, i) => (
+              {product.category && <span style={S.tag('#fff', '#008000')}>{product.category}</span>}
+              {(product.tags || []).map((t, i) => (
                 <span key={i} style={S.tag('#555', '#f0f0f0')}>{t}</span>
               ))}
             </div>
 
-            {/* Price: chưa chọn mẫu thì hiện khoảng giá, chọn 1 mẫu rồi thì chốt đúng giá mẫu đó (kiểu Shopee) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
-              {variantPriceRange && !hasPickedVariant ? (
-                <span style={S.price}>{fmtPrice(variantPriceRange.min)} - {fmtPrice(variantPriceRange.max)}</span>
-              ) : (
-                <>
-                  <span style={S.price}>{fmtPrice(displayPrice)}</span>
-                  {hasDiscount && (
-                    <>
-                      <span style={S.strike}>{fmtPrice(strikePrice)}</span>
-                      {isFlashSale ? (
-                        <span className="flash-sale-badge">
-                          ⚡ FLASH SALE {discountBadgeText}
-                        </span>
-                      ) : (
-                        <span style={S.tag('#fff', '#e11d48')}>{discountBadgeText}</span>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-              {activePromotion?.coupon?.code && (
-                <span style={{ fontSize: 11, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 6 }}>
-                  ⚡ Áp dụng mã: {activePromotion.coupon.code}
-                </span>
+            {/* Giá: đúng số tiền tính khi thanh toán. Chưa chọn mẫu thì hiện khoảng giá (kiểu Shopee). */}
+            <div style={{ background: '#fafaf9', border: '1px solid #f0efed', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                {variantPriceRange && !hasPickedVariant ? (
+                  <span style={S.price}>{fmtPrice(variantPriceRange.min)} - {fmtPrice(variantPriceRange.max)}</span>
+                ) : (
+                  <>
+                    <span style={S.price}>{fmtPrice(basePrice)}</span>
+                    {listOriginal > basePrice && (
+                      <>
+                        <span style={{ ...S.strike, marginLeft: 0 }}>{fmtPrice(listOriginal)}</span>
+                        <span style={S.tag('#fff', '#e11d48')}>-{Math.round(((listOriginal - basePrice) / listOriginal) * 100)}%</span>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+              {hasDiscount && variantDeal && (
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, color: '#9a3412' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#e11d48', color: '#fff', fontWeight: 800, fontSize: 11, padding: '3px 8px', borderRadius: 6, letterSpacing: 0.3 }}>
+                    <Zap size={12} /> {variantDeal.isFlash ? 'FLASH SALE' : 'Mã giảm'} {discountBadgeText}
+                  </span>
+                  <span>
+                    Còn <b style={{ color: '#e11d48' }}>{fmtPrice(finalPrice)}</b> khi dùng mã{' '}
+                    <b>{variantDeal.code}</b> lúc thanh toán
+                  </span>
+                </div>
               )}
             </div>
-            <p style={{ fontSize: 12, color: '#888', margin: '4px 0 0' }}>Giá đã bao gồm VAT</p>
 
             {/* Vouchers applicable */}
             {productVouchers.length > 0 && (
@@ -812,25 +758,27 @@ export function BuyerProductDetailPage() {
                     onClick={() => navigate('/vouchers')}
                     style={{ fontSize: 11, fontWeight: 700, color: '#008000', background: 'none', border: 'none', cursor: 'pointer' }}
                   >
-                    Kho voucher &rarr;
+                    Kho voucher
                   </button>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {productVouchers.slice(0, 3).map(v => {
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {productVouchers.slice(0, 4).map(v => {
                     const isSaved = savedVouchers.includes(v.code);
                     return (
                       <div key={v.id || v.code} style={{
                         backgroundColor: '#fff',
                         border: isSaved ? '1px solid #86efac' : '1px solid #e7e5e4',
                         borderRadius: 8,
-                        padding: '6px 10px',
+                        padding: '8px 10px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 8
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        minWidth: 0
                       }}>
-                        <div>
+                        <div style={{ minWidth: 0 }}>
                           <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 900, color: '#1c1917' }}>{v.code}</span>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: '#008000' }}>{v.title || `Giảm ${v.discount_value}`}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#008000', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || `Giảm ${v.discount_value}`}</div>
                           <div style={{ fontSize: 9, fontWeight: 600, color: '#78716c', display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
                             {v.is_platform || !v.shop_id
                               ? 'Toàn sàn VietCraft'
@@ -840,7 +788,9 @@ export function BuyerProductDetailPage() {
                         <button
                           onClick={(e) => handleSaveVoucher(v.code, e)}
                           style={{
-                            padding: '3px 8px',
+                            padding: '5px 10px',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap',
                             borderRadius: 6,
                             border: 'none',
                             fontSize: 10,
@@ -850,7 +800,7 @@ export function BuyerProductDetailPage() {
                             color: isSaved ? '#166534' : '#fff'
                           }}
                         >
-                          {isSaved ? '✓ Đã lưu' : 'Lưu'}
+                          {isSaved ? 'Đã lưu' : 'Lưu'}
                         </button>
                       </div>
                     );
@@ -958,54 +908,85 @@ export function BuyerProductDetailPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#555' }}>Số lượng:</span>
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #ddd', borderRadius: 8, overflow: 'hidden' }}>
-                <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>−</button>
-                <span style={{ width: 36, textAlign: 'center', fontWeight: 700 }}>{qty}</span>
-                <button onClick={() => setQty(q => Math.max(1, Math.min(99, activeVariant?.stock ?? 99, q + 1)))} style={{ width: 32, height: 34, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: 'pointer', fontWeight: 700 }}>+</button>
+                <button type="button" aria-label="Giảm số lượng" disabled={qty <= 1} onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 36, height: 36, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: qty <= 1 ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: qty <= 1 ? 0.4 : 1 }}>−</button>
+                <span style={{ width: 44, textAlign: 'center', fontWeight: 700 }}>{qty}</span>
+                <button type="button" aria-label="Tăng số lượng" disabled={outOfStock || qty >= availableStock} onClick={() => setQty(q => Math.max(1, Math.min(availableStock, q + 1)))} style={{ width: 36, height: 36, border: 'none', background: '#f5f5f5', fontSize: 18, cursor: outOfStock || qty >= availableStock ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: outOfStock || qty >= availableStock ? 0.4 : 1 }}>+</button>
               </div>
-              <span style={{ fontSize: 12, color: '#888' }}>Còn {activeVariant?.stock ?? 100} sản phẩm</span>
+              <span style={{ fontSize: 12, color: outOfStock ? '#dc2626' : '#888', fontWeight: outOfStock ? 700 : 400 }}>
+                {discontinued ? 'Sản phẩm đã ngừng bán' : outOfStock ? 'Hết hàng' : `Còn ${availableStock.toLocaleString('vi-VN')} sản phẩm`}
+              </span>
             </div>
 
             {/* Action Buttons */}
-            {/* Dưới 1024px: Chat và Thêm giỏ ở hàng trên, Mua ngay rộng hết dòng ở hàng dưới. */}
-            <div className="mt-6 flex flex-wrap gap-2.5">
-              <button className="flex-1 sm:flex-initial" style={S.btnChat} onClick={handleChatWithSeller} title="Chat với người bán">
+            {product.isOwner ? (
+              <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+                <p className="m-0 font-bold text-emerald-900">Đây là sản phẩm của gian hàng bạn</p>
+                <p className="mt-1 mb-3 text-emerald-800/80">Người bán không thể tự mua hoặc tự chat với sản phẩm của mình.</p>
+                <button type="button" onClick={() => navigate('/seller/products')} style={{ ...S.btnFill, ...ACTION_BTN, width: 'auto' }}>
+                  <Store size={18} /> Quản lý sản phẩm
+                </button>
+              </div>
+            ) : isAdmin ? (
+              <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">
+                Tài khoản quản trị chỉ xem sản phẩm, không mua hàng.
+              </div>
+            ) : (
+            // Điện thoại: Chat + Thêm giỏ một hàng, Mua ngay rộng hết dòng; từ 640px ba nút cùng một hàng, cùng chiều cao.
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
+              <button type="button" style={{ ...S.btnChat, ...ACTION_BTN }} onClick={handleChatWithSeller} title="Chat với người bán">
                 <MessageCircle size={18} /> Chat ngay
               </button>
-              <button className="flex-1" style={S.btnOutline} onClick={addToCart}>
+              <button type="button" disabled={outOfStock} style={{ ...S.btnOutline, ...ACTION_BTN, ...(outOfStock ? DISABLED_BTN : {}) }} onClick={addToCart}>
                 <ShoppingCart size={18} /> Thêm vào giỏ
               </button>
-              <button className="w-full basis-full lg:w-auto lg:basis-auto lg:flex-1" style={{ ...S.btnFill, flex: undefined }} onClick={buyNow}>
+              <button type="button" className="col-span-2 sm:col-span-1" disabled={outOfStock} style={{ ...S.btnFill, ...ACTION_BTN, ...(outOfStock ? DISABLED_BTN : {}) }} onClick={buyNow}>
                 <Zap size={18} /> Mua ngay
               </button>
             </div>
+            )}
 
-            {/* Delivery accordion */}
-            <div style={S.accordion}>
-              <div style={S.accordionHead} onClick={() => setDescOpen(o => !o)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Truck size={15} color="#008000" /> Mô tả sản phẩm</span>
-                {descOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </div>
-              {descOpen && (
-                <div style={S.accordionBody}>
-                  {product.description || 'Sản phẩm chất lượng cao, được làm thủ công từ nguyên liệu tự nhiên. Phù hợp làm quà tặng hoặc dùng cá nhân.'}
-                </div>
-              )}
-            </div>
-            <div style={S.accordion}>
-              <div style={S.accordionHead} onClick={() => setShippingOpen(o => !o)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Shield size={15} color="#008000" /> Hướng dẫn bảo quản & đổi trả</span>
-                {shippingOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </div>
-              {shippingOpen && (
-                <div style={S.accordionBody}>
-                  <p style={{ margin: '0 0 6px' }}>• Giặt tay hoặc máy ở 30°C, không tẩy.</p>
-                  <p style={{ margin: '0 0 6px' }}>• Phơi bóng râm, tránh ánh nắng trực tiếp.</p>
-                  <p style={{ margin: '0 0 6px' }}>• Đổi trả trong 7 ngày nếu sản phẩm lỗi do nhà sản xuất.</p>
-                  <p style={{ margin: 0 }}>• Liên hệ shop qua chat để được hỗ trợ.</p>
-                </div>
-              )}
-            </div>
           </div>
+        </div>
+
+        {/* ── Chi tiết sản phẩm: rộng hết trang, dưới ảnh + thông tin (như các sàn lớn) ─────────── */}
+        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <section style={{ background: '#fff', border: '1px solid #eee', borderRadius: 14, padding: '20px 22px' }}>
+            <h2 style={{ ...S.sectionTitle, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FileText size={18} color="#008000" /> Mô tả sản phẩm
+            </h2>
+            {product.description?.trim() ? (
+              <>
+                <div style={{ position: 'relative', fontSize: 14, color: '#444', lineHeight: 1.75, whiteSpace: 'pre-line', maxHeight: descLong && !descOpen ? 320 : undefined, overflow: 'hidden' }}>
+                  {product.description}
+                  {descLong && !descOpen && (
+                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 80, background: 'linear-gradient(to bottom, rgba(255,255,255,0), #fff)' }} />
+                  )}
+                </div>
+                {descLong && (
+                  <button type="button" onClick={() => setDescOpen(o => !o)} style={{ marginTop: 10, background: 'none', border: 'none', color: '#008000', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0 }}>
+                    {descOpen ? <>Thu gọn <ChevronUp size={14} /></> : <>Xem thêm <ChevronDown size={14} /></>}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p style={{ margin: 0, color: '#9ca3af', fontStyle: 'italic', fontSize: 14 }}>Người bán chưa cập nhật mô tả cho sản phẩm này.</p>
+            )}
+          </section>
+
+          <section style={{ background: '#fff', border: '1px solid #eee', borderRadius: 14, padding: '20px 22px', alignSelf: 'start' }}>
+            <h2 style={{ ...S.sectionTitle, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Shield size={18} color="#008000" /> Chính sách đổi trả
+            </h2>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: '#555', lineHeight: 1.7, display: 'grid', gap: 6 }}>
+              {product.returnWindowDays ? (
+                <li>Gửi yêu cầu đổi trả trong {product.returnWindowDays} ngày kể từ khi nhận hàng, tại trang Đơn hàng của tôi.</li>
+              ) : null}
+              {product.shopInfo?.returnPolicy?.trim() ? (
+                <li style={{ whiteSpace: 'pre-line' }}>Chính sách của shop: {product.shopInfo.returnPolicy}</li>
+              ) : null}
+              <li>Liên hệ shop qua chat để được hỗ trợ.</li>
+            </ul>
+          </section>
         </div>
 
         {/* ── Reviews ───────────────────────────────────────────────────────── */}
@@ -1051,15 +1032,21 @@ export function BuyerProductDetailPage() {
             <div style={{ marginTop: 8 }}>
               {reviews.map((rv, idx) => {
                 const authorName = rv.name || rv.buyer?.name || 'Khách hàng ẩn danh';
-                const authorAvatar = rv.avatar || rv.buyer?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100';
+                const authorAvatar: string = rv.avatar || rv.buyer?.avatar || '';
                 const reviewDate = rv.date || (rv.createdAt ? new Date(rv.createdAt).toLocaleDateString('vi-VN') : '');
                 const reviewText = rv.text || rv.comment || '';
                 const reviewImages = Array.isArray(rv.images) ? rv.images : [];
-                const ratingVal = typeof rv.rating === 'number' ? rv.rating : 5;
+                const ratingVal = typeof rv.rating === 'number' ? rv.rating : 0;
 
                 return (
                   <div key={rv.id || rv._id || idx} style={S.reviewCard}>
-                    <img src={authorAvatar} alt={authorName} style={S.avatar} />
+                    {authorAvatar ? (
+                      <img src={authorAvatar} alt={authorName} style={S.avatar} />
+                    ) : (
+                      <div aria-hidden style={{ ...S.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#330033', color: '#fff', fontWeight: 700, fontSize: 14 }}>
+                        {authorName.trim().charAt(0).toUpperCase() || '?'}
+                      </div>
+                    )}
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                         <span style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{authorName}</span>
@@ -1092,7 +1079,7 @@ export function BuyerProductDetailPage() {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
                   onClick={() => navigate(`/product/${p.id}`)}>
-                  <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=300'} alt={p.title} style={S.cardImg} />
+                  <img src={p.images?.[0] || '/image-not-found.jpg'} alt={p.title} style={S.cardImg} />
                   <div style={S.cardInfo}>
                     <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 13, color: '#222', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
                     <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: '#008000' }}>{fmtPrice(p.price || 0)}</p>
@@ -1114,7 +1101,7 @@ export function BuyerProductDetailPage() {
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
                   onClick={() => navigate(`/product/${p.id}`)}>
                   <div style={{ position: 'relative' }}>
-                    <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} style={S.cardImg} />
+                    <img src={p.images?.[0] || '/image-not-found.jpg'} alt={p.title} style={S.cardImg} />
                   </div>
                   <div style={S.cardInfo}>
                     <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 13, color: '#222', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>

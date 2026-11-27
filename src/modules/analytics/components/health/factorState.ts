@@ -12,7 +12,7 @@ export function statusInfo(status: HealthStatus | null | undefined): { label: st
   return (status && STATUS_INFO[status]) || { label: 'Chưa có điểm', tone: 'neutral' };
 }
 
-export const AI_HINT = 'AI thấy ảnh có thể không đúng sản phẩm. AI có thể nhầm nên không trừ điểm, bạn chỉ cần xem lại ảnh.';
+export const AI_HINT = 'AI đoán, có thể nhầm nên không trừ điểm. Bạn xem lại mục này.';
 
 export function factorStateChip(f: HealthFactorV3): { label: string; tone: Tone } {
   switch (f.state) {

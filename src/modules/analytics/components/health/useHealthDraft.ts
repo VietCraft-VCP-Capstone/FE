@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toState, type InsightState } from '../../hooks/useInsight';
-import type { IntelPreviewBody, ListingIntel } from '../../intelTypes';
+import type { HealthDraftBody, ListingHealth } from '../../healthTypes';
 import { analyticsApi } from '../../services/analyticsApi';
 
 const BAD_DRAFT = 'Bản nháp chưa hợp lệ. Kiểm tra lại tên sản phẩm, mô tả và danh sách ảnh rồi thử lại.';
 
-export function useIntelPreview(body: IntelPreviewBody) {
-  const [state, setState] = useState<InsightState<ListingIntel>>({ kind: 'loading' });
+export function useHealthDraft(body: HealthDraftBody) {
+  const [state, setState] = useState<InsightState<ListingHealth>>({ kind: 'loading' });
   const [nonce, setNonce] = useState(0);
   const bodyRef = useRef(body);
   bodyRef.current = body;
@@ -15,7 +15,7 @@ export function useIntelPreview(body: IntelPreviewBody) {
     const controller = new AbortController();
     setState({ kind: 'loading' });
     analyticsApi
-      .intelPreview(bodyRef.current, controller.signal)
+      .healthDraft(bodyRef.current, controller.signal)
       .then(res =>
         setState(
           res.meta?.status === 'insufficient_data' || res.data === null
@@ -25,7 +25,7 @@ export function useIntelPreview(body: IntelPreviewBody) {
       )
       .catch(err => {
         if (controller.signal.aborted || err?.code === 'ERR_CANCELED') return;
-        setState(err?.response?.status === 400 ? { kind: 'error', message: BAD_DRAFT } : toState<ListingIntel>(err));
+        setState(err?.response?.status === 400 ? { kind: 'error', message: BAD_DRAFT } : toState<ListingHealth>(err));
       });
     return () => controller.abort();
   }, [nonce]);

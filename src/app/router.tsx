@@ -24,6 +24,7 @@ import { BuyerReturnPage } from '../modules/returns/BuyerReturnPage';
 import { LegacyRefundRedirect } from '../modules/returns/LegacyRefundRedirect';
 import { BuyerVouchersPage } from '../modules/buyer/pages/BuyerVouchersPage';
 import { BuyerSearchPage } from '../modules/buyer/pages/BuyerSearchPage';
+import { BuyerDealsPage } from '../modules/buyer/pages/BuyerDealsPage';
 import { useAuth } from '../modules/auth/hooks/useAuth';
 
 function RolePortal({ user, onLogout }: { user: any; onLogout: () => void }) {
@@ -111,6 +112,7 @@ export function AppRouter() {
         <Route path="/collections" element={<BuyerDashboard user={user} onLogout={logout} />} />
         <Route path="/vouchers" element={<BuyerVouchersPage />} />
         <Route path="/search" element={<BuyerSearchPage />} />
+        <Route path="/deals" element={<BuyerDealsPage />} />
         <Route path="/product/:id" element={<BuyerProductDetailPage />} />
         <Route path="/products/:id" element={<BuyerProductDetailPage />} />
         <Route path="/cart" element={<BuyerCartPage />} />

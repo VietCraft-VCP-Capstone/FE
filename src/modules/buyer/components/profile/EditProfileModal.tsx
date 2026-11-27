@@ -52,7 +52,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="flex items-center gap-4 py-2 border-b border-gray-100">
                         <div className="relative w-16 h-16 rounded-full overflow-hidden border border-gray-200 bg-gray-50 flex-shrink-0">
-                            <img src={profile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150'} alt="Avatar Preview" className="w-full h-full object-cover" />
+                            <img src={profile.avatar || '/placeholder-avatar.svg'} alt="Avatar Preview" className="w-full h-full object-cover" />
                             {uploadingAvatar && (
                                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                                     <Loader2 className="w-4 h-4 text-white animate-spin" />

@@ -175,7 +175,7 @@ export function SellerDashboard() {
   const restockTotal = metrics.outOfStock + metrics.lowStock.length;
 
   return (
-    <div className="mx-auto w-full max-w-[1600px]">
+    <div className="w-full">
       {/* Page Header */}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">

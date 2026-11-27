@@ -63,7 +63,7 @@ export function OrderItemActions({ orderId, item, eligibility, reviewable, onRev
       {isNormal(eligibility) ? (
         <button type="button" disabled={!!refund.blocked} title={refund.blocked || 'Gửi yêu cầu hoàn tiền'} onClick={refund.open}
           className={`${buttonClass} border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500`}>
-          Đổi/trả hàng
+          Yêu cầu hoàn tiền
         </button>
       ) : eligibility?.activeRequestId ? (
         <Link to={`/returns/${encodeURIComponent(eligibility.activeRequestId)}`} className={`${buttonClass} border-indigo-700 bg-indigo-700 text-white hover:bg-indigo-800`}>

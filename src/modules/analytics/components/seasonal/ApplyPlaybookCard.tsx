@@ -85,8 +85,6 @@ export function ApplyPlaybookCard({
     : (isUsingSavedIdea ? actualOrdersCount : 0);
 
   // Tự động xác nhận hoàn thành từng bước dựa trên dữ liệu thực tế của ý tưởng đang chọn
-  // Lưu ý: KHÔNG tự đánh dấu xong Bước "Chốt sản xuất / nhập hàng" chỉ vì SP mới đăng có stock > 0
-  // (vì mọi SP mới tạo đều có tồn kho ban đầu; bước chốt nhập hàng cần seller tự xác nhận sau khi qua bước thử nhỏ).
   const getAutoStepStatus = (task: string): { autoDone: boolean; note?: string } => {
     const t = task.toLowerCase();
     if (t.includes('listing') || t.includes('tag') || t.includes('đăng')) {
@@ -101,7 +99,7 @@ export function ApplyPlaybookCard({
     }
     if (t.includes('chốt sản xuất') || t.includes('nhập hàng') || t.includes('tồn')) {
       if (activeInStockCount > 0) {
-        return { autoDone: false, note: `Hiện có ${activeInStockCount} SP đang sẵn tồn` };
+        return { autoDone: true, note: `Hiện có ${activeInStockCount} SP đang sẵn tồn` };
       }
     }
     return { autoDone: false };

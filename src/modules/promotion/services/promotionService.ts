@@ -36,6 +36,8 @@ export interface CouponDTO {
     shop_name?: string;
     shop_logo?: string;
     is_eligible?: boolean;
+    /** Người mua đã dùng mã này ở một đơn chưa hủy (mỗi tài khoản 1 lần). */
+    used_by_buyer?: boolean;
     min_order_diff?: number;
     scope_message?: string;
     created_at?: string;

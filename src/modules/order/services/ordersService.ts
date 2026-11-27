@@ -55,7 +55,54 @@ export interface OrderResponse {
   };
 }
 
+export interface CheckoutLineInput {
+  productId: string;
+  variantId?: string;
+  quantity: number;
+}
+
+export interface OrderQuote {
+  shopId: string | null;
+  shopName: string;
+  shopLogo: string | null;
+  items: Array<{
+    productId: string;
+    variantId: string;
+    title: string;
+    color: string | null;
+    size: string | null;
+    image: string | null;
+    unitPrice: number;
+    quantity: number;
+    lineTotal: number;
+  }>;
+  subtotal: number;
+  shippingFee: number;
+  shipping: { zoneLabel: string; zoneType: string; pricingType: string };
+  productDiscount: number;
+  shippingDiscount: number;
+  total: number;
+  coupons: {
+    product: { code: string; isPlatform: boolean; title: string | null } | null;
+    shipping: { code: string; isPlatform: boolean; title: string | null } | null;
+  };
+  couponErrors: Partial<Record<'PRODUCT' | 'SHIPPING', string>>;
+  codAllowed: boolean;
+}
+
+export interface QuotePayload {
+  items: CheckoutLineInput[];
+  shippingAddress?: unknown;
+  couponCode?: string;
+  shippingCouponCode?: string;
+}
+
 export const ordersService = {
+  /** Server tính lại toàn bộ tiền đơn (giá, phí ship, mã) mà chưa giữ kho: số hiển thị = số sẽ thu. */
+  quote: async (payload: QuotePayload, signal?: AbortSignal): Promise<OrderQuote> => {
+    const res = await api.post('/orders/quote', payload, { signal });
+    return res.data;
+  },
   calculateShipping: async (payload: { shopId?: string; address?: any }): Promise<{
     shippingFee: number;
     pricingType: 'FLAT_RATE' | 'ZONE_BASED';

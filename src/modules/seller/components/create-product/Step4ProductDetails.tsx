@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Star, Plus, X, Tag as TagIcon } from 'lucide-react';
 import { abs } from './useHTMLImage';
 import SmartProductAiModal from '../SmartProductAiModal';
-import { IntelPreviewSection } from './IntelPreviewSection';
+import { HealthPreviewSection } from './HealthPreviewSection';
 import { ProposeCategoryModal } from './ProposeCategoryModal';
 import { VariantPricingTable, type SelectedVariants } from './VariantPricingTable';
 
@@ -253,7 +253,7 @@ export function Step4ProductDetails({
                         />
                     </div>
 
-                    <IntelPreviewSection
+                    <HealthPreviewSection
                         source={{ title, description, categories, categoryId, tags: selectedTags, materials, images: selectedImages, blank, selectedVariants, commissionPercent }}
                         onMaterialsChange={setMaterials}
                     />

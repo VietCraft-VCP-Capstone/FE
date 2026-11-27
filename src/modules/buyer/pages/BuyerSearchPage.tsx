@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo, type MouseEvent } from 'react';
+import { useState, useEffect, type MouseEvent } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
-import { promotionService } from '../../promotion/services/promotionService';
-import { buildDeals } from '../components/deals/buildDeals';
+import { useDealLookup } from '../hooks/useDealLookup';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import { ProductItem } from '../../product/types/product';
 import { SeoMeta } from '../../../shared/components/SeoMeta';
@@ -65,12 +64,11 @@ export function BuyerSearchPage() {
   const [categories, setCategories] = useState(PRIMARY_CATEGORIES);
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [popularKeywords, setPopularKeywords] = useState(FALLBACK_KEYWORDS.slice(0, 6));
-  const [coupons, setCoupons] = useState<any[]>([]);
   const { showToast } = useToast();
-  const dealMap = useMemo(() => new Map(buildDeals(coupons, products, Infinity).map(d => [d.id, d])), [coupons, products]);
+  // Giá tốt với mã do BE tính (cùng công thức thanh toán) cho đúng các sản phẩm đang hiện.
+  const dealMap = useDealLookup(products.map((p) => String(p.id)));
 
   useEffect(() => {
-    promotionService.getAll().then((list: any) => setCoupons(Array.isArray(list) ? list : [])).catch(() => { });
     productsService.getTrendingKeywords(6).then((kws) => { if (kws.length) setPopularKeywords(kws); });
     if (isLoggedIn()) favoritesService.getFavoriteIds().then(setFavoritedProductIds);
     productsService.getCategories().then((data: any) => {

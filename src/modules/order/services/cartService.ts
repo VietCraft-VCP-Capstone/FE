@@ -283,6 +283,28 @@ export const cartService = {
     notifyCartUpdate(data);
     return data;
   },
+  /** Đặt đúng tập dòng được chọn trong 1 request (dòng không có trong danh sách sẽ bị bỏ chọn). */
+  setSelection: async (selectedItemIds: string[]) => {
+    if (!isLoggedIn()) {
+      const wanted = new Set(selectedItemIds);
+      return mutateGuestCart((entries) => entries.map((e) => ({ ...e, isSelected: wanted.has(guestItemId(e)) })));
+    }
+    const res = await api.put('/cart/selection', { selectedItemIds });
+    const data = res.data?.data ?? res.data;
+    notifyCartUpdate(data);
+    return data;
+  },
+  /** Xoá nhiều dòng trong 1 request. */
+  removeItems: async (itemIds: string[]) => {
+    if (!isLoggedIn()) {
+      const ids = new Set(itemIds);
+      return mutateGuestCart((entries) => entries.filter((e) => !ids.has(guestItemId(e))));
+    }
+    const res = await api.post('/cart/items/bulk-delete', { itemIds });
+    const data = res.data?.data ?? res.data;
+    notifyCartUpdate(data);
+    return data;
+  },
   removeByProduct: async (productId: string, variantId?: string) => {
     if (!productId) return null;
     const cart = await cartService.getCart();

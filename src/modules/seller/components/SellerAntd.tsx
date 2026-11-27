@@ -32,7 +32,7 @@ export function SellerAntd({ children }: { children: React.ReactNode }) {
           borderRadius: 8,
           borderRadiusLG: 16,
           borderRadiusSM: 6,
-          fontFamily: '"Plus Jakarta Sans", Inter, system-ui, -apple-system, sans-serif',
+          fontFamily: '"Epilogue Variable", system-ui, -apple-system, sans-serif',
           fontSize: 13.5,
           controlHeight: 36,
           // Bóng nhuộm tông stone, không đen thuần.

@@ -28,17 +28,17 @@ body:has(.seller-layout) {
     height: 100vh;
     height: 100dvh;
     background: #f8fafb;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: var(--font-body);
     overflow: hidden;
 }
 
 .seller-sidebar {
-    width: 236px;
+    width: 240px;
     background: #fff;
     border-right: 1px solid #eef1f4;
     display: flex;
     flex-direction: column;
-    padding: 14px 0 18px;
+    padding: 0;
     flex-shrink: 0;
     transition: width 0.25s ease;
     position: relative;
@@ -49,9 +49,13 @@ body:has(.seller-layout) {
 }
 
 .seller-sidebar-top {
+    /* Cao bằng header để đường kẻ dưới nối liền một mạch */
+    height: 72px;
     display: flex;
-    justify-content: center;
-    padding: 6px 0 18px;
+    align-items: center;
+    padding: 0 14px;
+    border-bottom: 1px solid #eef1f4;
+    flex-shrink: 0;
 }
 
 .seller-collapse-btn {
@@ -76,34 +80,77 @@ body:has(.seller-layout) {
 
 .seller-nav {
     flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 0 14px;
+    gap: 2px;
+    padding: 14px 14px;
     overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #e2e8f0 transparent;
 }
 
 .seller-sidebar.collapsed .seller-nav {
-    padding: 0 10px;
+    padding: 14px 12px;
 }
 
 .seller-nav-item {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 13px;
-    padding: 11px 14px;
+    gap: 12px;
+    height: 42px;
+    padding: 0 12px;
     border-radius: 11px;
     color: #4b5563;
     text-decoration: none;
     font-size: 14px;
     font-weight: 500;
     white-space: nowrap;
-    transition: all 0.15s;
+    transition: background 0.15s, color 0.15s;
+}
+
+.seller-nav-item svg {
+    flex-shrink: 0;
+}
+
+.seller-nav-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.seller-nav-badge {
+    flex-shrink: 0;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
 }
 
 .seller-sidebar.collapsed .seller-nav-item {
     justify-content: center;
-    padding: 11px;
+    padding: 0;
+}
+
+.seller-sidebar.collapsed .seller-nav-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 9px;
+    line-height: 16px;
+    border: 1.5px solid #fff;
 }
 
 .seller-nav-item:hover {
@@ -122,28 +169,13 @@ body:has(.seller-layout) {
 }
 
 .seller-sidebar-footer {
-    display: flex;
-    justify-content: center;
-    padding-top: 14px;
+    flex-shrink: 0;
+    padding: 10px 14px 14px;
+    border-top: 1px solid #eef1f4;
 }
 
-.seller-settings-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    background: none;
-    border: none;
-    border-radius: 12px;
-    color: #64748b;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.seller-settings-btn:hover {
-    background: #f1f5f4;
-    color: #1a6b1a;
+.seller-sidebar.collapsed .seller-sidebar-footer {
+    padding: 10px 12px 14px;
 }
 
 .seller-main {
@@ -171,9 +203,10 @@ body:has(.seller-layout) {
 }
 
 .seller-logo-text {
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -0.01em;
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
 }
 
 .seller-header-center {
@@ -267,13 +300,14 @@ body:has(.seller-layout) {
     display: flex;
     align-items: center;
     gap: 3px;
+    height: 42px;
     font-size: 14px;
     font-weight: 600;
     color: #334155;
     background: #fff;
     border: 1px solid #e4e9ee;
     border-radius: 12px;
-    padding: 9px 12px;
+    padding: 0 12px;
     cursor: pointer;
     transition: all 0.15s;
 }
@@ -289,7 +323,8 @@ body:has(.seller-layout) {
 .seller-avatar {
     width: 42px;
     height: 42px;
-    border-radius: 12px;
+    padding: 0;
+    border-radius: 999px;
     background: #dff0df;
     color: #15691a;
     font-size: 15px;
@@ -360,8 +395,22 @@ body:has(.seller-layout) {
 
 .seller-content {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 24px 32px;
+}
+
+/* Bề rộng nội dung thống nhất cho mọi trang seller */
+.seller-page {
+    width: 100%;
+    max-width: 1440px;
+    margin: 0 auto;
+}
+
+@media (max-width: 767px) {
+    .seller-header { padding: 0 16px; gap: 10px; }
+    .seller-header-actions { gap: 6px; }
+    .seller-content { padding: 16px; }
 }
 
 .seller-content.seller-chat-content {
@@ -933,9 +982,10 @@ body:has(.seller-layout) {
 }
 
 .buyer-logo {
-    font-size: 24px;
-    font-weight: 800;
-    letter-spacing: -0.3px;
+    font-family: var(--font-heading);
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
     flex-shrink: 0;
     white-space: nowrap;
 }
@@ -1158,8 +1208,10 @@ body:has(.seller-layout) {
 }
 
 .buyer-intro-banner h1 {
-    font-size: 26px;
-    font-weight: 800;
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.2;
     margin: 0;
 }
 
@@ -1202,8 +1254,10 @@ body:has(.seller-layout) {
 }
 
 .buyer-section .section-head h2 {
-    font-size: 18px;
-    font-weight: 800;
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.25;
     color: #330033;
     margin: 0;
 }
@@ -1270,9 +1324,9 @@ body:has(.seller-layout) {
         padding: 16px;
     }
 
-    /* Tiêu đề mục trang chủ đặt cỡ chữ inline 20px, phải dùng !important để thu nhỏ trên điện thoại. */
+    /* Tiêu đề mục trang chủ đặt cỡ chữ inline 18px, phải dùng !important để thu nhỏ trên điện thoại. */
     .buyer-section .section-head h2 {
-        font-size: 17px !important;
+        font-size: 15px !important;
     }
 
     .buyer-scroll-row .style-overlay h3 {
@@ -1653,8 +1707,9 @@ body:has(.seller-layout) {
 }
 
 .brand-col h2 {
-    font-size: 24px;
-    font-weight: 800;
+    font-family: var(--font-heading);
+    font-size: 21px;
+    font-weight: 600;
     color: #fff;
     margin: 0;
 }
@@ -2481,6 +2536,18 @@ body:has(.seller-layout) {
     padding: 24px 28px;
     max-width: 1320px;
     margin: 0 auto;
+}
+
+/* Trong layout seller, khung .seller-page đã lo bề rộng và lề — không cộng thêm lần nữa */
+.seller-content .creator-page {
+    padding: 0;
+    max-width: none;
+    /* Cao tối thiểu = vùng nội dung (100dvh − header 72px − padding 2×24px) để thanh thao tác nằm sát đáy */
+    min-height: calc(100dvh - 120px);
+}
+
+@media (max-width: 767px) {
+    .seller-content .creator-page { min-height: calc(100dvh - 104px); }
 }
 
 .creator-page-head {

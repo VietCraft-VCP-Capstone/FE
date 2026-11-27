@@ -75,8 +75,10 @@ export const buyerOf = (item: RefundRequest) => (typeof item.buyer_id === 'objec
 
 export const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
+export const isCodRefund = (item: RefundRequest) => String(orderOf(item)?.payment_method || '').toUpperCase() === 'COD';
+
 export function refundAmountText(item: RefundRequest): string {
-  return item.refund_type === 'FULL' ? 'Toàn bộ đơn' : money(Number(item.refund_amount));
+  return item.refund_type === 'FULL' ? `${money(Number(item.refund_amount))} (toàn bộ đơn)` : money(Number(item.refund_amount));
 }
 
 /** Hạn phản hồi của bên đang phải xử lý (xưởng in với đơn POD, người bán với đơn thường). */

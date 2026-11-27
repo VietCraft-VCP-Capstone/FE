@@ -262,14 +262,14 @@ export function SignupPage({ onSignup, onGoogleLogin, user }: SignupPageProps) {
   });
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Epilogue Variable', system-ui, sans-serif" }}>
       {/* Left hero */}
       <div style={{ flex: 1, position: 'relative', minWidth: 0 }} className="auth-hero-panel">
         <img src="https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&q=80&w=900" alt=""
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,30,0,0.75) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)' }} />
         <div style={{ position: 'absolute', bottom: 44, left: 36, right: 36 }}>
-          <p style={{ color: '#fff', fontSize: 32, fontWeight: 800, lineHeight: 1.2, margin: '0 0 10px' }}>Tìm kiếm mảnh ghép<br />độc đáo.</p>
+          <p style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", color: '#fff', fontSize: 27, fontWeight: 600, lineHeight: 1.22, margin: '0 0 10px' }}>Tìm kiếm mảnh ghép<br />độc đáo.</p>
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, margin: 0 }}>Tham gia VietCraft để mua sắm hàng ngàn sản phẩm cá nhân hóa, lưu lại các thiết kế yêu thích và ủng hộ nhà sáng tạo Việt.</p>
         </div>
       </div>
@@ -279,10 +279,10 @@ export function SignupPage({ onSignup, onGoogleLogin, user }: SignupPageProps) {
         <div style={{ width: '100%', maxWidth: 480, margin: 'auto' }}>
           <div style={{ marginBottom: 12 }}>
             <Link to="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontSize: 30, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
+              <span style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em' }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
             </Link>
           </div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Tạo tài khoản</h1>
+          <h1 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033', margin: '0 0 4px' }}>Tạo tài khoản</h1>
           <p style={{ fontSize: 14, color: '#78716c', margin: '0 0 12px' }}>Đăng ký miễn phí để bắt đầu trải nghiệm mua sắm tuyệt vời.</p>
 
           <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

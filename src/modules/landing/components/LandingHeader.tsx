@@ -57,7 +57,7 @@ export function LandingHeader({
         
         {/* Logo */}
         <div className="flex items-center gap-1.5 cursor-pointer" onClick={onHome}>
-          <span className="text-2xl font-bold select-none">
+          <span className="font-heading text-xl font-semibold tracking-tight select-none">
             <span className="text-[#007700]">Viet</span>
             <span className="text-[#330033]">Craft</span>
           </span>
@@ -65,10 +65,13 @@ export function LandingHeader({
 
         {/* Navigation Links */}
         <nav className="hidden lg:flex items-center gap-6 font-semibold text-stone-700">
-          <a href="#kham-pha" className="hover:text-[#007700] transition-colors">Khám phá</a>
-          <a href="#qua-tang" className="hover:text-[#007700] transition-colors">Quà tặng</a>
-          <span className="cursor-pointer hover:text-[#007700] transition-colors" onClick={onSignup}>Đăng ký</span>
+          <Link to="/search" className="hover:text-[#007700] transition-colors">Khám phá</Link>
+          <Link to="/gifts" className="hover:text-[#007700] transition-colors">Quà tặng</Link>
           <a href="#xu-huong" className="hover:text-[#007700] transition-colors">Xu hướng</a>
+          <Link to="/vouchers" className="hover:text-[#007700] transition-colors">Ưu đãi</Link>
+          {!user && (
+            <button type="button" className="hover:text-[#007700] transition-colors" onClick={onSignup}>Đăng ký</button>
+          )}
           <Link to="/seller/register" className="text-[#007700] hover:text-[#005B00] font-bold transition-colors">
             Kênh Người Bán
           </Link>
@@ -90,7 +93,7 @@ export function LandingHeader({
 
         {/* Right Actions */}
         <div className="flex items-center gap-1 sm:gap-4">
-          <Link to="/favorites" className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all" title="Yêu thích">
+          <Link to={user ? '/favorites' : '/login?next=%2Ffavorites'} className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all" title="Yêu thích">
             <Heart className="h-5.5 w-5.5" />
           </Link>
           <Link to="/cart" className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all relative" title="Giỏ hàng">

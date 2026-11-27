@@ -495,7 +495,7 @@ export function BuyerOrderDetailPage() {
                 <div className="p-4 border-b border-gray-50 flex flex-wrap items-center justify-between gap-2 bg-gray-50/10">
                     <div className="flex min-w-0 items-center gap-2">
                         <div className="w-6 h-6 shrink-0 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
-                            <img src={order.shopLogo || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=80'} alt={order.shopName} className="w-full h-full object-cover" />
+                            <img src={order.shopLogo || '/placeholder-shop.svg'} alt={order.shopName} className="w-full h-full object-cover" />
                         </div>
                         <span className="truncate font-extrabold text-sm text-gray-800">{order.shopName || 'VietCraft Shop'}</span>
                     </div>
@@ -556,6 +556,8 @@ export function BuyerOrderDetailPage() {
             {!awaitingPayment && <RefundRequestPanel
                 orderId={order.id}
                 refundOrderId={order._id}
+                orderCode={order.id}
+                paymentMethod={order.paymentMethod}
                 formOpen={refundFormOpen}
                 onFormClose={() => setRefundFormOpen(false)}
                 onCreated={() => { setRefundFormOpen(false); setHasLegacyRefund(true); }}

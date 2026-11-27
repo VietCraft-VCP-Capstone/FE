@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { MaterialInput } from '../../../product/components/MaterialInput';
-import { IntelPreviewModal } from '../../../analytics/components/intel/IntelPreviewModal';
+import { HealthDraftModal } from '../../../analytics/components/health/HealthDraftModal';
 import { previewDraft, type DraftSource } from './previewDraft';
 
-export function IntelPreviewSection({ source, onMaterialsChange }: { source: DraftSource; onMaterialsChange: (v: string[]) => void }) {
+export function HealthPreviewSection({ source, onMaterialsChange }: { source: DraftSource; onMaterialsChange: (v: string[]) => void }) {
     const [open, setOpen] = useState(false);
     const hasTitle = !!source.title.trim();
 
@@ -24,11 +24,11 @@ export function IntelPreviewSection({ source, onMaterialsChange }: { source: Dra
                     <Sparkles size={14} aria-hidden /> Chấm thử trước khi đăng
                 </button>
                 <span className="text-xs text-stone-500">
-                    {hasTitle ? 'Xem điểm ảnh, từ khoá, tag và độ phù hợp dịp của bản nháp này. Chưa lưu gì.' : 'Nhập tên sản phẩm để chấm thử.'}
+                    {hasTitle ? 'Xem điểm 5 tiêu chí (ảnh, mô tả, tag, đánh giá, giá) và việc nên làm trước khi đăng. Chưa lưu gì.' : 'Nhập tên sản phẩm để chấm thử.'}
                 </span>
             </div>
 
-            {open && <IntelPreviewModal onClose={() => setOpen(false)} draft={previewDraft(source)} />}
+            {open && <HealthDraftModal onClose={() => setOpen(false)} draft={previewDraft(source)} />}
         </>
     );
 }

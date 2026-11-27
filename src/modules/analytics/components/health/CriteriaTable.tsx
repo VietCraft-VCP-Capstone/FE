@@ -1,6 +1,6 @@
 import { Banknote, FileText, HelpCircle, Image, Star, Tag, type LucideIcon } from 'lucide-react';
 import type { HealthFactorKey, HealthFactorV3 } from '../../healthTypes';
-import { TIER_COLOR } from '../intel/intelLabels';
+import { TIER_COLOR } from './tier';
 import { Chip } from '../ui';
 import { factorStateChip, isExcluded } from './factorState';
 
@@ -35,19 +35,21 @@ function FactorRow({ f }: { f: HealthFactorV3 }) {
   );
 }
 
-export function CriteriaTable({ factors, onExplain }: { factors?: HealthFactorV3[]; onExplain: () => void }) {
+export function CriteriaTable({ factors, onExplain }: { factors?: HealthFactorV3[]; onExplain?: () => void }) {
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
         <h2 className="m-0 text-base font-bold text-stone-900">Tiêu chí</h2>
-        <button
-          type="button"
-          onClick={onExplain}
-          className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-stone-500 transition-colors hover:text-[#007700]"
-        >
-          <HelpCircle size={13} aria-hidden />
-          <span>Cách tính điểm</span>
-        </button>
+        {onExplain && (
+          <button
+            type="button"
+            onClick={onExplain}
+            className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-stone-500 transition-colors hover:text-[#007700]"
+          >
+            <HelpCircle size={13} aria-hidden />
+            <span>Cách tính điểm</span>
+          </button>
+        )}
       </div>
       {factors?.length ? (
         <ul className="m-0 mt-1 list-none divide-y divide-stone-100 p-0">
