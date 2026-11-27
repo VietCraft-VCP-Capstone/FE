@@ -879,6 +879,7 @@ export function SeasonalPage() {
                     occasionName={activeCamp.name}
                     campId={activeCamp.id}
                     planRef={planRefOf(activeCamp)}
+                    forecastReview={data.forecast_review}
                     savedIdeaTitles={savedIdeaItems.map(x => x.title)}
                     appliedSummary={{
                       selectedIdeasCount: savedIdeaItems.length,

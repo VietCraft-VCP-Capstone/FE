@@ -972,6 +972,16 @@ export interface CampaignTargetBasis {
   missing: 'baseline_history' | 'baseline_orders' | 'uplift' | null;
 }
 
+export interface SeasonalForecastReview {
+  n: number;
+  hits: number;
+  coverage_pct: number;
+  actual: number;
+  event_key: string;
+  event_year: number;
+  items: Array<{ days_to_event: number; expected: { p10: number; p50: number; p90: number }; verdict: 'below' | 'within' | 'above' }>;
+}
+
 /** Đơn trong kỳ dịp chia theo trạng thái (BE `orderStatusBreakdown`). */
 export interface OrderStatusBreakdown {
   delivered: number;
@@ -1098,6 +1108,8 @@ export interface SeasonalForecast {
   is_live_shop?: boolean;
   /** false: đang xem gian hàng mẫu dùng chung, không lưu được kế hoạch */
   can_save_plan?: boolean;
+  /** Sau lễ: các bản dự báo đã lưu mỗi tuần so với số đơn thực tế của kỳ */
+  forecast_review?: SeasonalForecastReview | null;
   ready_to_ship_ideas?: ReadyToShipIdea[];
   pod_blanks?: PodBlankSuggestion[];
   opportunity_clusters?: any[];

@@ -362,6 +362,8 @@ export function SeasonalReadinessTab({
                     </div>
                   </div>
 
+                  {prod.stock_plan && <StockPlanLine plan={prod.stock_plan} />}
+
                   {/* Chi tiết 4 nhiệm vụ: highlight việc cần làm, thu gọn việc đã xong */}
                   {isExpanded && (
                     <div className="pt-3 border-t border-stone-100 space-y-2.5">
@@ -553,6 +555,34 @@ export function SeasonalReadinessTab({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+/** Gợi ý số lượng chuẩn bị (AI `stock_plan`, mô hình newsvendor theo nhịp bán ngày thường). */
+function StockPlanLine({ plan }: { plan: any }) {
+  const vnd = (n: number) => `${Math.round(n).toLocaleString('vi-VN')}đ`;
+  let text: string;
+  if (plan.mode === 'print_on_demand') text = 'In theo đơn: không cần nhập hàng trước.';
+  else if (plan.mode === 'no_sales_history') text = 'Chưa có lượt bán trong 90 ngày nên chưa gợi ý được số lượng chuẩn bị.';
+  else if (plan.mode === 'missing_cost') text = 'Chưa có giá vốn của sản phẩm nên chưa tính được số lượng chuẩn bị.';
+  else if (plan.mode === 'unprofitable') text = 'Giá bán chưa đủ bù giá vốn và phí sàn: không nên nhập thêm.';
+  else {
+    text =
+      `Nên có khoảng ${plan.recommended_qty} cái cho ${plan.window_days} ngày còn lại của dịp`
+      + (plan.to_add > 0 ? ` (đang có ${plan.current_stock}, cần thêm ${plan.to_add})` : ` (đang có ${plan.current_stock}, đủ)`)
+      + `. Nếu chỉ bán được ${plan.demand.p10} cái thì lỗ tối đa khoảng ${vnd(plan.worst_case_loss_vnd)}.`;
+  }
+  return (
+    <div className="rounded-lg bg-stone-50 px-3 py-2 text-[11.5px] text-stone-700">
+      <span className="font-semibold text-stone-900">Số lượng chuẩn bị: </span>
+      {text}
+      {plan.mode === 'stock' && (
+        <span className="block text-[10.5px] text-stone-500">
+          Theo nhịp bán ngày thường của sản phẩm ({plan.demand.p10}–{plan.demand.p90} cái, 80%); giả định hàng dư thanh lý thu về {Math.round(plan.salvage_pct * 100)}% giá vốn. Dịp lễ thường bán nhiều hơn: theo dõi tuần đầu mở bán rồi nhập thêm.
+        </span>
+      )}
     </div>
   );
 }

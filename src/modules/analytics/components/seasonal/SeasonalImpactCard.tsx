@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, CheckCircle2, Info, BarChart3, MessageSquare } from 'lucide-react';
-import type { SeasonalImpact } from '../../types';
+import type { SeasonalForecastReview, SeasonalImpact } from '../../types';
 import { money } from '../../../../shared/utils/format';
 import { analyticsApi, seasonalSaveError, type SeasonalPlanRef } from '../../services/analyticsApi';
 
@@ -34,6 +34,28 @@ interface Props {
   savedIdeaTitles?: string[];
   appliedSummary?: AppliedSummary;
   initialReview?: { rating?: 'good' | 'neutral' | 'poor'; note?: string; updated_at?: string };
+  /** sau lễ: dự báo đã lưu so với thực tế */
+  forecastReview?: SeasonalForecastReview | null;
+}
+
+const VERDICT_LABEL = { below: 'thấp hơn khoảng', within: 'nằm trong khoảng', above: 'cao hơn khoảng' } as const;
+
+function ForecastReviewBlock({ review }: { review: SeasonalForecastReview }) {
+  return (
+    <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3 text-xs text-stone-700 space-y-1.5">
+      <div className="font-semibold text-stone-900">
+        Độ chính xác của dự báo: {review.hits}/{review.n} lần khoảng dự báo chứa số đơn thực tế ({review.coverage_pct}%)
+      </div>
+      <ul className="m-0 list-none p-0 space-y-0.5 tabular-nums">
+        {review.items.map(it => (
+          <li key={it.days_to_event}>
+            Trước lễ {it.days_to_event} ngày: dự báo {it.expected.p10}–{it.expected.p90} đơn (nếu bán như ngày thường) · thực tế {review.actual} đơn, {VERDICT_LABEL[it.verdict]}
+          </li>
+        ))}
+      </ul>
+      <div className="text-[11px] text-stone-500">Dự báo chỉ tính nhịp bán ngày thường; thực tế cao hơn khoảng nghĩa là dịp này kéo thêm đơn so với ngày thường.</div>
+    </div>
+  );
 }
 
 export function SeasonalImpactCard({
@@ -44,6 +66,7 @@ export function SeasonalImpactCard({
   savedIdeaTitles = [],
   appliedSummary,
   initialReview,
+  forecastReview,
 }: Props) {
   const [rating, setRating] = useState<'good' | 'neutral' | 'poor'>(initialReview?.rating || 'good');
   const [note, setNote] = useState<string>(initialReview?.note || '');
@@ -78,19 +101,20 @@ export function SeasonalImpactCard({
   }
 
   const phaseLabel = {
-    upcoming: 'Trước mùa (Dự phóng kỳ vọng)',
-    running: 'Đang diễn ra (Theo dõi thực tế vs Kịch bản nền)',
-    ended: 'Sau mùa (Tổng kết đối chứng)',
+    upcoming: 'Trước mùa (Mức nếu bán như ngày thường)',
+    running: 'Đang diễn ra (Thực tế so với mức ngày thường)',
+    ended: 'Sau mùa (Tổng kết so với ngày thường)',
   }[impact.phase];
 
   return (
     <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6 space-y-4">
+      {forecastReview && <ForecastReviewBlock review={forecastReview} />}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-stone-100 pb-3">
         <div>
           <div className="flex items-center gap-2">
             <BarChart3 size={16} className="text-[#007700]" />
             <h4 className="m-0 text-sm sm:text-base font-bold text-stone-900">
-              Thành quả áp dụng vs Kịch bản không áp dụng ({occasionName})
+              Thành quả so với bán như ngày thường ({occasionName})
             </h4>
           </div>
           <p className="mt-0.5 mb-0 text-xs text-stone-500">
@@ -187,9 +211,9 @@ export function SeasonalImpactCard({
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-950 flex items-start gap-2.5">
           <Info size={16} className="mt-0.5 shrink-0 text-amber-700" />
           <div>
-            <strong>Chưa đủ đơn nền 8 tuần trước dịp để dựng kịch bản phản thực (counterfactual).</strong>
+            <strong>Chưa đủ đơn nền 8 tuần trước dịp để tính mức bán như ngày thường.</strong>
             <p className="mt-1 mb-0 text-amber-900/90">
-              Hệ thống cần đơn hợp lệ trong 8 tuần trước cửa sổ sự kiện để ước lượng mức đơn nếu không áp dụng ý tưởng. Khi shop phát sinh đơn, bảng đối chứng sẽ tự động cập nhật.
+              Hệ thống cần đơn hợp lệ trong 8 tuần trước cửa sổ sự kiện để ước lượng mức đơn nếu bán như ngày thường. Khi shop phát sinh đơn, bảng đối chứng sẽ tự động cập nhật.
             </p>
           </div>
         </div>
@@ -246,7 +270,7 @@ export function SeasonalImpactCard({
             </div>
 
             <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3.5">
-              <div className="text-[11px] text-stone-500">Nếu không áp dụng (Phản thực P50)</div>
+              <div className="text-[11px] text-stone-500">Nếu bán như ngày thường (P50)</div>
               <div className="mt-1 text-xl font-black text-stone-900">
                 {impact.counterfactual_orders.p50.toFixed(0)} đơn
               </div>
@@ -256,7 +280,7 @@ export function SeasonalImpactCard({
             </div>
 
             <div className="rounded-xl border border-stone-200 bg-stone-50/60 p-3.5">
-              <div className="text-[11px] text-stone-500">Chênh lệch vs Phản thực</div>
+              <div className="text-[11px] text-stone-500">Chênh lệch so với ngày thường</div>
               <div className={`mt-1 text-xl font-black ${(impact.lift_vs_counterfactual_pct ?? 0) >= 0 ? 'text-[#007700]' : 'text-amber-700'}`}>
                 {impact.lift_vs_counterfactual_pct != null ? `${impact.lift_vs_counterfactual_pct > 0 ? '+' : ''}${impact.lift_vs_counterfactual_pct}%` : '—'}
               </div>
