@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { SeasonalNavbar } from '../components/seasonal/SeasonalNavbar';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
@@ -15,7 +15,7 @@ import { OpportunityKeywordTable } from '../components/seasonal/OpportunityKeywo
 import { CampaignFunnelCard } from '../components/seasonal/CampaignFunnelCard';
 import { ApplyPlaybookCard } from '../components/seasonal/ApplyPlaybookCard';
 import { SeasonalImpactCard } from '../components/seasonal/SeasonalImpactCard';
-import { analyticsApi, planRefOf, seasonalSaveError, type SeasonalPlanRef } from '../services/analyticsApi';
+import { analyticsApi, occasionVoucherHref, planRefOf, seasonalSaveError, type SeasonalPlanRef } from '../services/analyticsApi';
 
 // Hub components (Khối A-H)
 import { HubActionFeed, type UnifiedOccasionAction } from '../components/seasonal/hub/HubActionFeed';
@@ -688,6 +688,29 @@ export function SeasonalPage() {
                     activeCampId={activeCamp?.id}
                     onSelectCampaign={handleSelectCampaign}
                   />
+
+                  {/* Hành động nhanh cho dịp đang xem: dùng đúng chức năng sẵn có của sàn */}
+                  {activeCamp && data.can_save_plan !== false && (() => {
+                    const voucherHref = occasionVoucherHref(activeCamp);
+                    return (
+                      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs">
+                        <span className="font-semibold text-stone-700">Hành động nhanh · {activeCamp.name}:</span>
+                        {voucherHref ? (
+                          <Link to={voucherHref} className="rounded-lg border border-[#007700] px-2.5 py-1 font-semibold text-[#007700] hover:bg-[#EAF0E2]/50">
+                            Tạo mã giảm giá cho dịp
+                          </Link>
+                        ) : (
+                          <span className="text-stone-400">Đã qua hạn chốt đơn: không tạo mã cho dịp này</span>
+                        )}
+                        <button type="button" onClick={() => handleSelectTab('potential')} className="rounded-lg border border-stone-200 px-2.5 py-1 font-semibold text-stone-700 hover:bg-stone-50">
+                          Chọn ý tưởng sản phẩm
+                        </button>
+                        <button type="button" onClick={() => handleSelectTab('readiness')} className="rounded-lg border border-stone-200 px-2.5 py-1 font-semibold text-stone-700 hover:bg-stone-50">
+                          Kiểm tra hàng & số lượng
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                   {/* Việc ưu tiên tuần này & Theo dõi tiến độ */}
                   <div className="space-y-2">

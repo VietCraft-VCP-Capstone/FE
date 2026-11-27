@@ -14,6 +14,21 @@ export function planRefOf(camp?: { id?: string; occasion_window?: { peak_date?: 
   return Number.isInteger(year) && year >= 2020 ? { camp_id: camp.id, event_year: year } : null;
 }
 
+/**
+ * Liên kết mở hộp tạo mã giảm giá đã điền sẵn thời gian của dịp: từ ngày mở bán (hoặc hôm nay) tới hạn chốt đơn.
+ * Mức giảm để seller tự quyết. Null khi đã qua hạn chốt.
+ */
+export function occasionVoucherHref(camp?: { name?: string; occasion_window?: { traction_start?: string; cut_off_date?: string } } | null): string | null {
+  const start = camp?.occasion_window?.traction_start;
+  const end = camp?.occasion_window?.cut_off_date;
+  if (!start || !end) return null;
+  const todayVn = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+  const from = start > todayVn ? start : todayVn;
+  if (end < from) return null;
+  const q = new URLSearchParams({ new: 'PERCENTAGE', title: `Ưu đãi ${camp?.name || 'dịp lễ'}`, start: from, end });
+  return `/seller/promotions?${q.toString()}`;
+}
+
 /** Câu báo lỗi cho các thao tác lưu kế hoạch mùa vụ: ưu tiên `message` BE trả về (vd. đang xem gian hàng mẫu). */
 export function seasonalSaveError(err: unknown, fallback: string): string {
   const msg = (err as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
