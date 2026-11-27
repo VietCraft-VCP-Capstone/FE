@@ -53,6 +53,9 @@ const REASON_TEXT: Record<string, string> = {
   'Buyer disputed rejection.': 'Bạn đã mở khiếu nại tranh chấp gửi lên Quản trị viên sàn VietCraft.',
   'Admin approved return request.': 'Quản trị viên đã phê duyệt yêu cầu đổi hàng.',
   'Admin rejected dispute.': 'Quản trị viên đã từ chối yêu cầu khiếu nại tranh chấp.',
+  'Admin-confirmed Refund bridge dispatch started.': 'Quản trị viên đã xác nhận hoàn tiền, đang xử lý chuyển tiền.',
+  'Persisted idempotent linked Refund bridge reference.': 'Đã tạo lệnh hoàn tiền.',
+  'Deadline expired; notify Admin, no automatic decision.': 'Quá hạn phản hồi, đã chuyển Quản trị viên xem xét.',
 };
 
 export const translateTimelineReason = (reason = '') => {
@@ -61,3 +64,5 @@ export const translateTimelineReason = (reason = '') => {
   if (trimmed.startsWith('Admin decided: REFUND')) return 'Quản trị viên đã phân xử: Chấp thuận hoàn tiền cho người mua.';
   return REASON_TEXT[trimmed] || trimmed;
 };
+
+export const reasonLabel = (code?: string) => reasons.find(r => r.code === code)?.label || code || '—';

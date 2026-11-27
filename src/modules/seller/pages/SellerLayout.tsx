@@ -4,7 +4,7 @@ import '../../../shared/components/layouts.css';
 import { POD_CREATE_ENABLED, POD_CREATE_PATH } from '../featureFlags';
 import {
   LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Palette, Ticket,
-  Wallet, Banknote, Rocket, Users,
+  Banknote, Rocket, Users, RotateCcw,
   Settings, Bell, Mail, PanelLeft, LogOut, ChevronDown, MessageSquare
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -12,6 +12,7 @@ import { chatService } from '../../chat/services/chatService';
 import { notificationService } from '../../notification/services/notificationService';
 import { HeaderNotificationDropdown } from '../../notification/components/HeaderNotificationDropdown';
 import { WorkspaceSwitcher, rememberSellerPath } from '../../analytics/components/WorkspaceSwitcher';
+import { useSocket } from '../../../infrastructure/websocket/useSocket';
 
 export interface SellerNavItem {
   to: string;
@@ -38,14 +39,13 @@ const OPS_NAV: SellerNavItem[] = [
   { to: '/seller/catalog', icon: Archive, label: 'Danh mục sản phẩm' },
   { to: '/seller/storefront', icon: Store, label: 'Thông tin cửa hàng' },
   { to: '/seller/orders', icon: ShoppingCart, label: 'Đơn hàng' },
-  { to: '/seller/refund-requests', icon: Package, label: 'Hoàn tiền' },
+  { to: '/seller/refund-requests', icon: RotateCcw, label: 'Hoàn tiền' },
   { to: '/seller/chat', icon: MessageSquare, label: 'Tin nhắn khách hàng' },
   { to: '/seller/products', icon: Package, label: 'Quản lí sản phẩm' },
   { to: '/seller/products/new', icon: PlusCircle, label: 'Tạo sản phẩm POD' },
   { to: '/seller/designs', icon: Palette, label: 'Kho thiết kế' },
   { to: '/seller/promotions', icon: Ticket, label: 'Khuyến mãi' },
   { to: '/seller/competitors', icon: Users, label: 'Đối thủ đang theo dõi' },
-  { to: '/seller/revenue', icon: Wallet, label: 'Doanh thu cửa hàng' },
   { to: '/seller/payouts', icon: Banknote, label: 'Đối soát & rút tiền' },
   { to: '/seller/onboarding', icon: Rocket, label: 'Thiết lập gian hàng' },
 ];
@@ -59,9 +59,12 @@ const SIDEBAR_COLLAPSED_KEY = 'vietcraft:seller-sidebar-collapsed';
 export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  useSocket(); // mở socket để chuông nhận thông báo realtime ở mọi trang seller
   // Sidebar chỉ đóng/mở khi người bán bấm, và giữ lựa chọn đó giữa các trang lẫn lần mở sau.
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'; } catch { return false; }
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY); } catch { saved = null; }
+    return saved !== null ? saved === '1' : window.matchMedia('(max-width: 767px)').matches;
   });
   const toggleCollapsed = () => {
     setCollapsed(prev => {
@@ -76,6 +79,9 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
   const menuRef = useRef<HTMLDivElement>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
 
+  // Khởi tạo kết nối WebSocket cho toàn bộ Seller portal
+  useSocket();
+
   useEffect(() => {
     chatService.getUnreadCount()
       .then(c => setUnreadChatCount(c))
@@ -83,7 +89,7 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
 
     notificationService.getUnreadCount()
       .then(c => setUnreadNotifCount(c))
-      .catch(() => {});
+      .catch(err => console.warn('MSG134', err));
 
     const onUnreadUpdate = (e: any) => {
       if (typeof e.detail?.unreadCount === 'number') {
@@ -174,10 +180,10 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
                     aria-current={isActive(to) ? 'page' : undefined}
                   >
                     <Icon size={19} />
-                    {!collapsed && <span>{label}</span>}
+                    {!collapsed && <span className="seller-nav-label">{label}</span>}
                     {to === '/seller/chat' && unreadChatCount > 0 && (
-                      <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold bg-red-500 text-white rounded-full">
-                        {unreadChatCount}
+                      <span className="seller-nav-badge">
+                        {unreadChatCount > 99 ? '99+' : unreadChatCount}
                       </span>
                     )}
                   </Link>
@@ -187,8 +193,13 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
           ))}
         </nav>
         <div className="seller-sidebar-footer">
-          <Link to="/seller/settings" className="seller-settings-btn" title="Cài đặt cửa hàng">
+          <Link
+            to="/seller/settings"
+            className={`seller-nav-item ${location.pathname.startsWith('/seller/settings') ? 'active' : ''}`}
+            title={collapsed ? 'Cài đặt cửa hàng' : undefined}
+          >
             <Settings size={19} />
+            {!collapsed && <span className="seller-nav-label">Cài đặt cửa hàng</span>}
           </Link>
         </div>
       </aside>
@@ -250,9 +261,14 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
         </header>
 
         {/* Main Body */}
-        <main className={`seller-content ${location.pathname.includes('/chat') ? 'seller-chat-content' : ''}`}>
-          {children}
-        </main>
+        {location.pathname.includes('/chat') ? (
+          <main className="seller-content seller-chat-content">{children}</main>
+        ) : (
+          <main className="seller-content">
+            {/* Khung chung: mọi trang seller cùng bề rộng tối đa và cùng lề, trang con không tự đặt max-width/padding */}
+            <div className="seller-page">{children}</div>
+          </main>
+        )}
       </div>
     </div>
   );

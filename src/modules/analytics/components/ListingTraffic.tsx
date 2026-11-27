@@ -43,8 +43,8 @@ export function ListingTraffic({ id, conversionDetail }: { id: string; conversio
 
   return (
     <>
-      <FunnelCard data={c.data} meta={c.meta} />
-      <DailyCards data={s.data} meta={s.meta} timeRange={timeRange} setRange={setRange} />
+      <FunnelCard data={c.data} />
+      <DailyCards data={s.data} timeRange={timeRange} setRange={setRange} />
     </>
   );
 }

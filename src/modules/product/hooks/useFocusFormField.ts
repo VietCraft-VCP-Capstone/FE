@@ -1,18 +1,24 @@
 import { RefObject, useEffect, useRef } from 'react';
 
-export type ProductFormFocusTarget = 'images' | 'title' | 'tags' | 'price' | 'stock' | 'description';
+export type ProductFormFocusTarget = 'images' | 'title' | 'tags' | 'price' | 'stock' | 'description' | 'materials' | 'categories';
 
 const FIELD_TO_TARGET: Record<string, ProductFormFocusTarget> = {
   images: 'images',
+  image: 'images',
   description: 'description',
+  size: 'description',
   tags: 'tags',
+  material: 'materials',
+  materials: 'materials',
   stock_quantity: 'stock',
   stock: 'stock',
+  'variants.stock': 'stock',
   'variants.retail_price': 'price',
   retail_price: 'price',
   price: 'price',
   content: 'title',
   title: 'title',
+  categories: 'categories',
 };
 
 const HIGHLIGHT_CLASSES = ['ring-2', 'ring-amber-400', 'ring-offset-4', 'rounded-xl'];
@@ -20,6 +26,7 @@ const HIGHLIGHT_MS = 2400;
 
 export function resolveFocusTarget(field?: string | null): ProductFormFocusTarget | null {
   if (!field) return null;
+  if (/^images\[\d+\]$/.test(field)) return 'images';
   return FIELD_TO_TARGET[field] ?? null;
 }
 

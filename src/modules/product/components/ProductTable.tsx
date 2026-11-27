@@ -1,6 +1,11 @@
 import { ProductItem } from '../types/product';
 import { ProductImage } from './ProductImage';
-import { BarChart2, Pencil, Trash2, PackageOpen, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { BarChart2, Pencil, Trash2, PackageOpen, MapPin, Info } from 'lucide-react';
+import { Tooltip } from 'antd';
+import { healthTier } from '../../analytics/components/health/tier';
+import { INSIGHTS_ROOT } from '../../analytics/nav';
+import { scoreText } from '../../analytics/format';
 
 interface ProductTableProps {
   products: ProductItem[];
@@ -11,6 +16,7 @@ interface ProductTableProps {
   onEdit: (product: ProductItem) => void;
   onDelete: (product: ProductItem) => void;
   loading?: boolean;
+  health?: Map<string, number | null>;
 }
 
 export function ProductTable({
@@ -22,6 +28,7 @@ export function ProductTable({
   onEdit,
   onDelete,
   loading = false,
+  health,
 }: ProductTableProps) {
   const isAllSelected = products.length > 0 && selectedIds.length === products.length;
   const isSomeSelected = selectedIds.length > 0 && selectedIds.length < products.length;
@@ -66,42 +73,58 @@ export function ProductTable({
   };
 
   const renderSparkline = (data?: number[], index: number = 0) => {
-    const trendPresets = [
-      { points: [15, 30, 45, 60, 55, 75, 90], pct: '+85%' },
-      { points: [40, 35, 50, 65, 80, 95, 120], pct: '+120%' },
-      { points: [20, 25, 35, 45, 50, 60, 68], pct: '+68%' },
-      { points: [50, 48, 55, 62, 70, 75, 88], pct: '+88%' },
-      { points: [10, 20, 30, 35, 40, 50, 55], pct: '+55%' },
-    ];
-    const preset = trendPresets[index % trendPresets.length];
-    const chartData = data && data.length > 2 ? data : preset.points;
-    const pct = data && data.length > 0 ? `+${data[data.length - 1]}%` : preset.pct;
+    // Chỉ vẽ dữ liệu tương tác thật từ backend; không có thì để đường phẳng 0 (không tự bịa xu hướng).
+    void index;
+    const chartData = data && data.length >= 2 ? data : [0, 0, 0, 0, 0, 0, 0];
+
+    const startVal = chartData[0];
+    const endVal = chartData[chartData.length - 1];
+
+    let pctNum = 0;
+    if (startVal > 0) {
+      pctNum = Math.round(((endVal - startVal) / startVal) * 100);
+    } else if (endVal > 0) {
+      pctNum = 100;
+    } else {
+      pctNum = 0;
+    }
+
+    const isPositive = pctNum > 0;
+    const isNegative = pctNum < 0;
+    const pct = isPositive ? `+${pctNum}%` : `${pctNum}%`;
+    const strokeColor = isNegative ? '#BA1A1A' : isPositive ? '#007700' : '#78716c';
+    const textColor = isNegative ? 'text-[#BA1A1A]' : isPositive ? 'text-[#007700]' : 'text-stone-500';
 
     const min = Math.min(...chartData);
-    const max = Math.max(...chartData) || 1;
+    const max = Math.max(...chartData);
     const width = 56;
     const height = 20;
     const svgPoints = chartData
       .map((val, idx) => {
         const x = (idx / (chartData.length - 1)) * width;
-        const y = height - ((val - min) / (max - min || 1)) * (height - 4) - 2;
+        const y = max === min
+          ? height / 2
+          : height - ((val - min) / (max - min)) * (height - 6) - 3;
         return `${x},${y}`;
       })
       .join(' ');
 
     return (
-      <div className="flex items-center gap-2" title="Chỉ số tương tác 7 ngày qua">
+      <div 
+        className="flex items-center gap-2" 
+        title={`Chỉ số tương tác 7 ngày: ${chartData.join(' → ')} (${pct})`}
+      >
         <svg width={width} height={height} className="overflow-visible">
           <polyline
             fill="none"
-            stroke="#007700"
+            stroke={strokeColor}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
             points={svgPoints}
           />
         </svg>
-        <span className="text-xs font-bold text-emerald-700 font-inter">{pct}</span>
+        <span className={`text-xs font-bold font-inter ${textColor}`}>{pct}</span>
       </div>
     );
   };
@@ -142,12 +165,12 @@ export function ProductTable({
     <div className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden transition-all relative">
       {/* Sleek Loading Bar */}
       {loading && (
-        <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-100 overflow-hidden z-30">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-[#EAF0E2] overflow-hidden z-30">
           <div className="w-full h-full bg-[#007700] animate-pulse" />
         </div>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse table-fixed min-w-[960px]">
+        <table className="w-full text-left border-collapse table-fixed min-w-[1040px]">
           <thead>
             <tr className="bg-stone-50/90 border-b border-stone-200/80 text-[11px] font-bold text-stone-500 uppercase tracking-wider font-jakarta">
               <th className="py-4 pl-5 pr-2 w-12 text-center">
@@ -161,9 +184,17 @@ export function ProductTable({
                   className="w-4 h-4 rounded text-[#007700] accent-[#007700] border-stone-300 focus:ring-[#007700] cursor-pointer transition-all"
                 />
               </th>
-              <th className="py-4 px-4 w-[36%]">THÔNG TIN CHI TIẾT</th>
-              <th className="py-4 px-3 w-[14%]">DANH MỤC</th>
-              <th className="py-4 px-3 w-[15%]">GIÁ BÁN & TỒN KHO</th>
+              <th className="py-4 px-4 w-[28%]">THÔNG TIN CHI TIẾT</th>
+              <th className="py-4 px-3 w-[11%]">DANH MỤC</th>
+              <th className="py-4 px-3 w-[13%]">GIÁ BÁN & TỒN KHO</th>
+              <th className="py-4 px-3 w-[12%]">
+                <div className="flex items-center gap-1 whitespace-nowrap">
+                  <span>TỐI ƯU SẢN PHẨM</span>
+                  <Tooltip title="Độ hoàn thiện trang sản phẩm, từ 0 đến 100: ảnh, mô tả, từ khoá và tag, đánh giá, giá. Không đo bán chạy hay không. Bấm vào điểm để xem còn thiếu gì.">
+                    <Info size={11} className="text-stone-400 hover:text-stone-600 cursor-help" />
+                  </Tooltip>
+                </div>
+              </th>
               <th className="py-4 px-3 w-[12%]">TRẠNG THÁI</th>
               <th className="py-4 px-3 w-[10%]">TƯƠNG TÁC</th>
               <th className="py-4 px-2 w-[6%]">MÀU SẮC</th>
@@ -176,6 +207,7 @@ export function ProductTable({
               const skuDisplay = product.sku || `VC-${(product.category || 'VC').substring(0, 2).toUpperCase()}-${String(product.id || index + 101).slice(-3)}`;
               const stockDisplay = product.stock !== undefined && product.stock !== null ? product.stock : 20;
               const productColors = getProductColors(product);
+              const score = health?.get(product.id) ?? null;
 
               return (
                 <tr
@@ -256,6 +288,43 @@ export function ProductTable({
                     </div>
                   </td>
 
+                  <td className="py-3 px-3">
+                    {score === null ? (
+                      <Tooltip title="Chưa có dữ liệu chấm điểm cho sản phẩm này">
+                        <span className="inline-flex items-center text-xs text-stone-400 font-medium">Chưa có</span>
+                      </Tooltip>
+                    ) : (() => {
+                      const tier = healthTier(score);
+                      const badgeStyle =
+                        tier.tone === 'good'
+                          ? 'bg-[#EAF0E2] text-[#007700] border-[#BECAB6]'
+                          : tier.tone === 'warn'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-rose-50 text-[#BA1A1A] border-rose-200';
+                      const dotStyle =
+                        tier.tone === 'good' ? 'bg-[#007700]' : tier.tone === 'warn' ? 'bg-amber-600' : 'bg-[#BA1A1A]';
+                      const tooltipMsg =
+                        tier.tone === 'good'
+                          ? `Độ hoàn thiện: ${scoreText(score)}/100 (${tier.label}). Trang sản phẩm đã đủ thông tin. Bấm để xem chi tiết.`
+                          : tier.tone === 'warn'
+                          ? `Độ hoàn thiện: ${scoreText(score)}/100 (${tier.label}). Còn vài mục nên bổ sung. Bấm để xem.`
+                          : `Độ hoàn thiện: ${scoreText(score)}/100 (${tier.label}). Còn thiếu nhiều thông tin quan trọng. Bấm để sửa.`;
+
+                      return (
+                        <Tooltip title={tooltipMsg} placement="top">
+                          <Link
+                            to={`${INSIGHTS_ROOT}/listings/${product.id}`}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border transition-transform hover:scale-105 no-underline whitespace-nowrap ${badgeStyle}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${dotStyle} shrink-0`} />
+                            <span className="tabular-nums font-mono">{scoreText(score)}</span>
+                            <span className="text-[10px] font-medium opacity-90 whitespace-nowrap">· {tier.label}</span>
+                          </Link>
+                        </Tooltip>
+                      );
+                    })()}
+                  </td>
+
                   {/* Status Badge */}
                   <td className="py-3 px-4">
                     {getStatusBadge(product.status)}
@@ -293,7 +362,7 @@ export function ProductTable({
 
                       <button
                         onClick={() => onEdit(product)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-[#007700] hover:bg-[#EAF0E2] transition-colors cursor-pointer"
                         title="Chỉnh sửa sản phẩm"
                       >
                         <Pencil size={16} />

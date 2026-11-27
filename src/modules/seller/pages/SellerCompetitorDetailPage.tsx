@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Store,
   Star,
@@ -12,18 +12,24 @@ import {
   Search,
   Ticket,
   DollarSign,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import { shopService, ShopDetail } from '../../product/services/shopService';
 import { productsService } from '../../product/services/productsService';
 import { promotionService, CouponDTO } from '../../promotion/services/promotionService';
 import { useToast } from '../../../shared/components/Toast';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
+import { useInsight, invalidateInsights } from '../../analytics/hooks/useInsight';
+import type { Competitors } from '../../analytics/types';
 
 export function SellerCompetitorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
+  // Về đúng trang đã mở shop này (phân tích đối thủ, kế hoạch hành động...); mở thẳng link thì về danh sách theo dõi.
+  const quayLai = () => (location.key !== 'default' ? navigate(-1) : navigate('/seller/competitors'));
 
   const [shop, setShop] = useState<ShopDetail | null>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -33,6 +39,11 @@ export function SellerCompetitorDetailPage() {
   const [sortOption, setSortOption] = useState<'newest' | 'price_asc' | 'price_desc' | 'rating'>('newest');
   const [isFollowing, setIsFollowing] = useState(false);
   const [followPending, setFollowPending] = useState(false);
+  // AI: bao nhiêu sản phẩm của mình có hàng giống bên shop này (danh mục chính).
+  const doiThu = useInsight<Competitors>('/competitors');
+  const trungSp = doiThu.state.kind === 'ready'
+    ? doiThu.state.data.my_listings.filter(l => l.direct_rivals?.some(r => r.shop_id === id)).length
+    : 0;
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -81,8 +92,9 @@ export function SellerCompetitorDetailPage() {
     try {
       setFollowPending(true);
       await shopService.unfollow(shopId);
+      invalidateInsights('/competitor-tracking');
       showToast(`Đã dừng theo dõi gian hàng "${shop.name || shop.shopName}".`, 'info');
-      navigate('/seller/competitors');
+      quayLai();
     } catch (err) {
       showToast(getApiErrorMessage(err, 'Không thể dừng theo dõi gian hàng này.'), 'error');
     } finally {
@@ -97,6 +109,7 @@ export function SellerCompetitorDetailPage() {
     try {
       setFollowPending(true);
       await shopService.follow(shopId);
+      invalidateInsights('/competitor-tracking');
       setIsFollowing(true);
       showToast(`Đã theo dõi gian hàng "${shop.name || shop.shopName}".`, 'success');
     } catch (err) {
@@ -158,7 +171,7 @@ export function SellerCompetitorDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-pulse font-sans">
+      <div className="space-y-6 animate-pulse font-sans">
         <div className="h-6 bg-stone-200 rounded w-48 mb-4" />
         <div className="h-64 bg-stone-200 rounded-3xl w-full" />
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -171,16 +184,15 @@ export function SellerCompetitorDetailPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in font-sans">
-      {/* 1. Breadcrumbs & Back Navigation */}
+    <div className="space-y-8 animate-fade-in font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-semibold text-stone-500">
           <button
-            onClick={() => navigate('/seller/competitors')}
+            onClick={quayLai}
             className="hover:text-emerald-700 transition-colors cursor-pointer flex items-center gap-1 text-stone-600"
           >
             <ArrowLeft size={14} />
-            <span>Đối thủ đang theo dõi</span>
+            <span>Quay lại</span>
           </button>
           <ChevronRight size={12} className="text-stone-400" />
           <span className="text-stone-900 font-bold truncate max-w-xs">{shopDisplayName}</span>
@@ -217,9 +229,7 @@ export function SellerCompetitorDetailPage() {
         </div>
       </div>
 
-      {/* 2. Shop Hero Profile Banner & Header Card */}
       <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
-        {/* Banner */}
         <div className="h-44 sm:h-56 w-full relative bg-stone-900 overflow-hidden">
           {shop?.banner ? (
             <img src={shop.banner} alt="" className="w-full h-full object-cover" />
@@ -231,7 +241,6 @@ export function SellerCompetitorDetailPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
         </div>
 
-        {/* Floating Info Section */}
         <div className="p-6 sm:p-8 pt-0 relative">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 -mt-12 sm:-mt-14 mb-6">
             <div className="flex items-end gap-4">
@@ -263,7 +272,6 @@ export function SellerCompetitorDetailPage() {
               </div>
             </div>
 
-            {/* Quick Location & Stats */}
             {(shop?.city || shop?.province || shop?.address) && (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-500 self-start md:self-end">
                 <MapPin size={14} className="text-stone-400 shrink-0" />
@@ -274,7 +282,14 @@ export function SellerCompetitorDetailPage() {
         </div>
       </div>
 
-      {/* 3. Competitor Benchmarking KPI Cards */}
+      {trungSp > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#007700]/20 bg-[#EAF0E2] px-4 py-3 text-[13px] text-stone-800">
+          <Sparkles size={15} className="text-[#007700]" aria-hidden />
+          <span>AI thấy <strong>{trungSp} sản phẩm</strong> của bạn có hàng giống bên shop này.</span>
+          <Link to="/seller/insights/competitors" className="font-semibold text-[#007700] no-underline hover:text-[#005B00]">Xem đối thủ trực tiếp</Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-2xs">
           <div className="flex items-center justify-between text-stone-500 mb-2">
@@ -291,10 +306,10 @@ export function SellerCompetitorDetailPage() {
             <Star size={18} className="text-amber-500 fill-amber-500" />
           </div>
           <div className="text-2xl font-black text-stone-900">
-            {(shop?.averageRating || shop?.rating || 5.0).toFixed(1)} / 5.0
+            {shop?.ratingCount ? `${(shop.averageRating ?? shop.rating ?? 0).toFixed(1)} / 5.0` : '—'}
           </div>
           <div className="text-[11px] text-stone-400 mt-0.5 font-medium">
-            {shop?.ratingCount || 0} lượt đánh giá thực tế
+            {shop?.ratingCount ? `${shop.ratingCount} lượt đánh giá thực tế` : 'Chưa có đánh giá'}
           </div>
         </div>
 
@@ -323,7 +338,6 @@ export function SellerCompetitorDetailPage() {
         </div>
       </div>
 
-      {/* 4. Active Vouchers Benchmark (Chiến lược ưu đãi của đối thủ) */}
       {vouchers.length > 0 && (
         <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2">
@@ -369,7 +383,6 @@ export function SellerCompetitorDetailPage() {
         </div>
       )}
 
-      {/* 5. Competitor Products Catalog Benchmarking */}
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -381,7 +394,6 @@ export function SellerCompetitorDetailPage() {
             </p>
           </div>
 
-          {/* Search & Sort Controls */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative min-w-[220px]">
               <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -407,7 +419,6 @@ export function SellerCompetitorDetailPage() {
           </div>
         </div>
 
-        {/* Product Grid */}
         {filteredProducts.length === 0 ? (
           <div className="py-12 text-center text-stone-400 text-xs font-semibold">
             Không tìm thấy sản phẩm nào của đối thủ khớp với từ khóa.
@@ -418,7 +429,8 @@ export function SellerCompetitorDetailPage() {
               const pId = p.id || p._id;
               const pPrice = Number(p.base_price || p.price || p.regular_price || p.variants?.[0]?.retail_price || 0);
               const pImg = p.images?.[0] || p.thumbnail || p.image || '/image-not-found.jpg';
-              const pRating = typeof p.average_rating === 'number' ? p.average_rating : (p.rating || 5);
+              const pRatingCount = Number(p.rating_count ?? p.ratingCount ?? 0);
+              const pRating = pRatingCount > 0 ? Number(p.average_rating ?? p.rating ?? 0) : 0;
               const pSold = p.sold_count || p.total_sold || 0;
 
               return (
@@ -442,10 +454,14 @@ export function SellerCompetitorDetailPage() {
                         {p.title || 'Sản phẩm đối thủ'}
                       </h4>
                       <div className="flex items-center gap-2 text-[11px] text-stone-500 mt-2">
-                        <span className="flex items-center gap-0.5 text-amber-600 font-bold">
-                          <Star size={12} className="fill-amber-400 text-amber-400" />
-                          {pRating.toFixed(1)}
-                        </span>
+                        {pRatingCount > 0 ? (
+                          <span className="flex items-center gap-0.5 text-amber-600 font-bold">
+                            <Star size={12} className="fill-amber-400 text-amber-400" />
+                            {pRating.toFixed(1)}
+                          </span>
+                        ) : (
+                          <span className="italic text-stone-400">Chưa có đánh giá</span>
+                        )}
                         {pSold > 0 && (
                           <>
                             <span>•</span>
@@ -461,12 +477,12 @@ export function SellerCompetitorDetailPage() {
                       {pPrice.toLocaleString('vi-VN')}đ
                     </span>
                     <button
-                      onClick={() => window.open(`/product/${pId}`, '_blank')}
+                      onClick={() => navigate(`/product/${pId}`)}
                       className="text-[11px] font-bold text-stone-500 hover:text-emerald-700 p-1 transition-colors flex items-center gap-1 cursor-pointer"
                       title="Xem sản phẩm trên sàn"
                     >
                       <span>Xem</span>
-                      <ExternalLink size={12} />
+                      <ChevronRight size={12} />
                     </button>
                   </div>
                 </div>

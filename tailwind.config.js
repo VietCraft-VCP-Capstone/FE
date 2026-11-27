@@ -62,10 +62,14 @@ export default {
                 admin: '10px',
             },
             fontFamily: {
-                sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                jakarta: ['"Plus Jakarta Sans"', 'sans-serif'],
-                vietnam: ['"Be Vietnam Pro"', 'sans-serif'],
-                inter: ['Inter', 'sans-serif'],
+                sans: ['"Epilogue Variable"', 'system-ui', '-apple-system', 'sans-serif'],
+                heading: ['"Unbounded Variable"', 'system-ui', 'sans-serif'],
+                body: ['"Epilogue Variable"', 'system-ui', 'sans-serif'],
+                // Alias tương thích cho các module hiện có
+                inter: ['"Epilogue Variable"', 'system-ui', 'sans-serif'],
+                poppins: ['"Epilogue Variable"', 'system-ui', 'sans-serif'],
+                jakarta: ['"Epilogue Variable"', 'system-ui', 'sans-serif'],
+                vietnam: ['"Epilogue Variable"', 'system-ui', 'sans-serif'],
             },
         },
     },

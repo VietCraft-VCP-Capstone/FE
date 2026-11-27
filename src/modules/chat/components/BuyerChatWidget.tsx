@@ -116,6 +116,9 @@ export function BuyerChatWidget({ user }: BuyerChatWidgetProps) {
     }
   }, [markRead]);
 
+  const activeConvRef = useRef<ConversationItem | null>(null);
+  activeConvRef.current = activeConv;
+
   // Khởi tạo và lắng nghe các event realtime
   useEffect(() => {
     if (user) {
@@ -124,9 +127,10 @@ export function BuyerChatWidget({ user }: BuyerChatWidgetProps) {
 
     const onMessageReceived = (e: any) => {
       const msg: ChatMessage = e.detail;
-      if (activeConv && msg.conversation_id === activeConv.conversation_id) {
+      const current = activeConvRef.current;
+      if (current && msg.conversation_id === current.conversation_id) {
         setMessages((prev) => appendUniqueMessage(prev, msg));
-        markRead(activeConv.conversation_id);
+        markRead(current.conversation_id);
         setTimeout(() => scrollToBottom('smooth'), 50);
       }
       fetchConversations();
@@ -185,7 +189,7 @@ export function BuyerChatWidget({ user }: BuyerChatWidgetProps) {
       window.removeEventListener('vietcraft-chat-unread-updated', onUnreadUpdated);
       window.removeEventListener('vietcraft-open-chat', onOpenChat);
     };
-  }, [user, activeConv, fetchConversations, loadMessages, markRead]);
+  }, [user, fetchConversations, loadMessages, markRead]);
 
   // Load tin nhắn khi activeConv thay đổi
   useEffect(() => {

@@ -22,6 +22,8 @@ export type InsightState<T> =
   | { kind: 'error'; message: string };
 
 const TTL_MS = 5 * 60 * 1000;
+const RATE_LIMITED = 'Bạn thử quá nhiều lần, vui lòng đợi một phút rồi thử lại.';
+const BAD_DATE = 'Ngày xem điểm không hợp lệ. Chọn ngày cách hôm nay tối đa 730 ngày.';
 const cache = new Map<string, { at: number; value: InsightState<unknown> }>();
 
 function keyOf(path: string, params?: QueryParams): string {
@@ -38,7 +40,7 @@ export function invalidateInsights(pathPrefix: string) {
   }
 }
 
-function toState<T>(err: any): InsightState<T> {
+export function toState<T>(err: any): InsightState<T> {
   const status: number | undefined = err?.response?.status;
   const body = err?.response?.data || {};
   if (status === 503 && body.error === 'mart_not_ready') return { kind: 'not_ready', collection: body.collection || '' };
@@ -47,6 +49,8 @@ function toState<T>(err: any): InsightState<T> {
   if (status === 502 || status === 503 || status === 504 || !status) {
     return { kind: 'unavailable', code: body.error || 'network' };
   }
+  if (status === 429) return { kind: 'error', message: typeof body.message === 'string' ? body.message : RATE_LIMITED };
+  if (status === 400 && (body.field ?? body.detail?.field) === 'date') return { kind: 'error', message: BAD_DATE };
   return { kind: 'error', message: typeof body.error === 'string' ? body.error : 'Không đọc được số liệu.' };
 }
 
@@ -55,12 +59,17 @@ function toState<T>(err: any): InsightState<T> {
  * danh mục). Kết quả được nhớ 5 phút theo đường dẫn + tham số, nên chuyển qua lại giữa
  * các trang, hoặc giữa khu vận hành và khu phân tích, không phải chờ tải lại.
  */
-export function useInsight<T>(path: string | null, params?: QueryParams) {
+export function useInsight<T>(path: string | null, params?: QueryParams, opts?: { keepPrevious?: boolean }) {
+  const keepPrevious = !!opts?.keepPrevious;
+  // true khi đang tải bộ lọc mới mà vẫn giữ số cũ trên màn hình (keepPrevious)
+  const [refreshing, setRefreshing] = useState(false);
   const key = path ? keyOf(path, params) : null;
   const [state, setState] = useState<InsightState<T>>(() => {
     const hit = key ? cache.get(key) : undefined;
     return hit && Date.now() - hit.at < TTL_MS ? (hit.value as InsightState<T>) : { kind: 'loading' };
   });
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [nonce, setNonce] = useState(0);
   const paramsRef = useRef(params);
   paramsRef.current = params;
@@ -74,13 +83,17 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
     const forced = forceRef.current;
     forceRef.current = false;
     const hit = cache.get(key);
-    if (!forced && hit && Date.now() - hit.at < TTL_MS) {
+    setRefreshing(false);
+    // Đối với phân tích mùa vụ /seasonal: luôn đọc dữ liệu đơn hàng mới nhất của gian hàng
+    const isNoCachePath = path?.includes('seasonal');
+    if (!forced && !isNoCachePath && hit && Date.now() - hit.at < TTL_MS) {
       setState(hit.value as InsightState<T>);
       return;
     }
 
     const controller = new AbortController();
-    setState({ kind: 'loading' });
+    if (keepPrevious && stateRef.current.kind === 'ready') setRefreshing(true);
+    else setState({ kind: 'loading' });
     analyticsApi
       .get<T>(path, paramsRef.current, controller.signal)
       .then(res => {
@@ -88,19 +101,22 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
           res.meta?.status === 'insufficient_data' || res.data === null
             ? { kind: 'insufficient', reason: res.meta?.reason || 'Chưa đủ dữ liệu để tính.', meta: res.meta, viewer: res.viewer }
             : { kind: 'ready', data: res.data as T, meta: res.meta, viewer: res.viewer };
-        // Chỉ lưu cache khi có dữ liệu (ready). Trạng thái 'insufficient' không lưu cache dài
-        // để khi người bán có đơn mới thì dữ liệu được cập nhật ngay lập tức.
-        if (value.kind === 'ready') {
+        // Không lưu cache cứng cho seasonal để phản hồi ngay khi có đơn mới
+        if (value.kind === 'ready' && !isNoCachePath) {
           cache.set(key, { at: Date.now(), value });
         }
         setState(value);
+        setRefreshing(false);
       })
       .catch(err => {
         if (controller.signal.aborted || err?.code === 'ERR_CANCELED') return;
+        setRefreshing(false);
+        // SRS 3.9: lỗi tải phải được ghi ra console.
+        console.error(`[analytics] ${path}`, err);
         setState(toState<T>(err));
       });
     return () => controller.abort();
-  }, [path, key, nonce]);
+  }, [path, key, nonce, keepPrevious]);
 
   const reload = useCallback(() => {
     if (key) cache.delete(key);
@@ -109,5 +125,5 @@ export function useInsight<T>(path: string | null, params?: QueryParams) {
     setNonce(n => n + 1);
   }, [key, path]);
 
-  return { state, reload };
+  return { state, reload, refreshing };
 }

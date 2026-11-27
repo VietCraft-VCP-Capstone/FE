@@ -1,618 +1,313 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Loader2, Check, Star, Palette, Image as ImageIcon, Eye, Layers } from 'lucide-react';
-import { productsService, MockupColorPreview } from '../../../product/services/productsService';
-import { abs } from './useHTMLImage';
-
-interface ColorGroup {
-    color: string;
-    color_hex: string;
-    skus: string[];
-    sizes: string[];
-    base_cost: number;
-}
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, Star, RotateCcw, AlertTriangle, Check, ShieldCheck, ChevronDown, Info } from 'lucide-react';
+import { productsService, type MockupColorPreview, type MockupLevel } from '../../../product/services/productsService';
+import { VideoAdCard } from './VideoAdCard';
+import { LEVEL_META, formatVnd, worstLevel, type ColorGroup, type VariantMap } from './podShared';
 
 interface Step3Props {
     blank: any;
-    faces: Record<string, any[]>;
-    toApiLayer: (layer: any) => any;
-    selectedVariants: Record<string, { on: boolean; markup: string; stock: string; color?: string; size?: string; base_cost?: number }>;
-    setSelectedVariants?: React.Dispatch<React.SetStateAction<Record<string, { on: boolean; markup: string; stock: string; color?: string; size?: string; base_cost?: number }>>>;
+    colorGroups: ColorGroup[];
+    /** Khoá nội dung thiết kế hiện tại; khác khoá của ảnh đã có thì render lại. */
+    signature: string;
+    placements: () => any[];
+    previews: { sig: string; byColor: MockupColorPreview[] } | null;
+    setPreviews: (p: { sig: string; byColor: MockupColorPreview[] } | null) => void;
+    selectedVariants: VariantMap;
+    setSelectedVariants: React.Dispatch<React.SetStateAction<VariantMap>>;
     selectedImages: string[];
     setSelectedImages: React.Dispatch<React.SetStateAction<string[]>>;
     coverImage: string;
     setCoverImage: React.Dispatch<React.SetStateAction<string>>;
-    spaceOf?: (area: any) => { x: number; y: number; width: number; height: number };
 }
 
-const COLOR_HEX_MAP: Record<string, string> = {
-    'đen': '#18181b',
-    'black': '#18181b',
-    'đen huyền bí': '#18181b',
-    'đen mộc': '#27272a',
-    'trắng': '#ffffff',
-    'white': '#ffffff',
-    'trắng men mờ': '#ffffff',
-    'kem tự nhiên': '#fdfbf7',
-    'kem': '#fef3c7',
-    'be': '#f5f5dc',
-    'beige': '#f5f5dc',
-    'nâu': '#78350f',
-    'nâu gỗ': '#6b4226',
-    'nâu đất': '#5c3a21',
-    'gỗ sồi tự nhiên': '#d4a373',
-    'gỗ nâu óc chó': '#582f0e',
-    'xám': '#6b7280',
-    'xám melange': '#9ca3af',
-    'ghi': '#9ca3af',
-    'xám tiêu': '#9ca3af',
-    'xanh navy': '#1e3a8a',
-    'navy': '#1e3a8a',
-    'xanh than': '#172554',
-    'xanh rêu': '#14532d',
-    'xanh lá': '#15803d',
-    'xanh dương': '#2563eb',
-    'đỏ': '#dc2626',
-    'đỏ đô': '#991b1b',
-    'vàng': '#ca8a04',
-    'hồng': '#db2777',
-    'cam': '#ea580c',
-    'tím': '#7e22ce'
-};
-
-const resolveHex = (colorName?: string, hex?: string) => {
-    if (hex && typeof hex === 'string' && /^#[0-9a-f]{3,6}$/i.test(hex.trim())) return hex.trim();
-    if (!colorName) return '#ffffff';
-    return COLOR_HEX_MAP[colorName.trim().toLowerCase()] || '#d1d5db';
-};
+function LevelBadge({ level, compact }: { level: MockupLevel; compact?: boolean }) {
+    const m = LEVEL_META[level];
+    return (
+        <span title={m.hint} className={`inline-flex items-center gap-1 rounded-md border font-bold ${compact ? 'px-1.5 py-px text-[10px]' : 'px-2 py-0.5 text-[11px]'} ${m.cls}`}>
+            {(level === 'photo' || level === 'verified') ? <ShieldCheck size={compact ? 10 : 12} /> : <AlertTriangle size={compact ? 10 : 12} />}
+            {m.label}
+        </span>
+    );
+}
 
 export function Step3MockupPreview({
-    blank,
-    faces,
-    toApiLayer,
-    selectedVariants,
-    setSelectedVariants,
-    selectedImages,
-    setSelectedImages,
-    coverImage,
-    setCoverImage,
-    spaceOf
+    blank, colorGroups, signature, placements, previews, setPreviews,
+    selectedVariants, setSelectedVariants, selectedImages, setSelectedImages, coverImage, setCoverImage,
 }: Step3Props) {
-    if (!blank) return null;
-    const printAreas = blank.print_areas || [];
-    const variations = blank.variations || [];
-    const areas = printAreas.filter((a: any) => (faces[a.key] || []).length > 0);
-
-    const [colorPreviews, setColorPreviews] = useState<MockupColorPreview[]>([]);
+    const areas = (blank?.print_areas || []) as any[];
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState('');
+    const [elapsed, setElapsed] = useState(0);
+    const [activeColor, setActiveColor] = useState(colorGroups[0]?.color || '');
+    const [activeIdx, setActiveIdx] = useState(0);
+    const [showVideo, setShowVideo] = useState(false);
+    const reqId = useRef(0);
 
-    // Active color and active face for the Hero preview
-    const [activeColorIdx, setActiveColorIdx] = useState(0);
-    const [activeFaceIdx, setActiveFaceIdx] = useState(0);
+    const isOn = (g: ColorGroup) => !g.skus.length || g.skus.some(s => selectedVariants[s]?.on);
+    const previewOf = (color: string) => previews?.byColor.find(p => p.color === color);
 
-    // Group variations by color
-    const colorGroups = useMemo<ColorGroup[]>(() => {
-        const groups: ColorGroup[] = [];
-        const map = new Map<string, ColorGroup>();
-
-        (variations || []).forEach((v: any) => {
-            const cName = (v.color || 'Màu mặc định').trim();
-            if (!map.has(cName)) {
-                const cg: ColorGroup = {
-                    color: cName,
-                    color_hex: resolveHex(cName, v.color_hex),
-                    skus: [],
-                    sizes: [],
-                    base_cost: v.base_cost || 0
-                };
-                map.set(cName, cg);
-                groups.push(cg);
-            }
-            const cg = map.get(cName)!;
-            if (v.sku && !cg.skus.includes(v.sku)) cg.skus.push(v.sku);
-            if (v.size && !cg.sizes.includes(v.size)) cg.sizes.push(v.size);
-            if (v.base_cost && (!cg.base_cost || v.base_cost < cg.base_cost)) cg.base_cost = v.base_cost;
-        });
-
-        if (groups.length === 0) {
-            groups.push({
-                color: 'Màu mặc định',
-                color_hex: '#ffffff',
-                skus: [],
-                sizes: [],
-                base_cost: 0
-            });
-        }
-        return groups;
-    }, [variations]);
-
-    // Check which colors are currently selected based on selectedVariants
-    const isColorActive = (cg: ColorGroup) => {
-        if (!cg.skus.length) return true;
-        return cg.skus.some(sku => selectedVariants[sku]?.on);
+    const render = () => {
+        const id = ++reqId.current;
+        setLoading(true); setErr(''); setElapsed(0);
+        productsService.previewMockup(blank._id, placements(), {
+            colors: colorGroups.map(g => ({ color: g.color, color_hex: g.hex })),
+        }).then(res => {
+            if (id !== reqId.current) return;
+            setPreviews({ sig: signature, byColor: res.byColor });
+            // Chọn sẵn ảnh của các màu đang bật; ảnh bìa là ảnh đầu của màu đầu tiên đang bật
+            const onColors = colorGroups.filter(isOn).map(g => g.color);
+            const imgs = res.byColor.filter(p => onColors.includes(p.color)).flatMap(p => p.images);
+            setSelectedImages(imgs);
+            setCoverImage(cur => (cur && imgs.includes(cur) ? cur : imgs[0] || ''));
+        }).catch((e: any) => {
+            if (id !== reqId.current) return;
+            const d = e.response?.data;
+            setErr(d?.errors?.join('; ') || d?.error || 'Không tạo được ảnh mockup. Thử lại sau ít phút.');
+        }).finally(() => { if (id === reqId.current) setLoading(false); });
     };
 
-    // Call backend API to generate mockups for all distinct colors
     useEffect(() => {
-        const placements = areas.map((a: any) => ({
-            print_area_key: a.key,
-            area: spaceOf ? spaceOf(a) : a,
-            layers: (faces[a.key] || []).map(toApiLayer)
-        }));
+        if (previews?.sig !== signature) render();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [signature]);
 
-        setLoading(true);
-        setErr('');
+    useEffect(() => {
+        if (!loading) return;
+        const t = window.setInterval(() => setElapsed(s => s + 1), 1000);
+        return () => window.clearInterval(t);
+    }, [loading]);
 
-        const colorsPayload = colorGroups.map(cg => ({
-            color: cg.color,
-            color_hex: cg.color_hex
-        }));
-
-        productsService.previewMockup(blank._id, placements, { colors: colorsPayload })
-            .then((res) => {
-                const byCol = res.byColor && res.byColor.length > 0
-                    ? res.byColor
-                    : colorGroups.map((cg, idx) => ({
-                        color: cg.color,
-                        color_hex: cg.color_hex,
-                        images: res.images && res.images[idx] ? [res.images[idx]] : []
-                    }));
-
-                setColorPreviews(byCol);
-
-                // Auto initialize selected images from active colors
-                const activeColPreviews = byCol.filter(cp => {
-                    const cg = colorGroups.find(g => g.color === cp.color);
-                    return cg ? isColorActive(cg) : true;
-                });
-                const activeImgs = Array.from(new Set(activeColPreviews.flatMap(c => c.images).filter(Boolean)));
-                if (activeImgs.length > 0) {
-                    setSelectedImages(activeImgs);
-                    if (!coverImage || !activeImgs.includes(coverImage)) {
-                        setCoverImage(activeImgs[0]);
-                    }
-                }
-            })
-            .catch((e: any) => {
-                const data = e.response?.data;
-                const msg = data?.errors?.join('; ') || data?.error || 'Không tạo được xem trước mockup';
-                setErr(msg);
-                const fallbackList = colorGroups.map(cg => ({
-                    color: cg.color,
-                    color_hex: cg.color_hex,
-                    images: [blank.default_image]
-                }));
-                setColorPreviews(fallbackList);
-            })
-            .finally(() => setLoading(false));
-    }, [blank._id, faces, colorGroups]);
-
-    // Handle toggle color on/off
-    const toggleColor = (cg: ColorGroup, enable: boolean) => {
-        if (!setSelectedVariants) return;
+    // ---------- chọn màu / ảnh ----------
+    const setColorOn = (g: ColorGroup, on: boolean) => {
         setSelectedVariants(prev => {
             const next = { ...prev };
-            cg.skus.forEach(sku => {
-                if (next[sku]) {
-                    next[sku] = { ...next[sku], on: enable };
-                }
-            });
+            g.skus.forEach(s => { if (next[s]) next[s] = { ...next[s], on }; });
             return next;
         });
-
-        // Also update selectedImages
-        const colPrev = colorPreviews.find(cp => cp.color === cg.color);
-        const colImages = colPrev ? colPrev.images : [];
-        if (enable) {
-            setSelectedImages(prev => Array.from(new Set([...prev, ...colImages])));
-            if (!coverImage && colImages.length > 0) setCoverImage(colImages[0]);
+        const imgs = previewOf(g.color)?.images || [];
+        if (on) {
+            setSelectedImages(prev => Array.from(new Set([...prev, ...imgs])));
+            if (!coverImage && imgs[0]) setCoverImage(imgs[0]);
         } else {
-            setSelectedImages(prev => {
-                const filtered = prev.filter(img => !colImages.includes(img));
-                if (colImages.includes(coverImage)) {
-                    setCoverImage(filtered[0] || '');
-                }
-                return filtered;
-            });
+            const rest = selectedImages.filter(u => !imgs.includes(u));
+            setSelectedImages(rest);
+            if (imgs.includes(coverImage)) setCoverImage(rest[0] || '');
         }
     };
-
-    // Toggle individual image selection
-    const toggleImageSelection = (imgUrl: string) => {
-        if (selectedImages.includes(imgUrl)) {
-            const remaining = selectedImages.filter(i => i !== imgUrl);
-            setSelectedImages(remaining);
-            if (coverImage === imgUrl) {
-                setCoverImage(remaining[0] || '');
-            }
-        } else {
-            setSelectedImages(prev => Array.from(new Set([...prev, imgUrl])));
-            if (!coverImage) setCoverImage(imgUrl);
-        }
-    };
-
-    // Set an image as cover image
-    const handleSetCover = (imgUrl: string) => {
-        setCoverImage(imgUrl);
-        if (!selectedImages.includes(imgUrl)) {
-            setSelectedImages(prev => Array.from(new Set([imgUrl, ...prev])));
-        }
-    };
-
-    // Select all colors
-    const selectAllColors = (enable: boolean) => {
-        if (!setSelectedVariants) return;
+    const setAllOn = (on: boolean) => {
         setSelectedVariants(prev => {
             const next = { ...prev };
-            colorGroups.forEach(cg => {
-                cg.skus.forEach(sku => {
-                    if (next[sku]) next[sku] = { ...next[sku], on: enable };
-                });
-            });
+            colorGroups.forEach(g => g.skus.forEach(s => { if (next[s]) next[s] = { ...next[s], on }; }));
             return next;
         });
-
-        if (enable) {
-            const all = colorPreviews.flatMap(cp => cp.images);
-            setSelectedImages(all);
-            if (!coverImage && all.length > 0) setCoverImage(all[0]);
+        const all = on ? (previews?.byColor || []).flatMap(p => p.images) : [];
+        setSelectedImages(all);
+        setCoverImage(on ? (coverImage && all.includes(coverImage) ? coverImage : all[0] || '') : '');
+    };
+    const toggleImage = (url: string) => {
+        if (selectedImages.includes(url)) {
+            const rest = selectedImages.filter(u => u !== url);
+            setSelectedImages(rest);
+            if (coverImage === url) setCoverImage(rest[0] || '');
         } else {
-            setSelectedImages([]);
-            setCoverImage('');
+            setSelectedImages(prev => [...prev, url]);
+            if (!coverImage) setCoverImage(url);
         }
     };
+    const makeCover = (url: string) => {
+        setCoverImage(url);
+        if (!selectedImages.includes(url)) setSelectedImages(prev => [url, ...prev]);
+    };
 
-    // Calculate minimum retail price
-    const chosenVariants = Object.entries(selectedVariants || {}).filter(([, v]: any) => v.on);
-    const prices = (chosenVariants.length ? chosenVariants : variations.map((v: any) => [v.sku, { markup: '0' }]))
-        .map(([sku, v]: any) => {
-            const bv = variations.find((x: any) => x.sku === sku);
-            return bv ? (bv.base_cost || 0) + (Number(v.markup) || 0) : 0;
-        })
-        .filter((n: number) => n > 0);
-    const minPrice = prices.length
-        ? Math.min(...prices)
-        : (variations.length ? Math.min(...variations.map((v: any) => v.base_cost || 0)) : 0);
+    // ---------- số liệu tóm tắt ----------
+    const summary = useMemo(() => {
+        const count: Record<MockupLevel, number> = { photo: 0, verified: 0, auto: 0, estimated: 0 };
+        for (const g of colorGroups) {
+            const w = worstLevel(previewOf(g.color));
+            if (w) count[w]++;
+        }
+        return count;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [previews, colorGroups]);
+    const needsReview = summary.auto + summary.estimated;
 
-    const activeColorGroup = colorGroups[activeColorIdx] || colorGroups[0];
-    const activeColorPreview = colorPreviews[activeColorIdx] || colorPreviews[0];
-    const heroImage = (activeColorPreview?.images && activeColorPreview.images[activeFaceIdx])
-        || activeColorPreview?.images?.[0]
-        || blank.default_image;
+    const active = previewOf(activeColor);
+    const activeGroup = colorGroups.find(g => g.color === activeColor);
+    const activeItem = active?.items[Math.min(activeIdx, (active?.items.length || 1) - 1)];
+    const heroUrl = activeItem?.url;
+    const areaLabel = (key: string) => areas.find(a => a.key === key)?.label || key;
+    const onCount = colorGroups.filter(isOn).length;
 
-    const selectedColorsCount = colorGroups.filter(isColorActive).length;
-    const selectedSkusCount = Object.values(selectedVariants || {}).filter((v: any) => v.on).length;
+    if (loading && !previews) {
+        return (
+            <div className="rounded-2xl border border-stone-200 bg-white p-8">
+                <div className="flex flex-col items-center text-center gap-2 mb-6">
+                    <Loader2 size={30} className="animate-spin text-admin-brand" />
+                    <div className="text-sm font-semibold text-stone-800">Đang tạo mockup cho {colorGroups.length} màu… {elapsed > 0 && <span className="text-stone-500 font-normal">({elapsed}s)</span>}</div>
+                    <div className="text-xs text-stone-500 max-w-md">
+                        {elapsed < 8 ? 'Ghép thiết kế lên từng màu phôi.' : 'Lần đầu dùng phôi này, AI cần tách phôi khỏi nền (khoảng 10–30 giây). Những lần sau sẽ nhanh hơn.'}
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {colorGroups.slice(0, 8).map(g => (
+                        <div key={g.color} className="rounded-xl border border-stone-200 p-2 animate-pulse">
+                            <div className="aspect-square rounded-lg bg-stone-100 mb-2" />
+                            <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: g.hex || '#e5e7eb' }} /><span className="text-[11px] text-stone-500">{g.color}</span></div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    if (err && !previews) {
+        return (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+                <AlertTriangle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                <div className="text-sm font-semibold text-red-700 mb-1">Chưa tạo được ảnh mockup</div>
+                <div className="text-xs text-red-600 mb-4">{err}</div>
+                <button type="button" onClick={render} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white border border-red-200 text-sm font-semibold text-red-700 hover:bg-red-100"><RotateCcw size={14} /> Thử lại</button>
+            </div>
+        );
+    }
 
     return (
-        <div className="flex flex-col gap-6 animate-fade-in">
-            {err && (
-                <div className="px-4 py-3 rounded-xl text-sm font-medium bg-red-50 border border-red-200 text-red-700">
-                    {err}
+        <div className="flex flex-col gap-4">
+            {/* Tóm tắt chất lượng ảnh */}
+            {previews && (
+                <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 rounded-xl border text-xs ${needsReview ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                    {needsReview ? <AlertTriangle size={16} className="shrink-0" /> : <ShieldCheck size={16} className="shrink-0" />}
+                    <span className="flex-1 min-w-[220px] leading-relaxed">
+                        {needsReview
+                            ? <><b>{needsReview} màu</b> dùng ảnh đổi màu tự động mà xưởng chưa xác nhận. Xem kỹ từng màu: nếu màu bị lem ra nền, hãy tắt màu đó hoặc báo xưởng bổ sung ảnh.</>
+                            : <>Tất cả ảnh đều là ảnh thật hoặc dùng vùng phôi xưởng đã xác nhận.</>}
+                    </span>
+                    <span className="flex flex-wrap gap-1.5">
+                        {(Object.keys(summary) as MockupLevel[]).filter(l => summary[l] > 0).map(l => (
+                            <span key={l} className="inline-flex items-center gap-1"><LevelBadge level={l} compact /> ×{summary[l]}</span>
+                        ))}
+                    </span>
+                    <button type="button" onClick={render} disabled={loading} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/70 border border-current/20 font-semibold hover:bg-white disabled:opacity-60">
+                        {loading ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Tạo lại
+                    </button>
                 </div>
             )}
 
-            {/* 1. HERO PREVIEW SECTION */}
-            <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
-                <div className="grid grid-cols-1 lg:grid-cols-12">
-                    {/* Left: Big Hero Image Canvas */}
-                    <div className="lg:col-span-7 bg-[#f6f7f6] p-6 flex flex-col items-center justify-center relative min-h-[440px] border-b lg:border-b-0 lg:border-r border-stone-200">
-                        {loading ? (
-                            <div className="flex flex-col items-center gap-3 py-16 text-stone-500">
-                                <Loader2 size={36} className="animate-spin text-[#1a6b1a]" />
-                                <span className="text-sm font-semibold">Đang tự động áp thiết kế lên các màu phôi của xưởng...</span>
-                                <span className="text-xs text-stone-400">Vui lòng chờ trong giây lát</span>
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-4 items-start">
+                {/* Ảnh lớn của màu đang xem */}
+                <section className="rounded-2xl border border-stone-200 bg-white overflow-hidden">
+                    <div className="relative bg-[#f6f7f6] flex items-center justify-center p-4 sm:p-6">
+                        <div className="relative w-full max-w-[520px] aspect-square">
+                            {heroUrl
+                                ? <img src={heroUrl} alt={`${blank.title} màu ${activeColor}`} className="w-full h-full object-contain rounded-xl" />
+                                : <div className="w-full h-full grid place-items-center text-sm text-stone-400">Không có ảnh cho màu này</div>}
+                            {loading && <div className="absolute inset-0 bg-white/60 grid place-items-center rounded-xl"><Loader2 size={26} className="animate-spin text-admin-brand" /></div>}
+                            {heroUrl && coverImage === heroUrl && (
+                                <span className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-admin-brand text-white text-[11px] font-bold shadow"><Star size={12} fill="currentColor" /> Ảnh bìa</span>
+                            )}
+                            {activeItem && <span className="absolute top-3 right-3"><LevelBadge level={activeItem.level} /></span>}
+                        </div>
+                    </div>
+                    <div className="p-4 flex flex-col gap-3 border-t border-stone-200">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="w-4 h-4 rounded-full border border-black/15" style={{ backgroundColor: active?.color_hex || activeGroup?.hex || '#e5e7eb' }} />
+                                <span className="text-sm font-bold text-stone-900">{activeColor}</span>
+                                {activeGroup && !isOn(activeGroup) && <span className="text-[11px] font-semibold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-md">Đang tắt</span>}
                             </div>
-                        ) : (
-                            <>
-                                <div className="relative group max-w-[420px] w-full aspect-square flex items-center justify-center">
-                                    <img
-                                        src={abs(heroImage)}
-                                        alt={blank.title}
-                                        className="w-full h-full object-contain rounded-xl drop-shadow-md transition-transform duration-200 group-hover:scale-[1.02]"
-                                    />
-                                    {coverImage === heroImage && (
-                                        <div className="absolute top-3 left-3 bg-[#1a6b1a] text-white text-xs font-bold px-2.5 py-1 rounded-full shadow flex items-center gap-1">
-                                            <Star size={12} fill="currentColor" /> Ảnh đại diện chính
-                                        </div>
-                                    )}
+                            {heroUrl && (
+                                <div className="flex items-center gap-1.5">
+                                    <button type="button" onClick={() => toggleImage(heroUrl)}
+                                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${selectedImages.includes(heroUrl) ? 'border-admin-brand bg-admin-brand-050 text-admin-brand' : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50'}`}>
+                                        <Check size={13} /> {selectedImages.includes(heroUrl) ? 'Đã đưa vào sản phẩm' : 'Đưa vào sản phẩm'}
+                                    </button>
+                                    <button type="button" onClick={() => makeCover(heroUrl)} disabled={coverImage === heroUrl}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
+                                        <Star size={13} /> Đặt làm ảnh bìa
+                                    </button>
                                 </div>
-
-                                {/* Face Thumbnails (Front / Back / Wrap) */}
-                                {areas.length > 1 && (
-                                    <div className="flex items-center gap-2 mt-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full border border-stone-200 shadow-xs">
-                                        <Layers size={14} className="text-stone-500" />
-                                        <span className="text-xs font-bold text-stone-600 mr-1">Mặt in:</span>
-                                        {areas.map((a: any, i: number) => (
-                                            <button
-                                                key={a.key}
-                                                type="button"
-                                                onClick={() => setActiveFaceIdx(i)}
-                                                className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${
-                                                    activeFaceIdx === i
-                                                        ? 'bg-[#1a6b1a] text-white shadow-xs'
-                                                        : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                                                }`}
-                                            >
-                                                {a.label || a.key}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </>
+                            )}
+                        </div>
+                        {active && active.items.length > 1 && (
+                            <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Mặt in">
+                                {active.items.map((it, i) => (
+                                    <button key={it.url} type="button" role="tab" aria-selected={i === activeIdx} onClick={() => setActiveIdx(i)}
+                                        className={`relative shrink-0 w-16 rounded-lg border p-0.5 bg-white ${i === activeIdx ? 'border-admin-brand ring-2 ring-admin-brand/25' : 'border-stone-200'}`}>
+                                        <img src={it.url} alt="" className="w-full aspect-square object-contain" />
+                                        <span className="block text-[9.5px] text-stone-600 truncate">{areaLabel(it.area_key)}</span>
+                                        {selectedImages.includes(it.url) && <span className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-admin-brand text-white grid place-items-center"><Check size={9} /></span>}
+                                    </button>
+                                ))}
+                            </div>
                         )}
                     </div>
+                </section>
 
-                    {/* Right: Info, Price & Color Picker Quick Bar */}
-                    <div className="lg:col-span-5 p-6 flex flex-col justify-between">
+                {/* Danh sách màu */}
+                <aside className="rounded-2xl border border-stone-200 bg-white">
+                    <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200">
                         <div>
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-[#edf5ed] text-[#1a6b1a] mb-2.5 border border-[#cbe3cb]">
-                                <Check size={13} /> Thiết kế đã render thành công
-                            </div>
-                            <h2 className="text-xl font-bold text-stone-900 leading-tight mb-2">{blank.title}</h2>
-                            <p className="text-xs text-stone-500 mb-4 line-clamp-2">{blank.description}</p>
-
-                            <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 mb-5">
-                                <span className="text-xs font-semibold text-stone-500 block mb-0.5">Giá bán dự kiến từ:</span>
-                                <span className="text-2xl font-extrabold text-[#1a6b1a]">
-                                    {minPrice.toLocaleString()}đ
-                                </span>
-                                <span className="text-xs text-stone-400 ml-1.5 font-medium">(Đã gồm tiền phôi + tiền lời)</span>
-                            </div>
-
-                            {/* Live Color Switcher for Hero Preview */}
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
-                                        <Palette size={14} className="text-[#1a6b1a]" />
-                                        Xem nhanh theo màu sắc ({colorGroups.length} màu):
-                                    </label>
-                                    <span className="text-xs font-bold text-[#1a6b1a]">
-                                        {activeColorGroup?.color}
-                                    </span>
-                                </div>
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    {colorGroups.map((cg, idx) => {
-                                        const isSelected = isColorActive(cg);
-                                        const isCurrentHero = activeColorIdx === idx;
-                                        return (
-                                            <button
-                                                key={cg.color}
-                                                type="button"
-                                                onClick={() => {
-                                                    setActiveColorIdx(idx);
-                                                    setActiveFaceIdx(0);
-                                                }}
-                                                className={`relative px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all ${
-                                                    isCurrentHero
-                                                        ? 'border-[#1a6b1a] bg-[#f0f7f0] text-[#1a6b1a] ring-2 ring-[#1a6b1a]/20 shadow-xs'
-                                                        : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50'
-                                                }`}
-                                            >
-                                                <span
-                                                    className="w-3.5 h-3.5 rounded-full border border-black/15 shadow-2xs shrink-0"
-                                                    style={{ backgroundColor: cg.color_hex }}
-                                                />
-                                                <span>{cg.color}</span>
-                                                {isSelected && (
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a6b1a]" title="Màu này đang được chọn bán" />
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            <h3 className="text-sm font-bold text-stone-900">Màu mở bán</h3>
+                            <p className="text-[11px] text-stone-500">{onCount}/{colorGroups.length} màu · {selectedImages.length} ảnh đã chọn</p>
                         </div>
-
-                        {/* Action buttons for Current Hero Image */}
-                        <div className="pt-4 border-t border-stone-200 flex items-center gap-2.5">
-                            <button
-                                type="button"
-                                onClick={() => handleSetCover(heroImage)}
-                                className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 border transition-all ${
-                                    coverImage === heroImage
-                                        ? 'bg-[#1a6b1a] text-white border-[#1a6b1a]'
-                                        : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-                                }`}
-                            >
-                                <Star size={13} fill={coverImage === heroImage ? 'currentColor' : 'none'} />
-                                {coverImage === heroImage ? 'Đang là ảnh đại diện' : 'Đặt làm ảnh đại diện'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => toggleImageSelection(heroImage)}
-                                className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                                    selectedImages.includes(heroImage)
-                                        ? 'bg-[#edf5ed] text-[#1a6b1a] border-[#cbe3cb]'
-                                        : 'bg-stone-100 text-stone-500 border-stone-200 hover:bg-stone-200'
-                                }`}
-                            >
-                                <ImageIcon size={13} />
-                                {selectedImages.includes(heroImage) ? 'Đã chọn ảnh này' : 'Bỏ chọn ảnh này'}
-                            </button>
+                        <div className="flex gap-1">
+                            <button type="button" onClick={() => setAllOn(true)} className="px-2 py-1 rounded-md text-[11px] font-semibold text-admin-brand hover:bg-admin-brand-050">Bật hết</button>
+                            <button type="button" onClick={() => setAllOn(false)} className="px-2 py-1 rounded-md text-[11px] font-semibold text-stone-600 hover:bg-stone-100">Tắt hết</button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            {/* 2. MULTI-COLOR MOCKUP SELECTION MATRIX */}
-            <div className="bg-white rounded-2xl p-6 border border-stone-200 shadow-sm">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-base font-bold text-stone-900">
-                                2. Tùy chọn Màu Sắc & Ảnh Mockup Đưa Vào Bán Hàng
-                            </h3>
-                            <span className="px-2 py-0.5 rounded-full text-xs font-extrabold bg-[#edf5ed] text-[#1a6b1a]">
-                                {colorGroups.length} màu từ xưởng
-                            </span>
-                        </div>
-                        <p className="text-xs text-stone-500 mt-1">
-                            Hệ thống đã tự động phối thiết kế của bạn lên các màu phôi do xưởng in khai báo. Hãy tick chọn các màu và ảnh bạn muốn mở bán.
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-start md:self-auto">
-                        <button
-                            type="button"
-                            onClick={() => selectAllColors(true)}
-                            className="px-3 py-1.5 text-xs font-bold text-[#1a6b1a] bg-[#edf5ed] hover:bg-[#e1ede1] rounded-lg transition-colors"
-                        >
-                            Chọn tất cả màu
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => selectAllColors(false)}
-                            className="px-3 py-1.5 text-xs font-bold text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors"
-                        >
-                            Bỏ chọn tất cả
-                        </button>
-                    </div>
-                </div>
-
-                {/* Color Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {colorGroups.map((cg, idx) => {
-                        const isSelected = isColorActive(cg);
-                        const preview = colorPreviews.find(cp => cp.color === cg.color) || colorPreviews[idx];
-                        const imgs = preview?.images || [blank.default_image];
-                        const mainColImg = imgs[0] || blank.default_image;
-                        const isHero = activeColorIdx === idx;
-
-                        return (
-                            <div
-                                key={cg.color}
-                                className={`rounded-xl border p-4 transition-all duration-200 flex flex-col justify-between ${
-                                    isHero ? 'ring-2 ring-[#1a6b1a]/40 border-[#1a6b1a] ' : ''
-                                }${
-                                    isSelected
-                                        ? 'bg-white border-stone-300 shadow-xs'
-                                        : 'bg-stone-50/70 border-dashed border-stone-200 opacity-60'
-                                }`}
-                            >
-                                <div>
-                                    {/* Card Header: Color Swatch + Checkbox */}
-                                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-stone-100">
-                                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                                            <input
-                                                type="checkbox"
-                                                className="w-4 h-4 accent-[#1a6b1a] rounded cursor-pointer"
-                                                checked={isSelected}
-                                                onChange={e => toggleColor(cg, e.target.checked)}
-                                            />
-                                            <div className="flex items-center gap-2">
-                                                <span
-                                                    className="w-4 h-4 rounded-full border border-black/15 shadow-2xs shrink-0"
-                                                    style={{ backgroundColor: cg.color_hex }}
-                                                />
-                                                <span className="font-bold text-sm text-stone-900">{cg.color}</span>
-                                            </div>
-                                        </label>
-
-                                        <span className="text-[11px] font-semibold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-md">
-                                            {cg.sizes.length ? `${cg.sizes.length} sizes: ${cg.sizes.join(', ')}` : 'Biến thể'}
+                    <ul className="divide-y divide-stone-100 max-h-[560px] overflow-y-auto">
+                        {colorGroups.map(g => {
+                            const p = previewOf(g.color);
+                            const on = isOn(g);
+                            const w = worstLevel(p);
+                            const thumb = p?.images[0];
+                            const viewing = g.color === activeColor;
+                            return (
+                                <li key={g.color} className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${viewing ? 'bg-admin-brand-050/60' : 'hover:bg-stone-50'}`}>
+                                    <button type="button" onClick={() => { setActiveColor(g.color); setActiveIdx(0); }} className="flex items-center gap-3 flex-1 min-w-0 text-left" aria-label={`Xem màu ${g.color}`}>
+                                        <span className={`relative w-14 h-14 shrink-0 rounded-lg border bg-[#f6f7f6] overflow-hidden ${viewing ? 'border-admin-brand' : 'border-stone-200'} ${on ? '' : 'opacity-50'}`}>
+                                            {thumb ? <img src={thumb} alt="" className="w-full h-full object-contain" /> : <span className="absolute inset-0 grid place-items-center text-[10px] text-stone-400">—</span>}
+                                            {thumb && thumb === coverImage && <span className="absolute bottom-0.5 left-0.5 w-4 h-4 rounded-full bg-admin-brand text-white grid place-items-center"><Star size={9} fill="currentColor" /></span>}
                                         </span>
-                                    </div>
-
-                                    {/* Card Body: Mockup Image Preview */}
-                                    <div className="relative group rounded-xl overflow-hidden bg-[#f7f8f7] border border-stone-200 aspect-square flex items-center justify-center p-2 mb-3">
-                                        <img
-                                            src={abs(mainColImg)}
-                                            alt={cg.color}
-                                            className="w-full h-full object-contain"
-                                        />
-
-                                        {/* Cover badge if main image is cover */}
-                                        {coverImage === mainColImg && (
-                                            <div className="absolute top-2 left-2 bg-[#1a6b1a] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow flex items-center gap-1">
-                                                <Star size={11} fill="currentColor" /> Ảnh bìa
-                                            </div>
-                                        )}
-
-                                        {/* Hover overlay with action buttons */}
-                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setActiveColorIdx(idx);
-                                                    setActiveFaceIdx(0);
-                                                }}
-                                                className="p-2 bg-white text-stone-800 rounded-lg text-xs font-bold shadow hover:bg-stone-100 flex items-center gap-1"
-                                                title="Xem to trên khung lớn"
-                                            >
-                                                <Eye size={13} /> Xem to
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleSetCover(mainColImg)}
-                                                className={`p-2 rounded-lg text-xs font-bold shadow flex items-center gap-1 ${
-                                                    coverImage === mainColImg
-                                                        ? 'bg-[#1a6b1a] text-white'
-                                                        : 'bg-white text-stone-800 hover:bg-stone-100'
-                                                }`}
-                                                title="Đặt làm ảnh đại diện sản phẩm"
-                                            >
-                                                <Star size={13} fill={coverImage === mainColImg ? 'currentColor' : 'none'} />
-                                                Đặt ảnh bìa
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Multi-face thumbnail strips if there are multiple images for this color */}
-                                    {imgs.length > 1 && (
-                                        <div className="flex items-center gap-1.5 mb-2 overflow-x-auto pb-1">
-                                            {imgs.map((im, i) => (
-                                                <div
-                                                    key={i}
-                                                    onClick={() => {
-                                                        setActiveColorIdx(idx);
-                                                        setActiveFaceIdx(i);
-                                                    }}
-                                                    className={`relative w-12 h-12 rounded-lg border overflow-hidden cursor-pointer shrink-0 p-0.5 bg-white ${
-                                                        coverImage === im ? 'border-[#1a6b1a] ring-2 ring-[#1a6b1a]/30' : 'border-stone-200'
-                                                    }`}
-                                                >
-                                                    <img src={abs(im)} alt="mặt in" className="w-full h-full object-contain" />
-                                                    {coverImage === im && (
-                                                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#1a6b1a] text-white rounded-tl flex items-center justify-center">
-                                                            <Star size={7} fill="currentColor" />
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Card Footer: Status & Price info */}
-                                <div className="pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs">
-                                    <span className={`inline-flex items-center gap-1 font-semibold ${isSelected ? 'text-[#1a6b1a]' : 'text-stone-400'}`}>
-                                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-[#1a6b1a]' : 'bg-stone-300'}`} />
-                                        {isSelected ? 'Đã bật màu này' : 'Chưa bật'}
-                                    </span>
-
-                                    <span className="font-bold text-stone-700">
-                                        Tiền phôi: <b className="text-[#1a6b1a]">{(cg.base_cost || 0).toLocaleString()}đ</b>
-                                    </span>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Bottom Summary Bar */}
-                <div className="mt-6 p-4 rounded-xl bg-[#fafcfa] border border-[#e2ede2] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <Check size={18} className="text-[#1a6b1a] shrink-0" />
-                        <span className="text-xs text-stone-700">
-                            Sẵn sàng chuyển sang Bước 4: Đã chọn <b>{selectedColorsCount}/{colorGroups.length}</b> màu ({selectedSkusCount} biến thể SKU) & <b>{selectedImages.length}</b> ảnh mockup đã duyệt.
-                        </span>
+                                        <span className="min-w-0">
+                                            <span className="flex items-center gap-1.5">
+                                                <span className="w-3 h-3 rounded-full border border-black/15 shrink-0" style={{ backgroundColor: p?.color_hex || g.hex || '#e5e7eb' }} />
+                                                <span className={`text-[13px] font-semibold truncate ${on ? 'text-stone-900' : 'text-stone-500'}`}>{g.color}</span>
+                                            </span>
+                                            <span className="block text-[11px] text-stone-500 truncate">{g.sizes.length ? g.sizes.join(' · ') : 'Một kích cỡ'} · phôi {formatVnd(g.minCost)}</span>
+                                            {w && <span className="block mt-0.5"><LevelBadge level={w} compact /></span>}
+                                        </span>
+                                    </button>
+                                    <label className="relative inline-flex items-center cursor-pointer shrink-0" title={on ? 'Đang bán màu này' : 'Không bán màu này'}>
+                                        <input type="checkbox" className="sr-only peer" checked={on} onChange={e => setColorOn(g, e.target.checked)} aria-label={`Bán màu ${g.color}`} />
+                                        <span className="w-9 h-5 rounded-full bg-stone-300 peer-checked:bg-admin-brand transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-admin-brand/40" />
+                                        <span className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+                                    </label>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className="flex items-start gap-1.5 px-4 py-3 border-t border-stone-200 text-[11px] text-stone-500 leading-relaxed">
+                        <Info size={13} className="shrink-0 mt-px" />
+                        Khách chọn màu nào sẽ thấy ảnh của màu đó. Ảnh bìa hiện ở trang tìm kiếm và danh sách sản phẩm.
                     </div>
-
-                    <div className="text-xs text-stone-500 font-medium">
-                        Bấm <b>Tiếp</b> ở góc trên để cấu hình chi tiết giá & tên sản phẩm.
-                    </div>
-                </div>
+                </aside>
             </div>
+
+            {/* Video quảng cáo (tuỳ chọn, tốn phí) */}
+            {(coverImage || heroUrl) && (
+                <section className="rounded-2xl border border-stone-200 bg-white">
+                    <button type="button" onClick={() => setShowVideo(v => !v)} aria-expanded={showVideo}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left">
+                        <span>
+                            <span className="text-sm font-bold text-stone-900">Video quảng cáo bằng AI</span>
+                            <span className="block text-[11px] text-stone-500">Tuỳ chọn. Tạo video ngắn từ ảnh bìa để đăng mạng xã hội.</span>
+                        </span>
+                        <ChevronDown size={18} className={`text-stone-500 transition-transform ${showVideo ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showVideo && <div className="px-4 pb-4"><VideoAdCard imageUrl={coverImage || heroUrl!} title={blank.title} /></div>}
+                </section>
+            )}
         </div>
     );
 }

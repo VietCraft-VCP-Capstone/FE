@@ -1,112 +1,179 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { productsService } from '../../product/services/productsService';
+import { productsService, absImg, FeaturedCategory } from '../../product/services/productsService';
+import { newsletterService } from '../services/newsletterService';
+import api from '../../../infrastructure/api/interceptors';
 import { useToast } from '../../../shared/components/Toast';
+
+export interface LandingProduct {
+    id: string;
+    title: string;
+    price: number;
+    rating: number;
+    reviews: number;
+    soldCount: number;
+    isBestseller: boolean;
+    image: string | null;
+}
+
+export interface LandingShop {
+    id: string;
+    name: string;
+    description: string;
+    rating: number;
+    reviews: number;
+    listingCount: number;
+    avatar: string | null;
+    banner: string | null;
+}
+
+/** Trạng thái tải của từng khối trên trang: mỗi khối lỗi riêng, không kéo cả trang sập. */
+export type SectionStatus = 'loading' | 'ready' | 'error';
+
+const TRENDING_LIMIT = 8;
+const CATEGORY_LIMIT = 6;
+
+const firstImage = (p: any): string | null => {
+    const img = (Array.isArray(p?.images) && p.images.find((u: any) => typeof u === 'string' && u)) || p?.thumbnail;
+    return typeof img === 'string' && img ? img : null;
+};
+
+const toLandingProduct = (p: any): LandingProduct => {
+    const soldCount = Number(p.soldCount ?? p.sales_count) || 0;
+    return {
+        id: String(p.id || p._id || ''),
+        title: p.title || '',
+        price: Number(p.price) || 0,
+        rating: Number(p.rating) || 0,
+        reviews: Number(p.ratingCount) || 0,
+        soldCount,
+        isBestseller: Boolean(p.is_bestseller) || soldCount > 10,
+        image: firstImage(p),
+    };
+};
+
+const toLandingShop = (s: any): LandingShop => ({
+    id: String(s._id || s.id || ''),
+    name: s.shop_name || '',
+    description: (typeof s.description === 'string' && s.description.trim()) || '',
+    rating: Number(s.average_rating) || 0,
+    reviews: Number(s.rating_count) || 0,
+    listingCount: Number(s.listing_count) || 0,
+    avatar: absImg(s.logo) || null,
+    banner: absImg(s.banner) || null,
+});
 
 export function useLandingPage() {
     const navigate = useNavigate();
     const { showToast } = useToast();
     const [searchQuery, setSearchQuery] = useState('');
     const [emailSubscription, setEmailSubscription] = useState('');
-    const [products, setProducts] = useState<any[]>([]);
-    const [shops, setShops] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [subscribing, setSubscribing] = useState(false);
+
+    const [products, setProducts] = useState<LandingProduct[]>([]);
+    const [productsStatus, setProductsStatus] = useState<SectionStatus>('loading');
+    const [shops, setShops] = useState<LandingShop[]>([]);
+    const [shopsStatus, setShopsStatus] = useState<SectionStatus>('loading');
+    const [categories, setCategories] = useState<FeaturedCategory[]>([]);
+    const [categoriesStatus, setCategoriesStatus] = useState<SectionStatus>('loading');
+    const [reloadKey, setReloadKey] = useState(0);
 
     useEffect(() => {
-        let isMounted = true;
-        async function fetchData() {
-            try {
-                setLoading(true);
-                const [prodData, shopData] = await Promise.all([
-                    productsService.getAll(),
-                    productsService.getFeaturedShops()
-                ]);
+        let alive = true;
+        setProductsStatus('loading');
+        setShopsStatus('loading');
+        setCategoriesStatus('loading');
 
-                if (isMounted) {
-                    const mappedShops = shopData.map((s: any) => ({
-                        // Trước đây map bỏ mất _id nên nút "Xem Shop" không có gì để điều hướng.
-                        id: s._id,
-                        name: s.shop_name,
-                        location: s.description || 'Bespoke Artisan',
-                        rating: s.average_rating || 5.0,
-                        reviews: s.reviews_count || s.listing_count || 0,
-                        avatar: s.logo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-                        banner: s.banner || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=600',
-                    }));
+        // "Đang thịnh hành" = sản phẩm bán chạy thật (xếp theo số đã bán), không phải danh sách mặc định.
+        // Gọi thẳng API để phân biệt "lỗi mạng" với "chưa có sản phẩm" (service search nuốt lỗi).
+        api.get('/products/search', { params: { sort: 'best_seller', limit: TRENDING_LIMIT, page: 1 } })
+            .then((res) => {
+                if (!alive) return;
+                const items = Array.isArray(res.data?.items) ? res.data.items : Array.isArray(res.data) ? res.data : [];
+                setProducts(items.map((p: any) => toLandingProduct({ ...p, images: (p.images || []).map(absImg), thumbnail: absImg(p.thumbnail) })).filter((p: LandingProduct) => p.id));
+                setProductsStatus('ready');
+            })
+            .catch((err) => {
+                console.error('Landing: không tải được sản phẩm thịnh hành', err);
+                if (alive) setProductsStatus('error');
+            });
 
-                    const productList = Array.isArray(prodData) ? prodData : (prodData?.items || []);
-                    const mappedProducts = productList.map((p: any) => ({
-                        id: p.id,
-                        title: p.title,
-                        price: p.price,
-                        rating: p.rating || 5,
-                        reviews: p.reviews_count || p.sales_count || 0,
-                        isBestseller: Boolean(p.is_bestseller || (p.sales_count && p.sales_count > 10)),
-                        image: p.images?.[0] || 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&q=80&w=600',
-                    }));
+        api.get('/products/featured-shops')
+            .then((res) => {
+                if (!alive) return;
+                setShops((Array.isArray(res.data) ? res.data : []).map(toLandingShop).filter((s: LandingShop) => s.id));
+                setShopsStatus('ready');
+            })
+            .catch((err) => {
+                console.error('Landing: không tải được shop nổi bật', err);
+                if (alive) setShopsStatus('error');
+            });
 
-                    setProducts(mappedProducts);
-                    setShops(mappedShops);
-                }
-            } catch (err: any) {
-                console.error('Failed to fetch landing assets from backend Mongo:', err);
-                if (isMounted) {
-                    setError(err.message || 'Failed to load assets');
-                }
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        }
+        productsService.getFeaturedCategories(CATEGORY_LIMIT)
+            .then((data) => {
+                if (!alive) return;
+                setCategories(data.filter((c) => c.product_count > 0));
+                setCategoriesStatus('ready');
+            })
+            .catch((err) => {
+                console.error('Landing: không tải được danh mục nổi bật', err);
+                if (alive) setCategoriesStatus('error');
+            });
 
-        fetchData();
-        return () => { isMounted = false; };
-    }, []);
+        return () => { alive = false; };
+    }, [reloadKey]);
 
-    const handleSubscribe = (e: FormEvent) => {
+    const retry = useCallback(() => setReloadKey((k) => k + 1), []);
+
+    const handleSubscribe = async (e: FormEvent) => {
         e.preventDefault();
-        if (emailSubscription) {
-            showToast(`Cảm ơn bạn đã đăng ký với email: ${emailSubscription}`, 'success');
+        const email = emailSubscription.trim();
+        if (!email || subscribing) return;
+        setSubscribing(true);
+        try {
+            const result = await newsletterService.subscribe(email);
+            showToast(
+                result.alreadySubscribed
+                    ? `Email ${email} đã có trong danh sách nhận tin.`
+                    : `Đã đăng ký nhận tin với email ${email}.`,
+                'success',
+            );
             setEmailSubscription('');
+        } catch (err: any) {
+            const msg = err?.response?.data?.error || err?.response?.data?.message || 'Không thể đăng ký lúc này, vui lòng thử lại sau.';
+            showToast(msg, 'error');
+        } finally {
+            setSubscribing(false);
         }
     };
 
-    // Chỉ dành cho nút "Đăng nhập" / "Đăng ký" trên header — KHÔNG gắn vào nút duyệt hàng.
     const handleNavigateToLogin = () => navigate('/login');
     const handleNavigateToSignup = () => navigate('/signup');
     const handleNavigateToHome = () => navigate('/');
-    // Chưa có trang duyệt hàng công khai riêng; đưa người dùng xuống lưới sản phẩm ngay trên trang.
     const handleNavigateToDashboard = () => navigate('/');
 
-    const scrollToSection = (id: string) => {
-        const el = typeof document !== 'undefined' ? document.getElementById(id) : null;
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-
-    // Trang chi tiết sản phẩm là route CÔNG KHAI — khách vãng lai xem được.
     const handleViewProduct = (id: string) => {
-        if (!id) return;
-        navigate(`/product/${id}`);
+        if (id) navigate(`/product/${id}`);
     };
-
-    // Hero "Khám Phá Ngay" + "xem tất cả" ở Trending: cuộn xuống lưới sản phẩm thật.
     const handleViewShop = (shopId: string) => {
         if (shopId) navigate(`/shop/${shopId}`);
     };
-
-    const handleExploreProducts = () => scrollToSection('xu-huong');
-    // Bộ sưu tập chưa có trang riêng: đưa về lưới sản phẩm thay vì chặn đăng nhập.
-    const handleViewCollections = () => scrollToSection('xu-huong');
+    // Trang tìm kiếm là trang duyệt hàng công khai đầy đủ (lọc, sắp xếp, phân trang).
+    const handleExploreProducts = () => navigate('/search');
+    const handleViewTrending = () => navigate('/search?sort=best_seller');
+    const handleViewCategory = (category: Pick<FeaturedCategory, 'name'>) =>
+        navigate(`/search?category=${encodeURIComponent(category.name)}`);
 
     return {
         searchQuery, setSearchQuery,
-        emailSubscription, setEmailSubscription,
+        emailSubscription, setEmailSubscription, subscribing,
         handleSubscribe,
         handleNavigateToLogin, handleNavigateToSignup,
         handleNavigateToHome, handleNavigateToDashboard,
-        handleViewProduct, handleViewShop, handleExploreProducts, handleViewCollections,
-        products, shops, loading, error
+        handleViewProduct, handleViewShop, handleExploreProducts, handleViewTrending, handleViewCategory,
+        products, productsStatus,
+        shops, shopsStatus,
+        categories, categoriesStatus,
+        retry,
     };
 }

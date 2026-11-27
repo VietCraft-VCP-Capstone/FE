@@ -287,7 +287,7 @@ export function SellerOrdersPage() {
   const empty = emptyCopy(filter.status, searching);
 
   return (
-    <div className="mx-auto w-full max-w-[1600px]">
+    <div className="w-full">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
           <h1 className="m-0 font-jakarta text-[26px] font-bold tracking-tight text-stone-900">Đơn hàng</h1>

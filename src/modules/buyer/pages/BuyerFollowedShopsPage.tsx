@@ -69,7 +69,7 @@ export function BuyerFollowedShopsPage() {
               <Store className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-gray-900 tracking-tight">
+              <h1 className="font-heading text-xl font-semibold leading-[1.2] text-gray-900 tracking-tight">
                 Gian hàng đang theo dõi
               </h1>
               <p className="text-sm text-gray-500 font-medium mt-0.5">

@@ -1,4 +1,4 @@
-import api from '../../../infrastructure/api/interceptors';
+import api, { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import {
   ProductItem,
   ProductFormData,
@@ -8,9 +8,26 @@ import {
   SuggestResult
 } from '../types/product';
 import { invalidateInsights } from '../../analytics/hooks/useInsight';
+import { getSessionId } from '../../buyer/services/eventService';
+
+export interface VideoAdQuota {
+  enabled: boolean;
+  durationSec: number;
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface VideoAdJobResult {
+  jobId: string;
+  status: 'pending' | 'done' | 'failed';
+  videoUrl?: string;
+  error?: string;
+  quota?: VideoAdQuota;
+}
 
 const ORIGIN = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
-const absImg = (u: any) => (typeof u === 'string' && u.startsWith('/') ? ORIGIN + u : u);
+export const absImg = (u: any) => (typeof u === 'string' && u.startsWith('/') ? ORIGIN + u : u);
 const resolveImages = (p: any) =>
   p && Array.isArray(p.images)
     ? { ...p, images: p.images.map(absImg), thumbnail: absImg(p.thumbnail) }
@@ -32,10 +49,63 @@ const toPaginated = (data: any): PaginatedProductsResult => {
   return { items: [], total: 0, page: 1, limit: 6, totalPages: 1 };
 };
 
+/** Giá tốt với mã — BE tính bằng đúng công thức thanh toán (có trần giảm tối đa). */
+export interface ProductDeal {
+  productId: string;
+  couponId: string;
+  couponCode: string;
+  couponTitle: string;
+  badge: 'FLASH_SALE' | 'VOUCHER';
+  basePrice: number;
+  finalPrice: number;
+  savings: number;
+  label: string;
+  discountType: string;
+  discountValue: number;
+  maxDiscount: number;
+  minOrder: number;
+}
+
+/**
+ * Số tiền một mã giảm cho tiền hàng — bản sao đúng của calcCouponDiscount ở BE (promotion/coupon-math.ts),
+ * để giá hiển thị theo phân loại khách chọn khớp số tiền khi thanh toán.
+ */
+export function couponDiscount(type: string, value: number, maxDiscount: number, subtotal: number): number {
+  const base = Math.max(0, subtotal);
+  if (type === 'FREE_SHIPPING') return 0;
+  const isPercent = type === 'PERCENTAGE' || ((type === 'FLASH_SALE' || type === 'BUNDLE') && value <= 100);
+  let raw = isPercent ? base * (value / 100) : value;
+  if (isPercent && maxDiscount > 0) raw = Math.min(raw, maxDiscount);
+  return Math.max(0, Math.min(Math.round(raw), base));
+}
+
+export interface HomeStats {
+  totalProducts: number;
+  newThisWeek: number;
+}
+
+export interface FeaturedCategory {
+  _id: string;
+  name: string;
+  slug: string;
+  product_count: number;
+  cover_image: string | null;
+}
+
+/** Độ tin cậy của ảnh mockup: ảnh thật xưởng chụp > vùng phôi xưởng đã xác nhận > AI tự tách > ước lượng. */
+export type MockupLevel = 'photo' | 'verified' | 'auto' | 'estimated';
+
+export interface MockupImageMeta {
+  url: string;
+  area_key: string;
+  level: MockupLevel;
+}
+
 export interface MockupColorPreview {
   color: string;
   color_hex?: string;
   images: string[];
+  items: MockupImageMeta[];
 }
 
 export interface PreviewMockupResult {
@@ -54,6 +124,12 @@ export const productsService = {
     }
   },
 
+  /** Như `getAll` nhưng ném lỗi khi API lỗi, để trang phân biệt "mất kết nối" với "chưa có sản phẩm". */
+  getAllStrict: async (filter?: Partial<ProductFilterState>): Promise<PaginatedProductsResult> => {
+    const res = await api.get('/products', { params: filter });
+    return toPaginated(res.data);
+  },
+
   search: async (params?: Partial<SearchFilterState>): Promise<PaginatedProductsResult> => {
     try {
       const res = await api.get('/products/search', { params });
@@ -62,6 +138,12 @@ export const productsService = {
       console.error('Error searching products from API:', err);
       return { items: [], total: 0, page: 1, limit: 12, totalPages: 1 };
     }
+  },
+
+  /** Như `search` nhưng ném lỗi khi API lỗi, để trang hiện "thử lại" thay vì giả như không có sản phẩm. */
+  searchStrict: async (params: Record<string, any>): Promise<PaginatedProductsResult> => {
+    const res = await api.get('/products/search', { params });
+    return toPaginated(res.data);
   },
 
   trackSearchClick: (logId: string, productId: string, position: number): void => {
@@ -79,10 +161,32 @@ export const productsService = {
     }
   },
 
+  /** Từ khoá người dùng VietCraft thật sự tìm trong 30 ngày (lịch sử tìm kiếm), không phải xu hướng thị trường. */
+  getPopularSearches: async (limit = 6): Promise<string[]> => {
+    try {
+      const res = await api.get('/products/meta/popular-searches', { params: { limit } });
+      return Array.isArray(res.data) ? res.data : [];
+    } catch {
+      return [];
+    }
+  },
+
   getTrendingKeywords: async (limit = 8): Promise<string[]> => {
     try {
       const res = await api.get('/products/meta/trending-keywords', { params: { limit } });
       return Array.isArray(res.data) ? res.data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  getForYou: async (limit: number, recentSearches: string[] = []): Promise<any[]> => {
+    try {
+      const res = await api.get('/products/meta/for-you', {
+        params: { limit, sessionId: getSessionId(), q: isLoggedIn() ? [] : recentSearches.filter(Boolean).slice(0, 3) },
+        paramsSerializer: { indexes: null },
+      });
+      return Array.isArray(res.data) ? res.data.map(resolveImages) : [];
     } catch {
       return [];
     }
@@ -100,6 +204,37 @@ export const productsService = {
     } catch (err) {
       return [];
     }
+  },
+
+  /** Sản phẩm đang có giá tốt với mã, xếp theo % tiết kiệm; phân trang ở server. Ném lỗi khi API lỗi. */
+  getDeals: async (page = 1, limit = 20): Promise<PaginatedProductsResult & { items: Array<ProductItem & { deal: ProductDeal }> }> => {
+    const res = await api.get('/products/deals', { params: { page, limit } });
+    return toPaginated(res.data) as any;
+  },
+
+  /** Giá tốt cho một nhóm sản phẩm đang hiển thị; lỗi thì coi như không có giá tốt (thẻ vẫn hiện giá gốc). */
+  lookupDeals: async (ids: string[]): Promise<Record<string, ProductDeal>> => {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (unique.length === 0) return {};
+    try {
+      const res = await api.get('/products/deals/lookup', { params: { ids: unique.slice(0, 100).join(',') } });
+      return res.data && typeof res.data === 'object' ? res.data : {};
+    } catch {
+      return {};
+    }
+  },
+
+  getHomeStats: async (): Promise<HomeStats> => {
+    const res = await api.get('/products/meta/home-stats');
+    return { totalProducts: Number(res.data?.totalProducts) || 0, newThisWeek: Number(res.data?.newThisWeek) || 0 };
+  },
+
+  /** Danh mục nổi bật (theo số sản phẩm đang bán thật), kèm ảnh bìa. Ném lỗi để trang tự hiện trạng thái lỗi. */
+  getFeaturedCategories: async (limit = 6): Promise<FeaturedCategory[]> => {
+    const res = await api.get('/products/meta/featured-categories', { params: { limit } });
+    return Array.isArray(res.data)
+      ? res.data.map((c: any) => ({ ...c, cover_image: absImg(c.cover_image) || null }))
+      : [];
   },
 
   getById: async (id: string): Promise<ProductItem | any> => {
@@ -155,8 +290,9 @@ export const productsService = {
     return res.data;
   },
 
-  getTags: async () => {
-    const res = await api.get('/products/meta/tags');
+  /** Có `categoryId` thì mỗi thẻ kèm `related_count` (số SP cùng nhóm danh mục đang dùng). */
+  getTags: async (categoryId?: string) => {
+    const res = await api.get('/products/meta/tags', { params: categoryId ? { categoryId } : undefined });
     return res.data;
   },
 
@@ -201,19 +337,34 @@ export const productsService = {
   previewMockup: async (
     blankId: string,
     designPlacements: any[],
-    options?: { colorHex?: string; colors?: any[] }
+    options?: { colors?: { color: string; color_hex?: string }[] }
   ): Promise<PreviewMockupResult> => {
     const res = await api.post('/products/preview-mockup', { blankId, designPlacements, ...options });
-    const rawImages: string[] = Array.isArray(res.data?.images) ? res.data.images : [];
-    const images = rawImages.map(absImg);
     const byColor: MockupColorPreview[] = Array.isArray(res.data?.byColor)
-      ? res.data.byColor.map((c: any) => ({
-          color: c.color,
-          color_hex: c.color_hex,
-          images: (Array.isArray(c.images) ? c.images : []).map(absImg)
-        }))
+      ? res.data.byColor.map((c: any) => {
+          const items: MockupImageMeta[] = (Array.isArray(c.images) ? c.images : [])
+            .filter((i: any) => i && typeof i.url === 'string')
+            .map((i: any) => ({ url: absImg(i.url), area_key: i.area_key, level: i.level || 'auto' }));
+          return { color: c.color, color_hex: c.color_hex, items, images: items.map(i => i.url) };
+        })
       : [];
-    return { images, byColor };
+    return { images: byColor.flatMap(c => c.images), byColor };
+  },
+
+  getVideoAdQuota: async (): Promise<VideoAdQuota> => {
+    const res = await api.get('/products/video-ad/quota');
+    return res.data;
+  },
+
+  /** TỐN TIỀN mỗi lần gọi thật — chỉ gọi khi người dùng bấm nút. */
+  createVideoAd: async (imageUrl: string, title?: string): Promise<VideoAdJobResult> => {
+    const res = await api.post('/products/video-ad', { imageUrl, title });
+    return { ...res.data, videoUrl: absImg(res.data?.videoUrl) };
+  },
+
+  getVideoAdStatus: async (jobId: string): Promise<VideoAdJobResult> => {
+    const res = await api.get(`/products/video-ad/${jobId}`);
+    return { ...res.data, videoUrl: absImg(res.data?.videoUrl) };
   },
 
   resetDefaults: (): ProductItem[] => {

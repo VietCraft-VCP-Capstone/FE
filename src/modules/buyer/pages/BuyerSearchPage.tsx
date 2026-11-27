@@ -1,8 +1,9 @@
 import { useState, useEffect, type MouseEvent } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { productsService } from '../../product/services/productsService';
 import { favoritesService } from '../../product/services/favoritesService';
+import { useDealLookup } from '../hooks/useDealLookup';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
 import { ProductItem } from '../../product/types/product';
 import { SeoMeta } from '../../../shared/components/SeoMeta';
@@ -13,7 +14,7 @@ import { SearchActiveFilterTags } from '../components/search/SearchActiveFilterT
 import { SearchProductCard } from '../components/search/SearchProductCard';
 import { SearchPagination } from '../components/search/SearchPagination';
 import { SearchEmptyState } from '../components/search/SearchEmptyState';
-import { addRecentSearch } from '../components/search/recentSearchStorage';
+import { rememberSearch } from '../components/search/recentSearchStorage';
 import { SearchFilters, UpdateQuery } from '../components/search/searchFilters';
 import { FALLBACK_KEYWORDS } from '../components/SearchPopover';
 import '../../../shared/components/layouts.css';
@@ -39,6 +40,7 @@ const PRIMARY_CATEGORIES = [
 
 export function BuyerSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [moLoc, setMoLoc] = useState(false);
   const navigate = useNavigate();
 
   const qParam = searchParams.get('q') || '';
@@ -63,6 +65,8 @@ export function BuyerSearchPage() {
   const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
   const [popularKeywords, setPopularKeywords] = useState(FALLBACK_KEYWORDS.slice(0, 6));
   const { showToast } = useToast();
+  // Giá tốt với mã do BE tính (cùng công thức thanh toán) cho đúng các sản phẩm đang hiện.
+  const dealMap = useDealLookup(products.map((p) => String(p.id)));
 
   useEffect(() => {
     productsService.getTrendingKeywords(6).then((kws) => { if (kws.length) setPopularKeywords(kws); });
@@ -91,7 +95,7 @@ export function BuyerSearchPage() {
   };
 
   useEffect(() => {
-    if (qParam) addRecentSearch(qParam);
+    if (qParam) rememberSearch(qParam);
   }, [qParam]);
 
   useEffect(() => {
@@ -179,31 +183,46 @@ export function BuyerSearchPage() {
         <SearchActiveFilterTags filters={filters} updateQuery={updateQuery} onResetFilters={handleResetFilters} />
       )}
 
-      <div className="grid grid-cols-[260px_1fr] items-start gap-7">
-        <SearchFilterSidebar
-          categories={categories}
-          filters={filters}
-          hasActiveFilters={hasActiveFilters}
-          updateQuery={updateQuery}
-          onResetFilters={handleResetFilters}
-        />
+      {/* Dưới 1024px bộ lọc gom vào một nút, để kết quả dùng hết bề rộng màn hình. */}
+      <button
+        type="button"
+        onClick={() => setMoLoc((v) => !v)}
+        aria-expanded={moLoc}
+        className="mb-4 inline-flex cursor-pointer items-center gap-2 rounded-[12px] border border-[#e7e5e4] bg-white px-4 py-2.5 text-[13px] font-bold text-[#1c1917] lg:hidden"
+      >
+        <SlidersHorizontal size={16} color="#007700" />
+        Bộ lọc{hasActiveFilters ? ' (đang lọc)' : ''}
+        <ChevronDown size={16} className={moLoc ? 'rotate-180' : ''} />
+      </button>
 
-        <section>
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#e7e5e4] bg-white px-5 py-3">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-[13px] font-bold text-[#78716c]">Sắp xếp theo:</span>
+      <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-[260px_1fr]">
+        <div className={moLoc ? 'block' : 'hidden lg:block'}>
+          <SearchFilterSidebar
+            categories={categories}
+            filters={filters}
+            hasActiveFilters={hasActiveFilters}
+            updateQuery={updateQuery}
+            onResetFilters={handleResetFilters}
+          />
+        </div>
+
+        <section className="min-w-0">
+          <div className="mb-5 flex items-center justify-between gap-3 rounded-[14px] border border-[#e7e5e4] bg-white px-3 py-2.5 sm:flex-wrap sm:px-5 sm:py-3">
+            {/* Điện thoại: các nút sắp xếp nằm một hàng cuộn ngang thay vì xuống 3 dòng. */}
+            <div className="no-scrollbar flex min-w-0 items-center gap-2.5 overflow-x-auto sm:flex-wrap">
+              <span className="shrink-0 text-[13px] font-bold text-[#78716c]">Sắp xếp theo:</span>
               {SORT_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
                   type="button"
                   onClick={() => updateQuery({ sort: opt.key })}
-                  className={`cursor-pointer rounded-[20px] border px-3.5 py-1.5 text-[12px] font-bold transition-all duration-150 ${sortParam === opt.key ? 'border-[#007700] bg-[#007700] text-white' : 'border-[#e7e5e4] bg-white text-[#44403c]'}`}
+                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-[20px] border px-3.5 py-1.5 text-[12px] font-bold transition-all duration-150 ${sortParam === opt.key ? 'border-[#007700] bg-[#007700] text-white' : 'border-[#e7e5e4] bg-white text-[#44403c]'}`}
                 >
                   {opt.label}
                 </button>
               ))}
             </div>
-            <div className="text-[13px] text-[#78716c]">
+            <div className="hidden shrink-0 whitespace-nowrap text-[13px] text-[#78716c] sm:block">
               Trang <strong className="text-[#1c1917]">{pageParam}</strong> / {totalPages || 1}
             </div>
           </div>
@@ -236,6 +255,7 @@ export function BuyerSearchPage() {
                   <SearchProductCard
                     key={p.id}
                     product={p}
+                    deal={dealMap.get(p.id)}
                     isFavorited={favoritedProductIds.includes(p.id)}
                     onToggleFavorite={handleToggleFavorite}
                     onClick={() => {

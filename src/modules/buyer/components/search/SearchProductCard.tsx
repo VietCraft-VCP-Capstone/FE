@@ -1,9 +1,11 @@
 import React from 'react';
-import { Heart, Store, Star } from 'lucide-react';
+import { Heart, Store, Star, Zap } from 'lucide-react';
 import { ProductItem } from '../../../product/types/product';
+import { Deal } from '../deals/buildDeals';
 
 interface SearchProductCardProps {
   product: ProductItem;
+  deal?: Deal;
   isFavorited: boolean;
   onToggleFavorite: (productId: string, title: string, e: React.MouseEvent) => void;
   onClick: () => void;
@@ -11,11 +13,14 @@ interface SearchProductCardProps {
 
 export const SearchProductCard: React.FC<SearchProductCardProps> = ({
   product,
+  deal,
   isFavorited,
   onToggleFavorite,
   onClick
 }) => {
-  const isPod = product.productType === 'POD_TEMPLATE';
+  // Giá chính = giá thanh toán khi chưa áp mã; giá sau mã hiện thành dòng riêng.
+  const price = Number(product.price) || 0;
+  const oldPrice = product.originalPrice;
   const shopName = product.shopInfo?.name || 'VietCraft Artisan';
 
   return (
@@ -26,27 +31,18 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
     >
       <div className="card-media">
         <img
-          src={product.thumbnail || product.images?.[0] || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400'}
+          src={product.thumbnail || product.images?.[0] || '/image-not-found.jpg'}
           alt={product.title}
           loading="lazy"
         />
 
-        <div style={{
-          position: 'absolute',
-          top: 8,
-          left: 8,
-          backgroundColor: isPod ? 'rgba(109, 40, 217, 0.9)' : 'rgba(0, 119, 0, 0.9)',
-          color: '#ffffff',
-          fontSize: 10,
-          fontWeight: 800,
-          padding: '3px 7px',
-          borderRadius: 6,
-          letterSpacing: '0.02em',
-          textTransform: 'uppercase',
-          backdropFilter: 'blur(4px)'
-        }}>
-          {isPod ? 'In theo yêu cầu' : 'Thủ công'}
-        </div>
+        {deal && (
+          <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', zIndex: 3 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, backgroundColor: '#e11d48', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 6 }}>
+              <Zap size={11} /> {deal.discount}
+            </span>
+          </div>
+        )}
 
         <button
           type="button"
@@ -107,14 +103,19 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
 
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 'auto', paddingTop: 4 }}>
           <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: '#007700' }}>
-            {(product.price || 0).toLocaleString('vi-VN')}đ
+            {price.toLocaleString('vi-VN')}đ
           </p>
-          {product.originalPrice && product.originalPrice > product.price && (
+          {oldPrice && oldPrice > price && (
             <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#a8a29e' }}>
-              {product.originalPrice.toLocaleString('vi-VN')}đ
+              {oldPrice.toLocaleString('vi-VN')}đ
             </span>
           )}
         </div>
+        {deal && (
+          <p style={{ margin: 0, fontSize: 11.5, color: '#9a3412', lineHeight: '16px' }}>
+            Còn <b style={{ color: '#e11d48' }}>{deal.price.toLocaleString('vi-VN')}đ</b> với mã {deal.couponCode}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -30,6 +30,10 @@ export function GeneralSettingsTab({ initialData, onSave, loading = false }: Gen
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
+  React.useEffect(() => {
+    setFormData(initialData);
+  }, [initialData]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);

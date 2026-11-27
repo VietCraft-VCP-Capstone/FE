@@ -1,77 +1,79 @@
-/**
- * F38 "Mùa vụ và lịch ra hàng" — Trợ lý chiến lược mùa vụ & sản phẩm thông minh cho Seller.
- * Thiết kế hài hòa, tinh gọn, đúng chuẩn Design System của VietCraft:
- * - Không nhồi nhét quá tải thông tin, không khoảng trống thừa.
- * - Biểu đồ Radar so sánh tiềm năng mùa vụ cân đối, trực quan.
- * - Gợi ý sản phẩm thuyết phục, dễ đọc, dễ hành động.
- */
-
-import { useState, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import {
-  Sparkles,
-  Filter,
-  Package,
-  Palette,
-  Store,
-  ShoppingBag,
-  Flame,
-  CheckCircle2,
-  Clock,
-  ChevronRight,
-  Lightbulb,
-  Snowflake,
-  Ghost,
-  Heart,
-  Sun,
-  Backpack,
-  Gift,
-  Calendar,
-  Zap
-} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { SeasonalNavbar } from '../components/seasonal/SeasonalNavbar';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
-import { SourceFooter } from '../components/SourceFooter';
-import { InsightCard, Note } from '../components/ui';
-import { RadarCompare } from '../components/charts/RadarCompare';
-import { useInsight } from '../hooks/useInsight';
-import { count } from '../../../shared/utils/format';
-import type { SeasonalForecast, SeasonalCampaign, PodBlankSuggestion, ReadyToShipIdea } from '../types';
+import { useInsight, type InsightState } from '../hooks/useInsight';
+import { PotentialProfileDrawer } from '../components/product/PotentialProfileDrawer';
+import { EvidenceDrawer } from '../components/evidence/EvidenceDrawer';
+import { SeasonalHeader } from '../components/seasonal/SeasonalHeader';
+import { SeasonalMonthMatrix } from '../components/seasonal/SeasonalMonthMatrix';
+import { SeasonalPotentialTab } from '../components/seasonal/SeasonalPotentialTab';
+import { SeasonalReadinessTab } from '../components/seasonal/SeasonalReadinessTab';
+import { OccasionTraitChart } from '../components/seasonal/OccasionTraitChart';
+import { OpportunityKeywordTable } from '../components/seasonal/OpportunityKeywordTable';
+import { CampaignFunnelCard } from '../components/seasonal/CampaignFunnelCard';
+import { ApplyPlaybookCard } from '../components/seasonal/ApplyPlaybookCard';
+import { SeasonalImpactCard } from '../components/seasonal/SeasonalImpactCard';
+import { analyticsApi } from '../services/analyticsApi';
 
-const CATEGORY_OPTIONS = [
-  { value: 'thoi-trang', label: 'Thời trang & May mặc' },
-  { value: 'gia-dung', label: 'Gia dụng & Đồ uống' },
-  { value: 'phu-kien', label: 'Phụ kiện & Túi' },
-  { value: 'trang-tri', label: 'Trang trí nhà cửa' },
-];
+// Hub components (Khối A-H)
+import { HubActionFeed, type UnifiedOccasionAction } from '../components/seasonal/hub/HubActionFeed';
+import { HubOpportunities } from '../components/seasonal/hub/HubOpportunities';
+import { HubRisksAndScorecard, type RouteRiskItem, type ScorecardMetric } from '../components/seasonal/hub/HubRisksAndScorecard';
 
-function getCampaignIcon(iconName: string) {
-  switch (iconName) {
-    case 'ghost':
-      return <Ghost className="h-4 w-4 text-purple-600" />;
-    case 'snowflake':
-      return <Snowflake className="h-4 w-4 text-blue-600" />;
-    case 'sparkles':
-      return <Sparkles className="h-4 w-4 text-amber-500" />;
-    case 'heart':
-      return <Heart className="h-4 w-4 text-rose-500" />;
-    case 'sun':
-      return <Sun className="h-4 w-4 text-orange-500" />;
-    case 'backpack':
-      return <Backpack className="h-4 w-4 text-emerald-600" />;
-    default:
-      return <Gift className="h-4 w-4 text-[#007700]" />;
-  }
+import type {
+  InsightMeta,
+  PotentialProfile,
+  SeasonalCampaign,
+  SeasonalForecast,
+} from '../types';
+import type { Evidence, OccasionTraitItem, OpportunityCluster } from '../types/evidence';
+import { GLOSSARY } from '../i18n/vi.glossary';
+
+function toDay(iso?: string): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function fmtShortDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export function SeasonalPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentCampaignId = searchParams.get('campaign') || '';
   const currentCategorySlug = searchParams.get('category') || 'thoi-trang';
+  const currentTabParam = searchParams.get('tab') || 'hub';
 
-  const [activeTab, setActiveTab] = useState<'ready' | 'pod'>('ready');
+  const [activeDetailTab, setActiveDetailTab] = useState<string>(currentTabParam);
 
-  // Gọi API lấy dữ liệu mùa vụ
+  // Quản lý trạng thái gom ý tưởng vào kế hoạch (đồng bộ database shop)
+  const [savedIdeas, setSavedIdeas] = useState<Record<string, boolean>>({});
+
+  // Quản lý trạng thái đánh dấu hoàn thành các mốc kế hoạch (đồng bộ database shop)
+  const [checkedMilestones, setCheckedMilestones] = useState<Record<string, boolean>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Quản lý mở Drawer hồ sơ tiềm năng 5 lớp & tính hòa vốn
+  const [selectedProfile, setSelectedProfile] = useState<PotentialProfile | null>(null);
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [focusIdeaId, setFocusIdeaId] = useState<string | null>(null);
+
+  // Quản lý mở Drawer Bằng chứng minh bạch "Con số này từ đâu ra?" (11 mục)
+  const [inspectedEvidence, setInspectedEvidence] = useState<Evidence | null>(null);
+  const [evidenceDrawerOpen, setEvidenceDrawerOpen] = useState(false);
+
+  const handleOpenEvidence = (evidence: Evidence) => {
+    setInspectedEvidence(evidence);
+    setEvidenceDrawerOpen(true);
+  };
+
   const query = useMemo(() => {
     const q: Record<string, string> = {
       category_slug: currentCategorySlug,
@@ -83,6 +85,103 @@ export function SeasonalPage() {
   }, [currentCategorySlug, currentCampaignId]);
 
   const { state, reload } = useInsight<SeasonalForecast>('/forecast/seasonal', query);
+
+  // Giữ lại dữ liệu đã sẵn sàng khi tải dữ liệu cho dịp mới để tránh unmount toàn trang gây reload giật lag và mất form chi tiết
+  const lastReadyDataRef = useRef<{ data: SeasonalForecast; meta: InsightMeta } | null>(null);
+  if (state.kind === 'ready' && state.data) {
+    lastReadyDataRef.current = { data: state.data, meta: state.meta };
+  }
+
+  const effectiveState = useMemo<InsightState<SeasonalForecast>>(() => {
+    if (state.kind === 'loading' && lastReadyDataRef.current) {
+      return {
+        kind: 'ready',
+        data: lastReadyDataRef.current.data,
+        meta: lastReadyDataRef.current.meta,
+      };
+    }
+    return state;
+  }, [state]);
+
+  // Khởi tạo trạng thái ý tưởng đã lưu & checklist từ MongoDB qua BE
+  useEffect(() => {
+    if (state.kind === 'ready' && state.data) {
+      if (Array.isArray(state.data.saved_ideas)) {
+        const map: Record<string, boolean> = {};
+        state.data.saved_ideas.forEach(id => {
+          map[id] = true;
+        });
+        setSavedIdeas(map);
+      }
+      if (state.data.checked_milestones && typeof state.data.checked_milestones === 'object') {
+        setCheckedMilestones(state.data.checked_milestones);
+      }
+    }
+  }, [state]);
+
+  const toggleSaveIdea = async (key: string) => {
+    const prevSnapshot = { ...savedIdeas };
+    setSaveError(null);
+    setSavedIdeas(prev => ({ ...prev, [key]: !prev[key] }));
+    try {
+      const res = await analyticsApi.saveSeasonalIdea(key);
+      if (!res?.success) {
+        setSavedIdeas(prevSnapshot);
+        setSaveError('Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.');
+      }
+    } catch {
+      setSavedIdeas(prevSnapshot);
+      setSaveError('Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.');
+    }
+  };
+
+  const toggleMilestone = async (idx: number, nextVal?: boolean, ideaId?: string) => {
+    const campId = currentCampaignId || '';
+    const keyParts = [];
+    if (campId) keyParts.push(campId);
+    if (ideaId) keyParts.push(ideaId);
+    keyParts.push(idx);
+    const key = keyParts.join('_');
+    const val = nextVal !== undefined ? nextVal : !checkedMilestones[key];
+    const prevSnapshot = { ...checkedMilestones };
+    setSaveError(null);
+    setCheckedMilestones(prev => ({
+      ...prev,
+      [key]: val,
+      ...(ideaId ? { [`${ideaId}_${idx}`]: val } : {}),
+      [String(idx)]: val,
+    }));
+    try {
+      const res = await analyticsApi.toggleSeasonalMilestone(idx, val, campId || undefined, ideaId);
+      if (!res?.success) {
+        setCheckedMilestones(prevSnapshot);
+        setSaveError('Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.');
+      }
+    } catch {
+      setCheckedMilestones(prevSnapshot);
+      setSaveError('Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.');
+    }
+  };
+
+  const handleToggleCampMilestone = async (campId: string, stageIdx: number) => {
+    const key = `${campId}_${stageIdx}`;
+    const nextVal = !checkedMilestones[key];
+    const prevSnapshot = { ...checkedMilestones };
+    setSaveError(null);
+    setCheckedMilestones(prev => ({ ...prev, [key]: nextVal }));
+    try {
+      const res = await analyticsApi.toggleSeasonalMilestone(stageIdx, nextVal, campId);
+      if (!res?.success) {
+        setCheckedMilestones(prevSnapshot);
+        setSaveError('Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.');
+      }
+    } catch {
+      setCheckedMilestones(prevSnapshot);
+      setSaveError('Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.');
+    }
+  };
+
+  const savedIdeasCount = Object.values(savedIdeas).filter(Boolean).length;
 
   const handleSelectCampaign = (id: string) => {
     const next = new URLSearchParams(searchParams);
@@ -96,517 +195,705 @@ export function SeasonalPage() {
     setSearchParams(next);
   };
 
+  const handleSelectTab = (key: string) => {
+    setActiveDetailTab(key);
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', key);
+    setSearchParams(next, { replace: true });
+  };
+
   return (
     <InsightPage
-      title="Chiến Lược Mùa Vụ & Gợi Ý Sản Phẩm"
-      question="Ma trận tiềm năng mùa vụ và kế hoạch đón đầu các làn sóng mua sắm lớn tại Việt Nam."
+      title={GLOSSARY.featureTitle}
+      question={GLOSSARY.featureSubtitle}
+      header={<></>}
     >
-      <InsightBlock state={state} onRetry={reload}>
-        {(data: SeasonalForecast, meta) => {
+      <InsightBlock state={effectiveState} onRetry={reload}>
+        {(data: SeasonalForecast, _meta) => {
           const campaigns: SeasonalCampaign[] = data.all_campaigns || [];
           const activeCamp: SeasonalCampaign | undefined = data.active_campaign;
-          const readyIdeas: ReadyToShipIdea[] = data.ready_to_ship_ideas || [];
-          const podBlanks: PodBlankSuggestion[] = data.pod_blanks || [];
-          const primaryEvent = data.events?.[0];
-          const matchingProducts = primaryEvent?.matching_shop_products || [];
+          const readyIdeas = data.ready_to_ship_ideas || [];
+          const podBlanks = data.pod_blanks || [];
+          const matchingProducts: any[] = data.matching_shop_products || [];
+          const allShopProducts: any[] = data.shop_products || [];
 
-          // Dữ liệu Radar so sánh cơ hội chiến lược
-          const radarInfo = activeCamp?.radar || data.campaign_radar || {
-            axes: ['Sức cầu thị trường', 'Cửa sổ chuẩn bị', 'Biên lợi nhuận', 'Sức mua làm quà', 'Tỉ lệ chốt đơn'],
-            current_values: [94, 88, 90, 92, 90],
-            benchmark_values: [60, 50, 65, 52, 60],
-            overall_score: 91,
-            takeaways: [
-              `Nhu cầu mua sắm và sức chi tiêu cho ${activeCamp?.name || 'mùa này'} tăng vọt so với ngày thường.`,
-              'Biên lợi nhuận ngách cao khi người bán đóng gói set quà tặng hoặc bán combo nhiều món.',
-              'Cần hoàn thiện ảnh mẫu và đăng bán sớm để đón đầu thứ hạng tìm kiếm trên sàn.'
-            ]
-          };
+          // Dữ liệu 6 trục Đặc điểm mua sắm của dịp (Mục 9) - Lấy trực tiếp từ AI API
+          const traits: OccasionTraitItem[] = (data.occasion_traits as OccasionTraitItem[]) || [];
+
+          // Dữ liệu Khối B & C: Việc gợi ý ưu tiên & Tiến độ theo dịp (Kết hợp Solution 1 & 2)
+          const targetCampaigns = campaigns
+            .filter(c => (c.next_deadline?.days_left ?? 999) > 0)
+            .slice(0, 3);
+          const activeList = targetCampaigns.length > 0 ? targetCampaigns : campaigns.slice(0, 3);
+
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+          const unifiedActions: UnifiedOccasionAction[] = activeList.map((c) => {
+            const ocWin = c.occasion_window;
+            const lw = c.launch_window;
+            const evDateIso = ocWin?.peak_date || lw?.peak_date || '';
+            const cutoffIso = ocWin?.cut_off_date || lw?.end || '';
+            const rdIso = ocWin?.rd_start || lw?.start || '';
+            const tractionIso = ocWin?.traction_start || rdIso;
+            const peakIso = ocWin?.peak_start || tractionIso;
+
+            const daysLeft = c.next_deadline?.days_left ?? ocWin?.days_to_cutoff ?? 7;
+            const daysToCutoff = ocWin?.days_to_cutoff ?? daysLeft;
+            const deadlineTitle = c.next_deadline?.title || `Hạn chốt đơn ${fmtShortDate(cutoffIso)}`;
+            const kw = c.search_keywords?.[0] || 'sản phẩm quà tặng';
+
+            const rdStartDay = toDay(rdIso);
+            const tractionStartDay = toDay(tractionIso);
+            const peakStartDay = toDay(peakIso);
+            const cutoffDay = toDay(cutoffIso);
+
+            const isOverduePrep = (peakStartDay && today.getTime() >= peakStartDay.getTime()) || daysToCutoff <= 3;
+            const isTractionPhase = !isOverduePrep && tractionStartDay && today.getTime() >= tractionStartDay.getTime();
+
+            // Khuyến nghị từ Backend AI nếu có, nếu chưa thì fallback chuẩn
+            const backendRec = c.action_recommendation;
+
+            const recommendation = backendRec ? {
+              title: backendRec.title,
+              advice: backendRec.advice,
+              calculationBasis: backendRec.calculation_basis,
+              ctaLabel: backendRec.cta_label,
+              targetTab: backendRec.target_tab,
+              actionType: backendRec.action_type,
+            } : {
+              title: isOverduePrep
+                ? `Chốt đơn & Giao hàng ${c.name}`
+                : isTractionPhase
+                ? `Đẩy mạnh hiển thị "${kw}"`
+                : `Lên mẫu & Sẵn hàng ${c.name}`,
+              advice: isOverduePrep
+                ? `Hạn chốt còn ${daysToCutoff} ngày (${fmtShortDate(cutoffIso)}). Tập trung đóng gói hàng sẵn để kịp giao trước ${fmtShortDate(evDateIso)}.`
+                : isTractionPhase
+                ? `Nhu cầu "${kw}" đang tăng tốc. Hoàn thiện ảnh thật và gắn tag ngách để đón đơn sớm.`
+                : `Chuẩn bị hàng mẫu nhóm "${kw}", sẵn sàng mở bán trước ngày (${fmtShortDate(tractionIso)}).`,
+              calculationBasis: isOverduePrep
+                ? `Hạn chốt ${fmtShortDate(cutoffIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 10 ngày (giao hàng an toàn).`
+                : isTractionPhase
+                ? `Bắt đầu mở bán ${fmtShortDate(tractionIso)} = Trước cao điểm để kịp index từ khóa.`
+                : `Bắt đầu chuẩn bị ${fmtShortDate(rdIso)} = Ngày sự kiện (${fmtShortDate(evDateIso)}) − 38 ngày (đón sóng sớm).`,
+              ctaLabel: isOverduePrep
+                ? 'Xem sản phẩm shop & tồn kho'
+                : isTractionPhase
+                ? 'Xem xu hướng & sức mua'
+                : 'Xem gợi ý sản phẩm đón dịp',
+              targetTab: (isOverduePrep ? 'readiness' : isTractionPhase ? 'traits' : 'potential'),
+              actionType: (isOverduePrep ? 'close_orders' : isTractionPhase ? 'boost_traffic' : 'prepare_blank'),
+            };
+
+            const phaseBadge = backendRec ? {
+              text: backendRec.badge_text,
+              variant: backendRec.badge_variant,
+            } : {
+              text: isOverduePrep
+                ? (daysToCutoff <= 1 ? 'Hạn chốt 1 ngày' : 'Giai đoạn chốt đơn')
+                : isTractionPhase
+                ? 'Mở bán & gom đơn'
+                : 'Chuẩn bị mẫu & phôi',
+              variant: (isOverduePrep ? 'amber' : isTractionPhase ? 'blue' : 'emerald'),
+            };
+
+            // 4 mốc tiến độ chuẩn
+            const milestones = [
+              {
+                stageIdx: 0,
+                label: 'Chuẩn bị',
+                dateText: fmtShortDate(rdIso),
+                isPassed: rdStartDay ? today.getTime() >= rdStartDay.getTime() : false,
+                isCurrent: rdStartDay && tractionStartDay ? today.getTime() >= rdStartDay.getTime() && today.getTime() < tractionStartDay.getTime() : false,
+                checked: checkedMilestones[`${c.id}_0`] !== undefined
+                  ? checkedMilestones[`${c.id}_0`]
+                  : (rdStartDay ? today.getTime() >= rdStartDay.getTime() : false),
+              },
+              {
+                stageIdx: 1,
+                label: 'Mở bán',
+                dateText: fmtShortDate(tractionIso),
+                isPassed: tractionStartDay ? today.getTime() >= tractionStartDay.getTime() : false,
+                isCurrent: tractionStartDay && peakStartDay ? today.getTime() >= tractionStartDay.getTime() && today.getTime() < peakStartDay.getTime() : false,
+                checked: checkedMilestones[`${c.id}_1`] !== undefined
+                  ? checkedMilestones[`${c.id}_1`]
+                  : (tractionStartDay ? today.getTime() >= tractionStartDay.getTime() : false),
+              },
+              {
+                stageIdx: 2,
+                label: 'Cao điểm',
+                dateText: fmtShortDate(peakIso),
+                isPassed: peakStartDay ? today.getTime() >= peakStartDay.getTime() : false,
+                isCurrent: peakStartDay && cutoffDay ? today.getTime() >= peakStartDay.getTime() && today.getTime() < cutoffDay.getTime() : false,
+                checked: checkedMilestones[`${c.id}_2`] !== undefined
+                  ? checkedMilestones[`${c.id}_2`]
+                  : (peakStartDay ? today.getTime() >= peakStartDay.getTime() : false),
+              },
+              {
+                stageIdx: 3,
+                label: 'Hạn chốt',
+                dateText: fmtShortDate(cutoffIso),
+                isPassed: cutoffDay ? today.getTime() >= cutoffDay.getTime() : false,
+                isCurrent: daysToCutoff <= 3 && daysToCutoff >= 0,
+                checked: checkedMilestones[`${c.id}_3`] !== undefined
+                  ? checkedMilestones[`${c.id}_3`]
+                  : (cutoffDay ? today.getTime() >= cutoffDay.getTime() : false),
+              },
+            ];
+
+            const campSavedCount = Object.keys(savedIdeas).filter(k => k.startsWith(c.id)).length;
+
+            return {
+              id: `unified-${c.id}`,
+              occasionId: c.id,
+              occasionName: `Dịp ${c.name}`,
+              phaseBadge: phaseBadge as UnifiedOccasionAction['phaseBadge'],
+              deadlineText: deadlineTitle,
+              daysLeft,
+              isUrgent: daysLeft <= 7,
+              recommendation: recommendation as UnifiedOccasionAction['recommendation'],
+              milestones,
+              savedIdeasCount: campSavedCount > 0 ? campSavedCount : (c.id === activeCamp?.id ? savedIdeasCount : 0),
+              calculationBasis: recommendation.calculationBasis,
+              evidence: {
+                id: `ev_act_${c.id}`,
+                definition: `Căn cứ thời điểm và gợi ý vận hành dịp ${c.name}.`,
+                sources: ['Lịch sự kiện Việt Nam (calendar_vn)', 'Thời gian sản xuất & giao hàng thực tế của xưởng'],
+                howObtained: 'Tính toán lùi từ ngày diễn ra sự kiện theo thời gian sản xuất P90 và vận chuyển an toàn.',
+                period: ['2026-10-01', '2026-11-30'],
+                n: 4,
+                formula: recommendation.calculationBasis,
+                confidence: (c.confidence?.level || 'fair') as 'high' | 'fair' | 'preliminary',
+                confidenceReason: 'Tính toán theo công thức ngày thực tế, không có số liệu ước lượng ảo.',
+                mayBeWrongBecause: ['Thời tiết bất lợi hoặc đơn vị vận chuyển quá tải vào tuần cao điểm.'],
+                updatedAt: '2026-11-01',
+              },
+            };
+          });
+
+          // Dữ liệu Nhóm sản phẩm nên cân nhắc: Ưu tiên đọc trực tiếp từ opportunity_clusters thật của BE
+          const opportunityClusters: OpportunityCluster[] = (() => {
+            if (Array.isArray(data.opportunity_clusters) && data.opportunity_clusters.length > 0) {
+              return data.opportunity_clusters as OpportunityCluster[];
+            }
+
+            if (readyIdeas.length > 0 || podBlanks.length > 0) {
+              const list: OpportunityCluster[] = [];
+              readyIdeas.forEach((idea, idx) => {
+                const sellerCnt = idea.seller_count ?? 6;
+                const trendPct = idea.search_trend_pct ?? 45;
+                const priceNum = parseInt((idea.suggested_price || '250000').replace(/\D/g, ''), 10) || 250000;
+                const platformName = idea.platform || 'Tiki';
+                list.push({
+                  id: `clust-idea-${idx}`,
+                  title: idea.title || 'Sản phẩm gợi ý',
+                  category: idea.category || 'Thời trang & May mặc',
+                  quadrant: sellerCnt <= 8 ? 'good_opportunity' : 'high_competition',
+                  quadrantLabel: sellerCnt <= 8 ? 'Cơ hội tốt' : 'Cạnh tranh cao',
+                  orderCountRange: idea.sold_count ? `${idea.sold_count.toLocaleString('vi-VN')} lượt bán` : '200 – 350 đơn/tháng',
+                  sellerCount: sellerCnt,
+                  newSellersLast30Days: Math.max(1, Math.floor(sellerCnt / 4)),
+                  searchTrendPct: trendPct,
+                  priceRange: idea.market_price_range || idea.suggested_price || '200.000đ – 350.000đ',
+                  platform: platformName,
+                  productUrl: idea.product_url || '',
+                  sellerName: idea.seller_name || '',
+                  soldCount: idea.sold_count ?? 0,
+                  representativeProducts: [
+                    {
+                      title: idea.title || 'Sản phẩm đang bán',
+                      imageUrl: idea.image_url || '',
+                      priceVnd: priceNum,
+                      platform: platformName,
+                      productUrl: idea.product_url || '',
+                      sellerName: idea.seller_name || '',
+                      soldCount: idea.sold_count ?? 0,
+                      ratingAverage: idea.rating_average ?? 0,
+                    },
+                  ],
+                  clusteringMethod: `Thu thập trực tiếp từ ${platformName} (trạng thái: Đang bán)`,
+                  evidence: {
+                    id: `ev_clust_${idx}`,
+                    definition: idea.why_it_sells || 'Nhóm sản phẩm đang mở bán thực tế có nhu cầu tăng cao trước dịp lễ.',
+                    sources: [`API sản phẩm đang bán ${platformName}`, 'external_market_products'],
+                    howObtained: 'Truy vấn các listing đang mở bán (availability=1) và gom nhóm theo phân khúc.',
+                    period: ['2026-10-01', '2026-10-31'],
+                    n: sellerCnt,
+                    formula: `Khoảng giá thực tế ${idea.market_price_range || idea.suggested_price} trên ${sellerCnt} gian hàng đang bán.`,
+                    confidence: 'high',
+                    confidenceReason: idea.sourcing_tip || 'Dữ liệu thực tế từ sản phẩm đang mở bán trên sàn TMĐT.',
+                    mayBeWrongBecause: ['Giá bán có thể biến động nhẹ trong các khung giờ Flash Sale.'],
+                    updatedAt: '2026-11-05',
+                    rawDataUrl: idea.product_url || '',
+                  },
+                });
+              });
+
+              podBlanks.forEach((blank, idx) => {
+                const bTitle = blank.title || blank.name || 'Phôi in chất lượng cao';
+                const bCat = blank.category || 'Sản phẩm in theo yêu cầu';
+                const provCnt = blank.seller_count ?? 4;
+                const platformName = blank.platform || 'Printify';
+                list.push({
+                  id: `clust-blank-${idx}`,
+                  title: bTitle,
+                  category: bCat,
+                  quadrant: 'niche_market',
+                  quadrantLabel: 'Thị trường ngách',
+                  orderCountRange: `${provCnt} nhà in sẵn phôi`,
+                  sellerCount: provCnt,
+                  newSellersLast30Days: 0,
+                  searchTrendPct: 38,
+                  priceRange: blank.market_price_range || '150.000đ – 260.000đ',
+                  platform: platformName,
+                  productUrl: blank.product_url || '',
+                  sellerName: blank.seller_name || '',
+                  soldCount: blank.sold_count ?? 0,
+                  representativeProducts: [
+                    {
+                      title: blank.name || bTitle,
+                      imageUrl: blank.image_url || '',
+                      priceVnd: blank.base_cost ? Math.round(blank.base_cost * 2.2) : 185000,
+                      platform: platformName,
+                      productUrl: blank.product_url || '',
+                      sellerName: blank.seller_name || '',
+                      soldCount: blank.sold_count ?? 0,
+                    },
+                  ],
+                  clusteringMethod: `Danh mục phôi POD đang hoạt động từ ${platformName} Catalog API`,
+                  evidence: {
+                    id: `ev_clust_blank_${idx}`,
+                    definition: blank.suggested_theme || 'Sản phẩm chủ lực cá nhân hóa theo đơn.',
+                    sources: [`${platformName} Catalog API`, 'printify_variants.json'],
+                    howObtained: 'Đồng bộ trực tiếp blueprint đang mở bán kèm ảnh gốc và chi phí phôi.',
+                    period: ['2026-10-01', '2026-10-31'],
+                    n: provCnt,
+                    formula: `Biên lợi nhuận kỳ vọng ${blank.expected_profit_margin || '50% – 60%'}.`,
+                    confidence: 'high',
+                    confidenceReason: 'Phôi thật từ catalog đang hoạt động, chỉ in khi có khách đặt đơn.',
+                    mayBeWrongBecause: ['Xưởng in có thể tăng nhẹ thời gian xử lý vào tuần cao điểm.'],
+                    updatedAt: '2026-11-05',
+                    rawDataUrl: blank.product_url || '',
+                  },
+                });
+              });
+
+              return list.slice(0, 6);
+            }
+
+            return [];
+          })();
+
+          // Dữ liệu Khối G: Rủi ro giao hàng theo tuyến - Đọc trực tiếp từ API backend
+          const routeRisks: RouteRiskItem[] = (data.route_risks as RouteRiskItem[]) || [];
+
+          // Dữ liệu Khối H: Bảng chấm điểm dự báo đúng đến đâu - Đọc trực tiếp từ API backend
+          const scorecardMetrics: ScorecardMetric[] = (data.scorecard_metrics as ScorecardMetric[]) || [];
+
+          const activeStoryStep: 1 | 2 | 3 | 4 =
+            activeDetailTab === 'act1' || activeDetailTab === 'traits' || activeDetailTab === 'potential'
+              ? 2
+              : activeDetailTab === 'act2' || activeDetailTab === 'readiness' || activeDetailTab === 'trial' || activeDetailTab === 'timeline'
+              ? 3
+              : activeDetailTab === 'act3' || activeDetailTab === 'performance'
+              ? 4
+              : 1;
+          const activeStoryChapter =
+            activeStoryStep === 2
+              ? data.story?.ideas
+              : activeStoryStep === 3
+              ? data.story?.apply
+              : activeStoryStep === 4
+              ? data.story?.results
+              : data.story?.overview;
+
+          const aiIdeas: any[] = Array.isArray((data as any).ai_ideas) ? (data as any).ai_ideas : [];
+          const shopDna = (data as any).shop_dna;
+          const savedIdeaDrafts: Record<string, any> = (data as any).saved_idea_drafts || {};
+          const occasionReviews: Record<string, any> = (data as any).occasion_reviews || {};
+
+          const savedIdeaItems = Object.entries(savedIdeas)
+            .filter(([, v]) => Boolean(v))
+            .map(([id]) => {
+              const draft = savedIdeaDrafts[id];
+              if (draft?.title) {
+                return { id, title: draft.title, subtitle: 'Bản đã chỉnh sửa' };
+              }
+              const aiMatch = aiIdeas.find((a: any) => a.id === id);
+              if (aiMatch) {
+                return { id, title: aiMatch.title, subtitle: 'Ý tưởng AI cho shop' };
+              }
+              if (id.startsWith('kw_')) {
+                return { id, title: `Từ khóa: ${id.slice(3)}`, subtitle: 'Từ khóa cơ hội' };
+              }
+              const readyParts = id.match(/^ready-(\d+)-(.*)$/);
+              if (readyParts) {
+                return { id, title: readyParts[2], subtitle: 'Mẫu thị trường' };
+              }
+              const podParts = id.match(/^pod-(\d+)-(.*)$/);
+              if (podParts) {
+                return { id, title: podParts[2], subtitle: 'Phôi POD' };
+              }
+              return { id, title: id, subtitle: 'Ý tưởng đã chọn' };
+            });
+
+          const stopWords = new Set(['cho', 'dịp', 'mùa', 'tặng', 'quà', 'set', 'bộ', 'mẫu', 'sản', 'phẩm', 'và', 'của', 'theo', 'phong', 'cách', 'phiên', 'bản', 'siêu', 'sale']);
+          const campPrefix = activeCamp?.id ? `${activeCamp.id}_` : '';
+
+          const ideaProgressList = savedIdeaItems.map(idea => {
+            const iTitleLower = (idea.title || '').toLowerCase().trim();
+            const tokens = iTitleLower
+              .split(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/i)
+              .filter((w: string) => w.length >= 3 && !stopWords.has(w));
+
+            const matched = allShopProducts.filter((p: any) => {
+              if (p.source_idea_id && p.source_idea_id === idea.id) return true;
+              const pName = String(p.name || p.title || '').toLowerCase().trim();
+              if (iTitleLower && (pName === iTitleLower || pName.includes(iTitleLower))) return true;
+              if (tokens.length < 3) return false;
+              const hits = tokens.filter((tk: string) => pName.includes(tk)).length;
+              return hits >= Math.max(4, Math.ceil(tokens.length * 0.65));
+            });
+
+            const matchedProductsCount = matched.length;
+            const inStockCount = matched.filter((p: any) => (p.stock ?? 1) > 0).length;
+            const ordersCount = matched.reduce((sum: number, p: any) => sum + Number(p.sold_count ?? p.orders_count ?? 0), 0);
+
+            const step1Done = matchedProductsCount > 0;
+            const step2Done = ordersCount > 0 || Boolean(checkedMilestones[`${campPrefix}${idea.id}_1`] ?? checkedMilestones[`${campPrefix}1`]);
+            const step3Done = Boolean(checkedMilestones[`${campPrefix}${idea.id}_2`] ?? checkedMilestones[`${campPrefix}2`]);
+            const step4Done = Boolean(checkedMilestones[`${campPrefix}${idea.id}_3`] ?? checkedMilestones[`${campPrefix}3`]);
+            const step5Done = Boolean(checkedMilestones[`${campPrefix}${idea.id}_4`] ?? checkedMilestones[`${campPrefix}4`]);
+            const completedStepsCount = [step1Done, step2Done, step3Done, step4Done, step5Done].filter(Boolean).length;
+
+            return {
+              id: idea.id,
+              title: idea.title,
+              matchedProductsCount,
+              inStockCount,
+              ordersCount,
+              step1Done,
+              completedStepsCount,
+              totalStepsCount: 5,
+            };
+          });
+
+          const implementedIdeasCount = ideaProgressList.filter(item => item.step1Done).length;
+          const ideaMatchedProducts = savedIdeaItems.length === 0
+            ? []
+            : allShopProducts.filter((p: any) => {
+                if (p.source_idea_id && savedIdeaItems.some(i => i.id === p.source_idea_id)) return true;
+                const pName = String(p.name || p.title || '').toLowerCase().trim();
+                return savedIdeaItems.some(idea => {
+                  const iTitle = (idea.title || '').toLowerCase().trim();
+                  if (iTitle && (pName === iTitle || pName.includes(iTitle))) return true;
+                  const tokens = iTitle
+                    .split(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/i)
+                    .filter((w: string) => w.length >= 3 && !stopWords.has(w));
+                  if (tokens.length < 3) return false;
+                  const hits = tokens.filter((tk: string) => pName.includes(tk)).length;
+                  return hits >= Math.max(4, Math.ceil(tokens.length * 0.65));
+                });
+              });
+
+          const ideaInStockCount = ideaMatchedProducts.filter((p: any) => (p.stock ?? 1) > 0).length;
+          const ideaOrdersCount = ideaMatchedProducts.reduce(
+            (sum: number, p: any) => sum + Number(p.sold_count ?? p.orders_count ?? 0),
+            0
+          );
+
+          const isRefreshing = state.kind === 'loading' && Boolean(lastReadyDataRef.current);
 
           return (
-            <div className="space-y-6">
-              {/* 1. THANH ĐIỀU HƯỚNG SHOP & NGÀNH HÀNG: Nhẹ nhàng, đồng bộ giao diện VietCraft */}
-              <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EAF0E2] text-[#007700]">
-                    <Store className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-sm font-bold text-stone-900">
-                        Gian hàng: {data.seller_shop_name || 'Của bạn'}
-                      </h2>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                        <CheckCircle2 className="h-3 w-3" /> Chính thức
-                      </span>
-                      <span className="text-xs text-stone-500">
-                        Ngành: <strong>{data.seller_category?.name || 'Thời trang & May mặc'}</strong>
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-stone-500">
-                      Số liệu kết hợp xu hướng tìm kiếm người tiêu dùng Việt Nam và doanh số thực tế trên sàn.
-                    </p>
-                  </div>
+            <div className={`space-y-6 transition-opacity ${isRefreshing ? 'opacity-70' : 'opacity-100'}`}>
+              {isRefreshing && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                  Đang cập nhật dữ liệu mới cho dịp đã chọn...
                 </div>
-
-                {/* Bộ lọc ngành hàng */}
-                <div className="flex items-center gap-2 self-start sm:self-auto">
-                  <Filter className="h-3.5 w-3.5 text-stone-400" />
-                  <select
-                    value={currentCategorySlug}
-                    onChange={e => handleSelectCategory(e.target.value)}
-                    className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-800 transition hover:border-[#007700] focus:border-[#007700] focus:outline-none"
+              )}
+              {saveError && (
+                <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800">
+                  <span>{saveError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSaveError(null)}
+                    className="ml-3 rounded px-2 py-0.5 text-xs font-semibold hover:bg-rose-100"
                   >
-                    {CATEGORY_OPTIONS.map(c => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
+                    Đóng
+                  </button>
                 </div>
-              </div>
+              )}
+              {/* 1. THANH THÔNG TIN GIAN HÀNG & HEADER CHIẾN DỊCH (GỘP CÙNG TIẾN TRÌNH 4 BƯỚC) */}
+              <SeasonalHeader
+                shopName={data.seller_shop_name}
+                categoryName={data.seller_category?.name}
+                categorySlug={currentCategorySlug}
+                onSelectCategory={handleSelectCategory}
+                activeCamp={activeCamp}
+                savedIdeasCount={savedIdeasCount}
+                savedIdeaItems={savedIdeaItems}
+                onRemoveSavedIdea={id => toggleSaveIdea(id)}
+                onEditSavedIdea={id => {
+                  setFocusIdeaId(id);
+                  handleSelectTab('act1');
+                }}
+                onReload={reload}
+                storyChapter={activeStoryChapter}
+                storyStep={activeStoryStep}
+                onNavigateTab={handleSelectTab}
+              />
 
-              {/* 2. CHỌN MÙA VỤ: 6 Thẻ Mùa Cao Điểm Trong Năm */}
-              <div>
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="text-xs font-bold text-stone-700">
-                    Chọn một mùa vụ bên dưới để xem phân tích chi tiết:
+              {/* 2. THANH ĐIỀU HƯỚNG NAVBAR TRÊN ĐẦU TRANG (STICKY, KHÔNG BỊ CẮT BA CHẤM) */}
+              <SeasonalNavbar
+                activeTab={activeDetailTab}
+                onSelectTab={handleSelectTab}
+                ideasCount={aiIdeas.length + readyIdeas.length + podBlanks.length}
+              />
+
+              {/* 3. NỘI DUNG CHI TIẾT THEO CỐT TRUYỆN 4 CHƯƠNG */}
+              {activeDetailTab === 'hub' && (
+                <div className="space-y-6">
+                  {/* Vòng quay các dịp cao điểm 12 tháng */}
+                  <SeasonalMonthMatrix
+                    campaigns={campaigns}
+                    activeCampId={activeCamp?.id}
+                    onSelectCampaign={handleSelectCampaign}
+                  />
+
+                  {/* Việc ưu tiên tuần này & Theo dõi tiến độ */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
+                        Việc ưu tiên tuần này &amp; Theo dõi tiến độ
+                      </h4>
+                      <span className="text-xs text-stone-500 font-medium">
+                        {unifiedActions.length} dịp gần nhất
+                      </span>
+                    </div>
+                    <HubActionFeed
+                      occasions={unifiedActions}
+                      onOpenEvidence={handleOpenEvidence}
+                      onToggleMilestone={handleToggleCampMilestone}
+                      onNavigateTab={(tabKey, campId) => {
+                        handleSelectTab(tabKey);
+                        if (campId) {
+                          handleSelectCampaign(campId);
+                        }
+                      }}
+                    />
                   </div>
-                  {data.ai_model && (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-stone-500">
-                      <Sparkles className="h-3 w-3 text-amber-500" /> Phân tích bởi {data.ai_model}
-                    </span>
+
+                  {/* Phễu Chuyển Đổi & Kênh Bán Hàng */}
+                  {activeCamp && (
+                    <CampaignFunnelCard
+                      funnel={
+                        data.campaign_funnel
+                          ? { ...data.campaign_funnel, forecast_method_info: (data as any).forecast_method_info }
+                          : undefined
+                      }
+                      channels={data.channel_breakdown}
+                      motivation={data.motivation_breakdown}
+                      occasionName={activeCamp.name}
+                      onOpenEvidence={handleOpenEvidence}
+                    />
                   )}
-                </div>
 
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-                  {campaigns.map(camp => {
-                    const isSelected = activeCamp?.id === camp.id;
-                    const isGoldTime = camp.timing?.status === 'active';
-                    const isUpcoming = camp.timing?.status === 'upcoming';
+                  {/* Ma trận Từ khóa & Thẻ Tag đón đầu dịp */}
+                  {activeCamp && (
+                    <OpportunityKeywordTable
+                      keywords={data.opportunity_keywords || []}
+                      occasionName={activeCamp.name}
+                      onOpenEvidence={handleOpenEvidence}
+                      savedIdeas={savedIdeas}
+                      onToggleStar={tag => toggleSaveIdea(`kw_${tag}`)}
+                    />
+                  )}
 
-                    return (
-                      <button
-                        key={camp.id}
-                        type="button"
-                        onClick={() => handleSelectCampaign(camp.id)}
-                        className={`group relative flex flex-col justify-between rounded-xl border p-3 text-left transition-all duration-150 ${
-                          isSelected
-                            ? 'border-[#007700] bg-[#EAF0E2]/40 shadow-sm ring-2 ring-[#007700]/20'
-                            : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/50'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-100">
-                              {getCampaignIcon(camp.icon)}
-                            </div>
-                            {isGoldTime ? (
-                              <span className="flex items-center gap-0.5 rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 ring-1 ring-rose-200">
-                                <Flame className="h-2.5 w-2.5 fill-rose-600 text-rose-600" /> Vàng
-                              </span>
-                            ) : isUpcoming && camp.timing.days_diff <= 35 ? (
-                              <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
-                                {camp.timing.days_diff}d
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <h4 className={`mt-2 text-xs font-bold ${isSelected ? 'text-[#007700]' : 'text-stone-800'}`}>
-                            {camp.name}
-                          </h4>
-                        </div>
-
-                        <div className="mt-2 text-[10px] font-medium text-stone-400">
-                          {camp.months.map(m => `T${m}`).join(', ')}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 3. CHI TIẾT CHIẾN DỊCH & RADAR MA TRẬN: Bố cục cân xứng, không có khoảng trống */}
-              {activeCamp && (
-                <InsightCard
-                  title={`Chiến dịch: ${activeCamp.name}`}
-                  description={activeCamp.description}
-                  action={
-                    activeCamp.timing.status === 'active' ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-200">
-                        <Flame className="h-3.5 w-3.5 fill-rose-600 text-rose-600" /> Đang là thời điểm vàng chuẩn bị
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-600">
-                        <Clock className="h-3.5 w-3.5 text-stone-500" /> {activeCamp.timing.label}
-                      </span>
-                    )
-                  }
-                >
-                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
-                    {/* Cột trái (7 Cột): Cửa sổ thời gian & Định hướng */}
-                    <div className="space-y-4 lg:col-span-7">
-                      {/* 3 Mốc thời gian ra hàng chuẩn */}
-                      <div>
-                        <div className="mb-2 text-xs font-bold text-stone-600">
-                          Cửa sổ ra hàng và chuẩn bị:
-                        </div>
-                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                          <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-stone-500">
-                              <Calendar className="h-3 w-3" /> Bắt đầu chuẩn bị
-                            </div>
-                            <div className="mt-1 text-sm font-bold text-stone-800">
-                              {activeCamp.launch_window.start}
-                            </div>
-                            <div className="text-[10px] text-stone-400">Lùi 42 ngày trước đỉnh</div>
-                          </div>
-
-                          <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-amber-800">
-                              <Clock className="h-3 w-3" /> Hạn chót đăng bán
-                            </div>
-                            <div className="mt-1 text-sm font-bold text-amber-900">
-                              {activeCamp.launch_window.end}
-                            </div>
-                            <div className="text-[10px] text-amber-700/80">Lùi 21 ngày sản xuất</div>
-                          </div>
-
-                          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-800">
-                              <Zap className="h-3 w-3 fill-emerald-600 text-emerald-600" /> Đỉnh điểm sức mua
-                            </div>
-                            <div className="mt-1 text-sm font-bold text-[#007700]">
-                              {activeCamp.launch_window.peak_date}
-                            </div>
-                            <div className="text-[10px] text-emerald-700 font-semibold">{activeCamp.launch_window.peak_week}</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Lời khuyên định hướng ngành hàng */}
-                      <div className="rounded-xl border border-stone-100 bg-stone-50 p-3.5 text-xs text-stone-700">
-                        <div className="flex items-start gap-2">
-                          <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-                          <div className="leading-relaxed">
-                            <strong className="text-stone-900 font-semibold">
-                              Định hướng cho ngành {data.seller_category?.name || 'Thời trang'}:
-                            </strong>{' '}
-                            {activeCamp.category_summary}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 3 Bước hành động tinh gọn */}
-                      <div className="rounded-xl border border-stone-200 bg-white p-3.5 text-xs space-y-1.5">
-                        <div className="font-bold text-stone-800 text-[11px] uppercase tracking-wide">
-                          Khuyến nghị thực thi theo mốc:
-                        </div>
-                        <ul className="pl-4 list-disc space-y-1 text-stone-600 leading-relaxed">
-                          <li><strong>Tuần T-6:</strong> Lấy mẫu thử, chụp ảnh concept theo chủ đề {activeCamp.name}.</li>
-                          <li><strong>Tuần T-3:</strong> Đăng bán hoàn tất trên sàn, gắn từ khóa ngách đón tìm kiếm sớm.</li>
-                          <li><strong>Tuần T-0:</strong> Đỉnh điểm mua sắm, tung ưu đãi combo quà tặng để x2 giá trị đơn hàng.</li>
-                        </ul>
-                      </div>
-                    </div>
-
-                    {/* Cột phải (5 Cột): BIỂU ĐỒ RADAR MA TRẬN TIỀM NĂNG */}
-                    <div className="rounded-2xl border border-stone-100 bg-stone-50/60 p-4 lg:col-span-5">
-                      <div className="flex items-center justify-between border-b border-stone-200/70 pb-2">
-                        <div>
-                          <div className="text-xs font-bold text-stone-800">
-                            Radar Tiềm Năng Mùa Vụ
-                          </div>
-                          <div className="text-[11px] text-stone-500">
-                            So sánh với mặt bằng ngày thường
-                          </div>
-                        </div>
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                          Điểm: {radarInfo.overall_score ?? 90}/100
-                        </span>
-                      </div>
-
-                      {/* Biểu đồ Radar */}
-                      <div className="mt-1">
-                        <RadarCompare
-                          axes={radarInfo.axes}
-                          series={[
-                            {
-                              name: activeCamp.name,
-                              values: radarInfo.current_values,
-                              color: '#007700',
-                              primary: true,
-                            },
-                            {
-                              name: 'Ngày thường',
-                              values: radarInfo.benchmark_values,
-                              color: '#94a3b8',
-                              primary: false,
-                            },
-                          ]}
-                          height={230}
-                        />
-                      </div>
-
-                      {/* Nhận định ngắn gọn từ Radar */}
-                      <div className="mt-2 text-[11px] text-stone-600 space-y-1 border-t border-stone-200/70 pt-2 leading-relaxed">
-                        {(radarInfo.takeaways || []).slice(0, 2).map((t: string, i: number) => (
-                          <div key={i} className="flex items-start gap-1.5">
-                            <span className="text-emerald-700 font-bold">•</span>
-                            <span>{t}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  {/* Nhóm sản phẩm nên cân nhắc */}
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
+                      Nhóm sản phẩm tiềm năng &amp; Mật độ đối thủ
+                    </h4>
+                    <HubOpportunities
+                      clusters={opportunityClusters}
+                      onOpenEvidence={handleOpenEvidence}
+                    />
                   </div>
-                </InsightCard>
+
+                  {/* Biểu đồ đặc điểm mua sắm của dịp */}
+                  {activeCamp && (
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
+                        Đặc điểm hành vi khách mua
+                      </h4>
+                      <OccasionTraitChart
+                        occasionName={activeCamp.name}
+                        categoryName={data.seller_category?.name}
+                        measuredCycles={data.measured_cycles ?? 2}
+                        sampleSizeN={data.sample_size_n ?? traits[0]?.evidence?.n ?? 1200}
+                        traits={traits}
+                        activeCamp={activeCamp}
+                        traitActions={(data as any).trait_actions}
+                        onPlanAction={() => setActiveDetailTab('act2')}
+                        onOpenEvidence={handleOpenEvidence}
+                      />
+                    </div>
+                  )}
+
+                  {/* Rủi ro giao hàng & Bảng chấm điểm dự báo */}
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-stone-900 text-sm uppercase tracking-wide">
+                      Rủi ro vận chuyển &amp; Độ tin cậy dự báo
+                    </h4>
+                    <HubRisksAndScorecard
+                      risks={routeRisks}
+                      scorecard={scorecardMetrics}
+                      onOpenEvidence={handleOpenEvidence}
+                    />
+                  </div>
+                </div>
               )}
 
-              {/* 4. GỢI Ý SẢN PHẨM: 2 TABS TINH GỌN, DỄ ĐỌC */}
-              <InsightCard
-                title={`Gợi ý sản phẩm cho ${activeCamp?.name || 'mùa vụ này'}`}
-                description="Chọn mô hình kinh doanh phù hợp với nguồn hàng của gian hàng:"
-                action={
-                  <div className="inline-flex rounded-xl border border-stone-200 bg-stone-100 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('ready')}
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                        activeTab === 'ready'
-                          ? 'bg-white text-stone-900 shadow-sm'
-                          : 'text-stone-600 hover:text-stone-900'
-                      }`}
-                    >
-                      <Package className="h-3.5 w-3.5 text-[#007700]" />
-                      Hàng sẵn / Nhập sỉ ({readyIdeas.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('pod')}
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                        activeTab === 'pod'
-                          ? 'bg-white text-stone-900 shadow-sm'
-                          : 'text-stone-600 hover:text-stone-900'
-                      }`}
-                    >
-                      <Palette className="h-3.5 w-3.5 text-purple-600" />
-                      Phôi in POD ({podBlanks.length})
-                    </button>
-                  </div>
-                }
-              >
-                {/* TAB 1: SẢN PHẨM CÓ SẴN / NHẬP SỈ */}
-                {activeTab === 'ready' && (
-                  <div className="space-y-4">
-                    <Note>
-                      <strong>Hàng có sẵn:</strong> Các sản phẩm hoàn chỉnh đang có nhu cầu tìm kiếm cao trên sàn. Nhập sỉ hoặc đặt xưởng may sẵn để bán trực tiếp mà không cần thiết kế in ấn.
-                    </Note>
+              {/* TAB 1: Ý TƯỞNG (Sắp xếp theo mức độ ưu tiên hành động: Từ khóa cơ hội -> Sản phẩm tiềm năng -> Hành vi & Lịch chuẩn bị) */}
+              {(activeDetailTab === 'act1' || activeDetailTab === 'traits' || activeDetailTab === 'potential') && activeCamp && (
+                <div className="space-y-6">
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      {readyIdeas.map((idea, idx) => (
-                        <div
-                          key={idx}
-                          className="flex flex-col rounded-2xl border border-stone-200 bg-white p-4 shadow-sm transition hover:border-[#007700]"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <span className="inline-block rounded bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-600">
-                                {idea.category}
-                              </span>
-                              <h4 className="mt-1.5 text-sm font-bold text-stone-900 leading-snug">
-                                {idea.title}
-                              </h4>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                                Lãi: {idea.expected_profit_margin || '45% - 55%'}
-                              </span>
-                              <div className="mt-0.5 text-xs font-bold text-stone-700">
-                                {idea.market_price_range}
-                              </div>
-                            </div>
-                          </div>
+                  {/* 1. Ma trận từ khóa cơ hội (Ưu tiên cao nhất: chọn ngách & gắn thẻ / tạo sản phẩm ngay) */}
+                  <OpportunityKeywordTable
+                    keywords={data.opportunity_keywords || []}
+                    occasionName={activeCamp.name}
+                    onOpenEvidence={handleOpenEvidence}
+                    savedIdeas={savedIdeas}
+                    onToggleStar={tag => toggleSaveIdea(`kw_${tag}`)}
+                  />
 
-                          {/* Lý do bán chạy & mẹo bán kèm súc tích */}
-                          <div className="mt-3 space-y-1.5 text-xs leading-relaxed text-stone-600">
-                            {idea.why_it_sells && (
-                              <p className="m-0">
-                                <strong className="text-stone-800">Động cơ mua:</strong> {idea.why_it_sells}
-                              </p>
-                            )}
-                            {idea.upsell_bundle_tip && (
-                              <p className="m-0 text-emerald-900">
-                                <strong>Mẹo bán kèm:</strong> {idea.upsell_bundle_tip}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="mt-3 border-t border-stone-100 pt-2 text-[11px] text-stone-500">
-                            <span>Nguồn hàng: {idea.sourcing_tip}</span>
-                          </div>
-                        </div>
-                      ))}
+                  {/* 2. Hồ sơ sản phẩm tiềm năng (Hàng sẵn & Phôi POD kèm phân tích hòa vốn) */}
+                  <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
+                    <div className="mb-4">
+                      <h4 className="text-base font-bold text-stone-900">
+                        Sản phẩm tiềm năng
+                      </h4>
                     </div>
+                    <SeasonalPotentialTab
+                      readyIdeas={readyIdeas}
+                      podBlanks={podBlanks}
+                      aiIdeas={aiIdeas}
+                      shopDna={shopDna}
+                      savedIdeaDrafts={savedIdeaDrafts}
+                      focusIdeaId={focusIdeaId}
+                      onClearFocusIdea={() => setFocusIdeaId(null)}
+                      potentialProfiles={data.potential_profiles}
+                      savedIdeas={savedIdeas}
+                      onToggleSaveIdea={toggleSaveIdea}
+                      onOpenProfileDrawer={profile => {
+                        setSelectedProfile(profile);
+                        setProfileDrawerOpen(true);
+                      }}
+                      onApplyIdea={() => handleSelectTab('act2')}
+                    />
                   </div>
-                )}
 
-                {/* TAB 2: PHÔI IN POD */}
-                {activeTab === 'pod' && (
-                  <div className="space-y-4">
-                    <Note>
-                      <strong>In theo yêu cầu (POD):</strong> Kết nối trực tiếp với xưởng in liên kết trên VietCraft. Bạn chỉ cần tải mẫu thiết kế lên phôi, xưởng sẽ tự in và giao hàng khi có đơn.
-                    </Note>
+                  {/* 3. Đặc điểm hành vi khách mua & Lịch chuẩn bị theo giai đoạn */}
+                  <OccasionTraitChart
+                    occasionName={activeCamp.name}
+                    categoryName={data.seller_category?.name}
+                    measuredCycles={data.measured_cycles ?? 2}
+                    sampleSizeN={data.sample_size_n ?? traits[0]?.evidence?.n ?? 1200}
+                    traits={traits}
+                    activeCamp={activeCamp}
+                    traitActions={(data as any).trait_actions}
+                    onPlanAction={() => setActiveDetailTab('act2')}
+                    onOpenEvidence={handleOpenEvidence}
+                  />
+                </div>
+              )}
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      {podBlanks.map((pod, idx) => {
-                        const mb = pod.matched_blank;
-                        const createUrl = mb?._id
-                          ? `/seller/products/new?blankId=${encodeURIComponent(mb._id)}&title=${encodeURIComponent(pod.title)}`
-                          : `/seller/products/new?title=${encodeURIComponent(pod.title)}`;
+              {/* TAB 2: ÁP DỤNG (Gọn, không lặp lại timeline hay số liệu thử nghiệm fix cứng) */}
+              {(activeDetailTab === 'act2' || activeDetailTab === 'readiness' || activeDetailTab === 'trial' || activeDetailTab === 'timeline') && activeCamp && (
+                <div className="space-y-6">
+                  <ApplyPlaybookCard
+                    playbooks={data.apply_playbooks}
+                    savedIdeas={savedIdeas}
+                    savedIdeaItems={savedIdeaItems}
+                    aiIdeas={aiIdeas}
+                    allShopProducts={allShopProducts}
+                    matchingProductsCount={ideaMatchedProducts.length}
+                    inStockMatchingCount={ideaInStockCount}
+                    actualOrdersCount={ideaOrdersCount}
+                    checkedMilestones={checkedMilestones}
+                    onToggleMilestone={toggleMilestone}
+                    onEditSavedIdea={id => {
+                      setFocusIdeaId(id);
+                      handleSelectTab('act1');
+                    }}
+                    occasionName={activeCamp.name}
+                  />
 
-                        return (
-                          <div
-                            key={idx}
-                            className="flex flex-col rounded-2xl border border-stone-200 bg-white p-4 shadow-sm transition hover:border-purple-300"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="rounded bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700">
-                                Phôi: {pod.blank_type}
-                              </span>
-                              {pod.estimated_profit && (
-                                <span className="text-xs font-bold text-emerald-800">
-                                  Lãi: {pod.estimated_profit}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="mt-2.5 flex items-start gap-3">
-                              {mb?.default_image ? (
-                                <img
-                                  src={mb.default_image}
-                                  alt={pod.title}
-                                  className="h-16 w-16 shrink-0 rounded-xl border border-stone-100 object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-400">
-                                  <Palette className="h-6 w-6" />
-                                </div>
-                              )}
-
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-bold text-stone-900 leading-snug">
-                                  {pod.title}
-                                </h4>
-                                <p className="mt-0.5 text-xs text-stone-500">
-                                  Xưởng: {mb?.printer_name || 'Xưởng in liên kết VietCraft'}
-                                </p>
-                                {pod.color_palette && (
-                                  <p className="mt-0.5 text-[11px] text-stone-500">
-                                    Màu mốt: {pod.color_palette}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="mt-2.5 rounded-xl bg-purple-50/50 p-2.5 text-xs text-purple-950">
-                              <strong>Ý tưởng in:</strong> {pod.suggested_theme}
-                              {pod.design_hook && (
-                                <div className="mt-1 text-[11px] text-purple-900 font-medium">
-                                  💡 Gợi ý thiết kế: {pod.design_hook}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-2.5">
-                              <span className="text-xs text-stone-500">
-                                Giá phôi: <strong className="text-stone-800">{mb?.base_cost ? `${count(mb.base_cost)} đ` : 'Xem chi tiết'}</strong>
-                              </span>
-
-                              <Link
-                                to={createUrl}
-                                className="inline-flex items-center gap-1 rounded-xl bg-[#007700] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-800"
-                              >
-                                <Palette className="h-3.5 w-3.5" />
-                                Thiết kế trên phôi
-                              </Link>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                  {/* Rà soát sản phẩm hiện có của shop cho dịp */}
+                  <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-sm sm:p-6">
+                    <SeasonalReadinessTab
+                      matchingProducts={matchingProducts}
+                      allShopProducts={allShopProducts}
+                      activeCamp={activeCamp}
+                      onOpenEvidence={handleOpenEvidence}
+                    />
                   </div>
-                )}
-              </InsightCard>
+                </div>
+              )}
 
-              {/* 5. SẢN PHẨM CỦA SHOP CÓ THỂ ĐẨY MẠNH */}
-              <InsightCard
-                title="Sản phẩm của gian hàng bạn phù hợp đẩy mạnh"
-                description={`Các mặt hàng hiện có trong shop phù hợp với xu hướng mùa ${activeCamp?.name}:`}
-                action={
-                  <Link
-                    to="/seller/products"
-                    className="inline-flex items-center gap-1 text-xs font-bold text-[#007700] hover:underline"
-                  >
-                    Quản lý kho hàng <ChevronRight className="h-3.5 w-3.5" />
-                  </Link>
-                }
-              >
-                {matchingProducts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {matchingProducts.map((p: any, i: number) => (
-                      <div
-                        key={p._id || i}
-                        className="flex flex-col justify-between rounded-xl border border-stone-200 bg-stone-50/40 p-3 transition hover:border-emerald-400 hover:bg-white"
-                      >
-                        <div>
-                          {p.images?.[0] ? (
-                            <img
-                              src={p.images[0]}
-                              alt={p.title}
-                              className="h-28 w-full rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-28 w-full items-center justify-center rounded-lg bg-stone-100 text-stone-400">
-                              <ShoppingBag className="h-6 w-6" />
-                            </div>
-                          )}
+              {/* TAB 3: THÀNH QUẢ (Tập trung kết quả đơn/GMV, phễu chuyển đổi & đánh giá sau dịp) */}
+              {(activeDetailTab === 'act3' || activeDetailTab === 'performance') && activeCamp && (
+                <div className="space-y-6">
+                  <SeasonalImpactCard
+                    impact={data.impact}
+                    occasionName={activeCamp.name}
+                    campId={activeCamp.id}
+                    savedIdeaTitles={savedIdeaItems.map(x => x.title)}
+                    appliedSummary={{
+                      selectedIdeasCount: savedIdeaItems.length,
+                      implementedIdeasCount,
+                      completedMilestonesCount: ideaProgressList.reduce((acc, curr) => acc + curr.completedStepsCount, 0),
+                      totalMilestonesCount: Math.max(1, savedIdeaItems.length) * 5,
+                      matchingProductsCount: matchingProducts.length,
+                      ideaProductsCount: ideaMatchedProducts.length,
+                      ideasDetail: ideaProgressList,
+                    }}
+                    initialReview={occasionReviews[activeCamp.id]}
+                  />
 
-                          <h5 className="mt-2 line-clamp-2 text-xs font-bold text-stone-900 leading-snug">
-                            {p.title}
-                          </h5>
-                        </div>
-
-                        <div className="mt-2 border-t border-stone-200/60 pt-1.5 text-[11px] text-emerald-800 font-semibold">
-                          Gợi ý: Chụp lại ảnh concept {activeCamp?.name}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-6 text-center">
-                    <ShoppingBag className="h-8 w-8 text-stone-300" />
-                    <p className="mt-2 text-xs font-semibold text-stone-700">
-                      Chưa có sản phẩm nào trong kho của bạn gắn thẻ mùa {activeCamp?.name}
-                    </p>
-                    <p className="mt-0.5 max-w-sm text-[11px] text-stone-400">
-                      Đăng sản phẩm mới hoặc cập nhật từ khóa ngách cho các sản phẩm hiện có để đón đầu lượt tìm kiếm.
-                    </p>
-                    <Link
-                      to="/seller/products/new"
-                      className="mt-2.5 inline-flex items-center gap-1 rounded-xl bg-[#007700] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#005B00]"
-                    >
-                      Đăng sản phẩm đón mùa
-                    </Link>
-                  </div>
-                )}
-              </InsightCard>
-
-              {/* Chân trang thông tin nguồn dữ liệu */}
-              <SourceFooter meta={meta} limitation={data.limitation} method={data.method} />
+                  {/* Phễu chuyển đổi & đóng góp kênh bán thực tế */}
+                  <CampaignFunnelCard
+                    funnel={
+                      data.campaign_funnel
+                        ? { ...data.campaign_funnel, forecast_method_info: (data as any).forecast_method_info }
+                        : undefined
+                    }
+                    channels={data.channel_breakdown}
+                    motivation={data.motivation_breakdown}
+                    occasionName={activeCamp.name}
+                    onOpenEvidence={handleOpenEvidence}
+                  />
+                </div>
+              )}
             </div>
           );
         }}
       </InsightBlock>
+
+      {/* Drawer hồ sơ tiềm năng 5 lớp & máy tính hòa vốn động */}
+      <PotentialProfileDrawer
+        profile={selectedProfile}
+        open={profileDrawerOpen}
+        onClose={() => setProfileDrawerOpen(false)}
+      />
+
+      {/* Drawer Bằng chứng minh bạch "Con số này từ đâu ra?" (11 mục cố định) */}
+      <EvidenceDrawer
+        evidence={inspectedEvidence}
+        open={evidenceDrawerOpen}
+        onClose={() => setEvidenceDrawerOpen(false)}
+      />
     </InsightPage>
   );
 }

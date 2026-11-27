@@ -175,7 +175,7 @@ export function SellerDashboard() {
   const restockTotal = metrics.outOfStock + metrics.lowStock.length;
 
   return (
-    <div className="mx-auto w-full max-w-[1600px]">
+    <div className="w-full">
       {/* Page Header */}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
@@ -247,7 +247,7 @@ export function SellerDashboard() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-[#007700]/10 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-[#007700]">
-                    Cơ hội mùa vụ sắp tới
+                    Cơ hội dịp cao điểm sắp tới
                   </span>
                   <span className="font-jakarta text-base font-extrabold text-stone-900">
                     &ldquo;{seasonalEvent.name}&rdquo;

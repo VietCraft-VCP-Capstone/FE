@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Star,
   Store,
@@ -16,7 +16,6 @@ import {
   X,
   SlidersHorizontal,
   Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ShieldCheck
@@ -28,6 +27,7 @@ import { isLoggedIn, getApiErrorMessage } from '../../../infrastructure/api/inte
 import { useToast } from '../../../shared/components/Toast';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { SeoMeta } from '../../../shared/components/SeoMeta';
+import { useVoucherWallet } from '../../promotion/hooks/useVoucherWallet';
 
 interface ShopHeader {
   id?: string;
@@ -41,8 +41,10 @@ interface ShopHeader {
   province?: string;
   rating: number;
   ratingCount?: number;
+  productCount?: number;
   followersCount?: number;
   isFollowing?: boolean;
+  isOwner?: boolean;
   reputation_score?: number;
   reputation_tier?: string;
 }
@@ -57,23 +59,28 @@ const money = (n: number) => currencyFormatter.format(Number(n) || 0) + 'đ';
 export function BuyerShopPage() {
   const { user } = useAuth();
   const isSeller = user?.role?.toLowerCase() === 'seller';
+  // Tài khoản quản trị chỉ xem gian hàng; theo dõi/chat là thao tác của người mua và người bán.
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
+  // Seller mở ở tab mới (không có lịch sử) thì mới về Quản lý đối thủ; còn lại lùi đúng trang trước.
+  const veQuanLyDoiThu = isSeller && location.key === 'default';
   const productsSectionRef = useRef<HTMLDivElement>(null);
 
   // Shop & Product Data
+  // Trang sản phẩm hiện tại — lọc, sắp xếp, phân trang đều chạy ở server (không giới hạn số sản phẩm của shop).
   const [products, setProducts] = useState<any[]>([]);
+  const [resolvedShopId, setResolvedShopId] = useState<string | null>(null);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(false);
+  const [productsReload, setProductsReload] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [shop, setShop] = useState<ShopHeader | null>(null);
   const [vouchers, setVouchers] = useState<CouponDTO[]>([]);
-  const [savedVouchers, setSavedVouchers] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem('vietcraft_saved_vouchers');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
 
   // State
   const [isFollowing, setIsFollowing] = useState(false);
@@ -99,8 +106,8 @@ export function BuyerShopPage() {
         if (!alive) return;
         const resolvedShopId = shopDetail?.id || shopDetail?._id || id;
 
-        const [data, couponsData] = await Promise.all([
-          productsService.getAll({ shopId: resolvedShopId, pageSize: 100 } as any),
+        setResolvedShopId(String(resolvedShopId));
+        const [couponsData] = await Promise.all([
           isLoggedIn()
             ? promotionService.getAvailableCoupons({ shopId: resolvedShopId }).catch(async () => {
                 // Fallback: lấy từ tất cả khuyến mãi công khai lọc theo shop_id
@@ -119,8 +126,6 @@ export function BuyerShopPage() {
         ]);
 
         if (!alive) return;
-        const items = data.items || [];
-        setProducts(items);
 
         // Set Shop Info
         if (shopDetail) {
@@ -135,24 +140,20 @@ export function BuyerShopPage() {
             address: detail.address,
             city: detail.city,
             province: detail.province,
-            rating: typeof detail.averageRating === 'number' ? detail.averageRating : (detail.rating || 5),
+            rating: Number(detail.averageRating ?? detail.rating ?? 0),
             ratingCount: detail.ratingCount || 0,
+            productCount: Number(detail.listingCount) || 0,
             followersCount: detail.followersCount || 0,
             isFollowing: Boolean(detail.isFollowing),
+            isOwner: Boolean((detail as any).isOwner),
             reputation_score: detail.reputation_score,
             reputation_tier: detail.reputation_tier
           });
           setIsFollowing(Boolean(detail.isFollowing));
           setFollowersCount(detail.followersCount || 0);
         } else {
-          const info = items[0]?.shopInfo;
-          setShop(info ? {
-            name: info.name,
-            logo: info.logo,
-            rating: info.rating ?? 5,
-            followersCount: 0,
-            isFollowing: false
-          } : null);
+          // Không có gian hàng này (sai link, shop đã đóng): hiện trạng thái "không tìm thấy", không dựng shop giả.
+          setShop(null);
         }
 
         // Set Vouchers: chỉ hiển thị voucher do chính gian hàng phát hành (API trả kèm voucher toàn sàn)
@@ -182,14 +183,14 @@ export function BuyerShopPage() {
     try {
       setIsSubmittingFollow(true);
       if (isFollowing) {
-        await shopService.unfollow(id);
+        const res = await shopService.unfollow(id);
         setIsFollowing(false);
-        setFollowersCount(c => Math.max(0, c - 1));
+        setFollowersCount(c => (typeof res?.followersCount === 'number' ? res.followersCount : Math.max(0, c - 1)));
         showToast('Đã hủy theo dõi gian hàng.', 'info');
       } else {
-        await shopService.follow(id);
+        const res = await shopService.follow(id);
         setIsFollowing(true);
-        setFollowersCount(c => c + 1);
+        setFollowersCount(c => (typeof res?.followersCount === 'number' ? res.followersCount : c + 1));
         showToast('Đã theo dõi gian hàng thành công!', 'success');
       }
       window.dispatchEvent(new CustomEvent('shop-follow-updated'));
@@ -202,93 +203,62 @@ export function BuyerShopPage() {
   };
 
   // Save Voucher
-  const handleSaveVoucher = useCallback((code: string, e?: React.MouseEvent) => {
+  const wallet = useVoucherWallet((msg, type) => showToast(msg, type));
+  const savedVouchers = wallet.savedCodes;
+  const handleSaveVoucher = (code: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setSavedVouchers((prev) => {
-      let updated: string[];
-      if (prev.includes(code)) {
-        updated = prev.filter(c => c !== code);
-        showToast(`Đã bỏ lưu mã ${code}`, 'info');
-      } else {
-        updated = [...prev, code];
-        showToast(`Đã lưu mã ${code}! Mã sẽ tự động gợi ý khi thanh toán.`, 'success');
-      }
-      try {
-        localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
-      } catch (err) {
-        console.error('Failed to write saved vouchers to localStorage', err);
-      }
-      return updated;
-    });
-  }, [showToast]);
+    const coupon = vouchers.find((c: any) => c.code === code);
+    if (coupon) wallet.toggle(coupon as any);
+  };
 
-  // Lọc và sắp xếp sản phẩm (đã tối ưu hóa tính toán và sắp xếp)
-  const filteredAndSortedProducts = useMemo(() => {
-    let list = [...products];
+  // Gõ tìm kiếm: đợi người dùng ngừng gõ 300ms rồi mới hỏi server.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
-    // 1. Tìm kiếm từ khóa nội bộ
-    const term = searchTerm.trim().toLowerCase();
-    if (term) {
-      list = list.filter(p => {
-        const title = (p.title || p.name || '').toLowerCase();
-        const cat = (p.category || '').toLowerCase();
-        const desc = (p.description || '').toLowerCase();
-        const tags = Array.isArray(p.tags) ? p.tags.join(' ').toLowerCase() : '';
-        return title.includes(term) || cat.includes(term) || desc.includes(term) || tags.includes(term);
-      });
-    }
-
-    // 2. Lọc theo tab
-    if (selectedTab === 'promotions') {
-      list = list.filter(p => Boolean(p.originalPrice && p.originalPrice > p.price));
-    } else if (selectedTab === 'best_seller') {
-      list.sort((a, b) => {
-        const soldA = a.soldCount ?? a.sold_count ?? a.rank ?? 0;
-        const soldB = b.soldCount ?? b.sold_count ?? b.rank ?? 0;
-        return soldB - soldA;
-      });
-    } else if (selectedTab === 'newest') {
-      list.sort((a, b) => {
-        const tA = a._ts || (a._ts = new Date(a.createdAt || 0).getTime());
-        const tB = b._ts || (b._ts = new Date(b.createdAt || 0).getTime());
-        return tB - tA;
-      });
-    }
-
-    // 3. Sắp xếp theo dropdown
-    if (sortOption === 'price_asc') {
-      list.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
-    } else if (sortOption === 'price_desc') {
-      list.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
-    } else if (sortOption === 'popular' && selectedTab !== 'best_seller') {
-      list.sort((a, b) => {
-        const rankA = a.soldCount ?? a.sold_count ?? a.rank ?? 0;
-        const rankB = b.soldCount ?? b.sold_count ?? b.rank ?? 0;
-        return rankB - rankA;
-      });
-    } else if (sortOption === 'newest' && selectedTab !== 'newest') {
-      list.sort((a, b) => {
-        const tA = a._ts || (a._ts = new Date(a.createdAt || 0).getTime());
-        const tB = b._ts || (b._ts = new Date(b.createdAt || 0).getTime());
-        return tB - tA;
-      });
-    }
-
-    return list;
-  }, [products, searchTerm, selectedTab, sortOption]);
-
-  // Reset trang về 1 khi filter thay đổi
+  // Reset trang về 1 khi bộ lọc thay đổi
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedTab, sortOption]);
+  }, [debouncedSearch, selectedTab, sortOption]);
 
-  // Phân trang
-  const totalItems = filteredAndSortedProducts.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-  const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredAndSortedProducts.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredAndSortedProducts, currentPage]);
+  // Tab "Bán chạy" / "Hàng mới" quyết định thứ tự; tab "Tất cả" / "Khuyến mãi" theo dropdown.
+  const serverSort = selectedTab === 'best_seller' ? 'best_seller'
+    : selectedTab === 'newest' ? 'newest'
+    : sortOption === 'popular' ? 'best_seller'
+    : sortOption === 'price_asc' ? 'price_asc'
+    : sortOption === 'price_desc' ? 'price_desc'
+    : debouncedSearch ? 'relevance' : 'newest';
+
+  useEffect(() => {
+    if (!resolvedShopId) return;
+    let alive = true;
+    setProductsLoading(true);
+    setProductsError(false);
+    productsService.searchStrict({
+      shopId: resolvedShopId,
+      q: debouncedSearch || undefined,
+      sort: serverSort,
+      onSale: selectedTab === 'promotions' || undefined,
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+    })
+      .then((res) => {
+        if (!alive) return;
+        setProducts(res.items || []);
+        setTotalItems(Number(res.total) || 0);
+        setTotalPages(Math.max(1, Number(res.totalPages) || 1));
+      })
+      .catch((err) => {
+        console.error('Error fetching shop products', err);
+        if (alive) { setProducts([]); setProductsError(true); }
+      })
+      .finally(() => { if (alive) setProductsLoading(false); });
+    return () => { alive = false; };
+  }, [resolvedShopId, debouncedSearch, serverSort, selectedTab, currentPage, productsReload]);
+
+  const paginatedProducts = products;
+  const hasActiveFilter = Boolean(debouncedSearch) || selectedTab === 'promotions';
 
   // Chuyển trang mượt mà không bị giật màn hình
   const handlePageChange = useCallback((page: number) => {
@@ -308,11 +278,31 @@ export function BuyerShopPage() {
     }
   }, [totalPages, currentPage]);
 
+  if (!loading && !shop) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-24 text-center font-sans">
+        <SeoMeta title="Không tìm thấy gian hàng · VietCraft" description="Gian hàng không tồn tại hoặc đã ngừng hoạt động." noindex={true} />
+        <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-stone-100 text-stone-400">
+          <Store className="h-6 w-6" />
+        </span>
+        <p className="text-lg font-bold text-gray-900">Không tìm thấy gian hàng</p>
+        <p className="mt-1 text-sm text-stone-500">Gian hàng không tồn tại hoặc đã ngừng hoạt động.</p>
+        <button
+          type="button"
+          onClick={() => navigate('/search')}
+          className="mt-6 rounded-xl bg-[#15803d] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#166534] cursor-pointer"
+        >
+          Tiếp tục mua sắm
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 font-sans">
       <SeoMeta
-        title={shop?.name ? `${shop.name} - Nghệ nhân VietCraft` : 'Gian hàng VietCraft'}
-        description={shop?.description || shop?.slogan || `Gian hàng thủ công chính hãng ${shop?.name || ''} trên sàn VietCraft. Đánh giá ${shop?.rating || 5} sao.`}
+        title={shop?.name ? `${shop.name} · VietCraft` : 'Gian hàng VietCraft'}
+        description={shop?.description || shop?.slogan || `Gian hàng ${shop?.name || ''} trên sàn VietCraft.${shop?.ratingCount ? ` Đánh giá ${shop.rating.toFixed(1)} sao.` : ''}`}
         ogImage={shop?.banner || shop?.logo}
         schema={shop ? {
           "@context": "https://schema.org",
@@ -320,30 +310,27 @@ export function BuyerShopPage() {
           "name": shop.name,
           "description": shop.description || shop.slogan,
           "image": shop.logo || shop.banner,
-          "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": shop.rating || 5,
-            "reviewCount": shop.ratingCount || 1
-          }
+          // Chỉ khai báo điểm khi có đánh giá thật
+          ...(shop.ratingCount ? {
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": shop.rating,
+              "reviewCount": shop.ratingCount
+            }
+          } : {})
         } : undefined}
       />
       {/* Nút quay lại & Banner thông báo nếu là seller */}
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <button
-          onClick={() => {
-            if (isSeller) {
-              navigate('/seller/competitors');
-            } else {
-              navigate(-1);
-            }
-          }}
+          onClick={() => (veQuanLyDoiThu ? navigate('/seller/competitors') : navigate(-1))}
           className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-stone-600 transition-colors hover:text-[#15803d]"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>{isSeller ? 'Quay lại Quản lý đối thủ' : 'Quay lại'}</span>
+          <span>{veQuanLyDoiThu ? 'Quay lại Quản lý đối thủ' : 'Quay lại'}</span>
         </button>
 
-        {isSeller && (
+        {isSeller && !shop?.isOwner && (
           <span className="text-xs bg-amber-50 border border-amber-200 text-amber-800 font-semibold px-3 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto shadow-2xs">
             <Store size={12} className="text-amber-600" />
             Đang xem ở chế độ Cửa hàng công khai
@@ -393,12 +380,10 @@ export function BuyerShopPage() {
                   <h1 className="m-0 text-xl sm:text-2xl md:text-3xl font-black text-gray-900 tracking-tight truncate">
                     {shop?.name || 'Gian hàng VietCraft'}
                   </h1>
-                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-[#15803d] text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 shrink-0">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#15803d]" />
-                    <span>Xưởng thủ công</span>
-                  </span>
                   {shop?.reputation_tier === 'TRUSTED' && (
-                    <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-200 shrink-0 shadow-2xs">
+                    <span
+                      title="Gian hàng đạt điểm uy tín từ 90 trở lên nhờ chuỗi đơn hàng không khiếu nại"
+                      className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-200 shrink-0 shadow-2xs">
                       <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
                       <span>Nghệ Nhân Uy Tín</span>
                     </span>
@@ -416,6 +401,17 @@ export function BuyerShopPage() {
 
             {/* Nhóm nút hành động: Theo dõi & Chat với Shop */}
             <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto pt-2 lg:pt-0">
+              {shop?.isOwner ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/seller/storefront')}
+                  className="inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-xs sm:text-sm font-bold bg-[#15803d] text-white hover:bg-[#166534] shadow-xs cursor-pointer"
+                >
+                  <Store className="w-4 h-4" />
+                  <span>Quản lý gian hàng</span>
+                </button>
+              ) : !isAdmin && (
+              <>
               <button
                 disabled={isSubmittingFollow}
                 onClick={handleToggleFollow}
@@ -455,6 +451,8 @@ export function BuyerShopPage() {
                 <MessageCircle className="h-4 w-4 text-stone-600" />
                 <span>Chat với Shop</span>
               </button>
+              </>
+              )}
             </div>
           </div>
 
@@ -462,15 +460,19 @@ export function BuyerShopPage() {
           <div className="mt-5 pt-4 border-t border-stone-100 flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm font-medium text-stone-600">
             <div className="flex items-center gap-1.5 bg-amber-50/80 text-amber-900 px-3 py-1.5 rounded-xl border border-amber-200/60 font-semibold">
               <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              <span>{(shop?.rating ?? 5).toFixed(1)} / 5.0</span>
-              <span className="text-amber-700/80 font-normal">
-                ({shop?.ratingCount || 0} đánh giá)
-              </span>
+              {shop?.ratingCount ? (
+                <>
+                  <span>{shop.rating.toFixed(1)} / 5.0</span>
+                  <span className="text-amber-700/80 font-normal">({shop.ratingCount} đánh giá)</span>
+                </>
+              ) : (
+                <span className="font-normal">Chưa có đánh giá</span>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 bg-stone-50 px-3 py-1.5 rounded-xl text-stone-700">
               <Package className="h-4 w-4 text-[#15803d]" />
-              <span className="font-bold text-gray-900">{products.length}</span>
+              <span className="font-bold text-gray-900">{shop?.productCount ?? totalItems}</span>
               <span>Sản phẩm</span>
             </div>
 
@@ -628,7 +630,7 @@ export function BuyerShopPage() {
         {/* Các tab chuyển đổi danh mục / nhóm sản phẩm */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
           {[
-            { id: 'all', label: 'Tất cả sản phẩm', count: products.length },
+            { id: 'all', label: 'Tất cả sản phẩm', count: shop?.productCount ?? totalItems },
             { id: 'best_seller', label: 'Bán chạy nhất' },
             { id: 'newest', label: 'Hàng mới về' },
             { id: 'promotions', label: 'Khuyến mãi hot' }
@@ -659,7 +661,7 @@ export function BuyerShopPage() {
       </div>
 
       {/* 4. GRID HIỂN THỊ SẢN PHẨM & ĐIỀU HƯỚNG */}
-      {loading ? (
+      {loading || productsLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="overflow-hidden rounded-2xl border border-stone-100 bg-white">
@@ -671,20 +673,31 @@ export function BuyerShopPage() {
             </div>
           ))}
         </div>
-      ) : filteredAndSortedProducts.length === 0 ? (
+      ) : productsError ? (
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-stone-200 bg-white px-6 py-16 text-center shadow-xs">
+          <p className="m-0 text-base font-bold text-gray-900">Không tải được sản phẩm của gian hàng</p>
+          <button
+            type="button"
+            onClick={() => setProductsReload((n) => n + 1)}
+            className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-bold text-stone-700 hover:border-[#15803d] hover:text-[#15803d] cursor-pointer"
+          >
+            Thử lại
+          </button>
+        </div>
+      ) : products.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-3xl border border-stone-200 bg-white px-6 py-16 text-center shadow-xs">
           <span className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-stone-100 text-stone-400">
             <PackageSearch className="h-6 w-6" />
           </span>
           <p className="m-0 text-base font-bold text-gray-900">
-            {searchTerm ? 'Không tìm thấy sản phẩm phù hợp' : 'Gian hàng chưa có sản phẩm nào'}
+            {hasActiveFilter ? 'Không tìm thấy sản phẩm phù hợp' : 'Gian hàng chưa có sản phẩm nào'}
           </p>
           <p className="m-0 max-w-[42ch] text-sm text-stone-500">
-            {searchTerm
+            {hasActiveFilter
               ? 'Hãy thử tìm kiếm với từ khóa khác hoặc xóa bộ lọc để xem toàn bộ sản phẩm.'
               : 'Người bán chưa đăng sản phẩm, hoặc sản phẩm đang tạm ẩn khỏi marketplace.'}
           </p>
-          {searchTerm && (
+          {hasActiveFilter && (
             <button
               onClick={() => {
                 setSearchTerm('');
@@ -698,15 +711,15 @@ export function BuyerShopPage() {
         </div>
       ) : (
         <div>
-          {/* Vùng sản phẩm kết hợp 2 nút điều hướng bên trái và bên phải (không bao giờ đè lên sản phẩm) */}
+          {/* Vùng sản phẩm kết hợp 2 nút điều hướng bên trái và bên phải (từ sm trở lên) */}
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4 lg:gap-5">
-            {/* Nút mũi tên chuyển trang bên TRÁI */}
+            {/* Nút mũi tên chuyển trang bên TRÁI (từ sm trở lên, trên mobile chuyển xuống cụm phân trang dưới để không đè/ép sản phẩm) */}
             {totalPages > 1 && (
               <button
                 type="button"
                 disabled={currentPage === 1}
                 onClick={() => handlePageChange(currentPage - 1)}
-                className={`shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                className={`hidden sm:flex shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border items-center justify-center transition-all duration-200 ${
                   currentPage === 1
                     ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
                     : 'bg-white text-stone-700 border-stone-200 shadow-md hover:bg-[#15803d] hover:text-white hover:border-[#15803d] hover:scale-105 active:scale-95 cursor-pointer shadow-stone-200/50'
@@ -730,7 +743,7 @@ export function BuyerShopPage() {
                   const discountPct = hasDiscount
                     ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100)
                     : 0;
-                  const soldCount = p.soldCount ?? p.sold_count ?? (p.rank ? p.rank * 14 + 10 : 8);
+                  const soldCount = Number(p.soldCount ?? p.sold_count) || 0;
 
                   return (
                     <div
@@ -744,8 +757,9 @@ export function BuyerShopPage() {
                           src={
                             p.thumbnail ||
                             p.images?.[0] ||
-                            'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400'
+                            '/image-not-found.jpg'
                           }
+                          onError={(e) => { if (!e.currentTarget.src.endsWith('/image-not-found.jpg')) e.currentTarget.src = '/image-not-found.jpg'; }}
                           alt={p.title || p.name || 'Sản phẩm'}
                           loading="lazy"
                           decoding="async"
@@ -767,15 +781,23 @@ export function BuyerShopPage() {
                           </h3>
 
                           {/* Đánh giá sao & Đã bán */}
-                          <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-1.5">
-                            <div className="flex items-center gap-0.5 text-amber-500">
-                              <Star className="w-3.5 h-3.5 fill-current" />
-                              <span className="font-semibold text-stone-700 ml-0.5">
-                                {(p.rating || 5).toFixed(1)}
-                              </span>
-                            </div>
-                            <span>•</span>
-                            <span>Đã bán {soldCount}</span>
+                          <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-stone-500 mt-1.5">
+                            {(p.ratingCount ?? 0) > 0 ? (
+                              <div className="flex items-center gap-0.5 text-amber-500">
+                                <Star className="w-3.5 h-3.5 fill-current" />
+                                <span className="font-semibold text-stone-700 ml-0.5">
+                                  {(p.rating ?? 0).toFixed(1)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="italic text-stone-400">Chưa có đánh giá</span>
+                            )}
+                            {soldCount > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>Đã bán {soldCount.toLocaleString('vi-VN')}</span>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -797,13 +819,13 @@ export function BuyerShopPage() {
               </div>
             </div>
 
-            {/* Nút mũi tên chuyển trang bên PHẢI */}
+            {/* Nút mũi tên chuyển trang bên PHẢI (từ sm trở lên) */}
             {totalPages > 1 && (
               <button
                 type="button"
                 disabled={currentPage === totalPages}
                 onClick={() => handlePageChange(currentPage + 1)}
-                className={`shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                className={`hidden sm:flex shrink-0 w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full border items-center justify-center transition-all duration-200 ${
                   currentPage === totalPages
                     ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
                     : 'bg-white text-stone-700 border-stone-200 shadow-md hover:bg-[#15803d] hover:text-white hover:border-[#15803d] hover:scale-105 active:scale-95 cursor-pointer shadow-stone-200/50'
@@ -818,23 +840,55 @@ export function BuyerShopPage() {
 
           {/* Dấu chấm chuyển trang tinh tế và chỉ số trang phía dưới */}
           {totalPages > 1 && (
-            <div className="mt-8 flex flex-col items-center justify-center gap-2">
-              <div className="flex items-center gap-2">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => handlePageChange(p)}
-                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                      currentPage === p
-                        ? 'w-7 bg-[#15803d]'
-                        : 'w-2 bg-stone-300 hover:bg-stone-400'
-                    }`}
-                    aria-label={`Trang ${p}`}
-                    title={`Trang ${p}`}
-                  />
-                ))}
+            <div className="mt-8 flex flex-col items-center justify-center gap-3">
+              <div className="flex items-center gap-3">
+                {/* Trên màn hình nhỏ: nút chuyển trang đặt ở đây để không che hay ép sản phẩm */}
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={`sm:hidden w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                    currentPage === 1
+                      ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
+                      : 'bg-white text-stone-700 border-stone-200 shadow-sm active:scale-95 cursor-pointer'
+                  }`}
+                  aria-label="Trang trước"
+                >
+                  <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => handlePageChange(p)}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                        currentPage === p
+                          ? 'w-7 bg-[#15803d]'
+                          : 'w-2 bg-stone-300 hover:bg-stone-400'
+                      }`}
+                      aria-label={`Trang ${p}`}
+                      title={`Trang ${p}`}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={`sm:hidden w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-200 ${
+                    currentPage === totalPages
+                      ? 'opacity-25 cursor-not-allowed bg-stone-100 text-stone-300 border-stone-200'
+                      : 'bg-white text-stone-700 border-stone-200 shadow-sm active:scale-95 cursor-pointer'
+                  }`}
+                  aria-label="Trang sau"
+                >
+                  <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
               </div>
+
               <span className="text-xs text-stone-400 font-medium">
                 Trang {currentPage} / {totalPages} ({totalItems} sản phẩm)
               </span>

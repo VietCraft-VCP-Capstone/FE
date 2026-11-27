@@ -15,6 +15,15 @@ export interface ProductColorVariant {
   hex: string;
 }
 
+/** 1 dòng bảng phân loại: mẫu (set/lẻ/combo) × size, giá người bán nhận + kho riêng. */
+export interface ProductSkuRow {
+  option: string;
+  image?: string;
+  size?: string;
+  price: number;
+  stock: number;
+}
+
 export interface InventoryTrendPoint {
   date: string;
   stock: number;
@@ -27,6 +36,7 @@ export interface ProductItem {
   category: string;
   /** Tên các thẻ đang gắn — BE trả về từ product.tags. */
   tags?: string[];
+  materials?: string[];
   price: number;
   originalPrice?: number;
   stock: number;
@@ -49,6 +59,8 @@ export interface ProductItem {
     stock: number;
     mockupImage?: string;
   }[];
+  /** 'SKU' = seller khai bảng phân loại; không có = kiểu màu + chia đều kho. */
+  variantMode?: 'SKU';
   engagementTrend: number[]; // 5-7 data points for sparkline
   inventoryTrends: InventoryTrendPoint[]; // Timeline points for detail line chart
   /** BE luôn trả kèm (xem BE product.dto.ts: ProductItemResponseDTO.shopInfo). */
@@ -57,6 +69,7 @@ export interface ProductItem {
     name: string;
     logo?: string;
     rating: number;
+    ratingCount?: number;
   };
   sellerId?: string;
   rating?: number;
@@ -73,6 +86,8 @@ export interface CatalogOption {
   name: string;
   slug?: string;
   color?: string;
+  /** Chỉ có ở thẻ: số sản phẩm cùng nhóm danh mục đang dùng thẻ này. */
+  related_count?: number;
 }
 
 export interface ProductFormData {
@@ -82,6 +97,7 @@ export interface ProductFormData {
   categoryId: string;
   tagIds: string[];
   newTagNames?: string[];
+  materials?: string[];
   price: number;
   stock: number;
   sku: string;
@@ -93,6 +109,10 @@ export interface ProductFormData {
   images: string[];
   colors: ProductColorVariant[];
   sizes?: string[];
+  /** Có mảng này (kể cả rỗng) = đang dùng bảng phân loại thay cho màu. */
+  skus?: ProductSkuRow[];
+  /** ID ý tưởng mùa vụ (F38 Seasonal) nếu tạo sản phẩm từ gợi ý mùa vụ. */
+  source_idea_id?: string;
 }
 
 export type ProductSortOption = 

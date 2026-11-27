@@ -1,4 +1,5 @@
 import { Bold, Italic, List, ListOrdered, Link as LinkIcon, Minus, LucideIcon } from 'lucide-react';
+import { HINT } from './form/formUi';
 
 interface ProductFormDescriptionEditorProps {
   value: string;
@@ -33,37 +34,37 @@ export function ProductFormDescriptionEditor({ value, onChange }: ProductFormDes
   };
 
   return (
-    <div className="space-y-2 pt-2 border-t border-stone-100" data-focus-target="description">
-      <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider font-jakarta">
-        Mô tả chi tiết sản phẩm
-      </label>
-
-      <div className="flex items-center gap-1 p-1.5 bg-stone-100 border border-stone-200 rounded-t-xl">
-        {TOOLBAR.map((item, i) =>
-          item === 'divider' ? (
-            <span key={i} className="w-px h-4 bg-stone-300 mx-1" />
-          ) : (
-            <button
-              key={i}
-              type="button"
-              onClick={() => insertFormatting(item.prefix, item.suffix)}
-              className="p-1.5 text-stone-600 hover:bg-white rounded cursor-pointer"
-              title={item.title}
-            >
-              <item.icon size={14} />
-            </button>
-          )
-        )}
+    <div className="space-y-1.5" data-focus-target="description">
+      <div className="overflow-hidden rounded-lg border border-stone-300 bg-white transition-colors focus-within:border-[#007700] focus-within:ring-2 focus-within:ring-[#007700]/15">
+        <div className="flex items-center gap-0.5 border-b border-stone-200 bg-stone-50 px-2 py-1.5">
+          {TOOLBAR.map((item, i) =>
+            item === 'divider' ? (
+              <span key={i} className="mx-1 h-4 w-px bg-stone-300" />
+            ) : (
+              <button
+                key={i}
+                type="button"
+                onClick={() => insertFormatting(item.prefix, item.suffix)}
+                className="cursor-pointer rounded p-1.5 text-stone-600 hover:bg-stone-200 hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#007700]"
+                title={item.title}
+                aria-label={item.title}
+              >
+                <item.icon size={15} />
+              </button>
+            )
+          )}
+        </div>
+        <textarea
+          id={EDITOR_ID}
+          rows={7}
+          aria-label="Mô tả chi tiết sản phẩm"
+          placeholder="Kể về sản phẩm: chất liệu, kích thước, cách làm, cách bảo quản..."
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="block w-full resize-y p-3 text-sm leading-relaxed text-stone-900 placeholder:text-stone-400 focus:outline-none"
+        />
       </div>
-
-      <textarea
-        id={EDITOR_ID}
-        rows={4}
-        placeholder="Nhập mô tả chi tiết sản phẩm, chất liệu vải, công nghệ in ấn, bảng size..."
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full p-3.5 bg-stone-50/80 border border-stone-200 border-t-0 rounded-b-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700] resize-y"
-      />
+      <p className={`m-0 ${HINT}`}>Hỗ trợ định dạng Markdown. {value.trim().length} ký tự.</p>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
   dateTimeText,
   deadlineOf,
   executionOf,
+  isCodRefund,
   isVideoUrl,
   orderOf,
   refundAmountText,
@@ -51,6 +52,10 @@ export function SellerRefundRequestDrawer({
   const pod = item.product_type === 'POD';
   const execution = executionOf(item);
   const { date: deadline, overdue } = deadlineOf(item);
+  const cod = isCodRefund(item);
+  const approvedToast = cod
+    ? 'Đã duyệt. Hãy chuyển khoản hoàn cho khách rồi xác nhận mã giao dịch.'
+    : 'Đã duyệt yêu cầu, hệ thống đang hoàn tiền cho khách.';
   const canDecide = !pod && item.status === 'PENDING_SELLER';
   const images = (item.evidence || []).filter(url => !isVideoUrl(url));
   const videos = (item.evidence || []).filter(isVideoUrl);
@@ -60,7 +65,7 @@ export function SellerRefundRequestDrawer({
     setBusy(decision); setError('');
     try {
       await refundService.sellerDecision(item._id, decision, note.trim());
-      onUpdated(decision === 'APPROVE' ? 'Đã duyệt yêu cầu, hệ thống đang hoàn tiền cho khách.' : 'Đã từ chối yêu cầu hoàn tiền.');
+      onUpdated(decision === 'APPROVE' ? approvedToast : 'Đã từ chối yêu cầu hoàn tiền.');
     } catch (cause) {
       setError(getApiErrorMessage(cause, 'Không cập nhật được yêu cầu. Vui lòng thử lại.'));
     } finally {
@@ -135,8 +140,8 @@ export function SellerRefundRequestDrawer({
             </Popconfirm>
             <Popconfirm
               title="Duyệt và hoàn tiền?"
-              description={item.refund_type === 'FULL'
-                ? 'Hệ thống sẽ hoàn toàn bộ tiền đơn về tài khoản khách đã dùng để thanh toán.'
+              description={cod
+                ? `Bạn cần tự chuyển khoản ${refundAmountText(item)} cho khách sau khi duyệt, rồi nhập mã giao dịch.`
                 : `Hệ thống sẽ hoàn ${refundAmountText(item)} về tài khoản khách đã dùng để thanh toán.`}
               okText="Duyệt và hoàn tiền"
               cancelText="Quay lại"
@@ -152,7 +157,14 @@ export function SellerRefundRequestDrawer({
       ) : null}
     >
       <div className="space-y-6">
-        {execution === 'FAILED' || execution === 'NOT_STARTED' ? (
+        {cod && execution === 'NOT_STARTED' ? (
+          <Alert
+            type="info"
+            showIcon
+            title="Chờ bạn chuyển khoản hoàn cho khách"
+            description={`Đơn COD không hoàn tự động. Chuyển ${refundAmountText(item)} vào tài khoản khách bên dưới rồi nhập mã giao dịch.`}
+          />
+        ) : execution === 'FAILED' || execution === 'NOT_STARTED' ? (
           <Alert
             type="warning"
             showIcon
