@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { DistributionRuler } from '../../analytics/components/charts/MiniViz';
 import { ShoppingBag } from 'lucide-react';
 import { analyticsApi, SmartProductSuggestionResult } from '../../analytics/services/analyticsApi';
 import { netFromGross } from '../../../shared/utils/commission';
@@ -63,6 +64,8 @@ export function SmartProductAiModal({
   const [keywordIdea, setKeywordIdea] = useState(initialTitle);
   const [material, setMaterial] = useState(initialMaterial);
   const [loading, setLoading] = useState(false);
+  const [pricing, setPricing] = useState(false);
+  const [priceError, setPriceError] = useState<string | null>(null);
   const [data, setData] = useState<SmartProductSuggestionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,11 +83,11 @@ export function SmartProductAiModal({
   // Mô tả cho sửa ngay trong modal
   const [descDraft, setDescDraft] = useState('');
   const [loadingStep, setLoadingStep] = useState(0);
-  const [costInput, setCostInput] = useState(initialCost);
-  const unitCost = isPod ? blankCost : Number(costInput.replace(/\D/g, '')) || 0;
-  const needsCost = !isPod && unitCost <= 0;
-  const [marginInput, setMarginInput] = useState('30');
-  const marginRatio = Math.min(300, Math.max(0, Number(marginInput.replace(/[^\d.]/g, '')) || 0)) / 100;
+  const [costInput, setCostInput] = useState(initialCost.replace(/\D/g, ''));
+  const unitCost = isPod ? blankCost : Number(costInput) || 0;
+  // Giá vốn của lần gợi ý gần nhất: gõ giá vốn mới thì phải bấm "Gợi ý giá" mới hiện giá, không hiện số cũ
+  const [pricedCost, setPricedCost] = useState<number | null>(null);
+  const needsCost = !isPod && (unitCost <= 0 || unitCost !== pricedCost);
   // Hộp xác nhận khi "Áp dụng tất cả" sẽ thay tên/mô tả seller đã viết
   const [overwriteAsk, setOverwriteAsk] = useState(false);
 
@@ -95,6 +98,44 @@ export function SmartProductAiModal({
 
   // Huỷ lượt gọi trước khi gọi lượt mới: đổi danh mục nhanh thì phản hồi cũ về sau không được đè kết quả mới
   const inflightRef = useRef<AbortController | null>(null);
+
+  const priceRef = useRef<AbortController | null>(null);
+
+  /** Đổi giá vốn: chỉ tính lại giá, giữ nguyên tên, mô tả, thẻ seller đang chọn. */
+  const refreshPrice = useCallback(async () => {
+    if (!data || unitCost <= 0) return;
+    priceRef.current?.abort();
+    const controller = new AbortController();
+    priceRef.current = controller;
+    setPricing(true);
+    setPriceError(null);
+    try {
+      const matchedCat = categories.find(c => c._id === selectedCategory || c.name === selectedCategory);
+      const result = await analyticsApi.getSmartProductSuggestion({
+        category_id: selectedCategory,
+        category_name: matchedCat?.name || selectedCategory,
+        keywords: keywordIdea.trim(),
+        material: material.trim(),
+        blank_cost: unitCost,
+        product_type: isPod ? 'pod' : 'general',
+        commission_percent: commissionPercent ?? undefined,
+        pricing_only: true,
+      }, controller.signal);
+      if (result?.pricing_insight) {
+        setData(prev => (prev ? { ...prev, pricing_insight: result.pricing_insight } : result));
+        setPricedCost(unitCost);
+        setChosenPrice(result.pricing_insight.recommended_price);
+        setPriceChoice('rec');
+        setCustomPrice('');
+      }
+    } catch (err: any) {
+      if (controller.signal.aborted) return;
+      console.error('Failed to refresh AI price:', err);
+      setPriceError('Chưa tính được giá, vui lòng thử lại.');
+    } finally {
+      if (priceRef.current === controller) setPricing(false);
+    }
+  }, [data, unitCost, selectedCategory, keywordIdea, material, commissionPercent, isPod, categories]);
 
   const fetchSuggestion = useCallback(async (overrides?: { catId?: string; kw?: string; mat?: string }) => {
     inflightRef.current?.abort();
@@ -119,11 +160,11 @@ export function SmartProductAiModal({
         blank_cost: unitCost,
         product_type: isPod ? 'pod' : 'general',
         commission_percent: commissionPercent ?? undefined,
-        target_margin: !isPod && unitCost > 0 && marginRatio > 0 ? marginRatio : undefined,
       }, controller.signal);
 
       if (result) {
         setData(result);
+        setPricedCost(unitCost);
         if (result.suggested_titles?.length > 0) {
           setChosenTitle(result.suggested_titles[0]);
         }
@@ -165,7 +206,7 @@ export function SmartProductAiModal({
     } finally {
       if (inflightRef.current === controller) setLoading(false);
     }
-  }, [selectedCategory, keywordIdea, material, unitCost, marginRatio, commissionPercent, isPod, categories]);
+  }, [selectedCategory, keywordIdea, material, unitCost, commissionPercent, isPod, categories]);
 
   useEffect(() => {
     if (isOpen) {
@@ -554,34 +595,29 @@ export function SmartProductAiModal({
                       <input
                         type="text"
                         inputMode="numeric"
-                        value={costInput}
+                        value={costInput ? Number(costInput).toLocaleString('vi-VN') : ''}
                         aria-label="Giá vốn"
                         placeholder="Giá vốn / sản phẩm (đ), bắt buộc để gợi ý giá"
-                        onChange={e => { setCostInput(e.target.value); onCostChange?.(e.target.value); }}
-                        onKeyDown={e => { if (e.key === 'Enter' && unitCost > 0) fetchSuggestion(); }}
+                        onChange={e => {
+                          const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
+                          setCostInput(digits);
+                          onCostChange?.(digits);
+                        }}
+                        onKeyDown={e => { if (e.key === 'Enter' && unitCost > 0) refreshPrice(); }}
                         className="flex-1 px-3 py-2 rounded-xl border border-stone-200 text-xs focus:outline-none focus:border-emerald-400"
-                      />
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={marginInput}
-                        aria-label="Biên lãi mong muốn (%)"
-                        placeholder="Lãi %"
-                        onChange={e => setMarginInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && unitCost > 0) fetchSuggestion(); }}
-                        className="w-20 px-3 py-2 rounded-xl border border-stone-200 text-xs text-center focus:outline-none focus:border-emerald-400"
                       />
                       <button
                         type="button"
-                        onClick={() => fetchSuggestion()}
-                        disabled={unitCost <= 0 || loading}
+                        onClick={() => refreshPrice()}
+                        disabled={unitCost <= 0 || loading || pricing}
                         className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        {needsCost ? 'Gợi ý giá' : 'Cập nhật'}
+                        {pricing ? 'Đang tính...' : needsCost ? 'Gợi ý giá' : 'Cập nhật'}
                       </button>
                     </div>
                   )}
 
+                  {priceError && <p className="text-[11px] font-semibold text-rose-700">{priceError}</p>}
                   {needsCost ? null : data.pricing_insight.recommended_price <= 0 || data.pricing_insight.method === 'none' ? (
                     <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl text-center space-y-1.5">
                       <p className="text-xs font-bold text-stone-700">
@@ -670,6 +706,9 @@ export function SmartProductAiModal({
                           ...(median !== pi.recommended_price ? [{ key: 'p50' as const, label: 'Trung bình', sub: '', value: median }] : []),
                           { key: 'p75', label: 'Cao cấp', sub: profitSub('high'), value: pi.price_range.high },
                         ];
+                        // Dữ liệu ít thì nhiều mốc trùng giá: chỉ hiện mức khác nhau, luôn giữ "Gợi ý".
+                        const distinct = options.filter((o, i) => o.key === 'rec'
+                          || (o.value !== pi.recommended_price && options.findIndex(x => x.value === o.value) === i));
                         const shown = priceChoice === 'custom' ? (Number(customPrice) || 0) : chosenPrice;
                         // Lỗ khi số seller nhận (đã trừ phí sàn) không đủ trả giá phôi
                         const warn = shown > 0 && unitCost > 0 && netFor(shown) <= unitCost
@@ -684,8 +723,8 @@ export function SmartProductAiModal({
                             <span className="text-[10.5px] font-black text-stone-700 uppercase tracking-wider block">
                               Chọn mức giá bạn muốn
                             </span>
-                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                              {options.map(o => (
+                            <div className="grid grid-cols-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr gap-2">
+                              {distinct.map(o => (
                                 <button
                                   key={o.key}
                                   type="button"
@@ -702,10 +741,10 @@ export function SmartProductAiModal({
                                 <input
                                   type="text"
                                   inputMode="numeric"
-                                  placeholder="VD: 120000"
-                                  value={customPrice}
+                                  placeholder="VD: 120.000"
+                                  value={customPrice ? Number(customPrice).toLocaleString('vi-VN') : ''}
                                   onChange={e => {
-                                    const raw = e.target.value.replace(/\D/g, '');
+                                    const raw = e.target.value.replace(/\D/g, '').slice(0, 12);
                                     setCustomPrice(raw);
                                     selectPrice('custom', Number(raw) || 0);
                                   }}
@@ -715,6 +754,41 @@ export function SmartProductAiModal({
                               </div>
                             </div>
                             {warn && <p className="text-[11px] font-semibold text-amber-700">⚠ {warn}</p>}
+                            {(() => {
+                              const pts = pi.price_points || [];
+                              if (pts.length < 3 || shown <= 0) return null;
+                              const n = pts.length;
+                              const cheaper = pts.filter(p => p < shown).length;
+                              const pricier = pts.filter(p => p > shown).length;
+                              // Đếm số sản phẩm, không dùng %: chỉ vài sản phẩm thì "đắt hơn 100%" dễ hiểu nhầm
+                              const sentence = cheaper === n
+                                ? `Giá bạn chọn cao hơn tất cả ${n} sản phẩm tham khảo.`
+                                : pricier === n
+                                  ? `Giá bạn chọn thấp hơn tất cả ${n} sản phẩm tham khảo.`
+                                  : pricier >= cheaper
+                                    ? `Giá bạn chọn rẻ hơn ${pricier}/${n} sản phẩm tham khảo.`
+                                    : `Giá bạn chọn đắt hơn ${cheaper}/${n} sản phẩm tham khảo.`;
+                              // Vùng tô = giá phổ biến của chính các sản phẩm tham khảo (khoảng 25%–75%)
+                              const at = (q: number) => pts[Math.min(n - 1, Math.round(q * (n - 1)))];
+                              const bandLow = at(0.25);
+                              const bandHigh = at(0.75);
+                              return (
+                                <div className="pt-1">
+                                  <span className="text-[10.5px] font-black text-stone-700 uppercase tracking-wider block">Vị trí giá so với thị trường</span>
+                                  <DistributionRuler
+                                    min={Math.min(pts[0], shown, pi.recommended_price)}
+                                    max={Math.max(pts[n - 1], shown, pi.recommended_price)}
+                                    bandLow={bandLow}
+                                    bandHigh={bandHigh}
+                                    ticks={[
+                                      ...(shown !== pi.recommended_price ? [{ at: pi.recommended_price, label: 'Gợi ý', tone: 'muted' as const }] : []),
+                                      { at: shown, label: 'Giá của bạn', mine: true },
+                                    ]}
+                                  />
+                                  <p className="text-[11px] text-stone-600 -mt-4">{sentence} Vùng tô đậm là khoảng giá phổ biến của các sản phẩm này.</p>
+                                </div>
+                              );
+                            })()}
                           </div>
                         );
                       })()}
@@ -724,7 +798,7 @@ export function SmartProductAiModal({
                           <div className="p-3.5 bg-stone-50/80 border border-stone-200 rounded-2xl space-y-2">
                             <span className="text-[10.5px] font-black text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
                               <ShoppingBag size={12} className="text-stone-500" />
-                              Sản phẩm tương tự đang bán
+                              {data.pricing_insight.method === 'category_market' ? 'Sản phẩm cùng danh mục dùng để tính giá' : 'Sản phẩm tương tự đang bán'}
                             </span>
 
                             <div className="space-y-1.5">
@@ -734,10 +808,30 @@ export function SmartProductAiModal({
                                   className="flex items-center justify-between gap-3 p-2 bg-white rounded-xl border border-stone-200 text-xs shadow-2xs hover:border-emerald-200 transition"
                                 >
                                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                    <span className="font-semibold text-stone-800 truncate text-[11px]">
-                                      {item.title}
-                                    </span>
+                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.sold ? 'bg-emerald-500' : 'bg-stone-300'}`} />
+                                    <div className="min-w-0">
+                                      {item.url && /^(https?:\/\/|\/(?!\/))/.test(item.url) ? (
+                                        <a
+                                          href={item.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          title="Mở sản phẩm trong tab mới"
+                                          className="font-semibold text-stone-800 truncate text-[11px] block hover:text-emerald-700 hover:underline"
+                                        >
+                                          {item.title} ↗
+                                        </a>
+                                      ) : (
+                                        <span className="font-semibold text-stone-800 truncate text-[11px] block">
+                                          {item.title}
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] text-stone-500 block">
+                                        {[
+                                          item.sold ? `Đã bán ${item.sold.toLocaleString('vi-VN')}` : 'Chưa có số liệu bán',
+                                          item.similarity != null ? `giống ${Math.round(item.similarity * 100)}%` : '',
+                                        ].filter(Boolean).join(' · ')}
+                                      </span>
+                                    </div>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
                                     <span className="font-black text-emerald-700 text-xs bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
@@ -748,7 +842,10 @@ export function SmartProductAiModal({
                                         ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                         : 'bg-sky-50 text-sky-800 border-sky-200'
                                     }`}>
-                                      {item.source?.toLowerCase().includes('vietcraft') ? 'VietCraft' : 'Sàn khác'}
+                                      {(() => {
+                                        const s = item.source?.toLowerCase() || '';
+                                        return s.includes('vietcraft') ? 'VietCraft' : s.includes('tiki') ? 'Tiki' : s.includes('etsy') ? 'Etsy' : 'Sàn khác';
+                                      })()}
                                     </span>
                                   </div>
                                 </div>
@@ -757,16 +854,6 @@ export function SmartProductAiModal({
                           </div>
                         )}
 
-                      {/* Warnings if any */}
-                      {data.pricing_insight.warnings && data.pricing_insight.warnings.length > 0 && (
-                        <div className="p-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl space-y-1">
-                          {data.pricing_insight.warnings.map((w, wIdx) => (
-                            <p key={wIdx} className="text-[11px] font-medium text-amber-900 leading-tight">
-                              • {w}
-                            </p>
-                          ))}
-                        </div>
-                      )}
                     </>
                   )}
                 </div>

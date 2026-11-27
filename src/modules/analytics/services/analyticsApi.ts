@@ -89,6 +89,8 @@ export const analyticsApi = {
     target_margin?: number;
     /** % hoa hồng sàn: AI dùng để tính giá sàn không bán lỗ và tiền lời sau phí */
     commission_percent?: number;
+    /** Chỉ tính lại giá, không viết lại tên/mô tả */
+    pricing_only?: boolean;
   }, signal?: AbortSignal) {
     const res = await api.post(`${BASE}/product/smart-suggestion`, params, { signal });
     return res.data?.data;
@@ -198,7 +200,13 @@ export interface SmartProductSuggestionResult {
       similarity?: number;
       source?: string;
       segment?: string;
+      /** Số đã bán (0 nếu nguồn không có số liệu) */
+      sold?: number;
+      /** Link xem sản phẩm: Tiki/Etsy là link đầy đủ, sàn VietCraft là /product/<id> */
+      url?: string | null;
     }>;
+    /** Giá của các sản phẩm làm căn cứ, đã sắp xếp: vẽ thước vị trí giá */
+    price_points?: number[];
     market_signals?: string[];
     /** Có giá vốn: lãi và biên của từng mức giá, vị thế so với thị trường */
     cost_analysis?: {
