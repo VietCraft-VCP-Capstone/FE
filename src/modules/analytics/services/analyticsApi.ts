@@ -1,4 +1,24 @@
 import api from '../../../infrastructure/api/interceptors';
+
+/** Kỳ dịp của kế hoạch mùa vụ: mã dịp + năm của ngày lễ (BE lưu theo collection seasonal_plans). */
+export interface SeasonalPlanRef {
+  camp_id: string;
+  event_year: number;
+}
+
+/** Kỳ dịp của một chiến dịch lấy từ ngày lễ của chính kỳ đó (Noel 2026 vẫn là 2026 khi xem vào tháng 1/2027). */
+export function planRefOf(camp?: { id?: string; occasion_window?: { peak_date?: string }; launch_window?: { peak_date?: string } } | null): SeasonalPlanRef | null {
+  if (!camp?.id) return null;
+  const iso = camp.occasion_window?.peak_date || camp.launch_window?.peak_date || '';
+  const year = Number(String(iso).slice(0, 4));
+  return Number.isInteger(year) && year >= 2020 ? { camp_id: camp.id, event_year: year } : null;
+}
+
+/** Câu báo lỗi cho các thao tác lưu kế hoạch mùa vụ: ưu tiên `message` BE trả về (vd. đang xem gian hàng mẫu). */
+export function seasonalSaveError(err: unknown, fallback: string): string {
+  const msg = (err as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
+  return typeof msg === 'string' && msg ? msg : fallback;
+}
 import type { HealthStatus, InsightContext, InsightEnvelope, ShopSearchResult } from '../types';
 import type { ListingHealthList } from '../healthTypes';
 import type { HealthDraftBody, HealthPreview, ListingHealth, PreviewInputs } from '../healthTypes';
@@ -95,13 +115,13 @@ export const analyticsApi = {
   },
 
   /** Lưu hoặc bỏ lưu ý tưởng sản phẩm theo dịp vào database gian hàng */
-  async saveSeasonalIdea(ideaId: string): Promise<{ success: boolean; saved_ideas: string[] }> {
-    const res = await api.post(`${BASE}/forecast/seasonal/save-idea`, { idea_id: ideaId });
+  async saveSeasonalIdea(ideaId: string, plan: SeasonalPlanRef): Promise<{ success: boolean; saved_ideas: string[] }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/save-idea`, { idea_id: ideaId, ...plan });
     return res.data;
   },
 
   /** Lưu bản chỉnh sửa trực tiếp của seller cho ý tưởng mùa vụ */
-  async saveSeasonalIdeaDraft(payload: {
+  async saveSeasonalIdeaDraft(payload: SeasonalPlanRef & {
     idea_id: string;
     title: string;
     concept: string;
@@ -113,8 +133,7 @@ export const analyticsApi = {
   },
 
   /** Lưu đánh giá thành quả sau dịp của seller */
-  async saveSeasonalReview(payload: {
-    camp_id: string;
+  async saveSeasonalReview(payload: SeasonalPlanRef & {
     rating: 'good' | 'neutral' | 'poor';
     note: string;
   }): Promise<{ success: boolean; occasion_reviews: Record<string, any> }> {
@@ -123,8 +142,8 @@ export const analyticsApi = {
   },
 
   /** Cập nhật tiến độ checklist mốc thời gian vào database gian hàng */
-  async toggleSeasonalMilestone(milestoneIdx: number, isDone: boolean, campId?: string, ideaId?: string): Promise<{ success: boolean; checked_milestones: Record<string, boolean> }> {
-    const res = await api.post(`${BASE}/forecast/seasonal/milestone`, { milestone_idx: milestoneIdx, is_done: isDone, camp_id: campId, idea_id: ideaId });
+  async toggleSeasonalMilestone(milestoneIdx: number, isDone: boolean, plan: SeasonalPlanRef, ideaId?: string): Promise<{ success: boolean; checked_milestones: Record<string, boolean> }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/milestone`, { milestone_idx: milestoneIdx, is_done: isDone, idea_id: ideaId, ...plan });
     return res.data;
   },
 

@@ -16,7 +16,7 @@ import {
 import type { OpportunityKeywordItem } from '../../types';
 import type { Evidence } from '../../types/evidence';
 import { money } from '../../../../shared/utils/format';
-import { analyticsApi } from '../../services/analyticsApi';
+import { analyticsApi, seasonalSaveError } from '../../services/analyticsApi';
 
 interface Props {
   keywords: OpportunityKeywordItem[];
@@ -223,8 +223,8 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
           : `Thẻ «${kw.tag}» đã có sẵn trên sản phẩm${targetSummary}`
       );
       setTimeout(() => setCopyNotice(null), 4000);
-    } catch {
-      setCopyNotice(`Không thể gắn thẻ «${kw.tag}» tự động (kiểm tra backend đã restart chưa). Đã sao chép thẻ vào bộ nhớ tạm.`);
+    } catch (err) {
+      setCopyNotice(`${seasonalSaveError(err, `Không thể gắn thẻ «${kw.tag}» tự động.`)} Đã sao chép thẻ vào bộ nhớ tạm.`);
       navigator.clipboard?.writeText(kw.tag);
       setTimeout(() => setCopyNotice(null), 4000);
     } finally {

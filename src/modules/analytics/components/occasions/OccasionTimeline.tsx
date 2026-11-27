@@ -25,6 +25,16 @@ const PHASE_LABELS: Record<string, { label: string; icon: ReactNode; tone: 'bran
     icon: <Flame size={14} />,
     tone: 'warn',
   },
+  last_call: {
+    label: 'Pha 4: Sát lễ (Chỉ bán hàng có sẵn, giao nhanh)',
+    icon: <Clock size={14} />,
+    tone: 'bad',
+  },
+  post_event: {
+    label: 'Pha 5: Sau lễ (Xem kết quả & đánh giá)',
+    icon: <CheckCircle2 size={14} />,
+    tone: 'neutral',
+  },
   cut_off_passed: {
     label: 'Pha 4: Đã qua hạn chót (Ngừng nhận đơn dịp này)',
     icon: <Clock size={14} />,
@@ -153,21 +163,24 @@ export function OccasionTimeline({ window: ow, className = '' }: OccasionTimelin
 
           {/* Phase 4 */}
           <div className={`rounded border p-2.5 text-xs transition-colors ${
-            ow.current_phase === 'cut_off_passed'
+            ow.current_phase === 'cut_off_passed' || ow.current_phase === 'last_call'
               ? 'border-red-400 bg-red-50/50 ring-1 ring-red-400'
               : 'border-stone-200 bg-stone-50/70 text-stone-600'
           }`}>
             <div className="flex items-center justify-between text-[11px] font-semibold text-stone-500">
               <span>PHA 4: HẠN CHÓT ĐƠN</span>
-              <Flag size={13} className={ow.current_phase === 'cut_off_passed' ? 'text-red-600' : ''} />
+              <Flag size={13} className={ow.current_phase === 'cut_off_passed' || ow.current_phase === 'last_call' ? 'text-red-600' : ''} />
             </div>
-            <div className="mt-1 font-bold text-stone-900">Ngừng nhận đơn</div>
+            <div className="mt-1 font-bold text-stone-900">Hết nhận đơn làm theo yêu cầu</div>
             <div className="mt-1 text-[11px] font-semibold text-red-700">
               Trước {shortDate(ow.cut_off_date)}
             </div>
             <div className="mt-1.5 text-[10.5px] leading-tight text-stone-600">
-              Đóng cổng nhận đơn sự kiện. Đảm bảo giao hàng kịp ngày {shortDate(ow.peak_date)}.
+              Sau mốc này chỉ bán hàng có sẵn và giao nhanh để khách nhận kịp ngày {shortDate(ow.peak_date)}.
             </div>
+            {ow.cut_off_note && (
+              <div className="mt-1.5 text-[10.5px] font-semibold leading-tight text-amber-700">{ow.cut_off_note}</div>
+            )}
           </div>
         </div>
       </div>

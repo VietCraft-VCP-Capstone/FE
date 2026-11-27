@@ -626,7 +626,12 @@ export interface OccasionWindow {
   traction_start: string;
   peak_start: string;
   cut_off_date: string;
-  current_phase: 'rd_sprint' | 'traction' | 'peak' | 'cut_off_passed' | 'upcoming';
+  /** last_call: sau hạn chốt đơn thường tới ngày lễ; post_event: tối đa 14 ngày sau lễ để xem kết quả */
+  current_phase: 'rd_sprint' | 'traction' | 'peak' | 'last_call' | 'post_event' | 'cut_off_passed' | 'upcoming';
+  days_since_event?: number;
+  post_event_end?: string | null;
+  /** vd. hạn chốt bị dời sớm vì hãng vận chuyển nghỉ Tết */
+  cut_off_note?: string | null;
   days_to_peak: number;
   days_to_cutoff: number;
   status: 'active' | 'upcoming' | 'passed';
@@ -948,7 +953,35 @@ export interface RevenueScenarioItem {
   condition_note: string;
 }
 
+/** Cách tính mục tiêu đơn của dịp (BE `seasonal-math.ts`). */
+export interface CampaignTargetBasis {
+  /** nhịp đơn hợp lệ/ngày TRƯỚC kỳ dịp */
+  daily_rate: number | null;
+  rate_window_days: number;
+  baseline_orders?: number;
+  baseline_days?: number;
+  /** mốc kết thúc khoảng nền = ngày mở bán của dịp (ISO) */
+  baseline_end?: string;
+  /** tên các dịp khác có kỳ bán trùng khoảng nền */
+  baseline_overlaps?: string[];
+  window_days: number;
+  uplift: number | null;
+  uplift_source: 'deep_model' | 'search_interest' | null;
+  /** độ nâng LƯỢT TÌM KIẾM của dịp (tham khảo, không nhân vào số đơn) */
+  search_uplift?: number | null;
+  missing: 'baseline_history' | 'baseline_orders' | 'uplift' | null;
+}
+
+/** Đơn trong kỳ dịp chia theo trạng thái (BE `orderStatusBreakdown`). */
+export interface OrderStatusBreakdown {
+  delivered: number;
+  shipping: number;
+  processing: number;
+  cod_unpaid: number;
+}
+
 export interface CampaignFunnel {
+  target_basis?: CampaignTargetBasis;
   impressions?: number | null;
   clicks?: number | null;
   views?: number | null;
@@ -968,6 +1001,9 @@ export interface CampaignFunnel {
   tracking_stages?: string[];
   actual?: {
     orders: number;
+    direct_orders?: number;
+    halo_orders?: number;
+    status_breakdown?: OrderStatusBreakdown;
     gmv_vnd?: number;
     orders_progress_pct?: number;
     remaining_orders?: number;
@@ -1060,6 +1096,8 @@ export interface SeasonalForecast {
   seller_shop_name?: string;
   seller_category?: { slug: string; name: string };
   is_live_shop?: boolean;
+  /** false: đang xem gian hàng mẫu dùng chung, không lưu được kế hoạch */
+  can_save_plan?: boolean;
   ready_to_ship_ideas?: ReadyToShipIdea[];
   pod_blanks?: PodBlankSuggestion[];
   opportunity_clusters?: any[];

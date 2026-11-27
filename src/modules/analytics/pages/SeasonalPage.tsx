@@ -15,7 +15,7 @@ import { OpportunityKeywordTable } from '../components/seasonal/OpportunityKeywo
 import { CampaignFunnelCard } from '../components/seasonal/CampaignFunnelCard';
 import { ApplyPlaybookCard } from '../components/seasonal/ApplyPlaybookCard';
 import { SeasonalImpactCard } from '../components/seasonal/SeasonalImpactCard';
-import { analyticsApi } from '../services/analyticsApi';
+import { analyticsApi, planRefOf, seasonalSaveError, type SeasonalPlanRef } from '../services/analyticsApi';
 
 // Hub components (Khối A-H)
 import { HubActionFeed, type UnifiedOccasionAction } from '../components/seasonal/hub/HubActionFeed';
@@ -119,24 +119,42 @@ export function SeasonalPage() {
     }
   }, [state]);
 
+  // Kỳ dịp (mã + năm của ngày lễ) để lưu kế hoạch đúng kỳ; không có campId thì là dịp đang xem
+  const planRefFor = (campId?: string): SeasonalPlanRef | null => {
+    const d = lastReadyDataRef.current?.data;
+    if (!d) return null;
+    const camp = campId ? (d.all_campaigns || []).find(c => c.id === campId) : d.active_campaign;
+    return planRefOf(camp);
+  };
+
   const toggleSaveIdea = async (key: string) => {
+    const plan = planRefFor();
+    if (!plan) {
+      setSaveError('Chưa xác định được dịp đang xem, vui lòng tải lại trang.');
+      return;
+    }
     const prevSnapshot = { ...savedIdeas };
     setSaveError(null);
     setSavedIdeas(prev => ({ ...prev, [key]: !prev[key] }));
     try {
-      const res = await analyticsApi.saveSeasonalIdea(key);
+      const res = await analyticsApi.saveSeasonalIdea(key, plan);
       if (!res?.success) {
         setSavedIdeas(prevSnapshot);
         setSaveError('Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.');
       }
-    } catch {
+    } catch (err) {
       setSavedIdeas(prevSnapshot);
-      setSaveError('Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.');
+      setSaveError(seasonalSaveError(err, 'Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.'));
     }
   };
 
   const toggleMilestone = async (idx: number, nextVal?: boolean, ideaId?: string) => {
-    const campId = currentCampaignId || '';
+    const plan = planRefFor();
+    if (!plan) {
+      setSaveError('Chưa xác định được dịp đang xem, vui lòng tải lại trang.');
+      return;
+    }
+    const campId = plan.camp_id;
     const keyParts = [];
     if (campId) keyParts.push(campId);
     if (ideaId) keyParts.push(ideaId);
@@ -152,32 +170,37 @@ export function SeasonalPage() {
       [String(idx)]: val,
     }));
     try {
-      const res = await analyticsApi.toggleSeasonalMilestone(idx, val, campId || undefined, ideaId);
+      const res = await analyticsApi.toggleSeasonalMilestone(idx, val, plan, ideaId);
       if (!res?.success) {
         setCheckedMilestones(prevSnapshot);
         setSaveError('Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.');
       }
-    } catch {
+    } catch (err) {
       setCheckedMilestones(prevSnapshot);
-      setSaveError('Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.');
+      setSaveError(seasonalSaveError(err, 'Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.'));
     }
   };
 
   const handleToggleCampMilestone = async (campId: string, stageIdx: number) => {
+    const plan = planRefFor(campId);
+    if (!plan) {
+      setSaveError('Chưa xác định được kỳ của dịp này, vui lòng tải lại trang.');
+      return;
+    }
     const key = `${campId}_${stageIdx}`;
     const nextVal = !checkedMilestones[key];
     const prevSnapshot = { ...checkedMilestones };
     setSaveError(null);
     setCheckedMilestones(prev => ({ ...prev, [key]: nextVal }));
     try {
-      const res = await analyticsApi.toggleSeasonalMilestone(stageIdx, nextVal, campId);
+      const res = await analyticsApi.toggleSeasonalMilestone(stageIdx, nextVal, plan);
       if (!res?.success) {
         setCheckedMilestones(prevSnapshot);
         setSaveError('Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.');
       }
-    } catch {
+    } catch (err) {
       setCheckedMilestones(prevSnapshot);
-      setSaveError('Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.');
+      setSaveError(seasonalSaveError(err, 'Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.'));
     }
   };
 
@@ -612,6 +635,11 @@ export function SeasonalPage() {
                   Đang cập nhật dữ liệu mới cho dịp đã chọn...
                 </div>
               )}
+              {data.can_save_plan === false && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
+                  Bạn đang xem gian hàng mẫu nên chỉ xem được, chưa lưu được ý tưởng hay tiến độ. Hãy mở gian hàng để lập kế hoạch của riêng bạn.
+                </div>
+              )}
               {saveError && (
                 <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800">
                   <span>{saveError}</span>
@@ -776,6 +804,7 @@ export function SeasonalPage() {
                       </h4>
                     </div>
                     <SeasonalPotentialTab
+                      planRef={planRefOf(activeCamp)}
                       readyIdeas={readyIdeas}
                       podBlanks={podBlanks}
                       aiIdeas={aiIdeas}
@@ -849,6 +878,7 @@ export function SeasonalPage() {
                     impact={data.impact}
                     occasionName={activeCamp.name}
                     campId={activeCamp.id}
+                    planRef={planRefOf(activeCamp)}
                     savedIdeaTitles={savedIdeaItems.map(x => x.title)}
                     appliedSummary={{
                       selectedIdeasCount: savedIdeaItems.length,

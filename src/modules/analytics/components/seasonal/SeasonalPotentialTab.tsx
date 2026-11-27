@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import type { PodBlankSuggestion, PotentialProfile, ReadyToShipIdea } from '../../types';
-import { analyticsApi } from '../../services/analyticsApi';
+import { analyticsApi, seasonalSaveError, type SeasonalPlanRef } from '../../services/analyticsApi';
 
 export interface AiShopIdea {
   id: string;
@@ -52,6 +52,8 @@ export interface SavedIdeaDraftMap {
 }
 
 interface SeasonalPotentialTabProps {
+  /** kỳ dịp (mã + năm) để lưu bản nháp đúng kỳ */
+  planRef?: SeasonalPlanRef | null;
   readyIdeas: ReadyToShipIdea[];
   podBlanks: PodBlankSuggestion[];
   aiIdeas?: AiShopIdea[];
@@ -67,6 +69,7 @@ interface SeasonalPotentialTabProps {
 }
 
 export function SeasonalPotentialTab({
+  planRef,
   readyIdeas,
   podBlanks,
   aiIdeas = [],
@@ -150,7 +153,9 @@ export function SeasonalPotentialTab({
       .map(s => s.trim())
       .filter(Boolean);
     try {
+      if (!planRef) throw new Error('missing_plan_ref');
       await analyticsApi.saveSeasonalIdeaDraft({
+        ...planRef,
         idea_id: editingIdea.id,
         title: editingIdea.title,
         concept: editingIdea.concept,
@@ -171,8 +176,8 @@ export function SeasonalPotentialTab({
       }
       setDraftNotice(`Đã lưu bản chỉnh sửa ý tưởng «${editingIdea.title}».`);
       setTimeout(() => setDraftNotice(null), 3000);
-    } catch {
-      setDraftNotice('Không thể lưu bản sửa lúc này (kiểm tra kết nối backend).');
+    } catch (err) {
+      setDraftNotice(seasonalSaveError(err, 'Không thể lưu bản sửa lúc này.'));
       setTimeout(() => setDraftNotice(null), 3500);
     } finally {
       setSavingDraft(false);
@@ -187,7 +192,9 @@ export function SeasonalPotentialTab({
       .map(s => s.trim())
       .filter(Boolean);
     try {
+      if (!planRef) throw new Error('missing_plan_ref');
       await analyticsApi.saveSeasonalIdeaDraft({
+        ...planRef,
         idea_id: editingIdea.id,
         title: editingIdea.title,
         concept: editingIdea.concept,
@@ -397,8 +404,9 @@ export function SeasonalPotentialTab({
                               tags: displayTags,
                             },
                           }));
-                          analyticsApi
+                          if (planRef) analyticsApi
                             .saveSeasonalIdeaDraft({
+                              ...planRef,
                               idea_id: ai.id,
                               title: displayTitle,
                               concept: displayConcept,

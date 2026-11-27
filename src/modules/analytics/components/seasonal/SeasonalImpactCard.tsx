@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { TrendingUp, CheckCircle2, Info, BarChart3, MessageSquare } from 'lucide-react';
 import type { SeasonalImpact } from '../../types';
 import { money } from '../../../../shared/utils/format';
-import { analyticsApi } from '../../services/analyticsApi';
+import { analyticsApi, seasonalSaveError, type SeasonalPlanRef } from '../../services/analyticsApi';
 
 export interface IdeaProgressItem {
   id: string;
@@ -29,6 +29,8 @@ interface Props {
   impact?: SeasonalImpact;
   occasionName: string;
   campId?: string;
+  /** kỳ dịp (mã + năm) để lưu đánh giá đúng kỳ */
+  planRef?: SeasonalPlanRef | null;
   savedIdeaTitles?: string[];
   appliedSummary?: AppliedSummary;
   initialReview?: { rating?: 'good' | 'neutral' | 'poor'; note?: string; updated_at?: string };
@@ -38,6 +40,7 @@ export function SeasonalImpactCard({
   impact,
   occasionName,
   campId,
+  planRef,
   savedIdeaTitles = [],
   appliedSummary,
   initialReview,
@@ -53,14 +56,14 @@ export function SeasonalImpactCard({
   }, [initialReview?.rating, initialReview?.note, campId]);
 
   const handleSaveReview = async () => {
-    if (!campId) return;
+    if (!campId || !planRef) return;
     setSaving(true);
     try {
-      await analyticsApi.saveSeasonalReview({ camp_id: campId, rating, note });
+      await analyticsApi.saveSeasonalReview({ ...planRef, rating, note });
       setReviewMsg('Đã lưu đánh giá thành quả cho dịp này.');
       setTimeout(() => setReviewMsg(null), 3000);
-    } catch {
-      setReviewMsg('Không thể lưu đánh giá lúc này.');
+    } catch (err) {
+      setReviewMsg(seasonalSaveError(err, 'Không thể lưu đánh giá lúc này.'));
       setTimeout(() => setReviewMsg(null), 3000);
     } finally {
       setSaving(false);
@@ -96,7 +99,7 @@ export function SeasonalImpactCard({
         </div>
         <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
           {impact.status === 'measured'
-            ? 'Đo trực tiếp từ đơn hoàn tất'
+            ? 'Đo trực tiếp từ đơn hợp lệ (không gồm hủy, hoàn tiền)'
             : impact.status === 'projected'
             ? 'Dự phóng từ nền 8 tuần × Mô hình'
             : 'Chưa đủ dữ liệu nền'}
@@ -186,7 +189,7 @@ export function SeasonalImpactCard({
           <div>
             <strong>Chưa đủ đơn nền 8 tuần trước dịp để dựng kịch bản phản thực (counterfactual).</strong>
             <p className="mt-1 mb-0 text-amber-900/90">
-              Hệ thống cần đơn hàng hoàn tất trong 8 tuần trước cửa sổ sự kiện để ước lượng mức đơn nếu không áp dụng ý tưởng. Khi shop phát sinh đơn, bảng đối chứng sẽ tự động cập nhật.
+              Hệ thống cần đơn hợp lệ trong 8 tuần trước cửa sổ sự kiện để ước lượng mức đơn nếu không áp dụng ý tưởng. Khi shop phát sinh đơn, bảng đối chứng sẽ tự động cập nhật.
             </p>
           </div>
         </div>
@@ -351,7 +354,7 @@ export function SeasonalImpactCard({
           />
           <button
             type="button"
-            disabled={saving || !campId}
+            disabled={saving || !campId || !planRef}
             onClick={handleSaveReview}
             className="shrink-0 rounded-lg bg-[#007700] px-4 py-2 text-xs font-bold text-white hover:bg-[#005B00] transition-colors"
           >

@@ -102,6 +102,36 @@ export const CampaignFunnelCard: React.FC<Props> = ({
       : totalActualOrdersFromChannels;
 
   const targetOrders = typeof currentFunnel.orders === 'number' && currentFunnel.orders > 0 ? currentFunnel.orders : 0;
+  const basis = currentFunnel.target_basis;
+  const baselineEnd = basis?.baseline_end ? new Date(basis.baseline_end).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) : 'ngày mở bán';
+  const targetNote = !basis
+    ? null
+    : basis.missing === 'baseline_history'
+      ? `Chưa có mức ngày thường: shop cần ít nhất 14 ngày có đơn trước ngày mở bán (${baselineEnd}).`
+      : basis.missing === 'baseline_orders'
+        ? `Chưa có mức ngày thường: trước ${baselineEnd} shop mới có ${basis.baseline_orders ?? 0} đơn, cần ít nhất 5 đơn.`
+        : basis.missing === 'uplift'
+          ? 'Chưa có mức ngày thường cho dịp này.'
+          : basis.daily_rate != null
+            ? `Mức ngày thường = ${basis.daily_rate.toLocaleString('vi-VN')} đơn/ngày (${basis.baseline_orders ?? '?'} đơn trong ${basis.baseline_days ?? '?'} ngày trước ${baselineEnd}) × ${basis.window_days} ngày.`
+              + (basis.search_uplift != null
+                ? ` Tham khảo: lượt tìm kiếm dịp này gấp ${basis.search_uplift.toLocaleString('vi-VN')} lần ngày thường (lượt tìm, không phải số đơn).`
+                : '')
+            : null;
+  const baselineOverlapNote = basis && basis.missing == null && basis.baseline_overlaps?.length
+    ? `Lưu ý: khoảng ngày thường dùng làm nền trùng kỳ bán của ${basis.baseline_overlaps.join(', ')}, nên mục tiêu có thể đang cao hơn mức thực tế.`
+    : null;
+  const statusBreakdown = currentFunnel.actual?.status_breakdown;
+  const directOrders = currentFunnel.actual?.direct_orders;
+  const ordersBreakdownNote = statusBreakdown && actualOrders > 0
+    ? [
+        `Đã giao ${statusBreakdown.delivered}`,
+        `Đang giao ${statusBreakdown.shipping}`,
+        `Đang xử lý ${statusBreakdown.processing}`,
+        statusBreakdown.cod_unpaid > 0 ? `COD chưa thu tiền ${statusBreakdown.cod_unpaid}` : null,
+        typeof directOrders === 'number' ? `Đúng hàng của dịp ${directOrders}/${actualOrders}` : null,
+      ].filter(Boolean).join(' · ')
+    : null;
   const targetViews =
     typeof currentFunnel.views === 'number' && currentFunnel.views > 0
       ? currentFunnel.views
@@ -180,10 +210,10 @@ export const CampaignFunnelCard: React.FC<Props> = ({
 
   const funnelEvidence: Evidence = {
     id: 'ev_campaign_funnel',
-    definition: `Phễu chuyển đổi 3 tầng thực tế cho dịp ${occasionName}: Lượt xem sản phẩm (view) ➔ Thêm giỏ hàng (add_to_cart) ➔ Đơn hàng hoàn tất (orders).`,
+    definition: `Phễu chuyển đổi 3 tầng thực tế cho dịp ${occasionName}: Lượt xem sản phẩm (view) ➔ Thêm giỏ hàng (add_to_cart) ➔ Đơn đặt trong kỳ dịp (orders, tính từ ngày mở bán tới ngày lễ, không gồm đơn hủy/hoàn tiền).`,
     sources: ['Bảng sự kiện thực tế product_events (view, add_to_cart)', 'Bảng đơn hàng thực tế orders (loại đơn mô phỏng)'],
     howObtained:
-      'Đếm trực tiếp số event `view` và `add_to_cart` của các sản phẩm thuộc shop trong cửa sổ dịp và đối chiếu với số đơn hoàn tất thực tế. Không suy ngược lượt hiển thị (impression) giả định.',
+      'Đếm trực tiếp số event `view` và `add_to_cart` của các sản phẩm thuộc shop trong kỳ dịp và đối chiếu với số đơn đặt hợp lệ trong cùng kỳ. Không suy ngược lượt hiển thị (impression) giả định.',
     period: [windowStart, windowEnd],
     n: actualViews + actualOrders,
     formula:
@@ -303,8 +333,8 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             Đo thực tế:{' '}
             <strong className="font-semibold text-stone-900">{actualViews.toLocaleString('vi-VN')} lượt xem</strong> ➔{' '}
             <strong className="font-semibold text-stone-900">{actualCartAdds.toLocaleString('vi-VN')} thêm giỏ</strong> ➔{' '}
-            <strong className="font-semibold text-[#007700]">{actualOrders.toLocaleString('vi-VN')} đơn hoàn tất</strong>
-            {targetOrders > 0 && <> (mục tiêu {targetOrders.toLocaleString('vi-VN')} đơn)</>}
+            <strong className="font-semibold text-[#007700]">{actualOrders.toLocaleString('vi-VN')} đơn trong kỳ</strong>
+            {targetOrders > 0 && <> (ngày thường {targetOrders.toLocaleString('vi-VN')} đơn)</>}
             {realCartRatePct !== null && (
               <>
                 {' '}· Tỷ lệ thêm giỏ <strong className="font-semibold text-stone-900">{realCartRatePct}%</strong>
@@ -322,7 +352,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             Chưa ghi nhận lượt xem, lượt thêm giỏ hay đơn hàng thực tế trong cửa sổ dịp {occasionName}
             {targetOrders > 0 ? (
               <>
-                {' '}· Kỳ vọng theo nhịp đơn shop: <strong className="font-semibold text-[#007700]">{targetOrders.toLocaleString('vi-VN')} đơn</strong>.
+                {' '}· Nếu bán như ngày thường: <strong className="font-semibold text-[#007700]">{targetOrders.toLocaleString('vi-VN')} đơn</strong>.
               </>
             ) : (
               '. Dữ liệu sẽ tự cập nhật ngay khi có khách xem sản phẩm hoặc phát sinh đơn.'
@@ -435,24 +465,26 @@ export const CampaignFunnelCard: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Tầng 3: Đơn hàng hoàn tất */}
+        {/* Tầng 3: Đơn đặt trong kỳ dịp (không gồm hủy/hoàn tiền) */}
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-2 text-xs">
-            <span className="font-medium text-stone-700">3. Đơn hàng hoàn tất</span>
+            <span className="font-medium text-stone-700" title="Đơn đặt từ ngày mở bán tới ngày lễ, không gồm đơn hủy, hoàn tiền hay PayOS chưa thanh toán.">
+              3. Đơn trong kỳ dịp
+            </span>
             {showDetails ? (
               <div className="flex items-center gap-2 tabular-nums">
                 <span className="text-[#007700] font-bold">
                   Thực tế: {actualOrders.toLocaleString('vi-VN')} đơn
                 </span>
                 <span className="text-stone-300">|</span>
-                <span className="text-stone-500">
-                  Mục tiêu: {targetOrders > 0 ? `${targetOrders.toLocaleString('vi-VN')} đơn` : 'Chưa có'}
+                <span className="text-stone-500" title={targetNote ?? undefined}>
+                  Mức ngày thường: {targetOrders > 0 ? `${targetOrders.toLocaleString('vi-VN')} đơn` : 'Chưa có'}
                 </span>
               </div>
             ) : (
               <span className="text-stone-600 tabular-nums" title="Thực tế / Mục tiêu">
                 <strong className="text-[#007700]">{actualOrders.toLocaleString('vi-VN')}</strong>
-                {targetOrders > 0 ? ` / ${targetOrders.toLocaleString('vi-VN')} mục tiêu` : ' đơn'}
+                {targetOrders > 0 ? ` đơn · ngày thường ${targetOrders.toLocaleString('vi-VN')}` : ' đơn'}
               </span>
             )}
           </div>
@@ -463,11 +495,20 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             >
               {actualOrders > 0 && (
                 <span className="text-[11px] font-bold text-white tabular-nums">
-                  {targetOrders > 0 && orderRawPct > 100 ? `${orderRawPct}% mục tiêu` : `${orderRawPct}%`}
+                  {targetOrders > 0 && orderRawPct > 100 ? `gấp ${(actualOrders / targetOrders).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} lần ngày thường` : `${orderRawPct}%`}
                 </span>
               )}
             </div>
           </div>
+          {ordersBreakdownNote && (
+            <p className="text-[11px] text-stone-500 tabular-nums">{ordersBreakdownNote}</p>
+          )}
+          {(showDetails || targetOrders === 0) && targetNote && (
+            <p className="text-[11px] text-stone-500">{targetNote}</p>
+          )}
+          {showDetails && baselineOverlapNote && (
+            <p className="text-[11px] text-amber-700">{baselineOverlapNote}</p>
+          )}
         </div>
       </div>
 
