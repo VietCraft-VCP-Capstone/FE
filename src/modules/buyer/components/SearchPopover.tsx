@@ -106,7 +106,7 @@ export const SearchPopover: React.FC<SearchPopoverProps> = ({
 
           {suggestions.shops?.length > 0 && (
             <div className="mb-3.5">
-              <div className={sectionTitle}><Store size={13} /><span>Gian hàng thủ công</span></div>
+              <div className={sectionTitle}><Store size={13} /><span>Gian hàng</span></div>
               <div className="flex flex-col gap-1.5">
                 {suggestions.shops.map((s) => (
                   <div

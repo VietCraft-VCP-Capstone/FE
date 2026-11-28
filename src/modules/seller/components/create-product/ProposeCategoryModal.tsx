@@ -71,7 +71,7 @@ export function ProposeCategoryModal({ open, categories, onClose, onProposed }: 
                             required
                             value={catName}
                             onChange={e => setCatName(e.target.value)}
-                            placeholder="VD: Đồ gốm thủ công, Tranh dệt thổ cẩm..."
+                            placeholder="VD: Phụ kiện điện thoại, Đồ chơi giáo dục..."
                             className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs outline-none focus:border-[#007700]"
                         />
                     </div>

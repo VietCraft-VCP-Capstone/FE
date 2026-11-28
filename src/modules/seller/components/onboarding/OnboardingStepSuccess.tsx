@@ -19,7 +19,7 @@ export function OnboardingStepSuccess({ settings, onFinish }: OnboardingStepSucc
           Chúc mừng! Gian hàng đã sẵn sàng
         </h2>
         <p className="text-xs text-stone-600 max-w-md mx-auto">
-          Hồ sơ gian hàng của bạn đã được thiết lập thành công. Bây giờ bạn có thể bắt đầu đăng bán những sản phẩm thủ công mỹ nghệ đầu tiên!
+          Hồ sơ gian hàng của bạn đã được thiết lập thành công. Bây giờ bạn có thể bắt đầu đăng bán những sản phẩm đầu tiên!
         </p>
       </div>
 

@@ -38,7 +38,7 @@ export function OnboardingStepShipping({ data, onChange }: OnboardingStepShippin
               type="text"
               value={data.senderName}
               onChange={e => onChange({ ...data, senderName: e.target.value })}
-              placeholder="VD: Nghệ nhân Nguyễn Văn Bát"
+              placeholder="VD: Nguyễn Văn A"
               className="w-full px-4 py-2.5 bg-stone-50/80 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#007700]/20 focus:border-[#007700]"
               required
             />

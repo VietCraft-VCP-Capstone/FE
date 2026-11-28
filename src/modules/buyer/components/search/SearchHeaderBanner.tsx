@@ -42,7 +42,7 @@ export const SearchHeaderBanner: React.FC<SearchHeaderBannerProps> = ({
                 Danh mục: <span style={{ color: '#007700' }}>{category}</span>
               </>
             ) : (
-              'Tất cả sản phẩm thủ công mỹ nghệ'
+              'Tất cả sản phẩm'
             )}
           </h1>
           <span style={{
@@ -58,7 +58,7 @@ export const SearchHeaderBanner: React.FC<SearchHeaderBannerProps> = ({
           </span>
         </div>
         <p className="hidden sm:block" style={{ margin: '6px 0 0', fontSize: 13, color: '#78716c' }}>
-          Khám phá các tuyệt tác thủ công tinh hoa và quà tặng sáng tạo từ các nghệ nhân khắp Việt Nam
+          Khám phá hàng ngàn sản phẩm chất lượng từ các nhà bán hàng uy tín trên toàn quốc
         </p>
       </div>
 

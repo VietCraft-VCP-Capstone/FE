@@ -980,7 +980,7 @@ export function AdminTags() {
                   )}
                   value={rejectReason}
                   onChange={e => setRejectReason(e.target.value)}
-                  placeholder="Ví dụ: Tên thẻ không phù hợp với danh mục hàng thủ công, spam từ khóa..."
+                  placeholder="Ví dụ: Tên thẻ không phù hợp với danh mục, spam từ khóa..."
                   autoFocus
                 />
               </div>

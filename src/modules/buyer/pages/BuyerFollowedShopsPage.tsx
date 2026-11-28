@@ -74,8 +74,8 @@ export function BuyerFollowedShopsPage() {
               </h1>
               <p className="text-sm text-gray-500 font-medium mt-0.5">
                 {loading
-                  ? 'Đang tải danh sách xưởng và nghệ nhân thủ công...'
-                  : `Bạn đang theo dõi ${shops.length} gian hàng thủ công.`}
+                  ? 'Đang tải danh sách gian hàng...'
+                  : `Bạn đang theo dõi ${shops.length} gian hàng.`}
               </p>
             </div>
           </div>
@@ -109,14 +109,14 @@ export function BuyerFollowedShopsPage() {
               Chưa theo dõi gian hàng nào
             </h2>
             <p className="text-sm text-gray-600 font-medium leading-relaxed mb-8 max-w-md mx-auto">
-              Bạn chưa theo dõi gian hàng nào. Hãy khám phá các xưởng thủ công yêu thích để nhận thông báo sản phẩm mới nhất!
+              Bạn chưa theo dõi gian hàng nào. Hãy khám phá các gian hàng yêu thích để nhận thông báo sản phẩm mới nhất!
             </p>
             <button
               onClick={() => navigate('/')}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#15803d] hover:bg-[#166534] text-white text-sm font-bold shadow-sm transition-all hover:scale-105 cursor-pointer"
             >
               <Store className="w-4 h-4" />
-              Khám phá xưởng thủ công
+              Khám phá gian hàng
             </button>
           </div>
         ) : (

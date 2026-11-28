@@ -140,7 +140,7 @@ function generateSmartNotice(data: ShopOverview): string {
       );
     } else {
       observations.push(
-        `Tỉ lệ chuyển đổi đạt ${pct(cr, 1)} ở mức ổn định so với trung bình ngành thủ công.`
+        `Tỉ lệ chuyển đổi đạt ${pct(cr, 1)} ở mức ổn định so với trung bình ngành.`
       );
     }
   } else if (totalOrders > 0) {

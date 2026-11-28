@@ -157,7 +157,7 @@ export function BuyerVouchersPage() {
               Kho Voucher VietCraft & Gian Hàng
             </h1>
             <p className="text-emerald-100 text-xs sm:text-sm mt-2 font-medium leading-relaxed">
-              Thu thập mã giảm giá toàn sàn, trợ giá vận chuyển freeship và voucher giảm sốc từ các làng nghề truyền thống. Lưu mã ngay để tự động áp dụng khi thanh toán!
+              Thu thập mã giảm giá toàn sàn, trợ giá vận chuyển freeship và voucher giảm sốc từ các gian hàng. Lưu mã ngay để tự động áp dụng khi thanh toán!
             </p>
           </div>
         </div>

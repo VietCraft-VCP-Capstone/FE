@@ -346,7 +346,7 @@ export function AdminPromotionsPage() {
                         Quản lý Chiến dịch Khuyến mãi & Voucher Toàn Sàn
                     </h2>
                     <p className="mt-0 text-[13px] text-[#666]">
-                        Tạo mã ưu đãi sàn VietCraft (Mega Sale, Lễ hội làng nghề, Freeship) và giám sát mã khuyến mãi của các gian hàng.
+                        Tạo mã ưu đãi sàn VietCraft (Mega Sale, Flash Sale, Freeship) và giám sát mã khuyến mãi của các gian hàng.
                     </p>
                 </div>
                 <button

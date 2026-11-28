@@ -28,15 +28,7 @@ const SORT_OPTIONS = [
   { key: 'rating_desc', label: 'Đánh giá cao' }
 ];
 
-const PRIMARY_CATEGORIES = [
-  { id: 'cat-gom', name: 'Gốm sứ & Mỹ nghệ', slug: 'gom-su-my-nghe' },
-  { id: 'cat-do-go', name: 'Đồ gỗ mỹ nghệ', slug: 'do-go-my-nghe' },
-  { id: 'cat-tui', name: 'Túi Tote & Canvas', slug: 'tui-tote-canvas' },
-  { id: 'cat-qua-tang', name: 'Phụ kiện & Quà tặng', slug: 'phu-kien-qua-tang' },
-  { id: 'cat-may-tre', name: 'Mây tre đan & Cói', slug: 'may-tre-dan' },
-  { id: 'cat-vai', name: 'Thời trang & Vải lụa thêu', slug: 'thoi-trang-vai-lua' },
-  { id: 'cat-trang-tri', name: 'Trang trí nhà cửa', slug: 'trang-tri' }
-];
+const PRIMARY_CATEGORIES: { id: string; name: string; slug: string }[] = [];
 
 export function BuyerSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -150,10 +142,10 @@ export function BuyerSearchPage() {
   const seoTitle = qParam && category ? `"${qParam}" trong ${category} · VietCraft`
     : qParam ? `Tìm kiếm: "${qParam}" · VietCraft`
     : category ? `Sản phẩm ${category} · VietCraft`
-    : 'Tìm kiếm sản phẩm thủ công · VietCraft';
+    : 'Tìm kiếm sản phẩm · VietCraft';
   const seoDescription = qParam
-    ? `Tìm thấy ${total} sản phẩm thủ công mỹ nghệ tinh xảo phù hợp với từ khóa "${qParam}" tại VietCraft. Giao hàng toàn quốc, kiểm định nghệ nhân.`
-    : 'Khám phá hàng ngàn sản phẩm thủ công, quà tặng nghệ thuật và phôi in POD độc đáo từ các nghệ nhân Việt Nam.';
+    ? `Tìm thấy ${total} sản phẩm phù hợp với từ khóa "${qParam}" tại VietCraft. Giao hàng toàn quốc, thanh toán an toàn.`
+    : 'Khám phá hàng ngàn sản phẩm, quà tặng và sản phẩm in theo yêu cầu (POD) từ các nhà bán hàng uy tín trên VietCraft.';
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 pb-16 pt-6">

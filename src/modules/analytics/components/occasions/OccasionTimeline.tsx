@@ -64,7 +64,7 @@ export function OccasionTimeline({ window: ow, className = '' }: OccasionTimelin
             Chu kỳ 4 pha & Hạn chót nhận đơn: {ow.name}
           </h3>
           <InfoTip
-            text="Chu kỳ mua sắm chia làm 4 pha độc lập. Điểm mấu chốt của hàng thủ công/POD là hạn chót ngừng nhận đơn (Hard Cut-off) để trừ hao thời gian sản xuất và vận chuyển tránh giao trễ qua dịp."
+            text="Chu kỳ mua sắm chia làm 4 pha độc lập. Điểm mấu chốt của hàng làm theo đơn/POD là hạn chót ngừng nhận đơn (Hard Cut-off) để trừ hao thời gian sản xuất và vận chuyển tránh giao trễ qua dịp."
             label="Chi tiết chu kỳ thời gian"
           />
         </div>

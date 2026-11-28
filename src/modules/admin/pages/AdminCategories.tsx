@@ -1257,7 +1257,7 @@ export function AdminCategories() {
                   )}
                   value={rejectReason}
                   onChange={e => setRejectReason(e.target.value)}
-                  placeholder="Ví dụ: Tên danh mục trùng lặp với danh mục hiện có, không phù hợp ngành hàng thủ công..."
+                  placeholder="Ví dụ: Tên danh mục trùng lặp với danh mục hiện có, không phù hợp với ngành hàng của sàn..."
                   autoFocus
                 />
               </div>

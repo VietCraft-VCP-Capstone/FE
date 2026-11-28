@@ -144,7 +144,7 @@ export function ProductDetailModal({
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <span className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-stone-100 text-stone-700">
-                    {product.category || 'Thủ công mỹ nghệ'}
+                    {product.category || 'Chưa phân loại'}
                   </span>
                   {getStatusBadge(product.status)}
                   <span className="text-xs font-mono font-bold text-stone-600 ml-auto bg-stone-100 px-2 py-0.5 rounded border border-stone-200">

@@ -6,7 +6,7 @@ const statValue = 'text-2xl font-extrabold leading-none font-jakarta';
 
 const scoreHint = (score: number) =>
   score >= 90 ? '✨ Điểm uy tín xuất sắc: Sản phẩm của bạn được ưu tiên đẩy Top tìm kiếm tự nhiên và được ưu tiên bảo vệ khi phát sinh khiếu nại.'
-    : score >= 70 ? 'Gian hàng đạt chuẩn sàn: Duy trì chuỗi đơn sạch không lỗi để nâng hạng lên Nghệ Nhân Uy Tín.'
+    : score >= 70 ? 'Gian hàng đạt chuẩn sàn: Duy trì chuỗi đơn sạch không lỗi để nâng hạng lên Shop Uy Tín.'
       : '⚠️ Cảnh báo: Tỷ lệ khiếu nại cao. Hãy cải thiện chất lượng sản phẩm & đóng gói để tránh bị hạn chế hiển thị.';
 
 export function ShopReputationCard({ profile }: { profile: any }) {
