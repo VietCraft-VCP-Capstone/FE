@@ -266,7 +266,8 @@ export function SellerRegisterPage() {
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    // Lỗi hiện thành thông báo ở góc phải; bấm lại vẫn hiện dù nội dung trùng lần trước
+    const setError = (message: string | null) => { if (message) showToast(message, 'error'); };
     const [statusData, setStatusData] = useState<SellerKycStatusResponse | null>(null);
     const [showCancelKycModal, setShowCancelKycModal] = useState(false);
     const [cancellingKyc, setCancellingKyc] = useState(false);
@@ -1292,13 +1293,6 @@ export function SellerRegisterPage() {
                                 </button>
                             </div>
                         </div>
-                    </div>
-                )}
-
-                {error && (
-                    <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-                        <AlertCircle size={16} className="flex-shrink-0" />
-                        <span>{error}</span>
                     </div>
                 )}
 
@@ -2463,7 +2457,7 @@ export function SellerRegisterPage() {
                                         </div>
                                         <input
                                             type="text"
-                                            placeholder={nameToCompare || 'NGUYEN VAN A'}
+                                            placeholder="Nhập tên chủ tài khoản"
                                             value={accountHolder}
                                             onChange={(e) => setAccountHolder(e.target.value)}
                                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold uppercase focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
@@ -2538,7 +2532,7 @@ export function SellerRegisterPage() {
                                             return;
                                         }
                                         if (!accountHolder) {
-                                            setError('Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng.');
+                                            setError('Vui lòng nhập tên chủ tài khoản (hoặc bấm "Lấy theo tên trên CCCD").');
                                             return;
                                         }
                                         if (!isNameMatched) {
@@ -2629,13 +2623,6 @@ export function SellerRegisterPage() {
                                     Họ tên được ký sẽ được lưu cùng địa chỉ IP và dấu thời gian chứng thực điện tử.
                                 </span>
                             </div>
-
-                            {error && (
-                                <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-                                    <AlertCircle size={16} className="flex-shrink-0" />
-                                    <span>{error}</span>
-                                </div>
-                            )}
 
                             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                 <button

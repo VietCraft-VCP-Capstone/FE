@@ -34,12 +34,10 @@ const LAYER_ICONS = {
 };
 
 export function PotentialProfileDrawer({ profile, open, onClose }: PotentialProfileDrawerProps) {
-  if (!profile) return null;
-
   // State cho bộ tính điểm hòa vốn tương tác (interactive break-even calculator)
-  const [retailPrice, setRetailPrice] = useState<number>(profile.break_even.retail_price || 200000);
-  const [baseCost, setBaseCost] = useState<number>(profile.break_even.base_cost || 80000);
-  const [testBudget, setTestBudget] = useState<number>(profile.break_even.fixed_test_budget || 500000);
+  const [retailPrice, setRetailPrice] = useState<number>(profile?.break_even.retail_price || 200000);
+  const [baseCost, setBaseCost] = useState<number>(profile?.break_even.base_cost || 80000);
+  const [testBudget, setTestBudget] = useState<number>(profile?.break_even.fixed_test_budget || 500000);
   const [expandedLayers, setExpandedLayers] = useState<Record<string, boolean>>({
     demand: true,
     repeatability: true,
@@ -56,6 +54,8 @@ export function PotentialProfileDrawer({ profile, open, onClose }: PotentialProf
       setTestBudget(profile.break_even.fixed_test_budget);
     }
   }, [profile]);
+
+  if (!profile) return null;
 
   // Tính toán thời gian thực theo công thức SRS 3.10
   const platformFee = Math.round(retailPrice * 0.10); // Phí sàn 10%
