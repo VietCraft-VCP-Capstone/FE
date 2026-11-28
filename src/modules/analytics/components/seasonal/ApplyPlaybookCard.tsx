@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { CalendarClock, CheckCircle2, AlertTriangle, ArrowUpRight, HelpCircle, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import type { ApplyPlaybook } from '../../types';
+import type { ApplyPlaybook, PlaybookStep, SeasonalIdeaOutcome } from '../../types';
+import { autoStepStatus, playbookStepKey, playbookStepSlot } from './playbookSteps';
 import type { SavedIdeaSummaryItem } from './SeasonalHeader';
 import type { AiShopIdea } from './SeasonalPotentialTab';
 
@@ -11,9 +12,10 @@ interface Props {
   savedIdeaItems?: SavedIdeaSummaryItem[];
   aiIdeas?: AiShopIdea[];
   allShopProducts?: any[];
-  matchingProductsCount?: number;
-  inStockMatchingCount?: number;
-  actualOrdersCount?: number;
+  /** Thành quả từng ý tưởng do BE đo (sản phẩm có source_idea_id + đơn hợp lệ trong kỳ dịp) */
+  outcomes?: SeasonalIdeaOutcome[];
+  /** Gắn/bỏ gắn sản phẩm có sẵn vào ý tưởng; null khi không được lưu (gian hàng mẫu) */
+  onLinkProduct?: ((ideaId: string, productId: string, linked: boolean) => Promise<void>) | null;
   onEditSavedIdea?: (ideaId: string) => void;
   checkedMilestones?: Record<string | number, boolean>;
   onToggleMilestone?: (idx: number, nextVal: boolean, ideaId?: string) => void;
@@ -25,10 +27,9 @@ export function ApplyPlaybookCard({
   savedIdeas = {},
   savedIdeaItems = [],
   aiIdeas = [],
-  allShopProducts,
-  matchingProductsCount = 0,
-  inStockMatchingCount = 0,
-  actualOrdersCount = 0,
+  allShopProducts = [],
+  outcomes = [],
+  onLinkProduct = null,
   onEditSavedIdea,
   checkedMilestones,
   onToggleMilestone,
@@ -36,6 +37,9 @@ export function ApplyPlaybookCard({
 }: Props) {
   const [localCheckedSteps, setLocalCheckedSteps] = useState<Record<string, boolean>>({});
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
+  const [linkProductId, setLinkProductId] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   if (!playbooks || playbooks.length === 0) {
     return (
@@ -58,74 +62,45 @@ export function ApplyPlaybookCard({
   const activeIdea = displayPlanIdeas.find(i => i.id === selectedIdeaId) || displayPlanIdeas[0] || null;
   const isUsingSavedIdea = savedIdeaItems.length > 0 && activeIdea !== null;
 
-  // Tính tiến độ riêng cho ý tưởng đang chọn (khớp chính xác theo source_idea_id hoặc trùng >= 65% tên ý tưởng)
-  const stopWords = new Set(['cho', 'dịp', 'mùa', 'tặng', 'quà', 'set', 'bộ', 'mẫu', 'sản', 'phẩm', 'và', 'của', 'theo', 'phong', 'cách', 'phiên', 'bản', 'siêu', 'sale']);
-  const activeIdeaProducts = (() => {
-    if (!isUsingSavedIdea || !allShopProducts) return null;
-    const ideaTitleLower = (activeIdea.title || '').toLowerCase().trim();
-    const tokens = ideaTitleLower
-      .split(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/i)
-      .filter((w: string) => w.length >= 3 && !stopWords.has(w));
-    return allShopProducts.filter((p: any) => {
-      if (p.source_idea_id && p.source_idea_id === activeIdea.id) return true;
-      const pName = String(p.name || p.title || '').toLowerCase().trim();
-      if (ideaTitleLower && (pName === ideaTitleLower || pName.includes(ideaTitleLower))) return true;
-      if (tokens.length < 3) return false;
-      const hits = tokens.filter((tk: string) => pName.includes(tk)).length;
-      return hits >= Math.max(4, Math.ceil(tokens.length * 0.65));
-    });
-  })();
+  // Tiến độ của ý tưởng đang chọn: chỉ dựa vào sản phẩm gắn đúng ý tưởng và đơn hợp lệ trong kỳ dịp (BE đo)
+  const activeOutcome = isUsingSavedIdea ? outcomes.find(o => o.idea_id === activeIdea.id) || null : null;
+  const activeMatchingCount = activeOutcome ? activeOutcome.products.length : 0;
+  const activeOrdersCount = activeOutcome ? activeOutcome.orders : 0;
+  const linkedIds = new Set((activeOutcome?.products || []).map(p => p.id));
+  const linkableProducts = allShopProducts.filter((p: any) => p?._id && !linkedIds.has(String(p._id)));
 
-  const activeMatchingCount = activeIdeaProducts ? activeIdeaProducts.length : (isUsingSavedIdea ? matchingProductsCount : 0);
-  const activeInStockCount = activeIdeaProducts
-    ? activeIdeaProducts.filter((p: any) => (p.stock ?? 1) > 0).length
-    : (isUsingSavedIdea ? inStockMatchingCount : 0);
-  const activeOrdersCount = activeIdeaProducts
-    ? activeIdeaProducts.reduce((sum: number, p: any) => sum + Number(p.sold_count ?? p.orders_count ?? 0), 0)
-    : (isUsingSavedIdea ? actualOrdersCount : 0);
-
-  // Tự động xác nhận hoàn thành từng bước dựa trên dữ liệu thực tế của ý tưởng đang chọn
-  const getAutoStepStatus = (task: string): { autoDone: boolean; note?: string } => {
-    const t = task.toLowerCase();
-    if (t.includes('listing') || t.includes('tag') || t.includes('đăng')) {
-      if (activeMatchingCount > 0) {
-        return { autoDone: true, note: `Đã có ${activeMatchingCount} SP khớp` };
-      }
+  const doLink = async (productId: string, linked: boolean) => {
+    if (!onLinkProduct || !activeIdea) return;
+    setLinkBusy(true);
+    setLinkError(null);
+    try {
+      await onLinkProduct(activeIdea.id, productId, linked);
+      setLinkProductId('');
+    } catch {
+      setLinkError(linked ? 'Không gắn được sản phẩm, vui lòng thử lại.' : 'Không bỏ gắn được sản phẩm, vui lòng thử lại.');
+    } finally {
+      setLinkBusy(false);
     }
-    if (t.includes('thử nhỏ') || t.includes('đơn đầu')) {
-      if (activeOrdersCount > 0) {
-        return { autoDone: true, note: `Đã có ${activeOrdersCount} đơn` };
-      }
-    }
-    if (t.includes('chốt sản xuất') || t.includes('nhập hàng') || t.includes('tồn')) {
-      if (activeInStockCount > 0) {
-        return { autoDone: true, note: `Hiện có ${activeInStockCount} SP đang sẵn tồn` };
-      }
-    }
-    return { autoDone: false };
   };
 
-  const stepKey = (idx: number, task: string) => `${activeIdea?.id || activeIdx}_${idx}_${task}`;
+  // Bước tự ghi nhận từ dữ liệu thật (xem playbookSteps.ts); tick tay lưu theo vị trí cố định của bước, không theo dòng
+  const getAutoStepStatus = (step: PlaybookStep) => autoStepStatus(step, activeMatchingCount, activeOrdersCount);
 
-  const isStepDone = (idx: number, task: string) => {
-    const { autoDone } = getAutoStepStatus(task);
-    if (autoDone) return true;
-    const localVal = localCheckedSteps[stepKey(idx, task)];
+  const isStepDone = (step: PlaybookStep, slot: number) => {
+    if (getAutoStepStatus(step).autoDone) return true;
+    if (!activeIdea?.id) return false;
+    const localVal = localCheckedSteps[`${activeIdea.id}_${slot}`];
     if (localVal !== undefined) return localVal;
-    const ideaKey = activeIdea?.id ? `${activeIdea.id}_${idx}` : undefined;
-    if (ideaKey && checkedMilestones && checkedMilestones[ideaKey] !== undefined) {
-      return Boolean(checkedMilestones[ideaKey]);
-    }
-    return checkedMilestones ? Boolean(checkedMilestones[idx]) : false;
+    return Boolean(checkedMilestones?.[`${activeIdea.id}_${slot}`]);
   };
 
-  const toggleStep = (idx: number, task: string) => {
-    if (getAutoStepStatus(task).autoDone) return;
-    const nextVal = !isStepDone(idx, task);
-    const k = stepKey(idx, task);
-    setLocalCheckedSteps(prev => ({ ...prev, [k]: nextVal }));
+  const toggleStep = (step: PlaybookStep, slot: number) => {
+    if (getAutoStepStatus(step).autoDone || !activeIdea?.id) return;
+    const nextVal = !isStepDone(step, slot);
     if (onToggleMilestone) {
-      onToggleMilestone(idx, nextVal, activeIdea?.id);
+      onToggleMilestone(slot, nextVal, activeIdea.id);
+    } else {
+      setLocalCheckedSteps(prev => ({ ...prev, [`${activeIdea.id}_${slot}`]: nextVal }));
     }
   };
 
@@ -221,6 +196,68 @@ export function ApplyPlaybookCard({
         </div>
       )}
 
+      {/* Sản phẩm áp dụng ý tưởng: tạo mới (Tạo SP) hoặc gắn sản phẩm có sẵn của shop */}
+      {isUsingSavedIdea && activeIdea && (
+        <div className="rounded-xl border border-stone-200 p-3.5 space-y-2 text-xs">
+          <div className="font-bold text-stone-900">Sản phẩm áp dụng «{activeIdea.title}»</div>
+          {activeOutcome && activeOutcome.products.length > 0 ? (
+            <ul className="m-0 list-none space-y-1 p-0">
+              {activeOutcome.products.map(p => (
+                <li key={p.id} className="flex items-center justify-between gap-2 rounded-lg bg-stone-50 px-2.5 py-1.5">
+                  <span className="truncate text-stone-800" title={p.title}>{p.title || 'Sản phẩm'}</span>
+                  {onLinkProduct && (
+                    <button
+                      type="button"
+                      disabled={linkBusy}
+                      onClick={() => doLink(p.id, false)}
+                      className="shrink-0 rounded-md border border-stone-200 px-2 py-0.5 text-[11px] font-semibold text-stone-600 hover:bg-white disabled:opacity-50"
+                    >
+                      Bỏ gắn
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="m-0 text-stone-500">Chưa có sản phẩm nào áp dụng ý tưởng này.</p>
+          )}
+          {onLinkProduct && linkableProducts.length > 0 && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <label className="sr-only" htmlFor="seasonal-link-product">Chọn sản phẩm có sẵn</label>
+              <select
+                id="seasonal-link-product"
+                value={linkProductId}
+                onChange={e => setLinkProductId(e.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs"
+              >
+                <option value="">Chọn sản phẩm có sẵn của shop…</option>
+                {linkableProducts.map((p: any) => (
+                  <option key={String(p._id)} value={String(p._id)}>
+                    {p.title || p.name}
+                    {p.source_idea_id ? ' (đang gắn ý tưởng khác)' : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!linkProductId || linkBusy}
+                onClick={() => doLink(linkProductId, true)}
+                className="rounded-lg bg-[#007700] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#005B00] disabled:opacity-50"
+              >
+                Gắn vào ý tưởng
+              </button>
+            </div>
+          )}
+          {linkError && <p className="m-0 text-rose-700">{linkError}</p>}
+          {activeOutcome && activeOutcome.products.length > 0 && (
+            <p className="m-0 text-stone-500">
+              Trong kỳ dịp: {activeOutcome.orders} đơn · {activeOutcome.units} sản phẩm bán ra ·{' '}
+              {activeOutcome.revenue.toLocaleString('vi-VN')}đ (chỉ tính đơn hợp lệ của các sản phẩm trên).
+            </p>
+          )}
+        </div>
+      )}
+
       {/* 1 dòng trạng thái gọn: Tiến độ triển khai cho ý tưởng đang chọn */}
       <div className="flex flex-wrap items-center gap-2.5 text-xs text-stone-600">
         <span className="inline-flex items-center gap-1.5 font-semibold text-stone-900">
@@ -265,25 +302,26 @@ export function ApplyPlaybookCard({
           </thead>
           <tbody className="divide-y divide-stone-100">
             {pb.steps.map((st, idx) => {
-              const autoInfo = getAutoStepStatus(st.task);
-              const done = isStepDone(idx, st.task);
+              const slot = playbookStepSlot(st, idx);
+              const autoInfo = getAutoStepStatus(st);
+              const done = isStepDone(st, slot);
               const displayTask =
-                activeIdea && (st.task.toLowerCase().includes('listing') || st.task.toLowerCase().includes('gắn tag'))
+                activeIdea && playbookStepKey(st) === 'listing'
                   ? `Đăng listing & gắn tag cho «${activeIdea.title}»`
                   : st.task;
               const shortDate = /^\d{4}-\d{2}-\d{2}$/.test(st.date)
                 ? `${st.date.slice(8, 10)}/${st.date.slice(5, 7)}`
                 : st.date;
               return (
-                <tr key={idx} className={done ? 'bg-stone-50/50 text-stone-400' : 'bg-amber-50/40 text-stone-900'}>
+                <tr key={slot} className={done ? 'bg-stone-50/50 text-stone-400' : 'bg-amber-50/40 text-stone-900'}>
                   <td className="py-2.5 px-3">
                     <input
                       type="checkbox"
                       aria-label={displayTask}
                       checked={done}
                       disabled={autoInfo.autoDone}
-                      onChange={() => toggleStep(idx, st.task)}
-                      title={autoInfo.note ? `Tự động ghi nhận: ${autoInfo.note}` : 'Đánh dấu hoàn thành'}
+                      onChange={() => toggleStep(st, slot)}
+                      title={autoInfo.autoDone && autoInfo.note ? `Tự động ghi nhận: ${autoInfo.note}` : 'Đánh dấu hoàn thành'}
                       className="h-4 w-4 rounded border-stone-300 text-[#007700] focus:ring-[#007700] cursor-pointer"
                     />
                   </td>
@@ -297,8 +335,8 @@ export function ApplyPlaybookCard({
                       <span className={done ? 'line-through text-stone-400 font-medium' : 'font-semibold text-stone-900'}>
                         {displayTask}
                       </span>
-                      {autoInfo.autoDone && autoInfo.note && (
-                        <span className="text-[11px] font-medium text-[#007700]">
+                      {autoInfo.note && (
+                        <span className={`text-[11px] font-medium ${autoInfo.autoDone ? 'text-[#007700]' : 'text-amber-700'}`}>
                           · {autoInfo.note}
                         </span>
                       )}

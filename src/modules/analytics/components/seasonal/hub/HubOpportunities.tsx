@@ -64,6 +64,14 @@ export const HubOpportunities: React.FC<Props> = ({
         </div>
       </div>
 
+      {filtered.length === 0 && (
+        <p className="m-0 rounded-xl border border-dashed border-stone-200 bg-stone-50 px-3 py-4 text-center text-xs text-stone-500">
+          {clusters.length === 0
+            ? 'Chưa có sản phẩm thị trường đang bán cho dịp này trong dữ liệu đã thu. Danh sách sẽ có khi bộ thu catalog chạy xong.'
+            : 'Không có nhóm sản phẩm nào ở phân khúc này.'}
+        </p>
+      )}
+
       {/* Danh sách các nhóm */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
         {filtered.map(cluster => {

@@ -72,6 +72,8 @@ interface CalendarTimelineRow {
   name: string;
   weekdayText: string;
   expectedOrders: string;
+  upliftMid: number | null;
+  ordersBasis: string;
   confidenceText: 'Cao' | 'Khá' | 'Sơ bộ';
   confidenceDots: number; // 1 to 4
   nextDeadline: {
@@ -292,6 +294,8 @@ export function SeasonalMonthMatrix({
         name: camp.name,
         weekdayText: weekdayText || camp.name,
         expectedOrders: camp.expected_orders || '',
+        upliftMid: camp.expected_uplift?.mid ?? null,
+        ordersBasis: camp.expected_orders_basis || '',
         confidenceText: (confText === 'Cao' || confText === 'Khá' || confText === 'Sơ bộ') ? confText : 'Khá',
         confidenceDots: confDots,
         nextDeadline,
@@ -399,6 +403,8 @@ export function SeasonalMonthMatrix({
         weekdayText: row.weekdayText,
         expectedOrdersAvg: parsed.value,
         expectedOrdersDisplay: row.expectedOrders || 'Chưa có dữ liệu',
+        upliftMid: row.upliftMid,
+        ordersBasis: row.ordersBasis,
         hasForecastData: parsed.hasData,
         daysLeft: Math.max(0, row.nextDeadline.daysLeft),
         deadlineTitle: row.nextDeadline.title,
@@ -427,7 +433,7 @@ export function SeasonalMonthMatrix({
           <Info size={14} className="text-stone-400 cursor-help" />
           <div className="absolute left-0 top-6 hidden group-hover/info:block z-30 w-72 rounded-xl bg-stone-900 p-3 text-[11px] text-white shadow-xl pointer-events-none leading-relaxed">
             <strong className="text-emerald-400 block mb-1">Cách đọc biểu đồ cột kết hợp đường:</strong>
-            • <strong>Cột xanh</strong> (trục trái): số đơn dự kiến của từng dịp.<br />
+            • <strong>Cột xanh</strong> (trục trái): đơn dự kiến = mức bán ngày thường (nhịp đơn 60 ngày × số ngày kỳ dịp) × mức tăng đơn đo từ dữ liệu bán thật (đơn các mùa trước, tốc độ bán trên Tiki). Cột nhạt: chưa đo được mức tăng, đang là mức ngày thường.<br />
             • <strong>Đường hổ phách</strong> (trục phải): số ngày còn lại đến hạn chuẩn bị tiếp theo.<br />
             • Bấm vào bất kỳ cột nào để chọn dịp và mở chi tiết các mốc thời gian.
           </div>
@@ -467,22 +473,14 @@ export function SeasonalMonthMatrix({
           <strong className="font-semibold text-stone-900">{displayRows.length} dịp</strong>:{' '}
           gần nhất là{' '}
           <strong className="font-semibold text-stone-900">{chartMeta.nearest.name}</strong>{' '}
-          (còn {chartMeta.nearest.nextDeadline.daysLeft} ngày
-          {chartMeta.nearest.expectedOrders ? `, ${chartMeta.nearest.expectedOrders} đơn` : ''})
+          ({chartMeta.nearest.nextDeadline.title.toLowerCase()}: còn {chartMeta.nearest.nextDeadline.daysLeft} ngày
+          {chartMeta.nearest.expectedOrders ? `; dự kiến ${chartMeta.nearest.expectedOrders} đơn` : ''})
           {chartMeta.upcomingFocus && (
             <>
               , tiếp theo là{' '}
               <strong className="font-semibold text-stone-900">{chartMeta.upcomingFocus.name}</strong>{' '}
-              (còn {chartMeta.upcomingFocus.nextDeadline.daysLeft} ngày
-              {chartMeta.upcomingFocus.expectedOrders ? `, ${chartMeta.upcomingFocus.expectedOrders} đơn` : ''})
-            </>
-          )}
-          {chartMeta.peak && chartMeta.peak.id !== chartMeta.nearest.id && chartMeta.peak.id !== chartMeta.upcomingFocus?.id && (
-            <>
-              {' '}và nhiều đơn nhất là{' '}
-              <strong className="font-semibold text-[#007700]">
-                {chartMeta.peak.name} ({chartMeta.peak.expectedOrders} đơn)
-              </strong>
+              ({chartMeta.upcomingFocus.nextDeadline.title.toLowerCase()}: còn {chartMeta.upcomingFocus.nextDeadline.daysLeft} ngày
+              {chartMeta.upcomingFocus.expectedOrders ? `; dự kiến ${chartMeta.upcomingFocus.expectedOrders} đơn` : ''})
             </>
           )}
           .
@@ -547,6 +545,13 @@ export function SeasonalMonthMatrix({
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
+                          <span className="text-stone-500">Mức tăng của dịp</span>
+                          <span className="font-semibold text-stone-800">
+                            {item.upliftMid != null ? `x${item.upliftMid.toLocaleString('vi-VN')}` : 'chưa đo được'}
+                          </span>
+                        </div>
+                        {item.ordersBasis && <p className="m-0 text-[10px] leading-snug text-stone-500">{item.ordersBasis}</p>}
+                        <div className="flex items-center justify-between gap-2">
                           <span className="text-stone-500 truncate">{item.deadlineTitle}</span>
                           <span className="font-bold text-amber-600 shrink-0">còn {item.daysLeft} ngày</span>
                         </div>
@@ -588,9 +593,12 @@ export function SeasonalMonthMatrix({
               >
                 {rechartsData.map(entry => {
                   const isSelected = activeCampId === entry.id || (!activeCampId && selectedRow?.id === entry.id);
+                  // Đậm: đã nhân mức tăng đo được; nhạt: chưa đo được mức tăng (đang là mức ngày thường)
                   const fill = !entry.hasForecastData
                     ? isSelected ? '#78716c' : '#e7e5e4'
-                    : isSelected ? '#007700' : '#bbf7d0';
+                    : entry.upliftMid != null
+                      ? isSelected ? '#007700' : '#22c55e'
+                      : isSelected ? '#6fbf85' : '#d9f5e1';
                   return <Cell key={entry.id} fill={fill} />;
                 })}
               </Bar>
@@ -611,7 +619,7 @@ export function SeasonalMonthMatrix({
         <div className="flex items-center justify-between gap-4 pt-1 text-[11px] font-medium text-stone-600">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-xs bg-[#007700]" />
-            <span>Đơn dự kiến</span>
+            <span>Đơn dự kiến (cột nhạt: chưa đo được mức tăng)</span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-amber-700">
             <span className="inline-flex items-center">

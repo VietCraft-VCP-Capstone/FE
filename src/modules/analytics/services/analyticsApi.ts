@@ -34,7 +34,7 @@ export function seasonalSaveError(err: unknown, fallback: string): string {
   const msg = (err as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
   return typeof msg === 'string' && msg ? msg : fallback;
 }
-import type { HealthStatus, InsightContext, InsightEnvelope, ShopSearchResult } from '../types';
+import type { HealthStatus, InsightContext, InsightEnvelope, SeasonalIdeaSnapshot, ShopSearchResult } from '../types';
 import type { ListingHealthList } from '../healthTypes';
 import type { HealthDraftBody, HealthPreview, ListingHealth, PreviewInputs } from '../healthTypes';
 
@@ -130,8 +130,29 @@ export const analyticsApi = {
   },
 
   /** Lưu hoặc bỏ lưu ý tưởng sản phẩm theo dịp vào database gian hàng */
-  async saveSeasonalIdea(ideaId: string, plan: SeasonalPlanRef): Promise<{ success: boolean; saved_ideas: string[] }> {
-    const res = await api.post(`${BASE}/forecast/seasonal/save-idea`, { idea_id: ideaId, ...plan });
+  async saveSeasonalIdea(
+    ideaId: string,
+    plan: SeasonalPlanRef,
+    snapshot?: SeasonalIdeaSnapshot,
+  ): Promise<{ success: boolean; saved_ideas: string[]; idea_snapshots?: Record<string, SeasonalIdeaSnapshot> }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/save-idea`, { idea_id: ideaId, ...plan, ...(snapshot ? { snapshot } : {}) });
+    return res.data;
+  },
+
+  /** Áp dụng ý tưởng vào một sản phẩm có sẵn của shop (hoặc bỏ gắn) để đo thành quả theo đơn thật */
+  async linkSeasonalIdeaProduct(payload: SeasonalPlanRef & { idea_id: string; product_id: string; linked: boolean }): Promise<{
+    success: boolean;
+    product_id: string;
+    source_idea_id: string | null;
+    previous_idea_id: string | null;
+  }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/link-product`, payload);
+    return res.data;
+  },
+
+  /** "Gợi ý thêm": AI soạn tối đa 3 ý tưởng mới cho dịp (chờ ~20 giây), trả danh sách ý tưởng đầy đủ */
+  async moreSeasonalIdeas(plan: SeasonalPlanRef): Promise<{ success: boolean; ideas: any[] }> {
+    const res = await api.post(`${BASE}/forecast/seasonal/more-ideas`, plan, { timeout: 60_000 });
     return res.data;
   },
 
@@ -147,11 +168,16 @@ export const analyticsApi = {
     return res.data;
   },
 
-  /** Lưu đánh giá thành quả sau dịp của seller */
+  /** Lưu đánh giá thành quả sau dịp: đánh giá chung (không bắt buộc) + đánh giá từng ý tưởng đã áp dụng */
   async saveSeasonalReview(payload: SeasonalPlanRef & {
-    rating: 'good' | 'neutral' | 'poor';
+    rating: 'good' | 'neutral' | 'poor' | null;
     note: string;
-  }): Promise<{ success: boolean; occasion_reviews: Record<string, any> }> {
+    idea_reviews?: Record<string, { rating: 'good' | 'neutral' | 'poor'; note: string }>;
+  }): Promise<{
+    success: boolean;
+    occasion_reviews: Record<string, any>;
+    idea_reviews?: Record<string, { rating: 'good' | 'neutral' | 'poor'; note: string; updated_at?: string }>;
+  }> {
     const res = await api.post(`${BASE}/forecast/seasonal/review`, payload);
     return res.data;
   },

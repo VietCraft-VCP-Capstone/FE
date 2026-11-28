@@ -103,23 +103,27 @@ export const CampaignFunnelCard: React.FC<Props> = ({
 
   const targetOrders = typeof currentFunnel.orders === 'number' && currentFunnel.orders > 0 ? currentFunnel.orders : 0;
   const basis = currentFunnel.target_basis;
+  const tierBasis = currentFunnel.tier_basis;
+  const baseRates = tierBasis?.baseline_rates;
+  // Nhãn so với ngày thường: "gấp 2,1 lần" khi vượt, "75%" khi thấp hơn
+  const vsNormal = (rawPct: number) =>
+    rawPct >= 100 ? `gấp ${(rawPct / 100).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} lần ngày thường` : `${rawPct}% ngày thường`;
   const baselineEnd = basis?.baseline_end ? new Date(basis.baseline_end).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }) : 'ngày mở bán';
   const targetNote = !basis
     ? null
     : basis.missing === 'baseline_history'
-      ? `Chưa có mức ngày thường: shop cần ít nhất 14 ngày có đơn trước ngày mở bán (${baselineEnd}).`
-      : basis.missing === 'baseline_orders'
-        ? `Chưa có mức ngày thường: trước ${baselineEnd} shop mới có ${basis.baseline_orders ?? 0} đơn, cần ít nhất 5 đơn.`
-        : basis.missing === 'uplift'
+      ? `Chưa có mức ngày thường: trước ngày mở bán (${baselineEnd}) shop mới hoạt động ${basis.baseline_days ?? 0} ngày, cần ít nhất 7 ngày.`
+      : basis.missing === 'uplift'
           ? 'Chưa có mức ngày thường cho dịp này.'
           : basis.daily_rate != null
             ? `Mức ngày thường = ${basis.daily_rate.toLocaleString('vi-VN')} đơn/ngày (${basis.baseline_orders ?? '?'} đơn trong ${basis.baseline_days ?? '?'} ngày trước ${baselineEnd}) × ${basis.window_days} ngày.`
+              + (basis.low_confidence ? ' Độ tin cậy thấp: trước mùa còn ít đơn hoặc lịch sử ngắn, nên con số chỉ để tham khảo.' : '')
               + (basis.search_uplift != null
                 ? ` Tham khảo: lượt tìm kiếm dịp này gấp ${basis.search_uplift.toLocaleString('vi-VN')} lần ngày thường (lượt tìm, không phải số đơn).`
                 : '')
             : null;
   const baselineOverlapNote = basis && basis.missing == null && basis.baseline_overlaps?.length
-    ? `Lưu ý: khoảng ngày thường dùng làm nền trùng kỳ bán của ${basis.baseline_overlaps.join(', ')}, nên mục tiêu có thể đang cao hơn mức thực tế.`
+    ? `Lưu ý: khoảng ngày thường dùng làm nền trùng kỳ bán của ${basis.baseline_overlaps.join(', ')}, nên mức ngày thường có thể đang cao hơn thực tế.`
     : null;
   const statusBreakdown = currentFunnel.actual?.status_breakdown;
   const directOrders = currentFunnel.actual?.direct_orders;
@@ -172,8 +176,8 @@ export const CampaignFunnelCard: React.FC<Props> = ({
       : null;
 
   // Đồng nhất 1 ý nghĩa cho cả 3 thanh:
-  // - Khi có mục tiêu: cả 3 thanh đều biểu diễn TIẾN ĐỘ (Thực tế / Mục tiêu), tỷ lệ chuyển đổi nằm ở dòng nối giữa các tầng.
-  // - Khi chưa có mục tiêu: cả 3 thanh biểu diễn hình phễu tương đối so với Lượt xem (100% -> Thêm giỏ -> Đơn).
+  // - Khi cả 3 tầng có mức ngày thường (nhịp trước mùa của chính tầng đó): thanh = thực tế / ngày thường.
+  // - Khi thiếu: cả 3 thanh biểu diễn hình phễu tương đối so với Lượt xem (100% -> Thêm giỏ -> Đơn).
   const hasTargets = Boolean(targetOrders > 0 && targetViews && targetCartAdds);
 
   const viewRawPct = hasTargets
@@ -338,11 +342,21 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             {realCartRatePct !== null && (
               <>
                 {' '}· Tỷ lệ thêm giỏ <strong className="font-semibold text-stone-900">{realCartRatePct}%</strong>
+                {baseRates?.cart_rate_pct != null && (
+                  <span className={baseRates.low_confidence ? 'text-stone-400' : undefined}>
+                    {' '}(trước mùa {baseRates.cart_rate_pct}% trên {baseRates.views?.toLocaleString('vi-VN')} lượt xem{baseRates.low_confidence ? ', mẫu quá nhỏ để so' : ''})
+                  </span>
+                )}
               </>
             )}
             {realOrderRatePct !== null && (
               <>
                 , chốt đơn từ giỏ <strong className="font-semibold text-stone-900">{realOrderRatePct}%</strong>
+                {baseRates?.order_rate_pct != null && (
+                  <span className={baseRates.low_confidence ? 'text-stone-400' : undefined}>
+                    {' '}(trước mùa {baseRates.order_rate_pct}% trên {baseRates.carts?.toLocaleString('vi-VN')} lượt thêm giỏ{baseRates.low_confidence ? ', mẫu quá nhỏ để so' : ''})
+                  </span>
+                )}
               </>
             )}
             .
@@ -367,7 +381,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-stone-50 px-3 py-1.5 text-[11px] text-stone-600 border border-stone-200/70">
             <span>
               <strong className="text-stone-900">Thực tế</strong> = số đo thật của shop trong kỳ ·{' '}
-              <strong className="text-stone-700">Mục tiêu</strong> = ước tính theo nhịp đơn shop × mùa vụ
+              <strong className="text-stone-700">Ngày thường</strong> = nhịp của chính tầng đó trong 60 ngày trước ngày mở bán × số ngày kỳ dịp
             </span>
           </div>
         )}
@@ -383,13 +397,13 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                 </span>
                 <span className="text-stone-300">|</span>
                 <span className="text-stone-500">
-                  Mục tiêu: {targetViews ? targetViews.toLocaleString('vi-VN') : 'Chưa có'}
+                  Ngày thường: {targetViews ? targetViews.toLocaleString('vi-VN') : 'chưa đủ lịch sử trước mùa'}
                 </span>
               </div>
             ) : (
-              <span className="text-stone-600 tabular-nums" title="Thực tế / Mục tiêu">
+              <span className="text-stone-600 tabular-nums" title="Thực tế trong kỳ · mức ngày thường (nhịp trước mùa × số ngày kỳ dịp)">
                 <strong className="text-stone-900">{actualViews.toLocaleString('vi-VN')}</strong>
-                {targetViews ? ` / ${targetViews.toLocaleString('vi-VN')} mục tiêu` : ' lượt xem'}
+                {targetViews != null ? ` lượt xem · ngày thường ${targetViews.toLocaleString('vi-VN')}${tierBasis?.views?.low_confidence ? ' (ít dữ liệu)' : ''}` : ' lượt xem'}
               </span>
             )}
           </div>
@@ -400,7 +414,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             >
               {actualViews > 0 && (
                 <span className="text-[11px] font-bold text-white tabular-nums">
-                  {hasTargets && viewRawPct > 100 ? `${viewRawPct}% mục tiêu` : `${viewRawPct}%`}
+                  {hasTargets ? vsNormal(viewRawPct) : `${viewRawPct}%`}
                 </span>
               )}
             </div>
@@ -427,13 +441,13 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                 </span>
                 <span className="text-stone-300">|</span>
                 <span className="text-stone-500">
-                  Mục tiêu: {targetCartAdds ? targetCartAdds.toLocaleString('vi-VN') : 'Chưa có'}
+                  Ngày thường: {targetCartAdds ? targetCartAdds.toLocaleString('vi-VN') : 'chưa đủ lịch sử trước mùa'}
                 </span>
               </div>
             ) : (
-              <span className="text-stone-600 tabular-nums" title="Thực tế / Mục tiêu">
+              <span className="text-stone-600 tabular-nums" title="Thực tế trong kỳ · mức ngày thường (nhịp trước mùa × số ngày kỳ dịp)">
                 <strong className="text-stone-900">{actualCartAdds.toLocaleString('vi-VN')}</strong>
-                {targetCartAdds ? ` / ${targetCartAdds.toLocaleString('vi-VN')} mục tiêu` : ' lượt thêm giỏ'}
+                {targetCartAdds != null ? ` lượt · ngày thường ${targetCartAdds.toLocaleString('vi-VN')}${tierBasis?.cart_adds?.low_confidence ? ' (ít dữ liệu)' : ''}` : ' lượt thêm giỏ'}
               </span>
             )}
           </div>
@@ -444,7 +458,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
             >
               {actualCartAdds > 0 && (
                 <span className="text-[11px] font-bold text-white tabular-nums">
-                  {hasTargets && cartRawPct > 100 ? `${cartRawPct}% mục tiêu` : `${cartRawPct}%`}
+                  {hasTargets ? vsNormal(cartRawPct) : `${cartRawPct}%`}
                 </span>
               )}
             </div>
@@ -478,7 +492,7 @@ export const CampaignFunnelCard: React.FC<Props> = ({
                 </span>
                 <span className="text-stone-300">|</span>
                 <span className="text-stone-500" title={targetNote ?? undefined}>
-                  Mức ngày thường: {targetOrders > 0 ? `${targetOrders.toLocaleString('vi-VN')} đơn` : 'Chưa có'}
+                  Mức ngày thường: {basis?.daily_rate != null ? `${(currentFunnel.orders ?? 0).toLocaleString('vi-VN')} đơn${basis.low_confidence ? ' (ít dữ liệu)' : ''}` : 'Chưa có'}
                 </span>
               </div>
             ) : (

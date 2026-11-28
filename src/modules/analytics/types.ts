@@ -626,6 +626,8 @@ export interface OccasionWindow {
   traction_start: string;
   peak_start: string;
   cut_off_date: string;
+  /** shop_measured: hạn chốt theo thời gian giao đo từ đơn của shop; event_default: mặc định của dịp */
+  lead_time_source?: 'shop_measured' | 'event_default';
   /** last_call: sau hạn chốt đơn thường tới ngày lễ; post_event: tối đa 14 ngày sau lễ để xem kết quả */
   current_phase: 'rd_sprint' | 'traction' | 'peak' | 'last_call' | 'post_event' | 'cut_off_passed' | 'upcoming';
   days_since_event?: number;
@@ -708,6 +710,8 @@ export interface PotentialProfile {
 }
 
 export interface ReadyToShipIdea {
+  /** ID theo nội dung (ổn định khi danh sách đổi thứ tự hay đổi theo ngày) */
+  id?: string;
   title: string;
   keyword?: string;
   evidence_level?: 'market_listing' | 'hybrid_mining' | 'template';
@@ -739,6 +743,7 @@ export interface ReadyToShipIdea {
 }
 
 export interface PodBlankSuggestion {
+  id?: string;
   blank_type: string;
   title?: string;
   name?: string;
@@ -840,6 +845,9 @@ export interface SeasonalCampaign {
   confidence_text?: 'Cao' | 'Khá' | 'Sơ bộ';
   confidence_dots?: number;
   expected_orders?: string;
+  /** Mức tăng đơn của dịp đo từ dữ liệu bán thật; null = chưa đo được (đơn dự kiến đang là mức ngày thường) */
+  expected_uplift?: { low: number; mid: number; high: number; source: 'shop_orders' | 'platform_orders' | 'market_sold' } | null;
+  expected_orders_basis?: string;
   weekday_text?: string;
   next_deadline?: {
     title: string;
@@ -872,6 +880,9 @@ export interface SeasonalCampaign {
 export interface OpportunityKeywordItem {
   id: string;
   tag: string;
+  /** Nguồn đề xuất từ khóa (catalog_occasion, trends_seasonal, onsite_search, ...) */
+  origins?: string[];
+  origin_labels?: string[];
   volume: number;
   sold_count_real?: number;
   etsy_favorers?: number;
@@ -970,6 +981,8 @@ export interface CampaignTargetBasis {
   /** độ nâng LƯỢT TÌM KIẾM của dịp (tham khảo, không nhân vào số đơn) */
   search_uplift?: number | null;
   missing: 'baseline_history' | 'baseline_orders' | 'uplift' | null;
+  /** có số nhưng dựa trên ít đơn (< 5) hoặc lịch sử ngắn (< 14 ngày) */
+  low_confidence?: boolean;
 }
 
 export interface SeasonalForecastReview {
@@ -990,8 +1003,22 @@ export interface OrderStatusBreakdown {
   cod_unpaid: number;
 }
 
+export interface FunnelTierLevel { level: number; per_day: number; base_count: number; coverage_days: number; low_confidence?: boolean }
+
+export interface FunnelTierBasis {
+  window_days: number;
+  views: FunnelTierLevel | null;
+  cart_adds: FunnelTierLevel | null;
+  /** tỷ lệ chuyển đổi trong khoảng trước ngày mở bán */
+  baseline_rates: { cart_rate_pct: number | null; order_rate_pct: number | null; views?: number; carts?: number; orders?: number; low_confidence?: boolean };
+  baseline_orders: number;
+  coverage_days: number;
+}
+
 export interface CampaignFunnel {
   target_basis?: CampaignTargetBasis;
+  /** mức ngày thường của tầng lượt xem / thêm giỏ (nhịp sự kiện trước mùa × số ngày kỳ dịp) */
+  tier_basis?: FunnelTierBasis;
   impressions?: number | null;
   clicks?: number | null;
   views?: number | null;
@@ -1076,6 +1103,53 @@ export interface MotivationBreakdown {
   source_description?: string;
 }
 
+export type SeasonalIdeaKind = 'ai' | 'ready' | 'pod' | 'keyword';
+
+/** Nội dung ý tưởng lúc seller lưu vào kế hoạch */
+export interface SeasonalIdeaSnapshot {
+  title: string;
+  kind: SeasonalIdeaKind;
+  keyword?: string;
+  price_vnd?: number;
+  source?: string;
+  saved_at?: string;
+}
+
+/** Thành quả của một ý tưởng: sản phẩm áp dụng và đơn hợp lệ trong kỳ dịp */
+export interface SeasonalIdeaOutcome {
+  idea_id: string;
+  title: string;
+  kind: SeasonalIdeaKind | null;
+  saved: boolean;
+  stage: 'idea' | 'listed' | 'selling';
+  products: Array<{ id: string; title: string }>;
+  orders: number;
+  units: number;
+  revenue: number;
+}
+
+export interface SeasonalIdeaOutcomeReport {
+  items: SeasonalIdeaOutcome[];
+  totals: {
+    ideas_saved: number;
+    ideas_listed: number;
+    ideas_selling: number;
+    orders: number;
+    units: number;
+    revenue: number;
+    shop_orders_in_window: number;
+    share_of_shop_orders_pct: number | null;
+  };
+  window: { start: string; end: string };
+}
+
+export interface MarketSourceFreshness {
+  as_of: string | null;
+  age_days: number | null;
+  stale: boolean;
+  label: string;
+}
+
 export interface SeasonalForecast {
   keyword: string;
   primary_keyword?: string;
@@ -1093,6 +1167,8 @@ export interface SeasonalForecast {
   motivation_breakdown?: MotivationBreakdown;
   saved_ideas?: string[];
   checked_milestones?: Record<string, boolean>;
+  /** Bài học mùa trước (cùng dịp, kỳ năm trước) do BE dựng từ đánh giá + kết quả ý tưởng */
+  previous_season_lesson?: PreviousSeasonLesson | null;
   story?: SeasonalStory;
   apply_playbooks?: ApplyPlaybook[];
   impact?: SeasonalImpact;
@@ -1108,6 +1184,11 @@ export interface SeasonalForecast {
   is_live_shop?: boolean;
   /** false: đang xem gian hàng mẫu dùng chung, không lưu được kế hoạch */
   can_save_plan?: boolean;
+  saved_idea_snapshots?: Record<string, SeasonalIdeaSnapshot>;
+  idea_outcomes?: SeasonalIdeaOutcomeReport;
+  /** 'ready' = ý tưởng do AI soạn riêng; 'generating' = đang soạn nền; 'draft' = bản phác thảo từ số liệu */
+  ai_ideas_status?: 'ready' | 'generating' | 'draft' | 'none';
+  data_freshness?: Record<string, MarketSourceFreshness>;
   /** Sau lễ: các bản dự báo đã lưu mỗi tuần so với số đơn thực tế của kỳ */
   forecast_review?: SeasonalForecastReview | null;
   ready_to_ship_ideas?: ReadyToShipIdea[];
@@ -1146,7 +1227,33 @@ export interface SeasonalStory {
   results: SeasonalStoryChapter;
 }
 
+export interface PreviousSeasonLesson {
+  event_year: number;
+  rating: 'good' | 'neutral' | 'poor' | null;
+  note: string;
+  updated_at?: string;
+  ideas: Array<{
+    title: string;
+    stage: 'idea' | 'listed' | 'selling';
+    orders: number;
+    revenue: number;
+    rating?: 'good' | 'neutral' | 'poor';
+    note?: string;
+  }>;
+  totals: { orders: number; revenue: number };
+  /** true khi ý tưởng AI đang hiện được soạn kèm bài học này */
+  used_by_ai?: boolean;
+}
+
+export type PlaybookStepKey = 'listing' | 'test' | 'decide' | 'produce' | 'cutoff';
+
 export interface PlaybookStep {
+  /** Mã bước cố định do BE gán (thiếu ở phản hồi cũ trong cache) */
+  key?: PlaybookStepKey;
+  /** Vị trí lưu tick cố định: listing 0, test 1, decide 2, produce 3, cutoff 4 */
+  slot?: number;
+  /** Số đơn cần đạt ở bước thử nhỏ */
+  target_orders?: number;
   date: string;
   days_from_today: number;
   task: string;
@@ -1188,6 +1295,8 @@ export interface SeasonalImpact {
   adopted_orders?: number;
   adopted_gmv?: number;
   adopted_share_pct?: number;
+  /** 'source_idea_id' khi BE thay bằng số đo theo sản phẩm gắn ý tưởng (đúng hơn khớp tên) */
+  adopted_basis?: 'source_idea_id';
   gmv?: number;
   aov_vs_baseline_pct?: number | null;
   previous_season?: { orders_same_period: number; orders_total: number; yoy_pct: number | null };

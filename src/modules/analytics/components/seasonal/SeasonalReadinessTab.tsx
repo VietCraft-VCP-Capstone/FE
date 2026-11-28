@@ -47,6 +47,10 @@ export function SeasonalReadinessTab({
   onOpenEvidence,
 }: SeasonalReadinessTabProps) {
   const campName = activeCamp.name?.replace(/Lễ Hội |Mùa /gi, '') || 'Chiến dịch';
+  // Mốc của dịp lấy đúng từ khung thời gian AI tính (hạn chốt theo lead time), không đoán
+  const cutOffDate = activeCamp.occasion_window?.cut_off_date || '';
+  const tractionStart = activeCamp.occasion_window?.traction_start || '';
+  const eventDate = activeCamp.occasion_window?.peak_date || activeCamp.launch_window?.peak_date || '';
 
   const [filterTier, setFilterTier] = useState<'all' | 'zero' | 'low' | 'high'>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -501,16 +505,18 @@ export function SeasonalReadinessTab({
                   onClick={() =>
                     onOpenEvidence({
                       id: 'ev_readiness_logic',
-                      definition: 'Bộ tiêu chuẩn sẵn sàng đón dịp cho sản phẩm thủ công & thời trang.',
-                      sources: ['Phân tích hành vi mua sắm sàn TMĐT Việt Nam'],
-                      howObtained: 'Kiểm toán 1.200 listing trước và trong các kỳ cao điểm.',
-                      period: ['2026-01-01', '2026-11-01'],
-                      n: 1200,
-                      formula: 'Sản phẩm hoàn thiện 4/4 tiêu chí đạt doanh số gấp 2.8 lần sản phẩm thông thường.',
-                      confidence: 'high',
-                      confidenceReason: 'Đối chứng trực tiếp từ kết quả đối soát doanh thu.',
-                      mayBeWrongBecause: ['Chất lượng sản phẩm thực tế không tương xứng với ảnh chụp concept.'],
-                      updatedAt: '2026-11-05',
+                      definition: `Các lưu ý vận hành gắn với mốc thời gian của dịp ${activeCamp.name}.`,
+                      sources: ['Lịch dịp mua sắm Việt Nam (calendar_vn)', 'Hạn chốt đơn tính lùi từ ngày lễ theo thời gian sản xuất và giao hàng'],
+                      howObtained: 'Ngày hạn chốt và ngày mở bán lấy từ khung thời gian của dịp; các lưu ý là quy tắc vận hành, không phải số đo.',
+                      period: [tractionStart || cutOffDate || '', eventDate || cutOffDate || ''],
+                      n: 0,
+                      formula: cutOffDate
+                        ? `Hạn chốt ${fullDate(cutOffDate)} = ngày lễ − thời gian sản xuất & giao hàng.`
+                        : 'Chưa xác định được hạn chốt của dịp.',
+                      confidence: 'fair',
+                      confidenceReason: 'Mốc ngày tính theo công thức; đây là gợi ý vận hành, chưa có số đo hiệu quả của từng lưu ý.',
+                      mayBeWrongBecause: ['Thời gian giao thực tế của shop có thể dài hơn mặc định của dịp.'],
+                      updatedAt: new Date().toISOString().slice(0, 10),
                     })
                   }
                   className="p-1 rounded-lg text-stone-400 hover:text-[#007700] hover:bg-stone-100 transition-colors cursor-pointer"
@@ -524,16 +530,16 @@ export function SeasonalReadinessTab({
 
             <div className="space-y-2 text-[11px] leading-relaxed">
               <div className="rounded-xl bg-amber-50/80 border border-amber-200/80 p-2.5 text-amber-950">
-                <strong className="block text-amber-900">1. Chốt đơn đúng hạn {activeCamp.launch_window?.end ? fullDate(activeCamp.launch_window.end) : 'trước lễ 10 ngày'}</strong>
+                <strong className="block text-amber-900">1. Chốt đơn đúng hạn {cutOffDate ? fullDate(cutOffDate) : 'của dịp'}</strong>
                 <span className="text-amber-800">Ngừng nhận đơn sau mốc này để giao kịp lễ, tránh hủy đơn.</span>
               </div>
               <div className="rounded-xl bg-emerald-50/60 border border-emerald-200/70 p-2.5 text-stone-800">
-                <strong className="block text-[#007700]">2. Thêm phân loại hộp quà (+35.000đ)</strong>
+                <strong className="block text-[#007700]">2. Thêm phân loại hộp quà hoặc combo</strong>
                 <span className="text-stone-600">Tăng giá trị đơn (AOV) từ hàng sẵn có, không cần ôm mã mới.</span>
               </div>
               <div className="rounded-xl bg-stone-50 border border-stone-200/80 p-2.5 text-stone-700">
-                <strong className="block text-stone-900">3. Đổi tiêu đề &amp; tag trước 5–7 ngày</strong>
-                <span className="text-stone-600">Giúp sàn kịp lập chỉ mục tìm kiếm trước khi mở bán.</span>
+                <strong className="block text-stone-900">3. Cập nhật tiêu đề &amp; tag trước ngày mở bán{tractionStart ? ` (${fullDate(tractionStart)})` : ''}</strong>
+                <span className="text-stone-600">Để khách tìm thấy sản phẩm ngay khi nhu cầu của dịp bắt đầu tăng.</span>
               </div>
             </div>
 

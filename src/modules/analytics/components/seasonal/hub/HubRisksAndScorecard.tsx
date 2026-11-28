@@ -8,6 +8,9 @@ export interface RouteRiskItem {
   carrier: string;
   delayRatePct: number | null;
   cancelRatePct: number | null;
+  /** Số ngày từ lúc đặt tới lúc giao xong (trung vị, p90) đo từ đơn đã giao */
+  deliveryDaysP50?: number | null;
+  deliveryDaysP90?: number | null;
   sampleOrders: number;
   insufficientData?: boolean;
   isReferenceBenchmark?: boolean;
@@ -73,13 +76,13 @@ export const HubRisksAndScorecard: React.FC<Props> = ({
           <div className="space-y-1.5">
             {risks.length === 0 ? (
               <div className="rounded-lg border border-dashed border-stone-200 p-3 text-center text-[11px] text-stone-500">
-                Chưa ghi nhận rủi ro chậm trễ bất thường trên các tuyến chính.
+                Chưa có dữ liệu giao hàng theo vùng.
               </div>
             ) : (
               risks.map((risk, i) => {
                 const isOpen = openRisk === i;
                 const hasMeasuredRates =
-                  typeof risk.delayRatePct === 'number' && typeof risk.cancelRatePct === 'number';
+                  typeof risk.deliveryDaysP50 === 'number' && typeof risk.cancelRatePct === 'number';
                 return (
                   <div key={i} className="rounded-lg border border-stone-200/80 bg-stone-50/40 overflow-hidden">
                     <div className="flex items-center justify-between gap-2 px-2.5 py-2 text-xs">
@@ -89,13 +92,15 @@ export const HubRisksAndScorecard: React.FC<Props> = ({
                         className="flex items-center gap-1.5 text-left min-w-0 flex-1 cursor-pointer"
                       >
                         <span className="font-semibold text-stone-900 truncate">{risk.route}</span>
-                        <span className="text-[10px] text-stone-400 shrink-0 hidden sm:inline">({risk.carrier})</span>
+                        {risk.carrier && (
+                          <span className="text-[10px] text-stone-400 shrink-0 hidden sm:inline">({risk.carrier})</span>
+                        )}
                       </button>
                       <div className="flex items-center gap-2 shrink-0 text-[11px]">
                         {hasMeasuredRates ? (
                           <>
-                            <span className={risk.delayRatePct! > 10 ? 'font-bold text-amber-700' : 'text-stone-600'}>
-                              Trễ {risk.delayRatePct}%
+                            <span className="text-stone-600" title="Trung vị · 90% đơn giao xong trong">
+                              Giao {risk.deliveryDaysP50!.toLocaleString('vi-VN')} ngày (p90 {risk.deliveryDaysP90?.toLocaleString('vi-VN')})
                             </span>
                             <span className="text-stone-300">·</span>
                             <span className={risk.cancelRatePct! > 5 ? 'font-bold text-rose-700' : 'text-stone-600'}>
@@ -104,7 +109,7 @@ export const HubRisksAndScorecard: React.FC<Props> = ({
                           </>
                         ) : (
                           <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-500">
-                            Chưa đủ mẫu ({risk.sampleOrders}/10 đơn)
+                            Chưa đủ mẫu ({risk.sampleOrders}/10 đơn đã giao)
                           </span>
                         )}
                         <EvidenceTrigger evidence={risk.evidence} onOpen={onOpenEvidence} />
@@ -123,7 +128,7 @@ export const HubRisksAndScorecard: React.FC<Props> = ({
                         <AlertTriangle size={12} className="text-amber-600 shrink-0 mt-0.5" />
                         <span>
                           {risk.criticalDayNotice}{' '}
-                          <span className="text-stone-500">(n = {risk.sampleOrders} đơn thực tế 90 ngày)</span>
+                          <span className="text-stone-500">(n = {risk.sampleOrders} đơn đã giao trong 90 ngày)</span>
                         </span>
                       </div>
                     )}
