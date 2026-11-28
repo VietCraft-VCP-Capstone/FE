@@ -21,18 +21,18 @@ export const SearchHeaderBanner: React.FC<SearchHeaderBannerProps> = ({
       backgroundColor: '#ffffff',
       border: '1px solid #e7e5e4',
       borderRadius: 16,
-      padding: '24px 28px',
-      marginBottom: 24,
+      padding: 'clamp(14px, 4vw, 24px) clamp(16px, 4vw, 28px)',
+      marginBottom: 'clamp(14px, 4vw, 24px)',
       boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
       display: 'flex',
       flexWrap: 'wrap',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: 16
+      gap: 'clamp(10px, 3vw, 16px)'
     }}>
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1c1917', margin: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 10px' }}>
+          <h1 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 'clamp(16px, 4.2vw, 21px)', fontWeight: 600, lineHeight: 1.25, color: '#1c1917', margin: 0 }}>
             {query ? (
               <>
                 Kết quả tìm kiếm cho <span style={{ color: '#007700' }}>"{query}"</span>
@@ -51,12 +51,13 @@ export const SearchHeaderBanner: React.FC<SearchHeaderBannerProps> = ({
             fontSize: 13,
             fontWeight: 700,
             padding: '3px 10px',
+            whiteSpace: 'nowrap',
             borderRadius: 20
           }}>
             {total} sản phẩm
           </span>
         </div>
-        <p style={{ margin: '6px 0 0', fontSize: 13, color: '#78716c' }}>
+        <p className="hidden sm:block" style={{ margin: '6px 0 0', fontSize: 13, color: '#78716c' }}>
           Khám phá các tuyệt tác thủ công tinh hoa và quà tặng sáng tạo từ các nghệ nhân khắp Việt Nam
         </p>
       </div>

@@ -1,9 +1,8 @@
 import { Eye, ShoppingBag, ShoppingCart } from 'lucide-react';
 import { dateRange, decimal, pct } from '../../format';
 import { categoryLabel } from '../../labels';
-import type { InsightMeta, ListingConversion } from '../../types';
+import type { ListingConversion } from '../../types';
 import { FunnelFlow } from '../charts/FunnelFlow';
-import { SourceFooter } from '../SourceFooter';
 import { InsightCard } from '../ui';
 
 const BUOC_YEU = { view_to_cart: 1, cart_to_order: 2 } as const;
@@ -46,9 +45,9 @@ function Compare({ data }: { data: ListingConversion }) {
   );
 }
 
-export function FunnelCard({ data, meta }: { data: ListingConversion; meta: InsightMeta }) {
+export function FunnelCard({ data }: { data: ListingConversion }) {
   return (
-    <InsightCard title="Hành trình khách mua" description={`Từ ${dateRange(data.window.from, data.window.to)}.`} footer={<SourceFooter meta={meta} />}>
+    <InsightCard title="Hành trình khách mua" description={`Từ ${dateRange(data.window.from, data.window.to)}.`}>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <FunnelFlow
           stages={[

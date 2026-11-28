@@ -1,5 +1,5 @@
 import { withCommission } from '../../../../shared/utils/commission';
-import type { IntelDraft } from '../../../analytics/intelTypes';
+import type { HealthDraft } from '../../../analytics/healthTypes';
 
 export interface DraftSource {
     title: string;
@@ -14,7 +14,7 @@ export interface DraftSource {
     commissionPercent: number | null;
 }
 
-export function previewDraft(s: DraftSource): IntelDraft {
+export function previewDraft(s: DraftSource): HealthDraft {
     const pct = s.commissionPercent;
     const prices = pct === null ? [] : (s.blank?.variations || [])
         .filter((v: any) => s.selectedVariants[v.sku]?.on)

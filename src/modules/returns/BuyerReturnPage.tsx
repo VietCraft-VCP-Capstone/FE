@@ -4,10 +4,12 @@ import { getApiErrorMessage } from '../../infrastructure/api/interceptors';
 import { ArrowLeft, CalendarClock, Check, FileText, ImagePlus, Loader2, PackageCheck, Scale, ShieldAlert, UploadCloud, Video } from 'lucide-react';
 import { returnService, type ReturnDetail, type ReturnEvidence, type ReturnResolution } from './services/returnService';
 import { allowedReturnResolutions } from './return-workflow-policy';
-import { BADGE_CLASS, labels, reasons, statusTone } from './components/returnDisplay';
+import { BADGE_CLASS, labels, reasonLabel, reasons, statusTone } from './components/returnDisplay';
 import { ReturnStatusBanners } from './components/ReturnStatusBanners';
 import { ReturnTimeline } from './components/ReturnTimeline';
 import { EvidenceGallery } from './components/EvidenceGallery';
+import { ReturnBankCard, useCodOrder } from './components/ReturnBankCard';
+import { EMPTY_BANK_INFO, RefundBankFields, isValidBankInfo } from '../buyer/components/refund/RefundBankFields';
 
 const field = 'mt-1 w-full rounded-lg border border-gray-300 p-2.5 text-sm';
 const errorText = (error: unknown) => getApiErrorMessage(error, 'Không thể hoàn tất yêu cầu.');
@@ -25,6 +27,7 @@ export function BuyerReturnPage() {
   const [disputeReason, setDisputeReason] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [bankInfo, setBankInfo] = useState(EMPTY_BANK_INFO);
   const [uploading, setUploading] = useState(false);
   const orderId = params.get('orderId') || '';
   const orderItemId = params.get('orderItemId') || '';
@@ -36,6 +39,7 @@ export function BuyerReturnPage() {
   const backendDeadline = params.get('deadline');
   const allowedReasons = allowedReturnResolutions;
   const resolutionOptions = allowedReasons[reasonCode] || [];
+  const needsBank = useCodOrder(requestId ? '' : orderId) && resolution === 'REFUND';
 
   const load = async () => {
     if (!requestId) return;
@@ -72,9 +76,10 @@ export function BuyerReturnPage() {
     if (!orderId || !orderItemId) { setError('Thiếu mã đơn hoặc mã sản phẩm trong đơn.'); return; }
     if (description.trim().length < 5) { setError('Mô tả cần ít nhất 5 ký tự.'); return; }
     if (!evidence.length) { setError('Cần ít nhất một ảnh hoặc video minh chứng.'); return; }
+    if (needsBank && !isValidBankInfo(bankInfo)) { setError('Nhập đủ ngân hàng, chủ tài khoản và số tài khoản (6–20 chữ số) để nhận tiền hoàn.'); return; }
     setBusy(true);
     try {
-      const created = await returnService.create({ orderId, orderItemId, quantity, reasonCode, description: description.trim(), resolution, evidence });
+      const created = await returnService.create({ orderId, orderItemId, quantity, reasonCode, description: description.trim(), resolution, evidence, ...(needsBank ? { refundBankInfo: bankInfo } : {}) });
       navigate(`/returns/${encodeURIComponent(returnService.idOf(created))}`);
     } catch (e) { setError(errorText(e)); }
     finally { setBusy(false); }
@@ -113,7 +118,7 @@ export function BuyerReturnPage() {
           <section className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><FileText size={15} /> Mã yêu cầu</div><p className="mt-3 break-all font-mono text-sm font-semibold text-slate-900">{returnService.idOf(request)}</p></div>
             {request.deadline_at && <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><CalendarClock size={15} /> Hạn xử lý</div><p className="mt-3 text-sm font-semibold text-slate-900">{new Date(request.deadline_at).toLocaleString('vi-VN')}</p></div>}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><PackageCheck size={15} /> Phương án</div><p className="mt-3 text-sm font-semibold text-slate-900">{request.requested_resolution === 'EXCHANGE' ? 'Đổi hàng' : 'Hoàn tiền'}</p><p className="mt-1 text-xs text-slate-500">Lý do {request.reason_code || '—'} · Số lượng {request.quantity ?? '—'}</p></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500"><PackageCheck size={15} /> Phương án</div><p className="mt-3 text-sm font-semibold text-slate-900">{request.requested_resolution === 'EXCHANGE' ? 'Đổi hàng' : 'Hoàn tiền'}</p><p className="mt-1 text-xs text-slate-500">Lý do: {reasonLabel(request.reason_code)} · Số lượng {request.quantity ?? '—'}</p></div>
           </section>
 
           {/* Product Snapshot & Details Card */}
@@ -147,7 +152,7 @@ export function BuyerReturnPage() {
                 onClick={() => navigate(`/orders/${encodeURIComponent(request.order_id)}`)}
                 className="text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition border border-emerald-200 flex-shrink-0 flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Xem đơn hàng #{request.order_id}</span>
+                <span>Xem đơn hàng</span>
                 <ArrowLeft size={13} className="rotate-180" />
               </button>
             )}
@@ -161,6 +166,7 @@ export function BuyerReturnPage() {
           )}
 
           <ReturnStatusBanners request={request} timeline={detail?.timeline || []} />
+          <ReturnBankCard request={request} onSaved={load} />
 
           <div className="grid items-stretch gap-6 md:grid-cols-2">
             <ReturnTimeline timeline={detail?.timeline || []} />
@@ -226,6 +232,7 @@ export function BuyerReturnPage() {
           </section>
           <section className="border-t border-slate-100 pt-5"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-sm font-extrabold text-emerald-900">02</span><div><h2 className="font-bold text-slate-950">Phương án mong muốn</h2><p className="mt-1 text-sm text-slate-500">Tùy lý do, một số phương án có thể không khả dụng.</p></div></div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${resolution === 'REFUND' ? 'border-emerald-500 bg-emerald-50/70 ring-1 ring-emerald-500' : 'border-slate-200 hover:border-slate-300'}`}><input type="radio" name="resolution" disabled={!resolutionOptions.includes('REFUND')} className="mt-1 accent-emerald-700 disabled:cursor-not-allowed" checked={resolution === 'REFUND'} onChange={() => setResolution('REFUND')} /><span><strong className="block text-sm text-slate-900">Hoàn tiền</strong><small className="mt-1 block text-xs leading-5 text-slate-600">Yêu cầu hoàn tiền theo kết quả xử lý.</small></span></label><label className={`flex items-start gap-3 rounded-xl border p-4 transition ${!resolutionOptions.includes('EXCHANGE') ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-60' : resolution === 'EXCHANGE' ? 'cursor-pointer border-emerald-500 bg-emerald-50/70 ring-1 ring-emerald-500' : 'cursor-pointer border-slate-200 hover:border-slate-300'}`}><input type="radio" name="resolution" disabled={!resolutionOptions.includes('EXCHANGE')} className="mt-1 accent-emerald-700" checked={resolution === 'EXCHANGE'} onChange={() => setResolution('EXCHANGE')} /><span><strong className="block text-sm text-slate-900">Đổi hàng</strong><small className="mt-1 block text-xs leading-5 text-slate-600">Áp dụng cho sản phẩm in ấn bị lỗi kỹ thuật.</small></span></label></div>
+            {needsBank && <div className="mt-4"><RefundBankFields value={bankInfo} onChange={setBankInfo} /></div>}
           </section>
           <section className="border-t border-slate-100 pt-5"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-sm font-extrabold text-emerald-900">03</span><div><h2 className="font-bold text-slate-950">Ảnh / video minh chứng <span className="text-rose-600">*</span></h2><p className="mt-1 text-sm text-slate-500">Ít nhất 1 tệp · tối đa 3 ảnh và 1 video.</p></div></div>
             <label className="mt-4 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 text-center transition hover:border-emerald-500 hover:bg-emerald-50/50"><UploadCloud className="mb-2 text-emerald-800" size={24} /><span className="text-sm font-bold text-slate-800">{uploading ? 'Đang tải tệp lên…' : 'Chọn ảnh hoặc video'}</span><span className="mt-1 text-xs text-slate-500">JPG, PNG, WebP, MP4, WebM hoặc MOV</span><input className="sr-only" type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" disabled={uploading} onChange={e => { void upload(e.target.files); e.target.value = ''; }} /></label>

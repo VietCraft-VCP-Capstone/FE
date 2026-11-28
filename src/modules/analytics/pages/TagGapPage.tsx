@@ -17,6 +17,7 @@ import { ACTION_CLASS, Chip, DataTable, InsightCard, Note, SelectField, Takeaway
 import { decimal, pct } from '../format';
 import { useInsight } from '../hooks/useInsight';
 import { categoryLabel, tagLabel } from '../labels';
+import { MSG } from '../services/analyticsApi';
 import type { TagGap } from '../types';
 
 /** AI gợi ý từ khoá riêng cho một sản phẩm: lấy từ sản phẩm giống nó, bù bằng độ phổ biến trong cùng loại hàng. */
@@ -68,7 +69,7 @@ export function TagGapPage() {
 
   return (
     <InsightPage title="Gợi ý từ khoá" question="Shop bán chạy cùng danh mục hay gắn từ khoá (tag) nào mà tôi chưa có?">
-      <InsightBlock state={state} onRetry={reload}>
+      <InsightBlock state={state} onRetry={reload} errorText={MSG[140]}>
         {(data, meta) => {
           const trusted = data.signal.has_signal;
           const rows = [...data.missing_tags].sort((a, b) => b.lift - a.lift);
@@ -82,7 +83,7 @@ export function TagGapPage() {
                 action={
                   trusted && goi
                     ? <Link to="/seller/products" className={ACTION_CLASS}>Thêm từ khoá cho sản phẩm</Link>
-                    : <Link to="/seller/insights/competitors#manh-yeu" className={ACTION_CLASS}>Xem điểm mạnh & điểm yếu</Link>
+                    : <Link to="/seller/insights/competitors#so-sanh" className={ACTION_CLASS}>So sánh với đối thủ</Link>
                 }
               >
                 {trusted && goi ? (

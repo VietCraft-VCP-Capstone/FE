@@ -4,7 +4,7 @@ import '../../../shared/components/layouts.css';
 import { POD_CREATE_ENABLED, POD_CREATE_PATH } from '../featureFlags';
 import {
   LayoutGrid, Archive, Store, ShoppingCart, Package, PlusCircle, Palette, Ticket,
-  Banknote, Rocket, Users,
+  Banknote, Rocket, Users, RotateCcw,
   Settings, Bell, Mail, PanelLeft, LogOut, ChevronDown, MessageSquare
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -39,7 +39,7 @@ const OPS_NAV: SellerNavItem[] = [
   { to: '/seller/catalog', icon: Archive, label: 'Danh mục sản phẩm' },
   { to: '/seller/storefront', icon: Store, label: 'Thông tin cửa hàng' },
   { to: '/seller/orders', icon: ShoppingCart, label: 'Đơn hàng' },
-  { to: '/seller/refund-requests', icon: Package, label: 'Hoàn tiền' },
+  { to: '/seller/refund-requests', icon: RotateCcw, label: 'Hoàn tiền' },
   { to: '/seller/chat', icon: MessageSquare, label: 'Tin nhắn khách hàng' },
   { to: '/seller/products', icon: Package, label: 'Quản lí sản phẩm' },
   { to: '/seller/products/new', icon: PlusCircle, label: 'Tạo sản phẩm POD' },
@@ -180,10 +180,10 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
                     aria-current={isActive(to) ? 'page' : undefined}
                   >
                     <Icon size={19} />
-                    {!collapsed && <span>{label}</span>}
+                    {!collapsed && <span className="seller-nav-label">{label}</span>}
                     {to === '/seller/chat' && unreadChatCount > 0 && (
-                      <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold bg-red-500 text-white rounded-full">
-                        {unreadChatCount}
+                      <span className="seller-nav-badge">
+                        {unreadChatCount > 99 ? '99+' : unreadChatCount}
                       </span>
                     )}
                   </Link>
@@ -193,8 +193,13 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
           ))}
         </nav>
         <div className="seller-sidebar-footer">
-          <Link to="/seller/settings" className="seller-settings-btn" title="Cài đặt cửa hàng">
+          <Link
+            to="/seller/settings"
+            className={`seller-nav-item ${location.pathname.startsWith('/seller/settings') ? 'active' : ''}`}
+            title={collapsed ? 'Cài đặt cửa hàng' : undefined}
+          >
             <Settings size={19} />
+            {!collapsed && <span className="seller-nav-label">Cài đặt cửa hàng</span>}
           </Link>
         </div>
       </aside>
@@ -256,9 +261,14 @@ export function SellerLayout({ children, user, onLogout, groups }: SellerLayoutP
         </header>
 
         {/* Main Body */}
-        <main className={`seller-content ${location.pathname.includes('/chat') ? 'seller-chat-content' : ''}`}>
-          {children}
-        </main>
+        {location.pathname.includes('/chat') ? (
+          <main className="seller-content seller-chat-content">{children}</main>
+        ) : (
+          <main className="seller-content">
+            {/* Khung chung: mọi trang seller cùng bề rộng tối đa và cùng lề, trang con không tự đặt max-width/padding */}
+            <div className="seller-page">{children}</div>
+          </main>
+        )}
       </div>
     </div>
   );

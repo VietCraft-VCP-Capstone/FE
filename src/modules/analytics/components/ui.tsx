@@ -209,10 +209,18 @@ export function SelectField({ label, value, onChange, options, className }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  /** Lựa chọn liền nhau cùng `group` nằm chung một <optgroup>. */
+  options: { value: string; label: string; group?: string }[];
   className?: string;
 }) {
   const id = React.useId();
+  const nhom: { ten?: string; ds: typeof options }[] = [];
+  for (const o of options) {
+    const cuoi = nhom[nhom.length - 1];
+    if (cuoi && cuoi.ten === o.group) cuoi.ds.push(o);
+    else nhom.push({ ten: o.group, ds: [o] });
+  }
+  const the = (ds: typeof options) => ds.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>);
   return (
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <label htmlFor={id} className="whitespace-nowrap text-xs font-semibold text-stone-600">{label}</label>
@@ -222,9 +230,9 @@ export function SelectField({ label, value, onChange, options, className }: {
         onChange={e => onChange(e.target.value)}
         className="h-9 min-w-0 cursor-pointer rounded-md border border-stone-200 bg-white px-3 text-sm text-stone-800 outline-none transition-colors duration-150 hover:border-stone-300 focus-visible:border-[#007700] focus-visible:ring-2 focus-visible:ring-[#007700]/20"
       >
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
+        {nhom.map((g, i) => (g.ten
+          ? <optgroup key={i} label={g.ten}>{the(g.ds)}</optgroup>
+          : <React.Fragment key={i}>{the(g.ds)}</React.Fragment>))}
       </select>
     </div>
   );

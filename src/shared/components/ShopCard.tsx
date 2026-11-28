@@ -23,7 +23,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
   const navigate = useNavigate();
   const shopId = shop.id || shop._id || '';
   const shopTarget = shop.slug || shopId;
-  const ratingVal = shop.averageRating || shop.rating || 5.0;
+  const ratingVal = shop.averageRating ?? shop.rating ?? 0;
   const listingVal = shop.listingCount || 0;
   const followersVal = shop.followersCount || 0;
   const shopDisplayName = shop.name || shop.shopName || 'Gian hàng';
@@ -91,7 +91,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-600 mt-2.5 mb-4 pb-3 border-b border-gray-100">
             <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
               <Star className="w-3.5 h-3.5 fill-current text-amber-500" />
-              {ratingVal.toFixed(1)} {shop.ratingCount ? `(${shop.ratingCount})` : ''}
+              {shop.ratingCount ? `${ratingVal.toFixed(1)} (${shop.ratingCount})` : 'Chưa có đánh giá'}
             </span>
             <span className="inline-flex items-center gap-1 bg-stone-100 px-2 py-0.5 rounded-md text-stone-700">
               <Package className="w-3.5 h-3.5" />

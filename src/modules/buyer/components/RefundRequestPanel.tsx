@@ -22,12 +22,14 @@ const labels: Record<string, string> = {
 interface RefundRequestPanelProps {
   orderId: string;
   refundOrderId: string;
+  orderCode?: string;
+  paymentMethod?: string;
   formOpen: boolean;
   onFormClose: () => void;
   onCreated: () => void;
 }
 
-export function RefundRequestPanel({ orderId, refundOrderId, formOpen, onFormClose, onCreated }: RefundRequestPanelProps) {
+export function RefundRequestPanel({ orderId, refundOrderId, orderCode, paymentMethod, formOpen, onFormClose, onCreated }: RefundRequestPanelProps) {
   const [searchParams] = useSearchParams();
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -75,7 +77,7 @@ export function RefundRequestPanel({ orderId, refundOrderId, formOpen, onFormClo
 
   // Sau khi được duyệt, tiến trình chuyển tiền thật nằm ở execution_status.
   const approvedMessage = request?.status === 'REFUNDED' || request?.execution_status === 'SUCCEEDED'
-    ? 'Tiền đã được hoàn về tài khoản bạn dùng để thanh toán.'
+    ? `Đã hoàn ${Number(request.refund_amount || 0).toLocaleString('vi-VN')}đ cho bạn.`
     : request?.execution_status === 'FAILED' || request?.execution_status === 'NOT_STARTED'
     ? 'Yêu cầu được chấp thuận nhưng chưa chuyển được tiền hoàn. Người bán hoặc quản trị viên đang xử lý lại.'
     : 'Yêu cầu được chấp thuận. Hệ thống đang chuyển tiền hoàn về tài khoản bạn dùng để thanh toán.';
@@ -144,7 +146,7 @@ export function RefundRequestPanel({ orderId, refundOrderId, formOpen, onFormClo
               ? 'Người bán đang xem xét yêu cầu. Bạn sẽ thấy cập nhật tại đây.'
               : request.status === 'DISPUTED'
               ? 'Tranh chấp đã được chuyển đến quản trị viên để xem xét.'
-              : request.status.includes('APPROVED')
+              : request.status.includes('APPROVED') || request.status === 'REFUNDED'
               ? approvedMessage
               : 'Yêu cầu đang được xử lý.'}
           </div>
@@ -199,7 +201,8 @@ export function RefundRequestPanel({ orderId, refundOrderId, formOpen, onFormClo
         <RefundFormModal
           isOpen={formOpen}
           orderId={refundOrderId}
-          orderCode={requestOrderCode}
+          orderCode={requestOrderCode || orderCode}
+          paymentMethod={paymentMethod}
           onClose={onFormClose}
           onSuccess={newRequest => {
             setRequest(newRequest);

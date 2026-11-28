@@ -60,7 +60,6 @@ export interface InsightEnvelope<T> {
 
 export type TimeRange = '7d' | '30d' | '90d' | '180d' | '365d' | 'year';
 export type AlertPeriod = TimeRange | 'all';
-export type ForecastWindow = '30' | '60' | '90';
 
 /* ------------------------------------------------------------ F26 -------- */
 
@@ -133,7 +132,7 @@ export interface ListingConversion {
 /* ------------------------------------------------------------ F29 -------- */
 export type HealthStatus = 'good' | 'needs_improvement' | 'poor';
 
-export type HealthAxis = 'image' | 'description' | 'tags' | 'material' | 'review' | 'price';
+export type HealthAxis = 'image' | 'description' | 'tags' | 'review' | 'price';
 
 /** Mục do engine F29 sinh: 'todo' tăng điểm, 'warning' chỉ nhắc, không trừ điểm. */
 export interface HealthTodo {
@@ -189,6 +188,8 @@ export interface AnomalyAlert {
   direction: 'spike' | 'drop';
   /** daily: một ngày lệch · zero_run: nhiều ngày liền bằng 0 (date là ngày cuối). */
   rule: 'daily' | 'zero_run';
+  /** Số ngày liền bằng 0 (zero_run); daily = 1. Bản ghi cũ có thể thiếu. */
+  run_days?: number | null;
   z: number;
   /** VND nếu metric là revenue, lượt xem nếu views. */
   expected: number;
@@ -217,38 +218,12 @@ export interface AnomalyAlerts {
   };
 }
 
-/* ------------------------------------------------------------ F31 -------- */
-
-export interface CategoryRevenue {
-  range: TimeRange;
-  from: string;
-  to: string;
-  by_product_type: {
-    product_type_id: string;
-    name_vi: string;
-    revenue_vnd: number;
-    orders: number;
-    units: number;
-    share_pct: number;
-  }[];
-  total_revenue_vnd: number;
-  /** dow: 1 = Thứ Hai … 7 = Chủ Nhật, giờ Việt Nam (BR-185). */
-  heatmap: { dow: number; hour: number; orders: number; revenue_vnd: number }[];
-  heatmap_tz: string;
-  peak_window: { dow: number; dow_vi: string; hour: number; orders: number; note: string } | null;
-  heatmap_window: string;
-  limitation: string | null;
-}
-
 /* ------------------------------------------------------------ F32 -------- */
 
 /** GET /competitor-brief: việc nên làm tuần này, gom từ F32–F36. Chỉ có cho gian hàng thật. */
 export interface CompetitorBrief {
-  /** rules = lập theo luật; llm = mô hình ngôn ngữ viết lại, số đã đối chiếu với số liệu gốc. */
-  source: 'rules' | 'llm';
-  provider: string | null;
-  /** API xếp sẵn từ gấp tới nên làm; `priority` thiếu khi AI còn chạy bản cũ. */
-  actions: { action: string; why: string; link: string | null; priority?: 'gap' | 'quan_trong' | 'nen_lam' }[];
+  /** API xếp sẵn từ khẩn cấp tới duy trì; `priority` thiếu khi AI còn chạy bản cũ. */
+  actions: { action: string; why: string; link: string | null; priority?: 'gap' | 'quan_trong' | 'nen_lam' | 'duy_tri' }[];
   facts_count: number;
   generated_at: string;
 }
@@ -267,13 +242,95 @@ export interface DirectRival {
   near_identical?: boolean;
   /** Các từ hai sản phẩm cùng có, vd ["mèo", "cung hoàng đạo"]. */
   reasons: string[];
+  /** Chất liệu shop đó ghi; rỗng là chưa ghi. */
+  materials?: string[];
+}
+
+export interface RivalShop {
+  shop_id: string;
+  shop_name: string | null;
+  /** Số sản phẩm của bạn mà shop này có hàng giống. */
+  overlap: number;
+  best_similarity: number;
+  my_product_ids?: string[];
+  /** Danh mục của bạn có sản phẩm bị trùng. */
+  categories?: string[];
+}
+
+/** Một shop trong danh mục đang xem (kể cả shop bạn): số cho bản đồ vị thế và bảng so sánh. Chỉ shop thật. */
+export interface CompetitorShop {
+  shop_id: string;
+  shop_name: string | null;
+  is_me: boolean;
+  n_listings: number;
+  /** Loại hàng (danh mục lá) và số sản phẩm, nhiều nhất trước. */
+  types: { name: string; count: number }[];
+  /** Tối đa 3 chất liệu đã quy về tên chuẩn. */
+  materials: string[];
+  /** Sản phẩm đăng trong 8 tuần gần nhất. */
+  new_8w: number;
+  price_vnd: { p25: number; median: number; p75: number };
+  units_90d: number;
+  share_pct: number;
+  /** Sao đã co ngót theo số lượt (dùng xếp hạng); null khi chưa có đánh giá. */
+  rating: number | null;
+  /** Sao thật: trung bình mọi lượt đánh giá, để hiện như trang shop. */
+  rating_real: number | null;
+  n_reviews: number;
+  favorites: number;
+  /** Trung vị phút từ lúc khách hỏi tới tin trả lời đầu tiên, đo từ chat 90 ngày; null = dưới 6 lượt hỏi. */
+  response_minutes: number | null;
+  /** % lượt khách hỏi được trả lời; null như trên. */
+  reply_rate: number | null;
+  /** Số bán trong danh mục theo tuần, cũ -> mới (8 tuần). */
+  weekly_units: number[];
+  /** surge: tăng đột biến tuần này; up/down: thị phần 4 tuần gần đổi thật (kiểm định); null: chưa đủ số. */
+  trend: { kind: 'surge' | 'up' | 'down' | 'stable' | null; last_week?: number; baseline?: number; share_before_pct?: number; share_after_pct?: number; z?: number };
+  /** Số sản phẩm của bạn mà shop này có hàng giống (AI so nội dung). */
+  similar_listings: number;
+  /** 0–100: cùng loại hàng × giá gần bạn. null ở dòng của bạn. */
+  rivalry: number | null;
+  shared_types: string[];
+  /** Cùng phân khúc giá với bạn mà bán gấp nhiều lần: shop nên tham khảo. */
+  is_peer: boolean;
+  /** Ai trả lời nhanh hơn, chỉ khi Mann–Whitney trên từng lượt hỏi cho p < 0,05. */
+  response_better: 'them' | 'me' | null;
+  /** Đối thủ đăng nhiều sản phẩm mới hơn bạn, kiểm định Poisson p < 0,05. */
+  more_new: boolean;
+}
+
+/** Mỗi sản phẩm trong danh mục một điểm, để vẽ biểu đồ giá theo loại hàng và chất liệu. Chỉ shop thật. */
+export interface PricePoint {
+  listing_id: string;
+  title: string | null;
+  shop_name: string | null;
+  is_mine: boolean;
+  category_name?: string | null;
+  product_type_id: string | null;
+  product_type_name: string;
+  price_vnd: number;
+  units_90d: number;
+  /** Tên chuẩn theo từ điển chất liệu; rỗng là chưa ghi hoặc chưa nhận ra. */
+  materials: string[];
+  /** Cách gõ chưa có trong từ điển (chữ thường). */
+  materials_unknown: string[];
+  /** Giá riêng theo chất liệu khi biến thể chất liệu đó khác `price_vnd`. */
+  price_by_material?: Record<string, number>;
 }
 
 export interface Competitors {
   category_id: string;
+  /** Chỉ có ở shop thật. */
+  shops?: CompetitorShop[];
+  concentration_top3_pct?: number;
+  price_points?: PricePoint[];
+  /** Điểm giá của các danh mục khác trên sàn, cho nhóm "Danh mục khác" ở thẻ Phân bố giá. */
+  price_points_other?: PricePoint[];
   available_categories: string[];
   /** Chỉ có ở shop thật: mã danh mục -> tên. Danh mục của sàn không có trong bảng nhãn cứng. */
   category_names?: Record<string, string | null>;
+  /** Chỉ có ở shop thật: mã danh mục -> loại hàng của bạn trong đó, nhiều sản phẩm trước. */
+  my_types_by_category?: Record<string, string[]>;
   /** Dưới 5 sản phẩm của shop khác: vẫn hiện đủ số đang có, thứ hạng chỉ để tham khảo. */
   low_sample?: boolean;
   my_listings: {
@@ -287,11 +344,14 @@ export interface Competitors {
     /** Hạng theo số bán 90 ngày trong danh mục; hoà thì theo số đánh giá (BR-188). */
     rank_in_cat: number;
     n_in_cat: number;
+    materials?: string[];
     /** Chỉ có ở shop thật. */
     direct_rivals?: DirectRival[];
   }[];
-  /** Shop trùng nhiều sản phẩm với bạn nhất (chỉ có ở shop thật). */
-  direct_rival_shops?: { shop_id: string; shop_name: string | null; overlap: number; best_similarity: number }[];
+  /** Shop trùng nhiều sản phẩm với bạn nhất trong danh mục đang xem (chỉ có ở shop thật). */
+  direct_rival_shops?: RivalShop[];
+  /** Shop nên theo dõi trên mọi danh mục của bạn và theo từng danh mục, không phụ thuộc danh mục đang xem (chỉ shop thật). */
+  rival_shops_by_category?: { all: RivalShop[]; by_category: Record<string, RivalShop[]> };
   competitors: {
     rank: number;
     listing_id: string;
@@ -470,14 +530,13 @@ export interface PricingAnalysis {
 
 /** AI chấm mức đe doạ của một sản phẩm mới của đối thủ. */
 export interface Threat {
-  score: number;
+  /** high: gần như trùng và rẻ hơn; medium: gần như trùng, hoặc tương tự và rẻ hơn; low: còn lại. */
   level: 'high' | 'medium' | 'low';
   similarity: number;
   matched_product_id: string | null;
   matched_title: string | null;
   /** > 0: đối thủ rẻ hơn sản phẩm khớp của bạn bao nhiêu %. */
   price_gap_pct: number | null;
-  shop_strength: number;
   near_identical?: boolean;
 }
 
@@ -490,6 +549,22 @@ export interface CompetitorTracking {
     /** Shop thật: danh mục shop đó bán nhiều nhất và ngày đăng sản phẩm gần nhất (SRS 3.9.5). */
     category_name?: string | null;
     last_new_listing_at?: string | null;
+    /** Shop thật: số bán theo tuần, cũ -> mới (8 tuần). */
+    weekly_sales?: number[];
+    /** Shop thật: sản phẩm đăng trong 8 tuần; cùng ngách với bạn thì kèm mức cạnh tranh. */
+    launches?: {
+      listing_id: string;
+      title: string | null;
+      listed_at: string;
+      product_type_name: string | null;
+      price_vnd: number;
+      in_my_niche: boolean;
+      threat: Threat | null;
+      /** Giá sản phẩm của bạn giống nó nhất. */
+      matched_price_vnd: number | null;
+      /** Từ khoá của shop bạn mà sản phẩm này trùng (vì sao nó thuộc ngách của bạn). */
+      matched_tags?: string[];
+    }[];
   }[];
   slots_used: number;
   slots_limit: number;
@@ -514,7 +589,17 @@ export interface CompetitorTracking {
   }[];
   alerts_total: number;
   /** Chỉ có ở shop thật: shop đang theo dõi có tuần gần nhất bán vượt hẳn các tuần trước. */
-  surging?: { shop_id: string; shop_name: string | null; last_week: number; baseline: number; ratio: number | null; z: number }[];
+  surging?: {
+    shop_id: string;
+    shop_name: string | null;
+    last_week: number;
+    baseline: number;
+    ratio: number | null;
+    z: number;
+    /** Ngưỡng báo (trung vị + 3,5 × độ lệch bền) và số bán 8 tuần, để vẽ biểu đồ kiểm soát. */
+    threshold?: number;
+    weeks?: number[] | null;
+  }[];
   my_niche_tags: string[];
   /** Chỉ có ở shop thật: slug tag -> tên hiển thị. */
   tag_names?: Record<string, string>;
@@ -528,57 +613,161 @@ export interface ShopSearchResult {
   shop_id: string;
   shop_name: string;
   is_tracked: boolean;
-}
-
-/* ------------------------------------------------------------ F37 -------- */
-
-export interface RevenueForecast {
-  scope: 'shop' | string;
-  target_id: string;
-  horizon_days: number;
-  model: string;
-  points: { date: string; yhat: number; lo95: number; hi95: number }[];
-  total_forecast_vnd: number;
-  validation: {
-    metric: string;
-    value: number | null;
-    baseline: number | null;
-    beats_baseline: boolean | null;
-    holdout_days: number;
-    note: string;
-  };
-  model_selection: {
-    chosen: string;
-    seasonal_naive_mase: number | null;
-    arima_mase: number | null;
-    lstm_mase: number | null;
-    why: string;
-  };
-  limitation: string | null;
+  /** Chỉ có khi tìm theo danh mục: số sản phẩm shop đang bán trong danh mục đó. */
+  products_in_category?: number;
 }
 
 /* ------------------------------------------------------------ F38 -------- */
 
+export interface OccasionWindow {
+  event_id: string;
+  name: string;
+  peak_date: string;
+  lead_time_days: number;
+  rd_start: string;
+  traction_start: string;
+  peak_start: string;
+  cut_off_date: string;
+  /** shop_measured: hạn chốt theo thời gian giao đo từ đơn của shop; event_default: mặc định của dịp */
+  lead_time_source?: 'shop_measured' | 'event_default';
+  /** last_call: sau hạn chốt đơn thường tới ngày lễ; post_event: tối đa 14 ngày sau lễ để xem kết quả */
+  current_phase: 'rd_sprint' | 'traction' | 'peak' | 'last_call' | 'post_event' | 'cut_off_passed' | 'upcoming';
+  days_since_event?: number;
+  post_event_end?: string | null;
+  /** vd. hạn chốt bị dời sớm vì hãng vận chuyển nghỉ Tết */
+  cut_off_note?: string | null;
+  days_to_peak: number;
+  days_to_cutoff: number;
+  status: 'active' | 'upcoming' | 'passed';
+  is_safe_to_launch: boolean;
+  timing_warning: string | null;
+}
+
+export interface EvidenceLayer {
+  name: string;
+  status: 'dat' | 'chua_chac' | 'khong_dat' | 'pass' | 'uncertain' | 'fail';
+  text?: string;
+  model?: string;
+  metrics?: Record<string, any>;
+  question: string;
+  claim: string;
+  evidence: string;
+  metric_value: string | number | null;
+  target_value: string | number | null;
+}
+
+export interface BreakEvenFinancials {
+  retail_price: number;
+  base_cost: number;
+  platform_fee: number;
+  gross_margin: number;
+  gross_margin_pct: number;
+  estimated_cpa: number;
+  net_margin_per_unit: number;
+  net_margin_pct: number;
+  fixed_test_budget: number;
+  break_even_units: number;
+  is_viable: boolean;
+  verdict_note: string;
+}
+
+export interface TrialPlanStep {
+  step: number;
+  name: string;
+  action: string;
+  threshold: string;
+}
+
+export interface TrialPlan {
+  mode: 'make_to_order' | 'small_batch';
+  mode_label: string;
+  ladder_steps: TrialPlanStep[];
+  test_quantity: number;
+  test_budget_vnd: number;
+  success_criteria: string;
+  stop_loss_rules: string[];
+  timeframe_days: number;
+}
+
+export interface PotentialProfile {
+  product_id: string;
+  product_name: string;
+  category_name: string;
+  product_type: 'pod' | 'ready_to_ship';
+  keyword: string;
+  verdict: 'dat' | 'chua_chac' | 'khong_dat';
+  verdict_label: string;
+  signal_label: string;
+  signal_score: number;
+  layers: {
+    demand: EvidenceLayer;
+    repeatability: EvidenceLayer;
+    competition: EvidenceLayer;
+    profitability: EvidenceLayer;
+    capacity: EvidenceLayer;
+  };
+  break_even: BreakEvenFinancials;
+  anti_evidence: string[];
+  trial_plan: TrialPlan;
+}
+
 export interface ReadyToShipIdea {
+  /** ID theo nội dung (ổn định khi danh sách đổi thứ tự hay đổi theo ngày) */
+  id?: string;
   title: string;
+  keyword?: string;
+  evidence_level?: 'market_listing' | 'hybrid_mining' | 'template';
+  is_template?: boolean;
+  cost_basis?: string;
+  search_trend_pct?: number | null;
+  verdict?: string;
+  shop_coverage?: { matching: number; total: number; gap: boolean; product_ids: string[] };
   category: string;
-  market_price_range: string;
-  sourcing_tip: string;
+  market_price_range?: string;
+  suggested_price?: string;
+  base_cost?: string;
+  expected_profit?: string;
+  why?: string;
+  signal_label?: string;
+  sourcing_tip?: string;
   why_it_sells?: string;
   expected_profit_margin?: string;
   upsell_bundle_tip?: string;
   target_buyer?: string;
+  image_url?: string;
+  product_url?: string;
+  platform?: string;
+  seller_name?: string;
+  seller_count?: number;
+  sold_count?: number;
+  rating_average?: number;
+  review_count?: number;
 }
 
 export interface PodBlankSuggestion {
+  id?: string;
   blank_type: string;
-  title: string;
-  category: string;
-  suggested_theme: string;
+  title?: string;
+  name?: string;
+  category?: string;
+  suggested_theme?: string;
   design_hook?: string;
   color_palette?: string;
   estimated_profit?: string;
   target_audience?: string;
+  market_price_range?: string;
+  expected_profit_margin?: string;
+  sourcing_tip?: string;
+  why_it_sells?: string;
+  upsell_bundle_tip?: string;
+  signal_label?: string;
+  image_url?: string;
+  product_url?: string;
+  platform?: string;
+  seller_name?: string;
+  seller_count?: number;
+  sold_count?: number;
+  base_cost?: number;
   matched_blank?: {
     _id: string;
     title: string;
@@ -610,12 +799,22 @@ export interface SeasonalEvent {
   matching_shop_products?: MatchingShopProduct[];
 }
 
+export interface RadarProvenanceItem {
+  axis: string;
+  score: number;
+  benchmark: number;
+  source: string;
+  evidence: string;
+  formula?: string;
+}
+
 export interface CampaignRadar {
   axes: string[];
   current_values: number[];
   benchmark_values: number[];
   takeaways?: string[];
   overall_score?: number;
+  data_provenance?: RadarProvenanceItem[];
 }
 
 export interface SeasonalCampaign {
@@ -627,6 +826,7 @@ export interface SeasonalCampaign {
   peak_week: number;
   description: string;
   launch_window: { peak_week: string; peak_date: string; start: string; end: string; basis: string };
+  occasion_window?: OccasionWindow;
   timing: {
     status: 'active' | 'upcoming' | 'passed';
     label: string;
@@ -637,23 +837,367 @@ export interface SeasonalCampaign {
   category_summary: string;
   search_keywords: string[];
   radar?: CampaignRadar;
+  occasion_traits?: any[];
+  confidence?: {
+    level: 'high' | 'fair' | 'preliminary' | 'insufficient';
+    text: 'Cao' | 'Khá' | 'Sơ bộ' | 'Chưa đủ';
+    dots: number;
+    reason?: string;
+  };
+  confidence_text?: 'Cao' | 'Khá' | 'Sơ bộ';
+  confidence_dots?: number;
+  expected_orders?: string;
+  /** Mức tăng đơn của dịp đo từ dữ liệu bán thật; null = chưa đo được (đơn dự kiến đang là mức ngày thường) */
+  expected_uplift?: { low: number; mid: number; high: number; source: 'shop_orders' | 'platform_orders' | 'market_sold' } | null;
+  expected_orders_basis?: string;
+  weekday_text?: string;
+  next_deadline?: {
+    title: string;
+    date_text: string;
+    days_left: number;
+    is_urgent: boolean;
+  };
+  stages?: {
+    prep_start_days: number;
+    traction_start_days: number;
+    peak_days: number;
+    cutoff_days: number;
+    end_days: number;
+  };
+  is_dashed_curve?: boolean;
+  milestone_actions?: { title: string; desc: string }[];
+  action_recommendation?: {
+    action_type: 'close_orders' | 'boost_traffic' | 'prepare_inventory' | 'prepare_blank';
+    badge_text: string;
+    badge_variant: 'amber' | 'blue' | 'emerald';
+    title: string;
+    advice: string;
+    calculation_basis: string;
+    cta_label: string;
+    target_tab: 'potential' | 'readiness' | 'traits' | 'timeline' | 'hub' | 'trial' | 'act1' | 'act2' | 'act3';
+    is_urgent: boolean;
+  };
+}
+
+export interface OpportunityKeywordItem {
+  id: string;
+  tag: string;
+  /** Nguồn đề xuất từ khóa (catalog_occasion, trends_seasonal, onsite_search, ...) */
+  origins?: string[];
+  origin_labels?: string[];
+  volume: number;
+  sold_count_real?: number;
+  etsy_favorers?: number;
+  etsy_listings?: number;
+  effective_demand?: number;
+  sales_per_shop?: number | null;
+  trend_index?: number | null;
+  trend_index_raw?: number | null;
+  volume_level: 'high' | 'medium' | 'low';
+  competition: number;
+  competition_level: 'high' | 'medium' | 'low';
+  keyword_score: number | null;
+  score_basis?: 'sales+etsy' | 'sales_only' | 'etsy_only' | 'insufficient' | string;
+  score_breakdown?: {
+    demand: number | null;
+    demand_pts?: number | null;
+    headroom: number | null;
+    headroom_pts?: number | null;
+    effective_demand?: number;
+    momentum?: number | null;
+    etsy_signal?: number | null;
+    sales_per_shop?: number | null;
+    applied_caps?: string[];
+    formula_text?: string;
+  };
+  platforms?: string[];
+  listing_type?: 'physical' | 'pod' | 'custom' | string;
+  customizable?: boolean;
+  source_breakdown?: {
+    total_listings: number;
+    pod_count: number;
+    pod_pct: number;
+    customizable_count: number;
+    customizable_pct: number;
+    by_platform: Array<{
+      platform: string;
+      count: number;
+      pct: number;
+    }>;
+  };
+  when_made?: string;
+  avg_price_vnd?: number | null;
+  conversion_rate_pct?: number | null;
+  is_starred?: boolean;
+  is_in_shop?: boolean;
+  matched_product?: {
+    id: string;
+    title: string;
+    images?: any[];
+  };
+  evidence?: any;
+  search_wow_pct?: number | null;
+  trend_match?: 'exact' | 'partial' | 'proxy' | 'none';
+  trend_series_used?: string | null;
+  volume_basis?: 'listing_sales' | 'etsy_engagement' | 'trends_index' | 'insufficient' | 'listing_sales+trends' | 'trends_only';
+  shop_coverage?: { matching: number; total: number; gap: boolean; product_ids: string[] };
+  action?: { type: 'create_listing' | 'optimize_tags' | 'copy_tag'; label: string; priority: 'high' | 'normal' };
+}
+
+export interface FunnelDiagnosticStage {
+  stage: number;
+  title: string;
+  dropoff_rate_pct: number | null;
+  target_rate_pct?: number | null;
+  badge_label?: string;
+  metric_label: string;
+  status: 'healthy' | 'warning' | 'critical';
+  ai_recommendation: string;
+  abandoned_carts_count?: number;
+}
+
+export interface RevenueScenarioItem {
+  key: 'baseline' | 'breakthrough' | 'peak' | string;
+  name: string;
+  orders: number;
+  growth_pct?: number;
+  projected_gmv: number;
+  formula_basis: string;
+  condition_note: string;
+}
+
+/** Cách tính mục tiêu đơn của dịp (BE `seasonal-math.ts`). */
+export interface CampaignTargetBasis {
+  /** nhịp đơn hợp lệ/ngày TRƯỚC kỳ dịp */
+  daily_rate: number | null;
+  rate_window_days: number;
+  baseline_orders?: number;
+  baseline_days?: number;
+  /** mốc kết thúc khoảng nền = ngày mở bán của dịp (ISO) */
+  baseline_end?: string;
+  /** tên các dịp khác có kỳ bán trùng khoảng nền */
+  baseline_overlaps?: string[];
+  window_days: number;
+  uplift: number | null;
+  uplift_source: 'deep_model' | 'search_interest' | null;
+  /** độ nâng LƯỢT TÌM KIẾM của dịp (tham khảo, không nhân vào số đơn) */
+  search_uplift?: number | null;
+  missing: 'baseline_history' | 'baseline_orders' | 'uplift' | null;
+  /** có số nhưng dựa trên ít đơn (< 5) hoặc lịch sử ngắn (< 14 ngày) */
+  low_confidence?: boolean;
+}
+
+export interface SeasonalForecastReview {
+  n: number;
+  hits: number;
+  coverage_pct: number;
+  actual: number;
+  event_key: string;
+  event_year: number;
+  items: Array<{ days_to_event: number; expected: { p10: number; p50: number; p90: number }; verdict: 'below' | 'within' | 'above' }>;
+}
+
+/** Đơn trong kỳ dịp chia theo trạng thái (BE `orderStatusBreakdown`). */
+export interface OrderStatusBreakdown {
+  delivered: number;
+  shipping: number;
+  processing: number;
+  cod_unpaid: number;
+}
+
+export interface FunnelTierLevel { level: number; per_day: number; base_count: number; coverage_days: number; low_confidence?: boolean }
+
+export interface FunnelTierBasis {
+  window_days: number;
+  views: FunnelTierLevel | null;
+  cart_adds: FunnelTierLevel | null;
+  /** tỷ lệ chuyển đổi trong khoảng trước ngày mở bán */
+  baseline_rates: { cart_rate_pct: number | null; order_rate_pct: number | null; views?: number; carts?: number; orders?: number; low_confidence?: boolean };
+  baseline_orders: number;
+  coverage_days: number;
+}
+
+export interface CampaignFunnel {
+  target_basis?: CampaignTargetBasis;
+  /** mức ngày thường của tầng lượt xem / thêm giỏ (nhịp sự kiện trước mùa × số ngày kỳ dịp) */
+  tier_basis?: FunnelTierBasis;
+  impressions?: number | null;
+  clicks?: number | null;
+  views?: number | null;
+  ctr_pct?: number | null;
+  ctr_vs_baseline_pct?: number | null;
+  cart_adds?: number | null;
+  cart_rate_pct?: number | null;
+  orders: number;
+  conversion_rate_pct?: number | null;
+  view_to_order_pct?: number | null;
+  cvr_multiplier?: number | null;
+  real_ctr_pct?: number | null;
+  real_cart_rate_pct?: number | null;
+  real_order_rate_pct?: number | null;
+  real_view_to_order_pct?: number | null;
+  pv_uv_ratio?: number | null;
+  tracking_stages?: string[];
+  actual?: {
+    orders: number;
+    direct_orders?: number;
+    halo_orders?: number;
+    status_breakdown?: OrderStatusBreakdown;
+    gmv_vnd?: number;
+    orders_progress_pct?: number;
+    remaining_orders?: number;
+    impressions?: number | null;
+    views?: number;
+    clicks?: number;
+    cart_adds?: number;
+    window_label?: string;
+    window_start?: string;
+    window_end?: string;
+  };
+  diagnostics?: FunnelDiagnosticStage[];
+  scenarios?: RevenueScenarioItem[];
+  aov?: number;
+  target_gmv?: number;
+  forecast_method_info?: {
+    method: string;
+    method_display_name?: string;
+    validated_deep_model?: boolean;
+    empirical_coverage_pct?: number | null;
+    improvement_pct?: number | null;
+    uplift_p10?: number | null;
+    uplift_p50?: number | null;
+    uplift_p90?: number | null;
+  };
+}
+
+export interface ChannelSampleOrder {
+  order_code: string;
+  created_at?: string;
+  total_amount?: number;
+  item_summary?: string;
+  attribution_reason?: string;
+}
+
+export interface ChannelBreakdownItem {
+  channel_key: string;
+  name: string;
+  share_pct: number;
+  gmv_vnd: number;
+  orders_count: number;
+  sku_orders: number;
+  items_sold: number;
+  aov_vnd: number;
+  growth_pct?: number | null;
+  action_tip: string;
+  source_type?: 'shop_actual' | 'industry_benchmark' | 'insufficient';
+  is_target_plan?: boolean;
+  criteria_rule?: string;
+  sample_orders?: ChannelSampleOrder[];
+  action_checklist?: string[];
+}
+
+export interface MotivationBreakdown {
+  gift_purchases_pct: number | null;
+  self_purchases_pct: number | null;
+  top_reasons: { reason: string; pct: number }[];
+  source_type?: 'shop_actual' | 'industry_benchmark' | 'insufficient';
+  sample_size?: number;
+  source_description?: string;
+}
+
+export type SeasonalIdeaKind = 'ai' | 'ready' | 'pod' | 'keyword';
+
+/** Nội dung ý tưởng lúc seller lưu vào kế hoạch */
+export interface SeasonalIdeaSnapshot {
+  title: string;
+  kind: SeasonalIdeaKind;
+  keyword?: string;
+  price_vnd?: number;
+  source?: string;
+  saved_at?: string;
+}
+
+/** Thành quả của một ý tưởng: sản phẩm áp dụng và đơn hợp lệ trong kỳ dịp */
+export interface SeasonalIdeaOutcome {
+  idea_id: string;
+  title: string;
+  kind: SeasonalIdeaKind | null;
+  saved: boolean;
+  stage: 'idea' | 'listed' | 'selling';
+  products: Array<{ id: string; title: string }>;
+  orders: number;
+  units: number;
+  revenue: number;
+}
+
+export interface SeasonalIdeaOutcomeReport {
+  items: SeasonalIdeaOutcome[];
+  totals: {
+    ideas_saved: number;
+    ideas_listed: number;
+    ideas_selling: number;
+    orders: number;
+    units: number;
+    revenue: number;
+    shop_orders_in_window: number;
+    share_of_shop_orders_pct: number | null;
+  };
+  window: { start: string; end: string };
+}
+
+export interface MarketSourceFreshness {
+  as_of: string | null;
+  age_days: number | null;
+  stale: boolean;
+  label: string;
 }
 
 export interface SeasonalForecast {
   keyword: string;
+  primary_keyword?: string;
   tag_ids: string[];
   decomposition: { trend: number[]; seasonal: number[]; residual: number[]; window: string };
   amplitude: number;
   n_points: number;
+  sample_size_n?: number;
+  measured_cycles?: number;
+  route_risks?: any[];
+  scorecard_metrics?: any[];
+  opportunity_keywords?: OpportunityKeywordItem[];
+  campaign_funnel?: CampaignFunnel;
+  channel_breakdown?: ChannelBreakdownItem[];
+  motivation_breakdown?: MotivationBreakdown;
+  saved_ideas?: string[];
+  checked_milestones?: Record<string, boolean>;
+  /** Bài học mùa trước (cùng dịp, kỳ năm trước) do BE dựng từ đánh giá + kết quả ý tưởng */
+  previous_season_lesson?: PreviousSeasonLesson | null;
+  story?: SeasonalStory;
+  apply_playbooks?: ApplyPlaybook[];
+  impact?: SeasonalImpact;
+  industry_compare?: { shop_orders: number; industry_orders: number; past_cycles_shop: number; past_cycles_industry: number; min_window_orders: number };
   events: SeasonalEvent[];
   all_campaigns?: SeasonalCampaign[];
   active_campaign?: SeasonalCampaign;
+  potential_profiles?: PotentialProfile[];
   campaign_radar?: CampaignRadar;
+  occasion_traits?: any[];
   seller_shop_name?: string;
   seller_category?: { slug: string; name: string };
   is_live_shop?: boolean;
+  /** false: đang xem gian hàng mẫu dùng chung, không lưu được kế hoạch */
+  can_save_plan?: boolean;
+  saved_idea_snapshots?: Record<string, SeasonalIdeaSnapshot>;
+  idea_outcomes?: SeasonalIdeaOutcomeReport;
+  /** 'ready' = ý tưởng do AI soạn riêng; 'generating' = đang soạn nền; 'draft' = bản phác thảo từ số liệu */
+  ai_ideas_status?: 'ready' | 'generating' | 'draft' | 'none';
+  data_freshness?: Record<string, MarketSourceFreshness>;
+  /** Sau lễ: các bản dự báo đã lưu mỗi tuần so với số đơn thực tế của kỳ */
+  forecast_review?: SeasonalForecastReview | null;
   ready_to_ship_ideas?: ReadyToShipIdea[];
   pod_blanks?: PodBlankSuggestion[];
+  opportunity_clusters?: any[];
+  shop_products?: any[];
+  matching_shop_products?: any[];
   ai_model?: string;
   flat_keywords: string[];
   method: string;
@@ -668,73 +1212,94 @@ export interface SeasonalForecast {
   }[];
 }
 
-/* ------------------------------------------------------------ F39 -------- */
+/* ---------- Seasonal v2: câu chuyện, kế hoạch áp dụng, thành quả (căn cứ dữ liệu) ---------- */
 
-export type NicheQuadrant = 'opportunity' | 'crowded' | 'niche_quiet' | string;
-
-export interface Niches {
-  niches: {
-    rank: number;
-    keyword: string;
-    tag_id: string;
-    demand_pct: number;
-    /** null ở shop thật: sàn chưa đủ listing thật gắn tag để so cung — xem meta.unlock. */
-    supply_pct: number | null;
-    gap_score: number | null;
-    n_listings: number | null;
-    demand_index: number;
-    trend: TrendDirection | 'rising' | 'falling' | string;
-    growth_pct: number | null;
-    quadrant: NicheQuadrant;
-    sparkline_7d: number[];
-    /** true khi phần CUNG bị che vì chưa đủ listing thật (shop thật, xem meta.unlock). */
-    supply_insufficient?: boolean;
-  }[];
-  total_niches: number;
-  banned_filtered: number;
-  banned_list_size: number;
-  limitation: string | null;
+export interface SeasonalStoryChapter {
+  title: string;
+  headline: string;
+  bullets: string[];
+  next_step: string;
+  cta_tab: 'hub' | 'act1' | 'act2' | 'act3';
 }
 
-/* ------------------------------------------------------------ F40 -------- */
-
-export interface TrendRadar {
-  week: string;
-  top_tags: {
-    rank: number;
-    tag_id: string;
-    name_vi: string;
-    growth_pct: number;
-    momentum: number;
-    demand_index: number;
-    supply_n_listings: number;
-    trend: string;
-    searches_per_week: number | null;
-  }[];
-  radar: { axes: string[]; values: number[]; values_raw: number[]; scale: string };
-  limitation: string | null;
+export interface SeasonalStory {
+  overview: SeasonalStoryChapter;
+  ideas: SeasonalStoryChapter;
+  apply: SeasonalStoryChapter;
+  results: SeasonalStoryChapter;
 }
 
-/* ------------------------------------------------------------ F41 -------- */
+export interface PreviousSeasonLesson {
+  event_year: number;
+  rating: 'good' | 'neutral' | 'poor' | null;
+  note: string;
+  updated_at?: string;
+  ideas: Array<{
+    title: string;
+    stage: 'idea' | 'listed' | 'selling';
+    orders: number;
+    revenue: number;
+    rating?: 'good' | 'neutral' | 'poor';
+    note?: string;
+  }>;
+  totals: { orders: number; revenue: number };
+  /** true khi ý tưởng AI đang hiện được soạn kèm bài học này */
+  used_by_ai?: boolean;
+}
 
-export interface Recommendations {
-  shop_id: string;
-  scope: 'shop' | 'platform';
-  personalised: boolean;
-  recommendations: {
-    priority: number;
-    /** scale: đẩy mạnh loại đang bán tốt · expand: mở rộng sang tag · explore: shop mới, gợi ý chung. */
-    action: 'scale' | 'expand' | 'explore' | string;
-    target: { type: 'product_type' | 'tag' | 'keyword' | string; id: string; name_vi?: string; keyword?: string; tag_id?: string };
-    why: string[];
-    expected: string;
-    confidence: 'low' | 'medium' | 'high' | string;
-  }[];
-  /* Ba trường dưới chỉ có khi shop đã có lịch sử (scope 'shop'). Shop mới nhận gợi ý
-     chung toàn sàn (scope 'platform') và service không trả chúng. */
-  excluded_product_types?: string[];
-  exclusion_reason?: string;
-  my_listings_analysed?: number;
-  validated: boolean;
-  validation_note: string;
+export type PlaybookStepKey = 'listing' | 'test' | 'decide' | 'produce' | 'cutoff';
+
+export interface PlaybookStep {
+  /** Mã bước cố định do BE gán (thiếu ở phản hồi cũ trong cache) */
+  key?: PlaybookStepKey;
+  /** Vị trí lưu tick cố định: listing 0, test 1, decide 2, produce 3, cutoff 4 */
+  slot?: number;
+  /** Số đơn cần đạt ở bước thử nhỏ */
+  target_orders?: number;
+  date: string;
+  days_from_today: number;
+  task: string;
+  kpi: string;
+  why: string;
+  overdue: boolean;
+}
+
+export interface ApplyPlaybook {
+  idea: string;
+  steps: PlaybookStep[];
+  expected_orders_next_30d: { p10: number; p50: number; p90: number } | null;
+  feasible: boolean;
+  days_left_to_cut_off: number;
+  evidence_level?: string;
+  signal_label?: string;
+  shop_coverage?: { matching: number; total: number; gap: boolean; product_ids: string[] };
+}
+
+export interface SeasonalImpact {
+  phase: 'upcoming' | 'running' | 'ended';
+  status: 'measured' | 'projected' | 'insufficient';
+  window: [string, string];
+  elapsed_days: number;
+  adopted_keywords: string[];
+  baseline_orders_per_day: number | null;
+  baseline_n: number;
+  shop_orders_total?: number;
+  uplift_basis?: string;
+  expected_orders_p10?: number;
+  expected_orders_p50?: number;
+  expected_orders_p90?: number;
+  expected_gmv_p50?: number;
+  actual_orders?: number;
+  counterfactual_orders?: { p10: number; p50: number; p90: number };
+  lift_vs_counterfactual_pct?: number | null;
+  beats_p90?: boolean;
+  below_p10?: boolean;
+  adopted_orders?: number;
+  adopted_gmv?: number;
+  adopted_share_pct?: number;
+  /** 'source_idea_id' khi BE thay bằng số đo theo sản phẩm gắn ý tưởng (đúng hơn khớp tên) */
+  adopted_basis?: 'source_idea_id';
+  gmv?: number;
+  aov_vs_baseline_pct?: number | null;
+  previous_season?: { orders_same_period: number; orders_total: number; yoy_pct: number | null };
 }

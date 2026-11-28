@@ -1,821 +1,488 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
-import { Heart, ArrowRight, CheckCircle2, Info, Ticket, Flame, UserPlus, Store } from 'lucide-react';
-import { productsService } from '../../product/services/productsService';
+import { Fragment, useState, useEffect, useMemo, useCallback, type MouseEvent, type ReactNode } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { CheckCircle2, Info } from 'lucide-react';
+import { productsService, absImg, FeaturedCategory, HomeStats } from '../../product/services/productsService';
 import { shopService } from '../../product/services/shopService';
 import { promotionService } from '../../promotion/services/promotionService';
 import { favoritesService } from '../../product/services/favoritesService';
 import { isLoggedIn } from '../../../infrastructure/api/interceptors';
+import { useVoucherWallet } from '../../promotion/hooks/useVoucherWallet';
 import { ForYouSection } from '../components/home/ForYouSection';
-import { buildDeals } from '../components/deals/buildDeals';
-import '../../../shared/components/layouts.css';
+import { HomeHero, type HeroProduct } from '../components/home/HomeHero';
+import { HomeProductCard, HomeProductSkeleton } from '../components/home/HomeProductCard';
+import { VoucherTicketStrip, type HomeVoucher } from '../components/home/VoucherTicketStrip';
+import { ShopShelf, type ShelfShop } from '../components/home/ShopShelf';
+import { CategoryShelf } from '../components/home/CategoryShelf';
+import { toDeal, type Deal } from '../components/deals/buildDeals';
+import { useDealLookup } from '../hooks/useDealLookup';
+import '../components/home/home.css';
 
-// Bộ nhớ đệm cấp module: giữ lại sản phẩm và voucher khi người dùng chuyển trang
+/** Giữ dữ liệu khi người dùng chuyển trang rồi quay lại, tránh tải lại và nhảy bố cục. */
 let homeDataCache: {
   products: any[];
+  productPage: number;
+  productPages: number;
+  stats: HomeStats;
+  heroProducts: any[];
+  dealItems: any[];
+  dealTotal: number;
   shops: any[];
   suggestedShops: any[];
+  categories: FeaturedCategory[];
+  keywords: string[];
   coupons: any[];
-  timestamp: number;
 } | null = null;
 
-export function BuyerDashboard({ user: _user }: { user?: any; onLogout?: () => void }) {
+/** Mỗi lần "Xem thêm" tải thêm một trang từ server (3 hàng x 4 cột). */
+const PAGE = 12;
+const DEALS_ON_HOME = 10;
+const num = (v: any) => parseFloat(typeof v === 'object' && v?.$numberDecimal ? v.$numberDecimal : v || 0) || 0;
+const shopIdOf = (s: any) => String(s?._id || s?.id || '');
+
+function toVoucher(v: any): HomeVoucher {
+  const val = num(v.discount_value);
+  const minVal = num(v.min_order_value);
+  const maxVal = num(v.max_discount_amount);
+  const k = (n: number) => `${(n / 1000).toLocaleString('vi-VN')}K`;
+  let value: string;
+  if (v.discount_type === 'PERCENTAGE') value = `Giảm ${val}%${maxVal > 0 ? `, tối đa ${k(maxVal)}` : ''}`;
+  else if (v.discount_type === 'FREE_SHIPPING') value = val > 0 ? `Freeship ${k(val)}` : 'Miễn phí vận chuyển';
+  else if (v.discount_type === 'FLASH_SALE') value = val <= 100 ? `Flash sale ${val}%` : `Flash sale ${k(val)}`;
+  else value = val >= 1_000_000 ? `Giảm ${(val / 1_000_000).toLocaleString('vi-VN')} triệu` : `Giảm ${k(val)}`;
+  return {
+    id: String(v._id || v.id),
+    code: v.code,
+    value,
+    condition: minVal > 0 ? `Đơn từ ${minVal >= 1_000_000 ? `${(minVal / 1_000_000).toLocaleString('vi-VN')} triệu` : k(minVal)}` : 'Mọi đơn hàng',
+    is_platform: v.is_platform ?? !v.shop_id,
+    shop_name: v.shop_name || 'Gian hàng',
+    applicable_scope: v.applicable_scope || 'ALL',
+    applicable_products_count: v.applicable_product_ids?.length || 0,
+    end_date: v.end_date,
+  };
+}
+
+function SectionHead({ title, note, action }: { title: string; note?: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="vc-display m-0 text-[20px] font-semibold leading-tight text-[#330033] sm:text-[22px]">{title}</h2>
+        {note && <p className="m-0 mt-1.5 text-[13.5px] text-stone-500">{note}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function TextAction({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="whitespace-nowrap text-[13.5px] font-semibold text-[#007700] underline-offset-4 hover:underline">
+      {children}
+    </button>
+  );
+}
+
+export function BuyerDashboard({ user }: { user?: any; onLogout?: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const outletContext = useOutletContext<any>() || {};
-  const search = outletContext.search || '';
 
-  const [allProducts, setAllProducts] = useState<any[]>(() => homeDataCache?.products || []);
+  const [products, setProducts] = useState<any[]>(() => homeDataCache?.products || []);
+  const [productPage, setProductPage] = useState(() => homeDataCache?.productPage || 1);
+  const [productPages, setProductPages] = useState(() => homeDataCache?.productPages || 1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState(false);
+  const [stats, setStats] = useState<HomeStats>(() => homeDataCache?.stats || { totalProducts: 0, newThisWeek: 0 });
+  const [heroSource, setHeroSource] = useState<any[]>(() => homeDataCache?.heroProducts || []);
+  const [dealItems, setDealItems] = useState<any[]>(() => homeDataCache?.dealItems || []);
+  const [dealTotal, setDealTotal] = useState(() => homeDataCache?.dealTotal || 0);
   const [shopList, setShopList] = useState<any[]>(() => homeDataCache?.shops || []);
   const [suggestedShopList, setSuggestedShopList] = useState<any[]>(() => homeDataCache?.suggestedShops || []);
-  const [followingShopId, setFollowingShopId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<FeaturedCategory[]>(() => homeDataCache?.categories || []);
+  const [keywords, setKeywords] = useState<string[]>(() => homeDataCache?.keywords || []);
   const [couponList, setCouponList] = useState<any[]>(() => homeDataCache?.coupons || []);
-  const [favoritedProductIds, setFavoritedProductIds] = useState<string[]>([]);
-  const [savedVouchers, setSavedVouchers] = useState<string[]>([]);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [shopProducts, setShopProducts] = useState<Record<string, any[]>>({});
+  const [favIds, setFavIds] = useState<string[]>([]);
+  const [followingShopId, setFollowingShopId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(() => !homeDataCache);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
-  // Tự động cuộn đến section tương ứng khi URL là /collections, /gifts
+  const triggerToast = useCallback((message: string, type: 'success' | 'info' = 'success') => {
+    setToast({ message, type });
+    window.setTimeout(() => setToast(null), 3000);
+  }, []);
+  const wallet = useVoucherWallet((msg, type) => triggerToast(msg, type === 'success' ? 'success' : 'info'));
+
+  // /collections và /gifts dùng chung trang này: cuộn tới đúng khối.
   useEffect(() => {
-    if (location.pathname === '/collections' || location.hash === '#collections-section') {
-      setTimeout(() => {
-        document.getElementById('collections-section')?.scrollIntoView({ behavior: 'smooth' });
-      }, 80);
-    } else if (location.pathname === '/gifts' || location.hash === '#gifts-section') {
-      setTimeout(() => {
-        document.getElementById('kham-pha')?.scrollIntoView({ behavior: 'smooth' });
-      }, 80);
-    }
-  }, [location.pathname, location.hash]);
+    const target = location.pathname === '/collections' || location.hash === '#collections-section'
+      ? 'collections-section'
+      : location.pathname === '/gifts' || location.hash === '#gifts-section' ? 'kham-pha' : null;
+    if (!target) return;
+    const t = window.setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: 'smooth' }), 120);
+    return () => window.clearTimeout(t);
+  }, [location.pathname, location.hash, isLoading]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
-
-  useEffect(() => {
-    if (!isLoggedIn()) {
-      setFavoritedProductIds([]);
-    } else {
-      favoritesService.getFavoriteIds()
-        .then((ids) => {
-          setFavoritedProductIds(ids);
-          localStorage.setItem('vietcraft_favorites', JSON.stringify(ids));
-        })
-        .catch(() => {
-          try {
-            const stored = localStorage.getItem('vietcraft_favorites');
-            if (stored) setFavoritedProductIds(JSON.parse(stored));
-          } catch {}
-        });
-    }
-    const vls = localStorage.getItem('vietcraft_saved_vouchers');
-    if (vls) {
-      try { setSavedVouchers(JSON.parse(vls)); } catch (e) {}
-    }
-
-    // Chỉ bật loading spinner nếu chưa có cache sẵn trong RAM
-    if (!homeDataCache) {
-      setIsLoading(true);
-    }
-
-    Promise.all([
-      productsService.getAll({ pageSize: 100 }).catch((err) => { console.error('Failed to fetch products', err); return { items: [] as any[], total: 0, page: 1, limit: 6, totalPages: 1 }; }),
-      // Chỉ lấy đúng các shop người dùng đang theo dõi, không fallback sang toàn bộ shop
-      isLoggedIn()
-        ? shopService.getFollowedShops().catch((err) => { console.error('Failed to fetch followed shops', err); return []; })
-        : Promise.resolve([]),
-      productsService.getFeaturedShops().catch((err) => { console.error('Failed to fetch shops', err); return []; }),
-      promotionService.getAll().catch((err) => { console.error('Failed to fetch coupons', err); return []; }),
-    ]).then(([products, followed, featured, coupons]) => {
-      const productList = Array.isArray(products) ? products : (products as any)?.items || [];
-      const followedShops = Array.isArray(followed) ? followed : [];
-      const followedIds = new Set(followedShops.map((s: any) => (s._id || s.id)?.toString()));
-      // Gợi ý: các shop nổi bật mà người dùng chưa theo dõi
-      const suggestedShops = (Array.isArray(featured) ? featured : [])
-        .filter((s: any) => !followedIds.has((s._id || s.id)?.toString()))
-        .slice(0, 6);
-      setAllProducts(productList);
-      setShopList(followedShops);
-      setSuggestedShopList(suggestedShops);
-      setCouponList(coupons || []);
-      homeDataCache = {
-        products: productList,
-        shops: followedShops,
-        suggestedShops,
-        coupons: coupons || [],
-        timestamp: Date.now()
-      };
-    }).finally(() => {
-      setIsLoading(false);
-    });
+    if (!isLoggedIn()) { setFavIds([]); return; }
+    favoritesService.getFavoriteIds().then(setFavIds).catch(() => setFavIds([]));
   }, []);
 
-  const triggerToast = (message: string, type: 'success' | 'info' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+  useEffect(() => {
+    let alive = true;
+    if (!homeDataCache) setIsLoading(true);
+    setLoadError(false);
+
+    Promise.all([
+      productsService.getAllStrict({ page: 1, pageSize: PAGE } as any),
+      isLoggedIn() ? shopService.getFollowedShops().catch(() => []) : Promise.resolve([]),
+      productsService.getFeaturedShops(),
+      promotionService.getAll().catch(() => []),
+      productsService.getFeaturedCategories(5).catch(() => [] as FeaturedCategory[]),
+      productsService.getPopularSearches(6),
+      productsService.getHomeStats().catch(() => null),
+      productsService.searchStrict({ sort: 'best_seller', limit: 8 }).catch(() => ({ items: [] as any[] })),
+      productsService.getDeals(1, DEALS_ON_HOME).catch(() => ({ items: [] as any[], total: 0 })),
+    ]).then(([productRes, followed, featured, coupons, cats, kws, homeStats, bestRes, dealsRes]) => {
+      if (!alive) return;
+      const list = productRes.items || [];
+      const followedShops = Array.isArray(followed) ? followed : [];
+      const followedIds = new Set(followedShops.map(shopIdOf));
+      const suggested = (Array.isArray(featured) ? featured : []).filter((s: any) => !followedIds.has(shopIdOf(s))).slice(0, 4);
+      const nextStats = homeStats || { totalProducts: Number(productRes.total) || list.length, newThisWeek: 0 };
+      const pages = Math.max(1, Number(productRes.totalPages) || 1);
+      setProducts(list);
+      setProductPage(1);
+      setProductPages(pages);
+      setStats(nextStats);
+      setHeroSource(bestRes.items || []);
+      setDealItems(dealsRes.items || []);
+      setDealTotal(Number((dealsRes as any).total) || 0);
+      setShopList(followedShops);
+      setSuggestedShopList(suggested);
+      setCouponList(Array.isArray(coupons) ? coupons : []);
+      setCategories(cats);
+      setKeywords(kws);
+      homeDataCache = {
+        products: list, productPage: 1, productPages: pages, stats: nextStats, heroProducts: bestRes.items || [],
+        dealItems: dealsRes.items || [], dealTotal: Number((dealsRes as any).total) || 0,
+        shops: followedShops, suggestedShops: suggested, categories: cats, keywords: kws,
+        coupons: Array.isArray(coupons) ? coupons : [],
+      };
+    }).catch((err) => {
+      console.error('Home: không tải được dữ liệu', err);
+      if (alive && !homeDataCache) setLoadError(true);
+    }).finally(() => {
+      if (alive) setIsLoading(false);
+    });
+    return () => { alive = false; };
+  }, [reloadKey]);
+
+  // Kệ gian hàng: lấy đúng 3 sản phẩm bán chạy của từng shop (không phụ thuộc 100 sản phẩm mới nhất).
+  const shelfSource = shopList.length > 0 ? shopList.slice(0, 4) : suggestedShopList;
+  const shelfKey = shelfSource.map(shopIdOf).join(',');
+  useEffect(() => {
+    let alive = true;
+    const ids = shelfKey ? shelfKey.split(',') : [];
+    Promise.all(ids.map((id) =>
+      productsService.searchStrict({ shopId: id, sort: 'best_seller', limit: 3 })
+        .then((r) => [id, r.items || []] as const)
+        .catch(() => [id, []] as const),
+    )).then((rows) => { if (alive) setShopProducts(Object.fromEntries(rows)); });
+    return () => { alive = false; };
+  }, [shelfKey]);
+
+  /** "Xem thêm": tải trang kế tiếp từ server và nối vào danh sách. */
+  const loadMore = async () => {
+    if (loadingMore || productPage >= productPages) return;
+    setLoadingMore(true);
+    setMoreError(false);
+    try {
+      const next = productPage + 1;
+      const res = await productsService.getAllStrict({ page: next, pageSize: PAGE } as any);
+      const seen = new Set(products.map((p) => String(p.id)));
+      const merged = [...products, ...(res.items || []).filter((p: any) => !seen.has(String(p.id)))];
+      const pages = Math.max(next, Number(res.totalPages) || next);
+      setProducts(merged);
+      setProductPage(next);
+      setProductPages(pages);
+      if (homeDataCache) homeDataCache = { ...homeDataCache, products: merged, productPage: next, productPages: pages };
+    } catch {
+      setMoreError(true);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
-  const toggleFavorite = async (productId: string, title: string, e: React.MouseEvent) => {
+  const toggleFavorite = useCallback(async (productId: string, title: string, e: MouseEvent) => {
     e.stopPropagation();
     if (!isLoggedIn()) {
-      navigate('/login');
+      navigate(`/login?next=${encodeURIComponent(location.pathname)}`);
       return;
     }
     try {
       const res = await favoritesService.toggleFavorite(productId);
-      const isFav = res.isFavorite;
-      setFavoritedProductIds(prev =>
-        isFav ? [...prev, productId] : prev.filter(id => id !== productId)
-      );
-      triggerToast(
-        isFav ? `Đã thêm "${title}" vào danh sách yêu thích` : `Đã xóa "${title}" khỏi danh sách yêu thích`,
-        isFav ? 'success' : 'info'
-      );
+      setFavIds((prev) => (res.isFavorite ? [...prev, productId] : prev.filter((id) => id !== productId)));
+      triggerToast(res.isFavorite ? `Đã thêm "${title}" vào yêu thích` : `Đã bỏ "${title}" khỏi yêu thích`, res.isFavorite ? 'success' : 'info');
       window.dispatchEvent(new CustomEvent('wishlist-updated'));
-    } catch (err) {
-      console.error('toggleFavorite failed', err);
+    } catch {
       triggerToast('Không thể cập nhật yêu thích, vui lòng thử lại.', 'info');
     }
-  };
+  }, [navigate, location.pathname, triggerToast]);
 
-  const handleFollowShop = async (shopId: string, shopName: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleFollowShop = async (shopId: string, shopName: string) => {
     if (!isLoggedIn()) {
-      navigate('/login');
+      navigate(`/login?next=${encodeURIComponent(location.pathname)}`);
       return;
     }
     if (!shopId || followingShopId) return;
     setFollowingShopId(shopId);
     try {
       await shopService.follow(shopId);
-      const followedShop = suggestedShopList.find((s: any) => (s._id || s.id)?.toString() === shopId);
+      const followedShop = suggestedShopList.find((s: any) => shopIdOf(s) === shopId);
       const nextFollowed = followedShop ? [...shopList, followedShop] : shopList;
-      const nextSuggested = suggestedShopList.filter((s: any) => (s._id || s.id)?.toString() !== shopId);
+      const nextSuggested = suggestedShopList.filter((s: any) => shopIdOf(s) !== shopId);
       setShopList(nextFollowed);
       setSuggestedShopList(nextSuggested);
-      if (homeDataCache) {
-        homeDataCache = { ...homeDataCache, shops: nextFollowed, suggestedShops: nextSuggested };
-      }
-      triggerToast(`Đã theo dõi gian hàng "${shopName}"`, 'success');
-    } catch (err) {
-      console.error('followShop failed', err);
-      triggerToast('Không thể theo dõi gian hàng, vui lòng thử lại.', 'info');
+      if (homeDataCache) homeDataCache = { ...homeDataCache, shops: nextFollowed, suggestedShops: nextSuggested };
+      triggerToast(`Đã theo dõi "${shopName}"`, 'success');
+    } catch (err: any) {
+      triggerToast(err?.response?.data?.error || 'Không thể theo dõi gian hàng, vui lòng thử lại.', 'info');
     } finally {
       setFollowingShopId(null);
     }
   };
 
-  const toggleVoucher = (voucherCode: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    let updated: string[];
-    if (savedVouchers.includes(voucherCode)) {
-      updated = savedVouchers.filter(code => code !== voucherCode);
-      triggerToast(`Đã hủy lưu mã ${voucherCode}`, 'info');
-    } else {
-      updated = [...savedVouchers, voucherCode];
-      navigator.clipboard?.writeText(voucherCode);
-      triggerToast(`Lưu mã ưu đãi ${voucherCode} thành công! Đã sao chép mã.`, 'success');
-    }
-    setSavedVouchers(updated);
-    localStorage.setItem('vietcraft_saved_vouchers', JSON.stringify(updated));
+  const vouchers = useMemo(() => couponList.map(toVoucher), [couponList]);
+  const toggleVoucher = (code: string) => {
+    const coupon = couponList.find((c: any) => c.code === code);
+    if (coupon) wallet.toggle(coupon);
   };
 
-  const vouchers = useMemo(() => {
-    return couponList.map((v: any) => {
-      const val = typeof v.discount_value === 'object' && v.discount_value?.$numberDecimal
-        ? parseFloat(v.discount_value.$numberDecimal)
-        : parseFloat(v.discount_value || 0);
-      const minVal = typeof v.min_order_value === 'object' && v.min_order_value?.$numberDecimal
-        ? parseFloat(v.min_order_value.$numberDecimal)
-        : parseFloat(v.min_order_value || 0);
-      const maxVal = typeof v.max_discount_amount === 'object' && v.max_discount_amount?.$numberDecimal
-        ? parseFloat(v.max_discount_amount.$numberDecimal)
-        : parseFloat(v.max_discount_amount || 0);
+  // Giá tốt cho thẻ "Mới lên kệ": BE tra theo đúng các sản phẩm đang hiện.
+  const lookedUp = useDealLookup(products.map((p) => String(p.id)));
+  const dealMap = useMemo(() => {
+    const m = new Map<string, Deal>(lookedUp);
+    dealItems.forEach((p: any) => { if (p.deal) m.set(String(p.id), toDeal(p.deal)); });
+    return m;
+  }, [lookedUp, dealItems]);
 
-      let displayValue = '';
-      if (v.discount_type === 'PERCENTAGE') {
-        displayValue = `GIẢM ${val}%${maxVal > 0 ? ` (Tối đa ${(maxVal / 1000).toLocaleString('vi-VN')}K)` : ''}`;
-      } else if (v.discount_type === 'FREE_SHIPPING') {
-        displayValue = val > 0 ? `FREESHIP ${(val / 1000).toLocaleString('vi-VN')}K` : 'FREESHIP 100%';
-      } else if (v.discount_type === 'FLASH_SALE') {
-        displayValue = val <= 100 ? `FLASH SALE ${val}%` : `FLASH SALE ${(val / 1000).toLocaleString('vi-VN')}K`;
-      } else {
-        displayValue = val >= 1000000 ? `GIẢM ${(val / 1000000).toLocaleString('vi-VN')} TR` : `GIẢM ${(val / 1000).toLocaleString('vi-VN')}K`;
-      }
+  // Hero: hàng bán chạy trên toàn sàn (không chỉ trang đầu), số liệu đếm ở BE.
+  // Chỉ gọi là "bán chạy" khi có lượt bán thật (đơn đã giao, trừ món hoàn tiền). Sàn chưa có đơn nào
+  // giao thành công thì hiện hàng mới nhất với nhãn "Vừa lên kệ", không gắn nhãn sai.
+  const toHero = (p: any): HeroProduct => ({
+    id: String(p.id),
+    title: p.title,
+    image: p.images?.[0] || p.thumbnail,
+    price: Number(p.price) || 0,
+    soldCount: Number(p.soldCount) || 0,
+    rating: Number(p.rating) || 0,
+    ratingCount: Number(p.ratingCount) || 0,
+    shopName: p.shopInfo?.name,
+  });
+  const { heroProducts, heroMode } = useMemo(() => {
+    const withImg = (list: any[]) => list.filter((p: any) => p.images?.[0] || p.thumbnail);
+    const sold = withImg(heroSource).filter((p: any) => Number(p.soldCount) > 0).slice(0, 5);
+    if (sold.length > 0) return { heroProducts: sold.map(toHero), heroMode: 'best' as const };
+    return { heroProducts: withImg(products).slice(0, 5).map(toHero), heroMode: 'new' as const };
+  }, [heroSource, products]);
 
-      let conditionLabel = 'Mọi đơn hàng';
-      if (minVal > 0) {
-        conditionLabel = minVal >= 1000000 ? `Đơn tối thiểu ${minVal / 1000000} triệu` : `Đơn tối thiểu ${(minVal / 1000)}K`;
-      }
+  const shelfShops: ShelfShop[] = useMemo(() => shelfSource.map((s: any) => {
+    const id = shopIdOf(s);
+    return {
+      id,
+      name: s.shop_name || s.name || s.shopName || 'Gian hàng',
+      logo: absImg(s.logo) || '',
+      productCount: Number(s.listing_count ?? s.listingCount) || 0,
+      rating: Number(s.average_rating ?? s.averageRating ?? s.rating) || 0,
+      ratingCount: Number(s.rating_count ?? s.ratingCount) || 0,
+      products: (shopProducts[id] || [])
+        .filter((p: any) => p.images?.[0] || p.thumbnail)
+        .map((p: any) => ({ id: String(p.id), title: p.title, image: p.images?.[0] || p.thumbnail, price: Number(p.price) || 0 })),
+    };
+  }), [shelfSource, shopProducts]);
 
-      return {
-        id: v._id || v.id,
-        code: v.code,
-        title: v.title,
-        discount_type: v.discount_type,
-        discount_value: val,
-        min_order_value: minVal,
-        max_discount_amount: maxVal,
-        is_platform: v.is_platform ?? !v.shop_id,
-        shop_name: v.shop_name || (v.shop_id ? 'Gian hàng' : 'VietCraft'),
-        applicable_scope: v.applicable_scope || 'ALL',
-        applicable_products_count: v.applicable_product_ids?.length || 0,
-        end_date: v.end_date,
-        value: displayValue,
-        condition: conditionLabel
-      };
-    });
-  }, [couponList]);
-
-  const flashDeals = useMemo(() => buildDeals(couponList, allProducts), [allProducts, couponList]);
-
-  const toShopCards = (shops: any[]) => {
-    if (!shops || shops.length === 0) return [];
-    return shops.map((shop: any) => {
-      const sId = (shop._id || shop.id)?.toString();
-      const sSlug = shop.slug;
-      const targetShop = sId || sSlug;
-
-      // Lọc sản phẩm của gian hàng này
-      const shopProds = allProducts.filter((p: any) => {
-        const pSeller = (p.sellerId || p.shop_id || p.shopInfo?.id || p.shopInfo?._id)?.toString();
-        return pSeller && sId && pSeller === sId;
-      }).slice(0, 3);
-
-      const thumbnails = shopProds.map((p: any) => p.images?.[0] || p.thumbnail || 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=150');
-      while (thumbnails.length < 3) {
-        thumbnails.push('https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=150');
-      }
-
-      return {
-        id: targetShop,
-        shopId: sId,
-        slug: sSlug,
-        name: shop.shop_name || shop.name || shop.shopName || 'Gian hàng',
-        caption: `Đã thêm ${shop.listing_count || shop.listingCount || (shopProds.length > 0 ? shopProds.length : 1)} sản phẩm mới`,
-        image: shop.logo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200',
-        thumbnails
-      };
-    });
-  };
-
-  const subbedShops = useMemo(() => toShopCards(shopList), [shopList, allProducts]);
-  const suggestedShops = useMemo(() => toShopCards(suggestedShopList), [suggestedShopList, allProducts]);
-
-  const displayProducts = allProducts;
-  const itemsPerPage = 8;
-  const totalPages = Math.ceil(displayProducts.length / itemsPerPage);
-  const paginatedProducts = displayProducts.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  // Map tất cả deal (FLASH SALE + ƯU ĐÃI) để hiện giá gạch ngang đúng
-  const flashSaleProductMap = useMemo(() => {
-    const map = new Map<string, any>();
-    flashDeals.forEach((fd: any) => {
-      map.set(fd.id?.toString(), fd);
-    });
-    return map;
-  }, [flashDeals]);
-
+  const openProduct = (p: any) => navigate(`/product/${p.id}`, { state: { initialProduct: p } });
+  const canShowMore = productPage < productPages;
+  const followingMode = shopList.length > 0;
 
   return (
-    <div className="buyer-wrapper" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      {/* Toast Notification */}
+    <div className="vc-home mx-auto max-w-[1200px] px-4 pb-16 pt-5 sm:px-6">
       {toast && (
-        <div style={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          backgroundColor: '#fff',
-          borderLeft: '4px solid #008000',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-          borderRadius: 8,
-          padding: '16px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          zIndex: 9999,
-          animation: 'slideUp 0.3s ease-out'
-        }}>
-          {toast.type === 'success'
-            ? <CheckCircle2 size={20} color="#008000" strokeWidth={2.5} />
-            : <Info size={20} color="#6366f1" strokeWidth={2.5} />
-          }
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#330033' }}>{toast.message}</span>
+        <div role="status" className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 rounded-xl border-l-4 border-[#007700] bg-white px-5 py-4 shadow-xl">
+          {toast.type === 'success' ? <CheckCircle2 size={20} color="#007700" /> : <Info size={20} color="#6366f1" />}
+          <span className="text-[14px] font-semibold text-[#330033]">{toast.message}</span>
         </div>
       )}
 
-      {/* Unique Vouchers Voucher Section - Đẩy lên trên đầu trang */}
-      <section id="vouchers-section" className="buyer-section" style={{ marginTop: 20 }}>
-        <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033', display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
-              <Ticket className="text-[#008000]" size={22} />
-              Ưu Đãi & Voucher Dành Cho Bạn
-            </h2>
-            <p style={{ fontSize: 13, color: '#78716c', margin: '4px 0 0 0' }}>
-              Lưu mã khuyến mãi toàn sàn và gian hàng để tự động trừ tiền khi thanh toán
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/vouchers')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              border: '#008000',
-              padding: '8px 18px',
-              borderRadius: 50,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,128,0,0.2)',
-              transition: 'all 0.2s'
-            }}
-          >
-            <Ticket size={16} />
-            Xem tất cả Voucher ({vouchers.length})
+      <HomeHero
+        name={user?.name || user?.full_name}
+        newThisWeek={stats.newThisWeek}
+        totalProducts={stats.totalProducts}
+        products={heroProducts}
+        mode={heroMode}
+        savedVoucherCount={wallet.savedCodes.length}
+        loading={isLoading}
+        onOpenProduct={(id) => navigate(`/product/${id}`)}
+        onExplore={() => document.getElementById('kham-pha')?.scrollIntoView({ behavior: 'smooth' })}
+        onOpenVouchers={() => navigate('/vouchers')}
+      />
+
+      {keywords.length > 0 && (
+        <p className="m-0 mt-4 px-1 text-[13.5px] leading-7 text-stone-500">
+          Mọi người đang tìm{' '}
+          {keywords.slice(0, 6).map((k, i, arr) => (
+            <Fragment key={k}>
+              <button
+                type="button"
+                onClick={() => navigate(`/search?q=${encodeURIComponent(k)}`)}
+                className="font-medium text-stone-800 underline decoration-stone-300 underline-offset-4 hover:text-[#007700] hover:decoration-[#007700]"
+              >
+                {k.toLocaleLowerCase('vi-VN')}
+              </button>
+              {i < arr.length - 1 ? ', ' : ''}
+            </Fragment>
+          ))}
+        </p>
+      )}
+
+      {loadError && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-[14px] text-rose-900">
+          <span>Không tải được sản phẩm. Kiểm tra kết nối mạng rồi thử lại.</span>
+          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="rounded-full bg-white px-4 py-2 font-semibold text-rose-900 ring-1 ring-rose-200">
+            Thử lại
           </button>
         </div>
+      )}
 
-        {vouchers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 16px', background: '#fafaf9', borderRadius: 16, color: '#78716c' }}>
-            <Ticket size={32} style={{ margin: '0 auto 8px', color: '#a8a29e' }} />
-            <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>Hiện chưa có mã ưu đãi công khai nào đang mở.</p>
-          </div>
-        ) : (
-          <div className="buyer-grid-4">
-            {vouchers.slice(0, 8).map((v, i) => {
-              const isSaved = savedVouchers.includes(v.code);
-              return (
-                <div key={i} className="voucher-card" style={{
-                  backgroundColor: isSaved ? '#f0fdf4' : '#fff8f8',
-                  borderColor: isSaved ? '#86efac' : '#fca5a5',
-                  height: 'auto',
-                  minHeight: 125,
-                  position: 'relative',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  padding: 14
-                }}>
-                  <div className="voucher-content">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
-                      <span className="font-mono" style={{ fontSize: 11, fontWeight: 900, backgroundColor: isSaved ? '#dcfce7' : '#fee2e2', color: isSaved ? '#166534' : '#991b1b', padding: '2px 6px', borderRadius: 4 }}>
-                        {v.code}
-                      </span>
-                      {v.is_platform ? (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#008000' }}>Toàn Sàn</span>
-                      ) : (
-                        <span style={{ fontSize: 10, color: '#57534e', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.shop_name}</span>
-                      )}
-                    </div>
-                    <span className="voucher-title" style={{ color: isSaved ? '#15803d' : '#cc1111', fontSize: 15, fontWeight: 800 }}>{v.value}</span>
-                    <span className="voucher-desc" style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{v.condition}</span>
-                    {v.applicable_scope === 'SPECIFIC_PRODUCTS' ? (
-                      <span style={{ fontSize: 10, color: '#d97706', fontWeight: 600, display: 'block', marginTop: 3 }}>
-                        • {v.applicable_products_count} sản phẩm chỉ định
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 10, color: '#78716c', fontWeight: 500, display: 'block', marginTop: 3 }}>
-                        • {v.is_platform ? 'Áp dụng toàn sàn' : 'Áp dụng toàn shop'}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    className="voucher-btn"
-                    onClick={(e) => toggleVoucher(v.code, e)}
-                    style={{
-                      backgroundColor: isSaved ? '#008000' : '#cc1111',
-                      color: '#fff',
-                      transition: 'all 0.2s',
-                      fontWeight: 700,
-                      marginTop: 8,
-                      padding: '5px 0'
-                    }}
-                  >
-                    {isSaved ? '✓ Đã lưu' : 'Lưu mã'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+      {vouchers.length > 0 && (
+        <section id="vouchers-section" className="mt-12" aria-label="Voucher">
+          <SectionHead
+            title="Lưu mã trước khi mua"
+            note="Mã đã lưu nằm trong ví của bạn và hiện đầu tiên ở bước thanh toán"
+            action={<TextAction onClick={() => navigate('/vouchers')}>Xem tất cả {vouchers.length} mã</TextAction>}
+          />
+          <VoucherTicketStrip vouchers={vouchers.slice(0, 10)} isSaved={wallet.isSaved} pendingCode={wallet.pendingCode} onToggle={toggleVoucher} />
+        </section>
+      )}
 
-      {/* Flash Deals Section - Sản phẩm Flash Sale với badge nhảy nhảy */}
-      <section className="buyer-section" style={{ marginTop: 36 }}>
-        <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Flame size={22} className="text-amber-500 fill-amber-500 animate-pulse" />
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: 0 }}>
-              ⚡ Ưu Đãi Chớp Nhoáng & Flash Sale
-            </h2>
-            {flashDeals.length > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: 20 }}>
-                {flashDeals.length} sản phẩm giảm giá
-              </span>
-            )}
-          </div>
-        </div>
+      {categories.length > 0 && (
+        <section id="collections-section" className="mt-12 scroll-mt-24" aria-label="Danh mục">
+          <SectionHead
+            title="Mua theo danh mục"
+            action={<TextAction onClick={() => navigate('/search')}>Tất cả danh mục</TextAction>}
+          />
+          <CategoryShelf categories={categories} onSelect={(c) => navigate(`/search?category=${encodeURIComponent(c.name)}`)} />
+        </section>
+      )}
 
-        {flashDeals.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '36px 16px', background: '#fafaf9', borderRadius: 16, color: '#78716c', border: '1px dashed #e7e5e4' }}>
-            <Flame size={32} style={{ margin: '0 auto 8px', color: '#f59e0b' }} />
-            <p style={{ fontWeight: 700, fontSize: 14, color: '#44403c', margin: 0 }}>
-              Hiện chưa có sản phẩm Flash Sale chớp nhoáng nào đang mở.
-            </p>
-            <p style={{ fontSize: 12, color: '#a8a29e', marginTop: 4, marginBottom: 12 }}>
-              Các gian hàng sẽ sớm tung ra khung giờ vàng giá sốc. Bạn hãy lưu voucher trước để sẵn sàng săn sale nhé!
-            </p>
-            <button
-              onClick={() => navigate('/vouchers')}
-              style={{
-                backgroundColor: '#008000',
-                color: '#fff',
-                padding: '6px 16px',
-                borderRadius: 20,
-                border: 'none',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              Mở Kho Voucher
-            </button>
+      {dealItems.length > 0 && (
+        <section className="mt-14" aria-label="Giá tốt với mã">
+          <SectionHead
+            title="Giá tốt hơn với mã"
+            note="Xếp theo mức tiết kiệm. Giá sau mã áp dụng khi bạn chọn mã ở bước thanh toán"
+            action={<TextAction onClick={() => navigate('/deals')}>Xem tất cả {dealTotal} sản phẩm</TextAction>}
+          />
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
+            {dealItems.map((p: any) => (
+              <HomeProductCard
+                key={p.id}
+                product={p}
+                deal={toDeal(p.deal)}
+                isFav={favIds.includes(p.id)}
+                onToggleFav={(e) => toggleFavorite(p.id, p.title, e)}
+                onOpen={() => openProduct(p)}
+              />
+            ))}
           </div>
-        ) : (
-          <div className="buyer-grid-5">
-            {flashDeals.map((fd) => {
-              const isFav = favoritedProductIds.includes(fd.id);
-              const isFlash = fd.badge === 'FLASH SALE';
-              return (
-                <div key={fd.id} className="buyer-card" onClick={() => navigate(`/product/${fd.id}`)}>
-                  <div className="card-media">
-                    <img src={fd.image} alt={fd.title} />
-                    <div style={{
-                      position: 'absolute',
-                      top: 8,
-                      left: 8,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 4,
-                      alignItems: 'flex-start',
-                      zIndex: 3
-                    }}>
-                      {isFlash ? (
-                        <span className="flash-sale-badge">
-                          ⚡ FLASH SALE
-                        </span>
-                      ) : (
-                        <span className="discount-tag" style={{ position: 'static' }}>
-                          {fd.badge || 'ƯU ĐÃI'}
-                        </span>
-                      )}
-                      {fd.discount && (
-                        <span style={{
-                          backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                          color: '#fef08a',
-                          fontSize: 10,
-                          fontWeight: 800,
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          backdropFilter: 'blur(4px)'
-                        }}>
-                          {fd.discount}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      className="fav-overlay"
-                      onClick={(e) => toggleFavorite(fd.id, fd.title, e)}
-                      style={{ color: isFav ? '#e11d48' : '#888' }}
-                    >
-                      <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
-                    </button>
-                  </div>
-                  <div className="card-info">
-                    <h3>{fd.title}</h3>
-                    <div className="price-row">
-                      <span className="new-price" style={{ color: '#008000', fontWeight: 800 }}>
-                        {fd.price.toLocaleString('vi-VN')}đ
-                      </span>
-                      {fd.oldPrice > fd.price && (
-                        <span className="old-price" style={{ textDecoration: 'line-through', color: '#a8a29e' }}>
-                          {fd.oldPrice.toLocaleString('vi-VN')}đ
-                        </span>
-                      )}
-                    </div>
-                    {fd.couponCode && (
-                      <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: 4 }}>
-                          ⚡ {fd.couponCode}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* Main Discover Grid */}
-      <section id="kham-pha" className="buyer-section" style={{ marginTop: 40 }}>
-        <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Tiếp tục khám phá</h2>
-          <span style={{ fontSize: 13, color: '#888', fontWeight: 500 }}>
-            {displayProducts.length} kết quả
-          </span>
-        </div>
-        
+      {shelfShops.length > 0 && (
+        <section className="mt-14" aria-label="Gian hàng">
+          <SectionHead
+            title={followingMode ? 'Từ gian hàng bạn theo dõi' : 'Gian hàng nên theo dõi'}
+            note={followingMode ? undefined : 'Theo dõi để thấy hàng mới của shop ngay tại đây'}
+            action={followingMode ? <TextAction onClick={() => navigate('/followed-shops')}>Quản lý</TextAction> : undefined}
+          />
+          <ShopShelf
+            shops={shelfShops}
+            mode={followingMode ? 'following' : 'suggested'}
+            followingId={followingShopId}
+            onOpenShop={(id) => navigate(`/shop/${id}`)}
+            onOpenProduct={(id) => navigate(`/product/${id}`)}
+            onFollow={handleFollowShop}
+          />
+        </section>
+      )}
+
+      <section id="kham-pha" className="mt-14 scroll-mt-24" aria-label="Mới lên kệ">
+        <SectionHead
+          title="Mới lên kệ"
+          note={stats.totalProducts > 0 ? `${stats.totalProducts.toLocaleString('vi-VN')} sản phẩm đang bán, mới nhất trước` : undefined}
+          action={<TextAction onClick={() => navigate('/search?sort=newest')}>Lọc và sắp xếp</TextAction>}
+        />
         {isLoading ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
-            <p style={{ fontWeight: 650 }}>Đang tải sản phẩm...</p>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: PAGE }, (_, i) => <HomeProductSkeleton key={i} />)}
           </div>
-        ) : displayProducts.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: '#888' }}>
-            <p style={{ fontWeight: 650 }}>Không tìm thấy sản phẩm phù hợp.</p>
+        ) : products.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-6 py-12 text-center text-[14px] text-stone-500">
+            Chưa có sản phẩm nào đang bán.
           </div>
         ) : (
           <>
-            <div className="buyer-grid-4">
-              {paginatedProducts.map((p: any) => {
-                const isFav = favoritedProductIds.includes(p.id);
-                const flashDeal = flashSaleProductMap.get((p.id || p._id)?.toString());
-                const isFlashSale = flashDeal?.badge === 'FLASH SALE';
-                const isOtherDeal = flashDeal && !isFlashSale;
-                return (
-                  <div key={p.id} className="buyer-card" onClick={() => navigate(`/product/${p.id}`, { state: { initialProduct: p } })}>
-                    <div className="card-media">
-                      <img src={p.images?.[0] || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300'} alt={p.title} />
-                      {isFlashSale && (
-                        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 3 }}>
-                          <span className="flash-sale-badge">
-                            ⚡ FLASH SALE
-                          </span>
-                        </div>
-                      )}
-                      {isOtherDeal && (
-                        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 3 }}>
-                          <span style={{ backgroundColor: '#7c3aed', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 12 }}>
-                            🏷️ ƯU ĐÃI
-                          </span>
-                        </div>
-                      )}
-                      <button
-                        className="fav-overlay"
-                        onClick={(e) => toggleFavorite(p.id, p.title || p.name, e)}
-                        style={{ color: isFav ? '#e11d48' : '#888' }}
-                      >
-                        <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
-                      </button>
-                    </div>
-                    <div className="card-info">
-                      <h3>{p.title || p.name}</h3>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                        <p style={{ margin: 0, fontWeight: 700, color: '#007700' }}>
-                          {(flashDeal ? flashDeal.price : p.price).toLocaleString('vi-VN')}đ
-                        </p>
-                        {flashDeal && flashDeal.oldPrice > flashDeal.price && (
-                          <span style={{ fontSize: 11, textDecoration: 'line-through', color: '#a8a29e' }}>
-                            {flashDeal.oldPrice.toLocaleString('vi-VN')}đ
-                          </span>
-                        )}
-                      </div>
-                      {flashDeal?.couponCode && (
-                        <span style={{ fontSize: 10, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: 4, width: 'fit-content', marginTop: 3 }}>
-                          ⚡ {flashDeal.couponCode}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+              {products.map((p: any) => (
+                <HomeProductCard
+                  key={p.id}
+                  product={p}
+                  deal={dealMap.get(String(p.id))}
+                  isFav={favIds.includes(p.id)}
+                  onToggleFav={(e) => toggleFavorite(p.id, p.title || p.name, e)}
+                  onOpen={() => openProduct(p)}
+                />
+              ))}
             </div>
-
-            {/* Pagination controls */}
-            {totalPages > 1 && (
-              <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 16,
-                marginTop: 28,
-                marginBottom: 12
-              }}>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 20,
-                    border: '1px solid #e7e5e4',
-                    backgroundColor: '#fff',
-                    color: currentPage === 1 ? '#a8a29e' : '#1c1917',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4
-                  }}
-                >
-                  &larr; Trước
-                </button>
-
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#44403c' }}>
-                  Trang {currentPage} / {totalPages}
-                </span>
-
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 20,
-                    border: '1px solid #e7e5e4',
-                    backgroundColor: '#fff',
-                    color: currentPage === totalPages ? '#a8a29e' : '#1c1917',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4
-                  }}
-                >
-                  Sau &rarr;
-                </button>
+            {loadingMore && (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+                {Array.from({ length: 4 }, (_, i) => <HomeProductSkeleton key={i} />)}
               </div>
             )}
-          </>
-        )}
-      </section>
-
-      <ForYouSection deals={flashSaleProductMap} />
-
-      {/* Followed Shop Updates Section */}
-      <section className="buyer-section" style={{ marginTop: 40 }}>
-        <div className="section-head" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Cập nhật từ gian hàng bạn theo dõi</h2>
-        </div>
-        {subbedShops.length === 0 ? (
-          <>
-            <div style={{ padding: '20px 16px', textAlign: 'center', background: '#fafaf9', border: '1px dashed #d6d3d1', borderRadius: 12, color: '#57534e' }}>
-              <Store size={28} style={{ color: '#a8a29e', margin: '0 auto 8px' }} />
-              <p style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#292524' }}>Bạn chưa theo dõi gian hàng nào</p>
-              <p style={{ fontSize: 12, margin: '4px 0 0' }}>Theo dõi gian hàng yêu thích để nhận cập nhật sản phẩm mới tại đây.</p>
-            </div>
-
-            {suggestedShops.length > 0 && (
-              <>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#330033', margin: '20px 0 12px' }}>Gợi ý gian hàng nên theo dõi</h3>
-                <div className="buyer-grid-3">
-                  {suggestedShops.map((shop, i) => {
-                    const targetShop = shop.id || shop.slug;
-                    const isFollowing = followingShopId === shop.shopId;
-                    return (
-                      <div
-                        key={shop.id || i}
-                        className="shop-update-card cursor-pointer hover:shadow-md transition-shadow"
-                        onClick={() => {
-                          if (targetShop) navigate(`/shop/${targetShop}`);
-                        }}
-                        style={{ cursor: 'pointer' }}
-                        title={`Xem gian hàng ${shop.name}`}
-                      >
-                        <div className="shop-head" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <img src={shop.image} alt={shop.name} className="shop-avatar" style={{ border: '1px solid #ebd0eb' }} />
-                          <div>
-                            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{shop.name}</h3>
-                            <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{shop.caption}</p>
-                          </div>
-                        </div>
-                        <div className="shop-thumbnails">
-                          {shop.thumbnails.map((t: string, idx: number) => (
-                            <img key={idx} src={t} alt="thumbnail" />
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          className="shop-view-btn"
-                          disabled={isFollowing}
-                          onClick={(e) => handleFollowShop(shop.shopId, shop.name, e)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 6,
-                            cursor: isFollowing ? 'wait' : 'pointer',
-                            opacity: isFollowing ? 0.7 : 1
-                          }}
-                          title={`Theo dõi gian hàng ${shop.name}`}
-                        >
-                          <UserPlus size={12} />
-                          <span>{isFollowing ? 'Đang theo dõi...' : 'Theo dõi'}</span>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </>
-        ) : (
-        <div className="buyer-grid-3">
-          {subbedShops.map((shop, i) => {
-            const targetShop = shop.id || shop.slug;
-            return (
-              <div
-                key={shop.id || i}
-                className="shop-update-card cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => {
-                  if (targetShop) navigate(`/shop/${targetShop}`);
-                }}
-                style={{ cursor: 'pointer' }}
-                title={`Xem gian hàng ${shop.name}`}
-              >
-                <div className="shop-head" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <img src={shop.image} alt={shop.name} className="shop-avatar" style={{ border: '1px solid #ebd0eb' }} />
-                  <div>
-                    <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{shop.name}</h3>
-                    <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{shop.caption}</p>
-                  </div>
-                </div>
-                <div className="shop-thumbnails">
-                  {shop.thumbnails.map((t: string, idx: number) => (
-                    <img
-                      key={idx}
-                      src={t}
-                      alt="thumbnail"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (targetShop) navigate(`/shop/${targetShop}`);
-                      }}
-                    />
-                  ))}
-                </div>
+            <div className="mt-7 flex flex-col items-center gap-2">
+              <p className="m-0 text-[13px] text-stone-500" aria-live="polite">
+                Đã xem {products.length.toLocaleString('vi-VN')} / {Math.max(stats.totalProducts, products.length).toLocaleString('vi-VN')} sản phẩm
+              </p>
+              {moreError && <p className="m-0 text-[13px] text-rose-700">Không tải được thêm sản phẩm. Bấm để thử lại.</p>}
+              {canShowMore ? (
                 <button
                   type="button"
-                  className="shop-view-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (targetShop) {
-                      navigate(`/shop/${targetShop}`);
-                    }
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    cursor: 'pointer'
-                  }}
-                  title={`Xem bộ sưu tập mới của ${shop.name}`}
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="rounded-full border border-[#330033] px-7 py-3 text-[14px] font-semibold text-[#330033] hover:bg-[#330033] hover:text-white disabled:opacity-60"
                 >
-                  <span>Xem bộ sưu tập mới</span>
-                  <ArrowRight size={12} />
+                  {loadingMore ? 'Đang tải...' : 'Xem thêm sản phẩm'}
                 </button>
-              </div>
-            );
-          })}
-        </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/search?sort=newest')}
+                  className="text-[13.5px] font-semibold text-[#007700] underline-offset-4 hover:underline"
+                >
+                  Bạn đã xem hết. Tìm theo bộ lọc
+                </button>
+              )}
+            </div>
+          </>
         )}
       </section>
 
-      {/* Styles Discovery Section */}
-      <section id="collections-section" className="buyer-section pb-12" style={{ marginTop: 40, marginBottom: 40 }}>
-        <div className="section-head" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#330033' }}>Khám phá các phong cách mới</h2>
-        </div>
-        <div className="buyer-grid-3">
-          <div className="style-card text-card-1" onClick={() => navigate('/')}>
-            <img src="https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=400" alt="Vẻ Đẹp Đương Đại" />
-            <div className="style-overlay">
-              <h3>Vẻ Đẹp Đương Đại</h3>
-            </div>
-          </div>
-          <div className="style-card text-card-2" onClick={() => navigate('/')}>
-            <img src="https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=400" alt="Góc Làm Việc Tối Giản" />
-            <div className="style-overlay">
-              <h3>Góc Làm Việc Tối Giản</h3>
-            </div>
-          </div>
-          <div className="style-card text-card-3" onClick={() => navigate('/')}>
-            <img src="https://images.unsplash.com/photo-1608156639585-b3a032ef9689?auto=format&fit=crop&w=400" alt="Nghệ Thuật Đường Phố" />
-            <div className="style-overlay">
-              <h3>Nghệ Thuật Đường Phố</h3>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ForYouSection
+        favIds={favIds}
+        onToggleFav={toggleFavorite}
+        renderHead={(title, note) => <SectionHead title={title} note={note} />}
+      />
     </div>
   );
 }

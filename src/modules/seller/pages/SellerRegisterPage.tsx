@@ -13,17 +13,8 @@ import { SUPPORTED_BANKS } from '../types/settings';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { useToast } from '../../../shared/components/Toast';
-
-const CRAFT_CATEGORIES = [
-    'Gốm sứ thủ công (Bát Tràng, Chu Đậu)',
-    'Mây tre đan & Cói thủ công',
-    'Dệt thổ cẩm & Lụa tơ tằm',
-    'Tranh nghệ thuật, Sơn mài & Khắc gỗ',
-    'Sản phẩm in theo yêu cầu (POD)',
-    'Nến thơm & Thủ công tinh dầu thảo mộc',
-    'Đồ lưu niệm & Quà tặng thủ công Việt Nam',
-    'Thời trang & Phụ kiện tái chế thủ công'
-];
+import { productsService } from '../../product/services/productsService';
+import type { CatalogOption } from '../../product/types/product';
 
 function normalizeName(str: string) {
     if (!str) return '';
@@ -49,10 +40,29 @@ function toDisplayDate(str: string): string {
 }
 
 function formatConfidenceScore(score: number | undefined | null): string {
-    if (score === undefined || score === null) return '0%';
-    // Nếu điểm trả về tỷ lệ thập phân 0–1 (ví dụ 0.83) thì nhân 100 thành 83%, nếu đã là 0-100 thì giữ nguyên
-    const pct = score <= 1 && score > 0 ? Math.round(score * 100) : Math.round(score);
-    return `${pct}%`;
+    // Service OCR luôn trả confidence_score là số nguyên 0–100 (tỷ lệ tiêu chí đạt)
+    if (score === undefined || score === null || Number.isNaN(Number(score))) return '—';
+    return `${Math.round(Number(score))}%`;
+}
+
+/** Ô kết quả kiểm tra: true = đạt, false = cảnh báo, undefined = chưa kiểm tra (không mặc định là đạt). */
+function OcrCheckCell({ label, value, ok, bad }: { label: string; value: boolean | undefined; ok: string; bad: string }) {
+    const tone = value === true ? 'text-[#007700]' : value === false ? 'text-amber-600' : 'text-slate-400';
+    return (
+        <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
+            <span className="text-[10.5px] text-slate-500 block">{label}</span>
+            <span className={`font-bold block ${tone}`}>
+                {value === true ? ok : value === false ? bad : '— Chưa kiểm tra'}
+            </span>
+        </div>
+    );
+}
+
+/** Số CCCD đạt khi đúng định dạng VÀ không lệch năm sinh / giới tính mã hóa trong số. */
+function idCheckValue(v: CccdVerification | null): boolean | undefined {
+    const c = v?.checks;
+    if (!c || c.id_format_valid === undefined) return undefined;
+    return c.id_format_valid && c.id_matches_dob !== false && c.id_matches_gender !== false;
 }
 
 function toIsoDate(str: string): string {
@@ -247,7 +257,8 @@ export function SellerRegisterPage() {
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    // Lỗi hiện thành thông báo ở góc phải; bấm lại vẫn hiện dù nội dung trùng lần trước
+    const setError = (message: string | null) => { if (message) showToast(message, 'error'); };
     const [statusData, setStatusData] = useState<SellerKycStatusResponse | null>(null);
     const [showCancelKycModal, setShowCancelKycModal] = useState(false);
     const [cancellingKyc, setCancellingKyc] = useState(false);
@@ -277,7 +288,7 @@ export function SellerRegisterPage() {
     const [checkingPortrait, setCheckingPortrait] = useState(false);
     const [frontVerification, setFrontVerification] = useState<CccdVerification | null>(null);
     const [backVerification, setBackVerification] = useState<CccdVerification | null>(null);
-    const [ocrNotice, setOcrNotice] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(null);
+    const [ocrNotice, setOcrNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     const [companyName, setCompanyName] = useState('');
     const [businessLicenseNumber, setBusinessLicenseNumber] = useState('');
@@ -359,8 +370,34 @@ export function SellerRegisterPage() {
 
     const [shopName, setShopName] = useState('');
     const [shopDescription, setShopDescription] = useState('');
-    const [mainCategory, setMainCategory] = useState(CRAFT_CATEGORIES[0]);
+    const [mainCategory, setMainCategory] = useState('');
     const [isCustomCategory, setIsCustomCategory] = useState(false);
+    // Ngành hàng chính = danh mục gốc của sàn (admin quản lý), không hardcode ở đây.
+    const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+    const [categoriesStatus, setCategoriesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+
+    useEffect(() => {
+        let alive = true;
+        productsService.getCategories()
+            .then((data: CatalogOption[]) => {
+                if (!alive) return;
+                const all = Array.isArray(data) ? data : [];
+                const roots = all.filter(c => !c.parent_id);
+                setCategoryOptions((roots.length ? roots : all).map(c => c.name));
+                setCategoriesStatus('ready');
+            })
+            .catch(() => { if (alive) setCategoriesStatus('error'); });
+        return () => { alive = false; };
+    }, []);
+
+    // Danh mục đã lưu không còn trong danh sách của sàn (hoặc tải lỗi) → chuyển sang ô tự điền để không mất dữ liệu.
+    useEffect(() => {
+        if (categoriesStatus === 'loading') return;
+        if (categoriesStatus === 'error' || categoryOptions.length === 0
+            || (mainCategory && !categoryOptions.includes(mainCategory))) {
+            setIsCustomCategory(true);
+        }
+    }, [categoriesStatus, categoryOptions, mainCategory]);
     const [recipientName, setRecipientName] = useState('');
     const [pickupPhone, setPickupPhone] = useState('');
     const [pickupPhoneError, setPickupPhoneError] = useState<string | null>(null);
@@ -932,11 +969,7 @@ export function SellerRegisterPage() {
                 if (app.shop_info) {
                     setShopName(app.shop_info.shop_name || '');
                     setShopDescription(app.shop_info.description || '');
-                    const savedCategory = app.shop_info.main_category || CRAFT_CATEGORIES[0];
-                    setMainCategory(savedCategory);
-                    if (app.shop_info.main_category && !CRAFT_CATEGORIES.includes(app.shop_info.main_category)) {
-                        setIsCustomCategory(true);
-                    }
+                    setMainCategory(app.shop_info.main_category || '');
                     if (app.shop_info.pickup_address) {
                         setRecipientName(app.shop_info.pickup_address.recipient_name || '');
                         setPickupPhone(app.shop_info.pickup_address.phone || '');
@@ -1025,15 +1058,17 @@ export function SellerRegisterPage() {
                         setDateOfBirth(toDisplayDate(res.ocr_data.date_of_birth));
                     }
 
-                    if (res.verification?.warnings && res.verification.warnings.length > 0) {
-                        setOcrNotice({
-                            type: 'warning',
-                            message: `Đã trích xuất thông tin, nhưng có cảnh báo: ${res.verification.warnings.join('; ')}`
-                        });
-                    } else {
+                    if (!res.verification?.warnings?.length) {
+                        const filled = [
+                            res.ocr_data.full_name && 'họ tên',
+                            res.ocr_data.id_number && 'số CCCD',
+                            res.ocr_data.date_of_birth && 'ngày sinh',
+                        ].filter(Boolean).join(', ');
                         setOcrNotice({
                             type: 'success',
-                            message: `AI đã quét thành công mặt trước CCCD (${res.verification?.confidence_score || 95}% tin cậy) và tự động điền họ tên, số CCCD, ngày sinh.`
+                            message: filled
+                                ? `Đã quét mặt trước CCCD (đạt ${formatConfidenceScore(res.verification?.confidence_score)} tiêu chí kiểm tra) và tự động điền ${filled}. Vui lòng đối chiếu lại với thẻ.`
+                                : `Đã quét mặt trước CCCD nhưng chưa đọc được trường nào. Vui lòng nhập tay.`
                         });
                     }
                 } else if (side === 'back') {
@@ -1045,12 +1080,7 @@ export function SellerRegisterPage() {
                         setIdIssuePlace(res.ocr_data.issuing_authority);
                     }
 
-                    if (res.verification?.warnings && res.verification.warnings.length > 0) {
-                        setOcrNotice({
-                            type: 'warning',
-                            message: `Đã trích xuất mặt sau, có cảnh báo: ${res.verification.warnings.join('; ')}`
-                        });
-                    } else {
+                    if (!res.verification?.warnings?.length) {
                         setOcrNotice({
                             type: 'success',
                             message: `AI đã quét thành công mặt sau CCCD và tự động điền ngày cấp, nơi cấp.`
@@ -1276,13 +1306,6 @@ export function SellerRegisterPage() {
                                 </button>
                             </div>
                         </div>
-                    </div>
-                )}
-
-                {error && (
-                    <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-                        <AlertCircle size={16} className="flex-shrink-0" />
-                        <span>{error}</span>
                     </div>
                 )}
 
@@ -1547,11 +1570,9 @@ export function SellerRegisterPage() {
                             {/* Thông báo quét OCR CCCD */}
                             {ocrNotice && (
                                 <div className={`p-3 rounded-xl text-xs font-medium flex items-start gap-2 ${ocrNotice.type === 'success' ? 'bg-emerald-100/90 text-emerald-900 border border-emerald-300' :
-                                    ocrNotice.type === 'warning' ? 'bg-amber-100/90 text-amber-900 border border-amber-300' :
                                         'bg-rose-100/90 text-rose-900 border border-rose-300'
                                     }`}>
                                     {ocrNotice.type === 'success' && <CheckCircle2 size={16} className="text-emerald-700 shrink-0 mt-0.5" />}
-                                    {ocrNotice.type === 'warning' && <AlertTriangle size={16} className="text-amber-700 shrink-0 mt-0.5" />}
                                     {ocrNotice.type === 'error' && <AlertCircle size={16} className="text-rose-700 shrink-0 mt-0.5" />}
                                     <div className="flex-1">{ocrNotice.message}</div>
                                 </div>
@@ -1754,57 +1775,35 @@ export function SellerRegisterPage() {
                                         </div>
 
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                                                <span className="text-[10.5px] text-slate-500 block">Độ sắc nét</span>
-                                                <span className={`font-bold block ${(frontVerification?.checks?.blur_check ?? true) ? 'text-[#007700]' : 'text-amber-600'
-                                                    }`}>
-                                                    {(frontVerification?.checks?.blur_check ?? true) ? '✓ Đạt chuẩn' : '⚠ Ảnh hơi mờ'}
-                                                </span>
-                                            </div>
-                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                                                <span className="text-[10.5px] text-slate-500 block">Bố cục thẻ</span>
-                                                <span className={`font-bold block ${(frontVerification?.checks?.layout_check ?? true) ? 'text-[#007700]' : 'text-amber-600'
-                                                    }`}>
-                                                    {(frontVerification?.checks?.layout_check ?? true) ? '✓ Chuẩn Quốc huy' : '⚠ Bố cục lạ'}
-                                                </span>
-                                            </div>
-                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                                                <span className="text-[10.5px] text-slate-500 block">Chống chụp màn hình</span>
-                                                <span className={`font-bold block ${(frontVerification?.checks?.screen_capture_check ?? true) ? 'text-[#007700]' : 'text-rose-600'
-                                                    }`}>
-                                                    {(frontVerification?.checks?.screen_capture_check ?? true) ? '✓ Thẻ vật lý' : '⚠ Nghi chụp màn hình'}
-                                                </span>
-                                            </div>
-                                            <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                                                <span className="text-[10.5px] text-slate-500 block">Cấu trúc 12 số</span>
-                                                <span className={`font-bold block ${(frontVerification?.checks?.id_number_format ?? true) ? 'text-[#007700]' : 'text-amber-600'
-                                                    }`}>
-                                                    {(frontVerification?.checks?.id_number_format ?? true) ? '✓ Quy chuẩn BCA' : '⚠ Cần đối soát'}
-                                                </span>
-                                            </div>
+                                            <OcrCheckCell
+                                                label="Chất lượng ảnh"
+                                                value={frontVerification?.checks?.image_quality_ok ?? backVerification?.checks?.image_quality_ok}
+                                                ok="✓ Rõ nét, đủ sáng"
+                                                bad="⚠ Mờ / tối / lóa"
+                                            />
+                                            <OcrCheckCell
+                                                label="Bố cục thẻ"
+                                                value={frontVerification?.checks?.layout_detected ?? backVerification?.checks?.layout_detected}
+                                                ok="✓ Đúng bố cục CCCD"
+                                                bad="⚠ Không giống CCCD"
+                                            />
+                                            <OcrCheckCell
+                                                label="Dấu hiệu chụp màn hình"
+                                                value={frontVerification?.checks?.no_screen_capture ?? backVerification?.checks?.no_screen_capture}
+                                                ok="✓ Không phát hiện"
+                                                bad="⚠ Có thể chụp từ màn hình"
+                                            />
+                                            <OcrCheckCell
+                                                label="Số CCCD 12 chữ số"
+                                                value={idCheckValue(frontVerification)}
+                                                ok="✓ Hợp lệ, khớp ngày sinh & giới tính"
+                                                bad={
+                                                    frontVerification?.checks?.id_format_valid
+                                                        ? '⚠ Lệch ngày sinh / giới tính'
+                                                        : '⚠ Không đọc được / sai định dạng'
+                                                }
+                                            />
                                         </div>
-
-                                        {/* Warnings List */}
-                                        {((frontVerification?.warnings && frontVerification.warnings.length > 0) ||
-                                            (backVerification?.warnings && backVerification.warnings.length > 0)) && (
-                                                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11.5px] space-y-1">
-                                                    <span className="font-bold flex items-center gap-1">
-                                                        <AlertTriangle size={13} className="text-amber-700" /> Lưu ý khi thẩm định:
-                                                    </span>
-                                                    <ul className="list-disc list-inside space-y-0.5 text-slate-700 pl-1">
-                                                        {frontVerification?.warnings?.map((w, idx) => (
-                                                            <li key={`f-${idx}`}>Mặt trước: {w}</li>
-                                                        ))}
-                                                        {backVerification?.warnings?.map((w, idx) => (
-                                                            <li key={`b-${idx}`}>Mặt sau: {w}</li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-
-                                        <p className="text-[11px] text-slate-500 italic bg-slate-100/70 p-2 rounded-lg border border-slate-200/80">
-                                            * Lưu ý: Kết quả phân tích chất lượng ảnh và trích xuất OCR chỉ hỗ trợ nhận diện và điền tự động biểu mẫu, không thay thế việc đối chiếu với cơ sở dữ liệu định danh quốc gia. Hồ sơ đăng ký sẽ được Quản trị viên thẩm định độc lập trước khi phê duyệt.
-                                        </p>
                                     </div>
                                 )}
                             </div>
@@ -2154,15 +2153,16 @@ export function SellerRegisterPage() {
                                     <div className="space-y-1.5">
                                         <div className="flex items-center justify-between">
                                             <label className="text-xs font-bold text-slate-700">
-                                                Danh mục thủ công mỹ nghệ chủ đạo <span className="text-rose-500">*</span>
+                                                Ngành hàng chính <span className="text-rose-500">*</span>
                                             </label>
+                                            {categoryOptions.length > 0 && (
                                             <button
                                                 type="button"
                                                 onClick={() => {
                                                     if (isCustomCategory) {
                                                         setIsCustomCategory(false);
-                                                        if (!CRAFT_CATEGORIES.includes(mainCategory)) {
-                                                            setMainCategory(CRAFT_CATEGORIES[0]);
+                                                        if (!categoryOptions.includes(mainCategory)) {
+                                                            setMainCategory('');
                                                         }
                                                     } else {
                                                         setIsCustomCategory(true);
@@ -2171,8 +2171,9 @@ export function SellerRegisterPage() {
                                                 }}
                                                 className="text-[11px] font-semibold text-[#007700] hover:text-[#005B00] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
                                             >
-                                                {isCustomCategory ? '📋 Chọn từ danh mục mẫu' : '✏️ Tự điền danh mục khác'}
+                                                {isCustomCategory ? '📋 Chọn từ danh mục của sàn' : '✏️ Tự điền ngành hàng khác'}
                                             </button>
+                                            )}
                                         </div>
 
                                         {isCustomCategory ? (
@@ -2180,14 +2181,16 @@ export function SellerRegisterPage() {
                                                 <input
                                                     type="text"
                                                     autoFocus
-                                                    placeholder="Nhập tên ngành nghề / danh mục của bạn (ví dụ: Trầm hương, Đồ da thủ công, Khảm xà cừ...)"
+                                                    placeholder="Nhập ngành hàng chính của gian hàng (ví dụ: Đồ gia dụng, Phụ kiện điện thoại...)"
                                                     value={mainCategory}
                                                     onChange={(e) => setMainCategory(e.target.value)}
                                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                                     required
                                                 />
                                                 <p className="text-[11px] text-slate-400">
-                                                    Nhập ngành nghề / sản phẩm thủ công đặc thù của xưởng hoặc gian hàng của bạn.
+                                                    {categoriesStatus === 'error'
+                                                        ? 'Không tải được danh mục của sàn, bạn có thể tự điền ngành hàng.'
+                                                        : 'Chỉ dùng khi ngành hàng của bạn chưa có trong danh mục của sàn.'}
                                                 </p>
                                             </div>
                                         ) : (
@@ -2201,12 +2204,16 @@ export function SellerRegisterPage() {
                                                         setMainCategory(e.target.value);
                                                     }
                                                 }}
+                                                disabled={categoriesStatus === 'loading'}
                                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 cursor-pointer"
                                             >
-                                                {CRAFT_CATEGORIES.map(cat => (
+                                                <option value="" disabled>
+                                                    {categoriesStatus === 'loading' ? 'Đang tải danh mục...' : '-- Chọn ngành hàng chính --'}
+                                                </option>
+                                                {categoryOptions.map(cat => (
                                                     <option key={cat} value={cat}>{cat}</option>
                                                 ))}
-                                                <option value="__CUSTOM__">✨ Khác (Tự điền danh mục thủ công...)</option>
+                                                <option value="__CUSTOM__">✨ Khác (Tự điền ngành hàng...)</option>
                                             </select>
                                         )}
                                     </div>
@@ -2471,7 +2478,7 @@ export function SellerRegisterPage() {
                                         </div>
                                         <input
                                             type="text"
-                                            placeholder={nameToCompare || 'NGUYEN VAN A'}
+                                            placeholder="Nhập tên chủ tài khoản"
                                             value={accountHolder}
                                             onChange={(e) => setAccountHolder(e.target.value)}
                                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold uppercase focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
@@ -2516,7 +2523,7 @@ export function SellerRegisterPage() {
                                             return;
                                         }
                                         if (!mainCategory || !mainCategory.trim()) {
-                                            setError('Vui lòng chọn hoặc tự điền danh mục thủ công mỹ nghệ chủ đạo.');
+                                            setError('Vui lòng chọn hoặc tự điền ngành hàng chính.');
                                             return;
                                         }
                                         if (!province || !district || !specificAddress) {
@@ -2546,7 +2553,7 @@ export function SellerRegisterPage() {
                                             return;
                                         }
                                         if (!accountHolder) {
-                                            setError('Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng.');
+                                            setError('Vui lòng nhập tên chủ tài khoản (hoặc bấm "Lấy theo tên trên CCCD").');
                                             return;
                                         }
                                         if (!isNameMatched) {
@@ -2637,13 +2644,6 @@ export function SellerRegisterPage() {
                                     Họ tên được ký sẽ được lưu cùng địa chỉ IP và dấu thời gian chứng thực điện tử.
                                 </span>
                             </div>
-
-                            {error && (
-                                <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-                                    <AlertCircle size={16} className="flex-shrink-0" />
-                                    <span>{error}</span>
-                                </div>
-                            )}
 
                             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                 <button

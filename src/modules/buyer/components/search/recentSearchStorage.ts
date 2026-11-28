@@ -58,3 +58,12 @@ function save(list: string[]): void {
     // localStorage bị chặn (chế độ ẩn danh) thì bỏ qua
   }
 }
+
+export async function forgetRecentSearch(keyword: string): Promise<void> {
+  if (!isLoggedIn()) return save(getRecentSearches().filter((s) => s !== keyword));
+  try {
+    await api.delete('/products/meta/recent-searches', { params: { keyword } });
+  } catch {
+    // lỗi mạng thì bỏ qua
+  }
+}

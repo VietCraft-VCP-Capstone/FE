@@ -10,7 +10,7 @@ import { ProductDetailModal } from '../components/ProductDetailModal';
 import { ProductDeleteModal } from '../components/ProductDeleteModal';
 import { ProductBatchActionsBar } from '../components/ProductBatchActionsBar';
 import { ProductPagination } from '../components/ProductPagination';
-import { useProductFormDeepLink } from '../hooks/useProductFormDeepLink';
+import { useProductFormDeepLink, ProductPrefillDraft } from '../hooks/useProductFormDeepLink';
 import { useToast } from '../../../shared/components/Toast';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { analyticsApi } from '../../analytics/services/analyticsApi';
@@ -41,6 +41,7 @@ export function ProductListingPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [focusField, setFocusField] = useState<string | null>(null);
+  const [prefillDraft, setPrefillDraft] = useState<ProductPrefillDraft | null>(null);
 
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [viewingProduct, setViewingProduct] = useState<ProductItem | null>(null);
@@ -51,9 +52,10 @@ export function ProductListingPage() {
 
   const [actionLoading, setActionLoading] = useState(false);
 
-  const openForm = useCallback((product: ProductItem | null, field: string | null = null) => {
+  const openForm = useCallback((product: ProductItem | null, field: string | null = null, prefill: ProductPrefillDraft | null = null) => {
     setEditingProduct(product);
     setFocusField(field);
+    setPrefillDraft(prefill);
     setIsFormOpen(true);
   }, []);
   useProductFormDeepLink(openForm, showToast);
@@ -161,7 +163,10 @@ export function ProductListingPage() {
         await productsService.update(editingProduct.id, formData);
         showToast(`Đã cập nhật sản phẩm "${formData.title}" thành công!`, 'success');
       } else {
-        await productsService.create(formData);
+        await productsService.create({
+          ...formData,
+          ...(prefillDraft?.source_idea_id ? { source_idea_id: prefillDraft.source_idea_id } : {}),
+        });
         showToast(`Đã thêm mới sản phẩm "${formData.title}" thành công!`, 'success');
       }
       setIsFormOpen(false);
@@ -250,7 +255,7 @@ export function ProductListingPage() {
   const currentPage = filter.page;
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 font-sans">
+    <div className="space-y-6 animate-fade-in font-sans">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -321,9 +326,13 @@ export function ProductListingPage() {
       {/* Create / Edit Modal */}
       <ProductFormModal
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          setIsFormOpen(false);
+          setPrefillDraft(null);
+        }}
         onSubmit={handleFormSubmit}
         product={editingProduct}
+        prefill={prefillDraft}
         loading={actionLoading}
         focusField={focusField}
       />

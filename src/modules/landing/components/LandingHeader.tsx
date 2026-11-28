@@ -52,12 +52,12 @@ export function LandingHeader({
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-100 px-6 py-4">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-100 px-4 sm:px-6 py-3 sm:py-4">
+      <div className="max-w-7xl mx-auto flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-4 gap-y-3">
         
         {/* Logo */}
         <div className="flex items-center gap-1.5 cursor-pointer" onClick={onHome}>
-          <span className="text-2xl font-bold select-none">
+          <span className="font-heading text-xl font-semibold tracking-tight select-none">
             <span className="text-[#007700]">Viet</span>
             <span className="text-[#330033]">Craft</span>
           </span>
@@ -65,16 +65,19 @@ export function LandingHeader({
 
         {/* Navigation Links */}
         <nav className="hidden lg:flex items-center gap-6 font-semibold text-stone-700">
-          <a href="#kham-pha" className="hover:text-[#007700] transition-colors">Khám phá</a>
-          <a href="#qua-tang" className="hover:text-[#007700] transition-colors">Quà tặng</a>
-          <span className="cursor-pointer hover:text-[#007700] transition-colors" onClick={onSignup}>Đăng ký</span>
+          <Link to="/search" className="hover:text-[#007700] transition-colors">Khám phá</Link>
+          <Link to="/gifts" className="hover:text-[#007700] transition-colors">Quà tặng</Link>
           <a href="#xu-huong" className="hover:text-[#007700] transition-colors">Xu hướng</a>
+          <Link to="/vouchers" className="hover:text-[#007700] transition-colors">Ưu đãi</Link>
+          {!user && (
+            <button type="button" className="hover:text-[#007700] transition-colors" onClick={onSignup}>Đăng ký</button>
+          )}
           <Link to="/seller/register" className="text-[#007700] hover:text-[#005B00] font-bold transition-colors">
             Kênh Người Bán
           </Link>
         </nav>
 
-        <div className="flex-1 max-w-lg min-w-[160px] relative group" ref={searchBox.containerRef}>
+        <div className="order-last basis-full sm:order-none sm:basis-auto flex-1 max-w-lg min-w-0 sm:min-w-[160px] relative group" ref={searchBox.containerRef}>
           <Search
             className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 group-focus-within:text-[#007700] transition-colors cursor-pointer"
             onClick={() => searchBox.onExecuteSearch()}
@@ -89,8 +92,8 @@ export function LandingHeader({
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-4">
-          <Link to="/favorites" className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all" title="Yêu thích">
+        <div className="flex items-center gap-1 sm:gap-4">
+          <Link to={user ? '/favorites' : '/login?next=%2Ffavorites'} className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all" title="Yêu thích">
             <Heart className="h-5.5 w-5.5" />
           </Link>
           <Link to="/cart" className="p-2 text-stone-600 hover:text-[#007700] hover:bg-stone-50 rounded-full transition-all relative" title="Giỏ hàng">
@@ -106,7 +109,7 @@ export function LandingHeader({
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => onDashboard(user.name)}
-                className="bg-[#007700] hover:bg-[#006000] text-white text-sm font-semibold px-5 py-2 rounded-full transition-all shadow-sm"
+                className="max-w-[10rem] truncate sm:max-w-none bg-[#007700] hover:bg-[#006000] text-white text-sm font-semibold px-4 sm:px-5 py-2 rounded-full transition-all shadow-sm"
               >
                 Bảng điều khiển ({user.name})
               </button>
@@ -120,7 +123,7 @@ export function LandingHeader({
           ) : (
             <button 
               onClick={onLogin}
-              className="bg-[#007700] hover:bg-[#006000] text-white text-sm font-semibold px-5 py-2 rounded-full transition-all shadow-sm active:scale-95"
+              className="whitespace-nowrap bg-[#007700] hover:bg-[#006000] text-white text-sm font-semibold px-4 sm:px-5 py-2 rounded-full transition-all shadow-sm active:scale-95"
             >
               Đăng nhập
             </button>

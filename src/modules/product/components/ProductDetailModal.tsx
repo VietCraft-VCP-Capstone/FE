@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ModalOverlay } from '../../../shared/components/ModalOverlay';
 import { ProductItem } from '../types/product';
 import { ProductImage } from './ProductImage';
@@ -35,9 +35,12 @@ export function ProductDetailModal({
   onEdit,
   onDelete,
 }: ProductDetailModalProps) {
-  if (!isOpen || !product) return null;
-
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  // Mở lại hoặc đổi sản phẩm thì quay về ảnh đầu
+  useEffect(() => setActiveImageIndex(0), [isOpen, product?.id]);
+
+  if (!isOpen || !product) return null;
 
   const images = product.images && product.images.length > 0 ? product.images : [product.thumbnail];
   const activeImage = images[activeImageIndex] || product.thumbnail;
@@ -46,15 +49,9 @@ export function ProductDetailModal({
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val || 0);
   };
 
-  const chartData = product.inventoryTrends && product.inventoryTrends.length > 0
-    ? product.inventoryTrends
-    : [
-        { date: 'T1', stock: (product.stock || 20) + 40 },
-        { date: 'T3', stock: (product.stock || 20) + 30 },
-        { date: 'T7', stock: (product.stock || 20) + 15 },
-        { date: 'T10', stock: (product.stock || 20) + 5 },
-        { date: 'Hiện tại', stock: product.stock || 20 }
-      ];
+  // Chỉ vẽ lịch sử tồn kho thật; chưa có thì hiện trạng thái trống, không tự dựng số.
+  const chartData = product.inventoryTrends || [];
+  const hasInventoryHistory = chartData.length >= 2;
 
   const getStatusBadge = (rawStatus?: string) => {
     const status = (rawStatus || 'ACTIVE').toUpperCase();
@@ -235,11 +232,14 @@ export function ProductDetailModal({
                   <p className="text-xs text-stone-500">Biến động số lượng tồn kho theo từng mốc thời gian</p>
                 </div>
               </div>
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100/60 px-2.5 py-1 rounded-full">
-                Ổn định
-              </span>
             </div>
 
+            {!hasInventoryHistory ? (
+              <div className="h-32 flex flex-col items-center justify-center text-center text-sm text-stone-500 border border-dashed border-stone-200 rounded-xl bg-white">
+                <p className="font-semibold text-stone-700">Chưa có lịch sử tồn kho</p>
+                <p className="text-xs mt-1">Tồn kho hiện tại: {(product.stock ?? 0).toLocaleString('vi-VN')} sản phẩm</p>
+              </div>
+            ) : (
             <div className="h-64 w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
@@ -287,6 +287,7 @@ export function ProductDetailModal({
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            )}
           </div>
         </div>
       </div>

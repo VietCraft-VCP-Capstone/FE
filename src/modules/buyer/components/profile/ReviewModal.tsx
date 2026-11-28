@@ -43,7 +43,7 @@ const RATING_LABELS: Record<number, string> = {
     5: '5★: Cực kỳ ưng ý & tuyệt vời!'
 };
 
-const FALLBACK_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=150';
+const FALLBACK_PRODUCT_IMAGE = '/image-not-found.jpg';
 
 export const ReviewModal: React.FC<ReviewModalProps> = ({
     isOpen,

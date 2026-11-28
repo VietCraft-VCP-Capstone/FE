@@ -1,133 +1,107 @@
 import api from '../../../infrastructure/api/client';
 
-export interface FixedCostsConfig {
-    domain_monthly: number;
-    vps_base_monthly: number;
-    frontend_hosting: number;
-    security_ssl: number;
+export interface MonthlyCost {
+    /** Chỉ khoản mặc định có `key` (không xóa được); khoản tự thêm thì không. */
+    key?: string;
+    name: string;
+    amount: number;
 }
 
-export interface UnitCostsConfig {
-    storage_per_gb: number;
-    ai_per_request: number;
-    db_per_active_seller: number;
-    payment_gateway_rate: number;
+export interface PaymentFee {
+    /** Mã trùng `payment_method` của đơn hàng. Cổng mới thêm chưa lưu thì chưa có; BE tạo từ tên. */
+    code?: string;
+    name: string;
+    rate: number;
+    fixed: number;
+    /** Cổng mặc định (VNPAY, PayOS, COD): không xóa được. */
+    is_default?: boolean;
+}
+
+export interface FinanceConfig {
+    monthly_costs: MonthlyCost[];
+    payment_fees: PaymentFee[];
     notification_per_order: number;
+    /** Vốn dự phòng hiện có (đ), để tính sàn trụ được bao lâu khi đang lỗ. */
+    cash_reserve: number;
+    updated_at?: string | null;
 }
 
-export interface SellerQuotasConfig {
-    free_storage_gb: number;
-    free_ai_requests: number;
-    overage_markup_rate: number;
-}
-
-export interface PoliciesConfig {
-    default_commission_rate: number;
-    min_order_fee: number;
-    max_voucher_profit_share: number;
-}
-
-export interface PlatformCostConfigData {
-    _id?: string;
-    fixed_costs: FixedCostsConfig;
-    unit_costs: UnitCostsConfig;
-    seller_quotas: SellerQuotasConfig;
-    policies: PoliciesConfig;
-    updated_at?: string;
-}
-
-export interface CvpAnalysisData {
-    period_days: number;
-    active_sellers: number;
-    completed_orders: number;
-    total_gmv: number;
-    aov: number;
-    actual_platform_revenue: number;
-    total_fixed_costs: number;
-    total_variable_costs: number;
-    total_costs: number;
+export interface TrendMonth {
+    month: string;
+    orders: number;
+    gmv: number;
+    net_revenue: number;
+    contribution: number;
+    fixed_costs: number;
     net_profit: number;
-    is_profitable: boolean;
-    break_even_orders: number;
-    break_even_gmv: number;
-    margin_of_safety_pct: number;
-    unit_economics: {
-        revenue_per_order: number;
-        variable_cost_per_order: number;
-        contribution_margin_per_order: number;
-        contribution_margin_ratio: number;
+    /** Tháng đang chạy: chi phí cố định chỉ tính số ngày đã qua. */
+    partial: boolean;
+}
+
+export interface FinanceOverview {
+    period: { days: number; from: string; to: string };
+    commission_percent: number;
+    orders: { paid: number; refunded: number };
+    gmv: number;
+    shipping: number;
+    paid_amount: number;
+    /** Tổng giảm giá của đơn đã thanh toán (voucher sàn + voucher shop). */
+    discount: number;
+    pnl: {
+        commission: number;
+        platform_voucher: number;
+        net_revenue: number;
+        payment_fees: number;
+        refund_losses: number;
+        notification: number;
+        contribution: number;
+        fixed_costs: number;
+        net_profit: number;
     };
-    breakdown: {
-        fixed_costs: {
-            domain: number;
-            vps: number;
-            frontend: number;
-            ssl: number;
-            subtotal: number;
-        };
-        infrastructure_costs: {
-            active_seller_db: number;
-            storage_estimated: number;
-            ai_estimated: number;
-            subtotal: number;
-        };
-        variable_costs: {
-            payment_gateway: number;
-            notification: number;
-            subtotal_per_order: number;
-        };
+    refunded_commission: number;
+    payment_mix: { method: string; name: string; orders: number; amount: number; fee: number }[];
+    take_rate: number | null;
+    contribution_per_order: number | null;
+    /** Kỳ liền trước cùng độ dài, để so sánh tăng/giảm. */
+    previous: { orders: number; gmv: number; net_revenue: number; contribution: number; net_profit: number };
+    monthly: {
+        fixed_costs: number;
+        orders: number;
+        net_profit: number;
+        break_even_orders: number | null;
+        break_even_gmv: number | null;
+        margin_of_safety: number | null;
+        runway_months: number | null;
+    };
+    trend: TrendMonth[];
+    baseline: {
+        aov: number | null;
+        shipping_per_order: number | null;
+        commission_percent: number;
+        payment_fee_rate: number;
+        refund_rate: number;
+        refund_fee_ratio: number;
+        voucher_per_order: number;
+        notification_per_order: number;
     };
 }
 
-export interface SimulationPoint {
-    quantity: number;
-    totalRevenue: number;
-    totalCost: number;
-    fixedCost: number;
-    netProfit: number;
-}
-
-export interface SimulationData {
-    simulated_orders: number;
-    simulated_commission_rate: number;
-    simulated_aov: number;
-    projected_revenue: number;
-    projected_total_cost: number;
-    projected_net_profit: number;
-    is_profitable: boolean;
-    break_even_orders: number;
-    break_even_gmv: number;
-    margin_of_safety_pct: number;
-    unit_contribution_margin: number;
-    chart_series: SimulationPoint[];
-}
+/** Kỳ báo cáo: N ngày gần nhất, hoặc từ ngày đến ngày (YYYY-MM-DD, giờ VN). */
+export type OverviewQuery = { days: number } | { from: string; to: string };
 
 export const adminFinanceService = {
-    async getConfig(): Promise<PlatformCostConfigData> {
+    async getConfig(): Promise<FinanceConfig> {
         const { data } = await api.get('/admin/finance/config');
         return data.data;
     },
 
-    async updateConfig(payload: Partial<PlatformCostConfigData>): Promise<PlatformCostConfigData> {
+    async updateConfig(payload: FinanceConfig): Promise<FinanceConfig> {
         const { data } = await api.put('/admin/finance/config', payload);
         return data.data;
     },
 
-    async getCVPAnalysis(): Promise<CvpAnalysisData> {
-        const { data } = await api.get('/admin/finance/cvp-analysis');
-        return data.data;
-    },
-
-    async runSimulation(
-        simulatedOrders: number,
-        simulatedRate: number,
-        simulatedAov?: number
-    ): Promise<SimulationData> {
-        const { data } = await api.post('/admin/finance/simulate', {
-            simulatedOrders,
-            simulatedRate,
-            simulatedAov,
-        });
+    async getOverview(query: OverviewQuery): Promise<FinanceOverview> {
+        const { data } = await api.get('/admin/finance/pnl', { params: query });
         return data.data;
     },
 };

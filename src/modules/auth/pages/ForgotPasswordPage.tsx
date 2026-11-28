@@ -65,14 +65,14 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Epilogue Variable', system-ui, sans-serif" }}>
       {/* Left hero */}
       <div style={{ flex: 1, position: 'relative', minWidth: 0 }} className="auth-hero-panel">
         <img src="/images/hero-login.png" alt="VietCraft"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,30,0,0.72) 0%, rgba(0,0,0,0.15) 55%, transparent 100%)' }} />
         <div style={{ position: 'absolute', bottom: 44, left: 36, right: 36 }}>
-          <p style={{ color: '#fff', fontSize: 30, fontWeight: 800, lineHeight: 1.25, margin: '0 0 10px' }}>Biến Ý tưởng thành<br />doanh thu.</p>
+          <p style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", color: '#fff', fontSize: 26, fontWeight: 600, lineHeight: 1.22, margin: '0 0 10px' }}>Biến Ý tưởng thành<br />doanh thu.</p>
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, margin: 0 }}>Nền tảng E-commerce thông minh tích hợp AI. Tối ưu thiết kế, tự động hóa bán hàng.</p>
         </div>
       </div>
@@ -82,11 +82,11 @@ export function ForgotPasswordPage() {
         <div style={{ width: '100%', maxWidth: 480, margin: 'auto' }}>
           <div style={{ marginBottom: 12 }}>
             <Link to="/" style={{ textDecoration: 'none' }}>
-              <span style={{ fontSize: 30, fontWeight: 800 }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
+              <span style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em' }}><span style={{ color: '#007700' }}>Viet</span><span style={{ color: '#330033' }}>Craft</span></span>
             </Link>
           </div>
 
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#330033', margin: '0 0 4px' }}>Quên mật khẩu?</h1>
+          <h1 style={{ fontFamily: "'Unbounded Variable', system-ui, sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1.25, color: '#330033', margin: '0 0 4px' }}>Quên mật khẩu?</h1>
           <p style={{ fontSize: 14, color: '#78716c', margin: '0 0 14px' }}>
             Nhập địa chỉ email tài khoản của bạn để nhận mã OTP xác thực đặt lại mật khẩu mới.
           </p>

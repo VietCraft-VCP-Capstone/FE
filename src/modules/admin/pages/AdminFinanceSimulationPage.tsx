@@ -1,1316 +1,1602 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Tooltip } from 'antd';
 import {
-  Calculator,
+  CreditCard,
+  Gauge,
+  HelpCircle,
+  Loader2,
+  Lock,
+  type LucideIcon,
+  Plus,
+  Receipt,
   RefreshCw,
   Save,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  ShieldAlert,
-  Database,
+  Scale,
   Server,
-  Sliders,
-  CheckCircle,
-  Percent,
-  Layers,
-  ArrowRight,
-  CreditCard,
-  Receipt,
-  PiggyBank,
-  Lightbulb,
   SlidersHorizontal,
-  Settings,
-  Sparkles,
-  Info,
+  Split,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+  Undo2,
+  Wallet,
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ReferenceLine,
-} from 'recharts';
 
 import {
   adminFinanceService,
-  PlatformCostConfigData,
-  CvpAnalysisData,
-  SimulationData,
+  FinanceConfig,
+  FinanceOverview,
+  OverviewQuery,
+  PaymentFee,
+  TrendMonth,
 } from '../services/adminFinanceService';
-import { PageHeader, Alert } from '../components/AdminPrimitives';
-import { CARD, BTN_PRIMARY, BTN_SECONDARY, PAGE, cx } from '../components/adminUi';
-import { money, compactMoney } from '../../../shared/utils/format';
+import { SCENARIOS, SimInput, profitBars, sensitivity, simulate } from '../services/financeSimulation';
+import { Alert, PageHeader, SegmentedControl, StatusPill } from '../components/AdminPrimitives';
+import {
+  BTN_PRIMARY,
+  BTN_SECONDARY,
+  BTN_SECONDARY_SM,
+  CARD,
+  CARD_HEADER,
+  FIELD,
+  FIELD_HINT,
+  ICON_BTN_DANGER,
+  PAGE,
+  TABLE,
+  TOOLBAR,
+  cx,
+} from '../components/adminUi';
+import {
+  BENCHMARKS,
+  BenchmarkChart,
+  CostBarsChart,
+  OrderSplit,
+  ProfitBarsChart,
+  SensitivityChart,
+  TrendBars,
+  WaterfallChart,
+  monthLabel,
+} from '../components/finance/FinanceCharts';
+import { SERIES } from '../../../shared/components/charts/chartTheme';
+import { count, money } from '../../../shared/utils/format';
+
+type FinanceSection = 'tong-quan' | 'mo-phong' | 'chi-phi';
+
+const SECTIONS: { value: FinanceSection; label: string }[] = [
+  { value: 'tong-quan', label: 'Tổng quan' },
+  { value: 'mo-phong', label: 'Mô phỏng' },
+  { value: 'chi-phi', label: 'Chi phí vận hành' },
+];
+
+type RangeKey = '7' | '30' | 'thang-nay' | 'thang-truoc' | '90' | '365' | 'tuy-chon';
+
+const RANGE_OPTIONS: { value: RangeKey; label: string }[] = [
+  { value: '7', label: '7 ngày' },
+  { value: '30', label: '30 ngày' },
+  { value: 'thang-nay', label: 'Tháng này' },
+  { value: 'thang-truoc', label: 'Tháng trước' },
+  { value: '90', label: '90 ngày' },
+  { value: '365', label: '1 năm' },
+  { value: 'tuy-chon', label: 'Tùy chọn' },
+];
+
+const DAY_MS = 86_400_000;
+const MAX_RANGE_DAYS = 365;
+
+// Việt Nam không đổi giờ theo mùa nên cộng cố định 7 giờ, giống BE.
+const vnDate = (t: number) => new Date(t + 7 * 3_600_000).toISOString().slice(0, 10);
+const dmy = (t: number) => vnDate(t).split('-').reverse().join('/');
+
+/** 0 = tháng này, −1 = tháng trước. Gửi tới cuối tháng, BE tự cắt về hết hôm nay. */
+function monthQuery(offset: number): OverviewQuery {
+  const [y, m] = vnDate(Date.now()).split('-').map(Number);
+  const day = (month: number, d: number) => new Date(Date.UTC(y, month, d)).toISOString().slice(0, 10);
+  return { from: day(m - 1 + offset, 1), to: day(m + offset, 0) };
+}
+
+function presetQuery(key: RangeKey): OverviewQuery {
+  if (key === 'thang-nay') return monthQuery(0);
+  if (key === 'thang-truoc') return monthQuery(-1);
+  return { days: Number(key) };
+}
+
+/** Cùng luật với BE để báo lỗi ngay khi chọn; BE vẫn kiểm lại. */
+function customError({ from, to }: { from: string; to: string }, today: string): string {
+  if (!from || !to) return 'Chọn đủ ngày bắt đầu và ngày kết thúc.';
+  if (from > to) return 'Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.';
+  if (from > today) return 'Ngày bắt đầu không được ở tương lai.';
+  if ((Date.parse(to < today ? to : today) - Date.parse(from)) / DAY_MS + 1 > MAX_RANGE_DAYS) {
+    return `Khoảng thời gian tối đa ${MAX_RANGE_DAYS} ngày.`;
+  }
+  return '';
+}
+
+/** "trong 30 ngày qua" khi kỳ kéo tới hôm nay, ngược lại "từ 01/09/2026 đến 30/09/2026". */
+function periodText(p: FinanceOverview['period']): string {
+  const last = Date.parse(p.to) - 1;
+  return vnDate(last) >= vnDate(Date.now())
+    ? `trong ${p.days} ngày qua`
+    : `từ ${dmy(Date.parse(p.from))} đến ${dmy(last)}`;
+}
+
+/** Giống `gatewayCode` ở BE: "Ví MoMo" → "VI_MOMO". Chỉ để xem trước, BE mới là nơi tạo mã. */
+function gatewayCode(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/đ/gi, 'D')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+// Kỳ chưa có đơn thì mô phỏng cần điểm xuất phát; giao diện ghi rõ đây là giả định.
+const ASSUMED = { orders: 100, aov: 200_000, shipping: 30_000 };
+
+function pct(v: number | null | undefined, digits = 1): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
+  return `${(v * 100).toLocaleString('vi-VN', { maximumFractionDigits: digits })}%`;
+}
+
+// Dấu trừ thật "−" giống nhãn biểu đồ.
+function signedMoney(v: number): string {
+  return v > 0 ? `+${money(v)}` : v < 0 ? `−${money(-v)}` : money(0);
+}
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
+const months = (v: number) => `${v.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tháng`;
+
+/** % thay đổi so với kỳ trước; kỳ trước bằng 0 thì không so được (null), tránh "+100%" bịa. */
+function changePercent(now: number, before: number): number | null {
+  if (!before) return null;
+  return Math.round(((now - before) / Math.abs(before)) * 1000) / 10;
+}
+
+function baselineOf(o: FinanceOverview): SimInput {
+  const b = o.baseline;
+  return {
+    orders: o.orders.paid > 0 ? o.monthly.orders : ASSUMED.orders,
+    aov: b.aov ?? ASSUMED.aov,
+    shipping: b.shipping_per_order ?? ASSUMED.shipping,
+    commissionPercent: b.commission_percent,
+    paymentFeeRate: b.payment_fee_rate,
+    refundRate: b.refund_rate,
+    refundFeeRatio: b.refund_fee_ratio,
+    voucherPerOrder: b.voucher_per_order,
+    notificationPerOrder: b.notification_per_order,
+    monthlyFixed: o.monthly.fixed_costs,
+  };
+}
+
+/** Câu chốt của biểu đồ 6 tháng; lấy tháng đủ ngày gần nhất vì tháng đang chạy chưa trọn. */
+function trendSummary(trend: TrendMonth[]): string {
+  const n = trend.length;
+  if (!n) return '';
+  const good = trend.filter(t => t.net_profit >= 0).length;
+  const head = good === 0 ? `Cả ${n} tháng đều lỗ.` : good === n ? `Cả ${n} tháng đều có lãi.` : `${good}/${n} tháng có lãi.`;
+  const last = [...trend].reverse().find(t => !t.partial && t.fixed_costs > 0);
+  return last
+    ? `${head} Tháng ${monthLabel(last)} lãi góp bằng ${pct(last.contribution / last.fixed_costs)} chi phí cố định.`
+    : head;
+}
+
+function benchmarkSummary(rate: number): string {
+  const v = Math.round(rate * 1000) / 10;
+  const lower = BENCHMARKS.filter(b => v < b.value).map(b => b.name);
+  const higher = BENCHMARKS.filter(b => v >= b.value).map(b => b.name);
+  return [
+    `VietCraft thu ${v.toLocaleString('vi-VN')}% mỗi đơn`,
+    lower.length ? `thấp hơn ${lower.join(' và ')}` : '',
+    higher.length ? `cao hơn ${higher.join(' và ')}` : '',
+  ]
+    .filter(Boolean)
+    .join(', ')
+    .concat('.');
+}
+
+/** Báo ngay sau khi lưu: số nào đã đổi vì chi phí mới. */
+function savedNotice(before: FinanceOverview | null, after: FinanceOverview | null): string {
+  if (!before || !after) return 'Đã lưu cấu hình. Số liệu ở các tab đã tính lại.';
+  const be = (o: FinanceOverview) =>
+    o.monthly.break_even_orders === null ? 'không thể hòa vốn' : `${count(o.monthly.break_even_orders)} đơn/tháng`;
+  const parts: string[] = [];
+  if (before.monthly.break_even_orders !== after.monthly.break_even_orders) {
+    parts.push(`cần để hòa vốn ${be(before)} → ${be(after)}`);
+  }
+  if (before.pnl.net_profit !== after.pnl.net_profit) {
+    parts.push(`lãi/lỗ ${periodText(after.period)} ${signedMoney(before.pnl.net_profit)} → ${signedMoney(after.pnl.net_profit)}`);
+  }
+  if (after.monthly.runway_months !== null && before.monthly.runway_months !== after.monthly.runway_months) {
+    parts.push(`vốn dự phòng trụ được ${months(after.monthly.runway_months)}`);
+  }
+  return `Đã lưu cấu hình${parts.length ? `: ${parts.join(' · ')}` : ''}. Số liệu ở các tab đã tính lại.`;
+}
+
+/* ------------------------------------------------------------------ Thành phần nhỏ */
+
+const GLOSSARY: [string, string][] = [
+  ['Tổng tiền hàng (GMV)', 'Tổng giá trị hàng bán qua sàn. Đây là tiền của người bán, sàn chỉ giữ hộ.'],
+  ['Hoa hồng', 'Phần sàn thu trên mỗi đơn (mặc định 5% tiền người bán muốn nhận, cộng vào giá khách trả).'],
+  ['Voucher sàn', 'Mã giảm giá do sàn tài trợ: khách được giảm nhưng người bán vẫn nhận đủ, sàn bù phần chênh.'],
+  ['Doanh thu thuần', 'Hoa hồng trừ phần voucher sàn bù cho khách — phần thật sự thuộc về sàn.'],
+  ['Phí cổng thanh toán', 'Phí cổng (và phí thu hộ COD) tính trên toàn bộ tiền khách trả, gồm cả ship.'],
+  ['Thất thoát do hoàn tiền', 'Đơn bị hoàn: cổng không trả lại phí đã thu, và sàn không thu được hoa hồng của đơn đó.'],
+  ['Take rate', 'Doanh thu thuần chia tổng tiền hàng: sàn giữ được bao nhiêu % trên mỗi đồng hàng bán ra.'],
+  ['Biến phí', 'Chi phí sinh ra theo từng đơn: phí cổng thanh toán, tin nhắn, phí cổng mất ở đơn hoàn.'],
+  ['Chi phí cố định (định phí)', 'Trả mỗi tháng dù không bán được gì: server, tên miền, hosting…'],
+  ['Lãi góp', 'Doanh thu thuần trừ biến phí: mỗi đơn góp bao nhiêu để trả chi phí cố định.'],
+  ['Lãi/lỗ ròng', 'Lãi góp trừ chi phí cố định: sau mọi chi phí, sàn thật sự lãi hay lỗ bao nhiêu.'],
+  ['Hòa vốn', 'Số đơn (hoặc tiền hàng) mỗi tháng để tổng lãi góp vừa bằng chi phí cố định. Ít hơn là lỗ, nhiều hơn là lãi.'],
+  ['Biên an toàn', 'Đang vượt điểm hòa vốn bao nhiêu %. Càng cao càng an toàn.'],
+  ['Runway (số tháng trụ được)', 'Vốn dự phòng chia cho số lỗ mỗi tháng — nếu cứ lỗ như vậy thì vốn đủ bù trong bao lâu.'],
+];
+const TERMS = new Map(GLOSSARY);
+
+/** Nút "?" cạnh thuật ngữ: rê chuột, chạm hoặc Tab tới để đọc nghĩa ngay tại chỗ. */
+function Hint({ term }: { term: string }) {
+  const id = useId();
+  const text = TERMS.get(term);
+  if (!text) return null;
+  return (
+    <Tooltip title={text} trigger={['hover', 'focus']}>
+      <button
+        type="button"
+        aria-label={`${term} là gì?`}
+        aria-describedby={id}
+        className="ml-1 inline-flex cursor-help items-center rounded-sm align-[-2px] text-admin-muted transition-colors duration-150 hover:text-admin-ink focus-visible:text-admin-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-brand/30"
+      >
+        <HelpCircle size={13} aria-hidden />
+        <span id={id} className="sr-only">
+          {text}
+        </span>
+      </button>
+    </Tooltip>
+  );
+}
+
+function Delta({ value, format }: { value: number | null; format: (v: number) => string }) {
+  if (value === null) return <span className="text-[12px] text-admin-muted">kỳ trước chưa có số liệu</span>;
+  if (value === 0) return <span className="text-[12px] text-admin-muted">không đổi so với kỳ trước</span>;
+  const up = value > 0;
+  return (
+    <span className={cx('inline-flex items-center gap-1 text-[12px] font-bold', up ? 'text-admin-brand-700' : 'text-[#b91c1c]')}>
+      {up ? <TrendingUp size={13} aria-hidden /> : <TrendingDown size={13} aria-hidden />}
+      {format(value)} <span className="font-medium text-admin-muted">so với kỳ trước</span>
+    </span>
+  );
+}
+
+type Tone = 'good' | 'bad' | undefined;
+const TONE_INK = (tone: Tone) => (tone === 'good' ? 'text-admin-brand' : tone === 'bad' ? 'text-[#b91c1c]' : 'text-admin-ink');
+const toneOf = (v: number | null | undefined): Tone => (v === null || v === undefined ? undefined : v < 0 ? 'bad' : 'good');
+
+const LABEL = 'flex items-center text-[12px] font-semibold text-admin-muted';
+
+/** Một ô trong dải chỉ số; các ô ngăn nhau bằng khe 1px của nền viền (gap-px) nên xếp mấy cột cũng đều. */
+function Kpi({
+  label,
+  term,
+  value,
+  tone,
+  delta,
+  sub,
+}: {
+  label: string;
+  term?: string;
+  value: string;
+  tone?: Tone;
+  delta?: React.ReactNode;
+  sub?: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0 bg-admin-surface px-5 py-4">
+      <div className={LABEL}>
+        {label}
+        {term && <Hint term={term} />}
+      </div>
+      <div className={cx('mt-1.5 text-[22px] font-bold leading-tight tracking-[-0.01em]', TONE_INK(tone))}>{value}</div>
+      {delta && <div className="mt-1">{delta}</div>}
+      {sub && <div className="mt-0.5 text-[12px] text-admin-muted">{sub}</div>}
+    </div>
+  );
+}
+
+/** Ô kết quả của tab Mô phỏng; ô nhấn mạnh được tô nền theo lãi/lỗ. */
+function Metric({
+  label,
+  term,
+  value,
+  tone,
+  sub,
+  emphasis,
+}: {
+  label: string;
+  term?: string;
+  value: string;
+  tone?: Tone;
+  sub?: React.ReactNode;
+  emphasis?: boolean;
+}) {
+  const box =
+    emphasis && tone === 'bad'
+      ? 'border-[#f6caca] bg-admin-danger-050'
+      : emphasis && tone === 'good'
+        ? 'border-[#b7e0b7] bg-admin-brand-050'
+        : 'border-admin-line bg-admin-surface';
+  return (
+    <div className={cx('rounded-admin border px-4 py-3', box)}>
+      <div className={LABEL}>
+        {label}
+        {term && <Hint term={term} />}
+      </div>
+      <div className={cx('mt-1 text-[22px] font-bold leading-tight tracking-[-0.01em]', TONE_INK(tone))}>{value}</div>
+      {sub && <div className="mt-0.5 text-[12px] text-admin-muted">{sub}</div>}
+    </div>
+  );
+}
+
+function Panel({
+  title,
+  icon: Icon,
+  sub,
+  actions,
+  className,
+  children,
+}: {
+  title: string;
+  icon?: LucideIcon;
+  sub?: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={cx(CARD, 'mb-5', className)}>
+      <div className={CARD_HEADER}>
+        <div className="flex min-w-0 items-center gap-3">
+          {Icon && (
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-admin-brand-050 text-admin-brand" aria-hidden>
+              <Icon size={16} />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h2 className="m-0 text-[15px] font-bold text-admin-ink">{title}</h2>
+            {sub && <p className="m-0 mt-0.5 text-[12px] text-admin-muted">{sub}</p>}
+          </div>
+        </div>
+        {actions}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Ô nhập tiền hiện dấu chấm ngăn cách (1.200.000) cho dễ đọc. */
+function MoneyInput({
+  value,
+  onChange,
+  label,
+  className,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      aria-label={label}
+      value={Math.round(value || 0).toLocaleString('vi-VN')}
+      onChange={e => onChange(Number(e.target.value.replace(/\D/g, '')) || 0)}
+      className={cx(FIELD, 'py-2 text-right tabular-nums', className)}
+    />
+  );
+}
+
+function SimField({
+  label,
+  hint,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  unit,
+}: {
+  label: string;
+  hint?: React.ReactNode;
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  unit: string;
+}) {
+  const id = useId();
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <label htmlFor={id} className="text-[13px] font-semibold text-admin-ink">
+          {label}
+        </label>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {unit === 'đ' ? (
+            <MoneyInput value={value} onChange={v => onChange(Math.max(min, v))} label={label} className="w-[140px] py-1.5" />
+          ) : (
+            <input
+              id={id}
+              type="number"
+              min={min}
+              step={step}
+              value={value}
+              onChange={e => onChange(Math.max(min, Number(e.target.value) || 0))}
+              className={cx(FIELD, 'w-[140px] py-1.5 text-right tabular-nums')}
+            />
+          )}
+          <span className="w-9 text-[12px] text-admin-muted">{unit}</span>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={Math.min(value, max)}
+        onChange={e => onChange(Number(e.target.value))}
+        aria-label={label}
+        className="mt-2 w-full cursor-pointer accent-admin-brand"
+      />
+      {hint && <p className={cx(FIELD_HINT, 'mt-0')}>{hint}</p>}
+    </div>
+  );
+}
+
+interface FlowRow {
+  label: string;
+  term?: string;
+  note?: string;
+  value: number;
+  kind: 'in' | 'out' | 'sum';
+}
+
+// Cùng màu với cột tương ứng trong biểu đồ thác nước để mắt nối bảng với cột.
+const FLOW_DOT = { in: SERIES.green, out: SERIES.red, sum: '#9ca3af' };
+
+/** Bảng số đi kèm biểu đồ thác nước. */
+function MoneyFlow({ rows }: { rows: FlowRow[] }) {
+  return (
+    <ul className="m-0 list-none p-0">
+      {rows.map(r => {
+        const sum = r.kind === 'sum';
+        const text =
+          r.value === 0
+            ? money(0)
+            : r.kind === 'in'
+              ? `+${money(r.value)}`
+              : r.kind === 'out'
+                ? `−${money(r.value)}`
+                : signedMoney(r.value);
+        return (
+          <li
+            key={r.label}
+            className={cx(
+              'flex items-start justify-between gap-4 border-b border-admin-line-soft px-[18px] py-2 last:border-b-0',
+              sum && 'bg-[#fafcfa]'
+            )}
+          >
+            <div className="flex min-w-0 gap-2.5 [overflow-wrap:anywhere]">
+              <span className="mt-[5px] h-2 w-2 shrink-0 rounded-[2px]" style={{ backgroundColor: FLOW_DOT[r.kind] }} aria-hidden />
+              <div className="min-w-0">
+                <div className={cx('text-[13px] text-admin-ink', sum ? 'font-bold' : 'font-medium')}>
+                  {r.label}
+                  {r.term && <Hint term={r.term} />}
+                </div>
+                {r.note && <div className="text-[11.5px] leading-[1.45] text-admin-muted">{r.note}</div>}
+              </div>
+            </div>
+            <div
+              className={cx(
+                'shrink-0 text-right text-[13.5px] tabular-nums',
+                sum ? cx('font-bold', TONE_INK(toneOf(r.value))) : 'font-medium text-admin-ink'
+              )}
+            >
+              {text}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+const STATUS = {
+  good: { pill: 'brand', label: 'Có lãi', bar: SERIES.green },
+  warn: { pill: 'warn', label: 'Đang lỗ', bar: SERIES.red },
+  bad: { pill: 'danger', label: 'Lỗ theo từng đơn', bar: SERIES.red },
+  none: { pill: 'neutral', label: 'Chưa có đơn', bar: SERIES.red },
+} as const;
+
+/** Đầu trang: lãi/lỗ ròng và tiến độ tới hòa vốn, kèm một câu vì sao và việc nên làm. Mỗi số chỉ xuất hiện ở đây. */
+function Summary({ o, cash }: { o: FinanceOverview; cash: number }) {
+  const profit = o.pnl.net_profit;
+  const be = o.monthly.break_even_orders;
+  const perMonth = o.monthly.orders;
+  const cpo = o.contribution_per_order ?? 0;
+  const runway = o.monthly.runway_months;
+  const reach = be ? Math.min(100, (perMonth / be) * 100) : 0;
+  const state: keyof typeof STATUS = !o.orders.paid ? 'none' : profit >= 0 ? 'good' : be === null ? 'bad' : 'warn';
+  const s = STATUS[state];
+  const tab = (key: string, text: string) => (
+    <Link to={`/admin/finance?tab=${key}`} className="font-semibold text-admin-brand hover:underline">
+      {text}
+    </Link>
+  );
+
+  const why =
+    state === 'none'
+      ? 'Chưa có đơn đã thanh toán trong kỳ; tab Mô phỏng đang dùng số giả định.'
+      : state === 'good'
+        ? `Đạt khoảng ${count(perMonth)} đơn/tháng, vượt mức hòa vốn ${count(be ?? 0)} đơn.`
+        : state === 'bad'
+          ? `${cpo < 0 ? `Mỗi đơn làm sàn lỗ thêm ${money(-cpo)}` : 'Mỗi đơn không góp được đồng nào'} vì phí cổng, voucher sàn và hoàn tiền lớn hơn hoa hồng — bán thêm cũng không hòa vốn.`
+          : `Mỗi đơn góp ${money(cpo)} để trả chi phí cố định ${money(o.monthly.fixed_costs)}/tháng.`;
+  const advice =
+    state === 'good' ? (
+      <>Thử kịch bản Bi quan ở tab {tab('mo-phong', 'Mô phỏng')} để xem nếu đơn giảm thì còn lãi không.</>
+    ) : state === 'bad' ? (
+      <>Tăng hoa hồng hoặc giảm voucher sàn; thử trước ở tab {tab('mo-phong', 'Mô phỏng')}.</>
+    ) : (
+      <>Thử tăng số đơn, hoa hồng hoặc giảm chi phí ở tab {tab('mo-phong', 'Mô phỏng')} để xem cách nào giảm lỗ nhiều nhất.</>
+    );
+  const lasts =
+    runway !== null ? (
+      <>
+        Vốn dự phòng {money(cash)} đủ bù lỗ khoảng <b className="text-admin-ink">{months(runway)}</b>.
+      </>
+    ) : (
+      <>Chưa biết — nhập vốn dự phòng ở tab {tab('chi-phi', 'Chi phí vận hành')}.</>
+    );
+
+  return (
+    <section aria-label="Kết luận" className={cx(CARD, 'mb-4')}>
+      <div className="grid grid-cols-1 gap-px bg-admin-line lg:grid-cols-2">
+        <div className="bg-admin-surface px-5 py-[18px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={LABEL}>
+              Lãi/lỗ ròng {periodText(o.period)}
+              <Hint term="Lãi/lỗ ròng" />
+            </span>
+            <StatusPill tone={s.pill}>{s.label}</StatusPill>
+          </div>
+          <div className={cx('mt-2 text-[34px] font-bold leading-none tracking-[-0.02em]', TONE_INK(toneOf(profit)))}>
+            {signedMoney(profit)}
+          </div>
+          <div className="mt-2">
+            <Delta value={profit - o.previous.net_profit} format={signedMoney} />
+          </div>
+          <p className="mb-0 mt-3 max-w-[60ch] text-[13px] leading-[1.55] text-admin-body">{why}</p>
+        </div>
+
+        <div className="bg-admin-surface px-5 py-[18px]">
+          <span className={LABEL}>
+            Đơn mỗi tháng so với mức hòa vốn
+            <Hint term="Hòa vốn" />
+          </span>
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+            <span className="text-[34px] font-bold leading-none tracking-[-0.02em] text-admin-ink">{count(perMonth)}</span>
+            <span className="text-[15px] font-semibold text-admin-muted">/ {be === null ? '—' : count(be)} đơn</span>
+          </div>
+          <div
+            className="mt-3 h-2.5 overflow-hidden rounded-full bg-admin-line-soft"
+            role="progressbar"
+            aria-label="Tiến độ tới hòa vốn"
+            aria-valuenow={Math.floor(reach)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className="h-full rounded-full" style={{ width: `${reach}%`, backgroundColor: reach >= 100 ? SERIES.green : s.bar }} />
+          </div>
+          <p className="mb-0 mt-2.5 text-[13px] leading-[1.55] text-admin-body">
+            {be === null ? (
+              'Không thể hòa vốn ở mức phí hiện tại.'
+            ) : perMonth >= be ? (
+              <>Đã vượt hòa vốn, biên an toàn <b className="text-admin-ink">{pct(o.monthly.margin_of_safety)}</b>.</>
+            ) : (
+              <>
+                Đạt {Math.floor(reach)}% — còn thiếu <b className="text-admin-ink">{count(be - perMonth)} đơn/tháng</b>
+                {o.monthly.break_even_gmv !== null && <>, tức khoảng {money(o.monthly.break_even_gmv)} tiền hàng/tháng</>}.
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      <dl className="m-0 grid grid-cols-1 gap-x-8 gap-y-1.5 border-t border-admin-line bg-[#fafcfa] px-5 py-3 text-[12.5px] leading-[1.55] lg:grid-cols-2">
+        {profit < 0 && (
+          <div className="flex gap-2">
+            <dt className="shrink-0 font-bold text-admin-ink">Trụ được:</dt>
+            <dd className="m-0 text-admin-body">{lasts}</dd>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <dt className="shrink-0 font-bold text-admin-ink">Nên làm gì:</dt>
+          <dd className="m-0 text-admin-body">{advice}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+/** Tab gạch chân giữa các mục của trang; tab nằm trên URL (?tab=...) để tải lại hay mở link vẫn đúng mục. */
+function SectionTabs({ value, onChange }: { value: FinanceSection; onChange: (v: FinanceSection) => void }) {
+  return (
+    <div role="tablist" aria-label="Mục tài chính" className="mb-5 flex gap-1 overflow-x-auto border-b border-admin-line">
+      {SECTIONS.map(opt => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.value)}
+            className={cx(
+              '-mb-px cursor-pointer whitespace-nowrap border-0 border-b-2 border-solid bg-transparent px-4 py-2.5 text-[14px] font-semibold transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-admin-brand motion-reduce:transition-none',
+              active ? 'border-admin-brand text-admin-brand' : 'border-transparent text-admin-muted hover:text-admin-ink'
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Glossary() {
+  return (
+    <details className={cx(CARD, 'mb-5')}>
+      <summary className="cursor-pointer select-none px-[18px] py-3 text-[14px] font-bold text-admin-ink">
+        Giải thích thuật ngữ
+      </summary>
+      <dl className="m-0 grid grid-cols-1 gap-x-6 gap-y-3 border-t border-admin-line px-[18px] py-4 md:grid-cols-2">
+        {GLOSSARY.map(([term, desc]) => (
+          <div key={term}>
+            <dt className="text-[13px] font-bold text-admin-ink">{term}</dt>
+            <dd className="m-0 text-[12.5px] leading-[1.55] text-admin-muted">{desc}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
+/* ------------------------------------------------------------------ Trang */
 
 export function AdminFinanceSimulationPage() {
-  const [config, setConfig] = useState<PlatformCostConfigData | null>(null);
-  const [cvp, setCvp] = useState<CvpAnalysisData | null>(null);
-  const [simulation, setSimulation] = useState<SimulationData | null>(null);
-
+  const [params, setParams] = useSearchParams();
+  const section = SECTIONS.find(s => s.value === params.get('tab'))?.value ?? 'tong-quan';
+  const [range, setRange] = useState<RangeKey>('30');
+  const [query, setQuery] = useState<OverviewQuery>({ days: 30 });
+  const [custom, setCustom] = useState({ from: '', to: '' });
+  const [overview, setOverview] = useState<FinanceOverview | null>(null);
+  const [config, setConfig] = useState<FinanceConfig | null>(null);
+  const [form, setForm] = useState<FinanceConfig | null>(null);
+  const [sim, setSim] = useState<SimInput | null>(null);
+  const [scenario, setScenario] = useState<string>('base');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const requestId = useRef(0);
 
-  // Tab điều hướng cho Admin: 'simulator' (Mô phỏng giả lập) | 'config' (Cấu hình đơn giá)
-  const [activeTab, setActiveTab] = useState<'simulator' | 'config'>('simulator');
-
-  // Form state cho Cấu hình Chi phí
-  const [formConfig, setFormConfig] = useState<PlatformCostConfigData | null>(null);
-
-  // Slider state cho What-If Simulation
-  const [simOrders, setSimOrders] = useState<number>(150);
-  const [simRatePercent, setSimRatePercent] = useState<number>(10);
-
-  // 1. Tải dữ liệu ban đầu
-  const loadData = useCallback(async () => {
+  const load = useCallback(async (q: OverviewQuery): Promise<FinanceOverview | null> => {
+    const id = ++requestId.current;
     setLoading(true);
-    setError(null);
+    setError('');
     try {
-      const [cfgData, cvpData] = await Promise.all([
-        adminFinanceService.getConfig(),
-        adminFinanceService.getCVPAnalysis(),
-      ]);
-      setConfig(cfgData);
-      setFormConfig(JSON.parse(JSON.stringify(cfgData)));
-      setCvp(cvpData);
-
-      // Khởi tạo slider với số liệu thực tế gần nhất
-      const defaultOrders = cvpData.completed_orders > 0 ? cvpData.completed_orders : 150;
-      const defaultRate = Math.round((cfgData.policies?.default_commission_rate || 0.10) * 100);
-      setSimOrders(defaultOrders);
-      setSimRatePercent(defaultRate);
-
-      // Chạy mô phỏng ban đầu
-      const simData = await adminFinanceService.runSimulation(
-        defaultOrders,
-        defaultRate / 100,
-        cvpData.aov
-      );
-      setSimulation(simData);
+      const [o, c] = await Promise.all([adminFinanceService.getOverview(q), adminFinanceService.getConfig()]);
+      if (id !== requestId.current) return null;
+      setOverview(o);
+      setConfig(c);
+      setForm(c);
+      setSim(baselineOf(o));
+      setScenario('base');
+      return o;
     } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Không thể tải dữ liệu tài chính.');
+      if (id === requestId.current) {
+        setError(err?.response?.data?.error || 'Không tải được số liệu tài chính. Bấm "Làm mới" để thử lại.');
+      }
+      return null;
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void load(query);
+  }, [query, load]);
 
-  // 2. Chạy mô phỏng khi người dùng kéo Slider (Debounce nhẹ)
-  useEffect(() => {
-    if (!cvp) return;
-    const timer = setTimeout(async () => {
-      try {
-        const res = await adminFinanceService.runSimulation(
-          simOrders,
-          simRatePercent / 100,
-          cvp.aov
-        );
-        setSimulation(res);
-      } catch (err: any) {
-        console.error('Lỗi chạy mô phỏng:', err);
-      }
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [simOrders, simRatePercent, cvp]);
+  const base = useMemo(() => (overview ? baselineOf(overview) : null), [overview]);
+  const baseResult = useMemo(() => (base ? simulate(base) : null), [base]);
+  const result = useMemo(() => (sim ? simulate(sim) : null), [sim]);
+  const bars = useMemo(() => (sim ? profitBars(sim) : []), [sim]);
+  const shocks = useMemo(() => (sim ? sensitivity(sim) : []), [sim]);
+  const dirty = JSON.stringify(form) !== JSON.stringify(config);
+  const costsInvalid = !!form?.monthly_costs.some(c => !c.name.trim());
+  const gatewaysInvalid = !!form?.payment_fees.some(g => !g.is_default && !gatewayCode(g.name));
+  const formInvalid = costsInvalid || gatewaysInvalid;
+  const cash = config?.cash_reserve ?? 0;
 
-  // 3. Xử lý lưu cấu hình chi phí
-  const handleSaveConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formConfig) return;
+  const setSimField = (patch: Partial<SimInput>) => {
+    setSim(s => (s ? { ...s, ...patch } : s));
+    setScenario('');
+  };
+
+  const pickScenario = (key: string) => {
+    const s = SCENARIOS.find(x => x.key === key);
+    if (!s || !base) return;
+    setSim(s.apply(base));
+    setScenario(key);
+  };
+
+  const pickRange = (key: RangeKey) => {
+    if (key === range) return;
+    setRange(key);
+    if (key !== 'tuy-chon') setQuery(presetQuery(key));
+    // Mở "Tùy chọn" thì điền sẵn kỳ đang xem để chỉ cần sửa.
+    else if (overview) {
+      setCustom({ from: vnDate(Date.parse(overview.period.from)), to: vnDate(Date.parse(overview.period.to) - 1) });
+    }
+  };
+
+  const updateCost = (idx: number, patch: Partial<FinanceConfig['monthly_costs'][number]>) =>
+    setForm(f => f && { ...f, monthly_costs: f.monthly_costs.map((c, i) => (i === idx ? { ...c, ...patch } : c)) });
+
+  const updateFee = (idx: number, patch: Partial<PaymentFee>) =>
+    setForm(f => f && { ...f, payment_fees: f.payment_fees.map((g, i) => (i === idx ? { ...g, ...patch } : g)) });
+
+  const save = async () => {
+    if (!form) return;
+    const before = overview;
     setSaving(true);
-    setSaveSuccess(false);
-    setError(null);
+    setError('');
+    setNotice('');
     try {
-      const updated = await adminFinanceService.updateConfig(formConfig);
-      setConfig(updated);
-      setSaveSuccess(true);
-      // Tải lại phân tích CVP với tham số mới
-      const cvpData = await adminFinanceService.getCVPAnalysis();
-      setCvp(cvpData);
-      const simData = await adminFinanceService.runSimulation(
-        simOrders,
-        simRatePercent / 100,
-        cvpData.aov
-      );
-      setSimulation(simData);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      await adminFinanceService.updateConfig({
+        ...form,
+        monthly_costs: form.monthly_costs.map(c => ({ ...c, name: c.name.trim() })),
+      });
+      setNotice(savedNotice(before, await load(query)));
     } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Lỗi khi lưu cấu hình.');
+      setError(err?.response?.data?.error || 'Lưu cấu hình thất bại.');
     } finally {
       setSaving(false);
     }
   };
 
-  // Khuyến nghị tự động từ CVP Advisor
-  const autoAdvisorMessage = useMemo(() => {
-    if (!simulation || !cvp) return null;
-    const bep = simulation.break_even_orders;
-    const isOk = simulation.is_profitable;
-    const margin = simulation.margin_of_safety_pct;
+  const header = (
+    <>
+      <PageHeader
+        title="Tài chính"
+        description="Sàn thu bao nhiêu, tốn bao nhiêu và cần bán bao nhiêu đơn để hòa vốn. Chỉ tính đơn đã thanh toán."
+      />
+      <SectionTabs value={section} onChange={v => setParams(v === 'tong-quan' ? {} : { tab: v })} />
+    </>
+  );
 
-    if (isOk && margin >= 20) {
-      return {
-        tone: 'success' as const,
-        title: 'Tài chính an toàn & Vận hành bền vững',
-        desc: `Với tỷ lệ hoa hồng ${simRatePercent}% và sản lượng ${simOrders} đơn/tháng, sàn đang có biên an toàn ${margin}%. Điểm hòa vốn đạt được từ đơn thứ ${bep}. Lợi nhuận dự kiến ${money(simulation.projected_net_profit)}/tháng.`,
-      };
-    } else if (isOk && margin < 20) {
-      return {
-        tone: 'warning' as const,
-        title: 'Biên an toàn mỏng (Dễ rơi vào điểm lỗ)',
-        desc: `Sàn đang có lãi nhẹ nhưng biên an toàn chỉ ${margin}% (cần ${bep} đơn để hòa vốn). Khuyến nghị duy trì tối thiểu ${Math.round(bep * 1.25)} đơn/tháng hoặc tối ưu biến phí cổng thanh toán.`,
-      };
-    } else {
-      return {
-        tone: 'danger' as const,
-        title: 'Cảnh báo: Kịch bản thâm hụt ngân sách',
-        desc: `Tại mức phí ${simRatePercent}% và ${simOrders} đơn/tháng, sàn đang lỗ ${money(Math.abs(simulation.projected_net_profit))}/tháng. Cần bán ít nhất ${bep} đơn mới đạt hòa vốn. Khuyến nghị nâng mức hoa hồng hoặc điều chỉnh phí tối thiểu/đơn.`,
-      };
-    }
-  }, [simulation, cvp, simOrders, simRatePercent]);
-
-  // Các biến tính toán trực quan cho Tầng 1 & Tầng 2
-  const aov = cvp?.aov || 315462;
-  const revPerOrder = cvp?.unit_economics.revenue_per_order || 31546;
-  const vcPerOrder = cvp?.unit_economics.variable_cost_per_order || 5732;
-  const cmPerOrder = cvp?.unit_economics.contribution_margin_per_order || 25814;
-  const sellerPrinterPayout = Math.max(0, aov - revPerOrder);
-  const fixedTotal = cvp?.total_fixed_costs || 2065550;
-  const bepOrders = cvp?.break_even_orders || 81;
-  const currentOrders = cvp?.completed_orders || 0;
-  const missingOrders = Math.max(0, bepOrders - currentOrders);
-  const survivePercent = bepOrders > 0 ? Math.min(100, Math.round((currentOrders / bepOrders) * 100)) : 0;
-
-  if (loading) {
+  if (loading && !overview) {
     return (
       <div className={PAGE}>
-        <div className="flex min-h-[400px] flex-col items-center justify-center gap-3">
-          <div className="h-9 w-9 animate-spin rounded-full border-4 border-admin-brand border-t-transparent" />
-          <p className="text-[14px] text-admin-muted">Đang phân tích dòng tiền và mô hình hòa vốn của sàn...</p>
+        {header}
+        <div className="flex items-center gap-2.5 py-16 text-[13.5px] text-admin-muted">
+          <Loader2 size={18} className="animate-spin" aria-hidden /> Đang tính số liệu tài chính…
         </div>
       </div>
     );
   }
 
-  return (
-    <div className={PAGE}>
-      {/* Header */}
-      <PageHeader
-        title="Quản trị Dòng tiền & Hòa vốn Sàn"
-        description="Mô hình hóa dòng tiền thực tế, phân tích ngưỡng an toàn tài chính và giả lập kịch bản kinh doanh cho sàn POD VietCraft."
-        actions={
-          <button
-            type="button"
-            className={BTN_SECONDARY}
-            onClick={() => void loadData()}
-            disabled={loading}
-          >
-            <RefreshCw size={15} aria-hidden />
-            Làm mới
-          </button>
-        }
-      />
+  const o = overview;
+  const today = vnDate(Date.now());
+  const customErr = range === 'tuy-chon' ? customError(custom, today) : '';
+  const refreshButton = (
+    <button type="button" className={BTN_SECONDARY} onClick={() => void load(query)} disabled={loading}>
+      <RefreshCw size={15} className={cx(loading && 'animate-spin')} aria-hidden /> Làm mới
+    </button>
+  );
 
-      {error && (
-        <Alert tone="danger">
-          {error}
-        </Alert>
-      )}
+  /* ---------------------------------------------------------------- Tab Tổng quan */
+  const renderOverview = (o: FinanceOverview) => {
+    const days = o.period.days;
+    const prev = o.previous;
+    const cpo = o.contribution_per_order;
+    const prevCpo = prev.orders ? Math.round(prev.contribution / prev.orders) : null;
+    const pctFormat = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toLocaleString('vi-VN')}%`;
+    const feeRate = o.gmv > 0 ? o.pnl.commission / o.gmv : o.commission_percent / (100 + o.commission_percent);
+    const mix = o.payment_mix.filter(m => m.orders);
+    const flow: FlowRow[] = [
+      {
+        label: 'Hoa hồng thu được',
+        term: 'Hoa hồng',
+        note: `${count(o.orders.paid)} đơn đã thanh toán`,
+        value: o.pnl.commission,
+        kind: 'in',
+      },
+      { label: 'Voucher sàn tài trợ', term: 'Voucher sàn', value: o.pnl.platform_voucher, kind: 'out' },
+      { label: 'Doanh thu thuần', term: 'Doanh thu thuần', value: o.pnl.net_revenue, kind: 'sum' },
+      {
+        label: 'Phí cổng thanh toán',
+        term: 'Phí cổng thanh toán',
+        note: mix.length ? mix.map(m => `${m.name} ${count(m.orders)}`).join(' · ') + ' đơn' : undefined,
+        value: o.pnl.payment_fees,
+        kind: 'out',
+      },
+      {
+        label: 'Thất thoát do hoàn tiền',
+        term: 'Thất thoát do hoàn tiền',
+        note: o.orders.refunded
+          ? `${count(o.orders.refunded)} đơn hoàn, mất hoa hồng ${money(o.refunded_commission)}`
+          : 'Không có đơn hoàn',
+        value: o.pnl.refund_losses,
+        kind: 'out',
+      },
+      {
+        label: 'Gửi thông báo email/SMS',
+        note: `${count(o.orders.paid + o.orders.refunded)} đơn × ${money(o.baseline.notification_per_order)}`,
+        value: o.pnl.notification,
+        kind: 'out',
+      },
+      { label: 'Lãi góp', term: 'Lãi góp', value: o.pnl.contribution, kind: 'sum' },
+      {
+        label: 'Chi phí cố định',
+        term: 'Chi phí cố định (định phí)',
+        note: `${money(o.monthly.fixed_costs)}/tháng × ${days} ngày`,
+        value: o.pnl.fixed_costs,
+        kind: 'out',
+      },
+      { label: 'Lãi/lỗ ròng', term: 'Lãi/lỗ ròng', value: o.pnl.net_profit, kind: 'sum' },
+    ];
 
-      {saveSuccess && (
-        <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] font-semibold text-emerald-800">
-          <CheckCircle size={18} className="text-emerald-600" />
-          <span>Đã lưu thành công cấu hình chi phí vận hành và cập nhật chính sách sàn!</span>
-        </div>
-      )}
-
-      {/* ========================================================
-          TẦNG 1: SƠ ĐỒ DÒNG TIỀN THỰC TẾ (VISUAL MONEY FLOW)
-          Admin nhìn 3 giây hiểu ngay cơ chế vận hành sàn POD
-      ======================================================== */}
-      {cvp && (
-        <section className={cx(CARD, 'mb-6 p-5 border-l-4 border-l-admin-brand bg-gradient-to-br from-white to-[#f7faf7]')}>
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-admin-brand">
-                <Sparkles size={16} />
-              </span>
-              <h2 className="m-0 text-[15px] font-extrabold text-admin-ink tracking-tight">
-                Cơ Chế Dòng Tiền Trên 1 Đơn Hàng POD (AOV Trung Bình: {money(aov)})
-              </h2>
+    return (
+      <>
+        <div className={cx(TOOLBAR, 'justify-between')}>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="max-w-full overflow-x-auto">
+              <SegmentedControl<RangeKey> value={range} onChange={pickRange} options={RANGE_OPTIONS} label="Khoảng thời gian" />
             </div>
-            <span className="hidden sm:inline-block rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[11.5px] font-bold text-admin-brand">
-              Mô hình phí sàn: {((revPerOrder / aov) * 100).toFixed(0)}%
+            {/* w-full/py-2.5 của FIELD đứng sau trong CSS và cx không gộp lớp, nên ô ngày phải ghi đè bằng "!". */}
+            {range === 'tuy-chon' && (
+              <form
+                className="flex flex-wrap items-center gap-2"
+                onSubmit={e => {
+                  e.preventDefault();
+                  if (!customErr) setQuery({ ...custom });
+                }}
+              >
+                <input
+                  type="date"
+                  aria-label="Từ ngày"
+                  value={custom.from}
+                  max={today}
+                  onChange={e => setCustom(c => ({ ...c, from: e.target.value }))}
+                  className={cx(FIELD, '!w-[150px] !py-1.5')}
+                />
+                <span className="text-admin-muted">–</span>
+                <input
+                  type="date"
+                  aria-label="Đến ngày"
+                  value={custom.to}
+                  min={custom.from || undefined}
+                  max={today}
+                  onChange={e => setCustom(c => ({ ...c, to: e.target.value }))}
+                  className={cx(FIELD, '!w-[150px] !py-1.5')}
+                />
+                <button type="submit" className={BTN_SECONDARY_SM} disabled={!!customErr || loading}>
+                  Xem
+                </button>
+                <span aria-live="polite" className="text-[12px] text-[#b91c1c]">
+                  {customErr}
+                </span>
+              </form>
+            )}
+            <span className="text-[12.5px] text-admin-muted">
+              {dmy(Date.parse(o.period.from))} – {dmy(Date.parse(o.period.to) - 1)} · so với {days} ngày liền trước · mức
+              hoa hồng mặc định <b className="text-admin-ink">{o.commission_percent}%</b>
             </span>
           </div>
-
-          <p className="mt-0 mb-4 text-[13px] text-admin-muted leading-relaxed">
-            Mỗi khi khách đặt mua 1 sản phẩm in ấn, tiền sẽ chạy qua 4 bước khấu trừ trước khi Sàn giữ lại phần lãi thuần để nuôi hệ thống:
-          </p>
-
-          {/* 4 Cards nối nhau bằng mũi tên ArrowRight */}
-          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-4 md:gap-3">
-            {/* Bước 1 */}
-            <div className="relative flex flex-col justify-between rounded-xl border border-admin-line bg-white p-3.5 shadow-sm">
-              <div>
-                <div className="flex items-center justify-between text-[11.5px] font-bold text-admin-muted uppercase">
-                  <span>Bước 1: Khách Trả</span>
-                  <CreditCard size={15} className="text-blue-600" />
-                </div>
-                <div className="mt-2 text-[20px] font-extrabold text-stone-900 tabular-nums">
-                  {money(aov)}
-                </div>
-                <p className="mt-1 mb-0 text-[11.5px] text-stone-500 leading-normal">
-                  Khách mua 1 áo POD. Tiền tạm giữ an toàn tại tài khoản Sàn.
-                </p>
-              </div>
-              <div className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 h-6 w-6 items-center justify-center rounded-full bg-white border border-admin-line shadow-sm text-admin-muted">
-                <ArrowRight size={13} />
-              </div>
-            </div>
-
-            {/* Bước 2 */}
-            <div className="relative flex flex-col justify-between rounded-xl border border-admin-line bg-white p-3.5 shadow-sm">
-              <div>
-                <div className="flex items-center justify-between text-[11.5px] font-bold text-admin-muted uppercase">
-                  <span>Bước 2: Nghĩa Vụ</span>
-                  <Receipt size={15} className="text-amber-600" />
-                </div>
-                <div className="mt-2 text-[20px] font-extrabold text-admin-brand tabular-nums">
-                  {money(revPerOrder)}
-                </div>
-                <p className="mt-1 mb-0 text-[11.5px] text-stone-500 leading-normal">
-                  Trả xưởng in & Seller: <strong className="text-stone-700">{compactMoney(sellerPrinterPayout)}</strong>. Sàn thu về phí dịch vụ <strong className="text-admin-brand">{money(revPerOrder)}</strong>.
-                </p>
-              </div>
-              <div className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 h-6 w-6 items-center justify-center rounded-full bg-white border border-admin-line shadow-sm text-admin-muted">
-                <ArrowRight size={13} />
-              </div>
-            </div>
-
-            {/* Bước 3 */}
-            <div className="relative flex flex-col justify-between rounded-xl border border-admin-line bg-white p-3.5 shadow-sm">
-              <div>
-                <div className="flex items-center justify-between text-[11.5px] font-bold text-admin-muted uppercase">
-                  <span>Bước 3: Chi Trung Gian</span>
-                  <Percent size={15} className="text-rose-600" />
-                </div>
-                <div className="mt-2 text-[20px] font-extrabold text-rose-700 tabular-nums">
-                  -{money(vcPerOrder)}
-                </div>
-                <p className="mt-1 mb-0 text-[11.5px] text-stone-500 leading-normal">
-                  Sàn thanh toán cổng trực tuyến (1.5%) + phí gửi thông báo/SMS/Email.
-                </p>
-              </div>
-              <div className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 h-6 w-6 items-center justify-center rounded-full bg-white border border-admin-line shadow-sm text-admin-muted">
-                <ArrowRight size={13} />
-              </div>
-            </div>
-
-            {/* Bước 4 */}
-            <div className="flex flex-col justify-between rounded-xl border-2 border-emerald-300 bg-emerald-50/70 p-3.5 shadow-sm">
-              <div>
-                <div className="flex items-center justify-between text-[11.5px] font-bold text-emerald-800 uppercase">
-                  <span>Bước 4: Sàn Đút Túi</span>
-                  <PiggyBank size={16} className="text-emerald-700" />
-                </div>
-                <div className="mt-2 text-[20px] font-extrabold text-emerald-800 tabular-nums">
-                  +{money(cmPerOrder)}
-                </div>
-                <p className="mt-1 mb-0 text-[11.5px] text-emerald-900 leading-normal font-medium">
-                  Lãi thuần giữ lại trên mỗi đơn để nuôi máy chủ VPS, Cloudinary & tên miền!
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Banner Kết luận dòng tiền trực quan */}
-          <div className="mt-3.5 flex flex-wrap items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-[12.5px] text-white">
-            <Lightbulb size={17} className="text-amber-400 shrink-0" />
-            <div className="flex-1">
-              <strong className="text-amber-300">Công thức sống sót của sàn:</strong> Tổng định phí máy chủ là{' '}
-              <strong className="underline text-white">{money(fixedTotal)}/tháng</strong>. Mỗi đơn sàn đút túi thuần{' '}
-              <strong className="underline text-emerald-300">{money(cmPerOrder)}</strong>.{' '}
-              <span>
-                Lấy <strong>{compactMoney(fixedTotal)}</strong> chia <strong>{compactMoney(cmPerOrder)}</strong> 👉{' '}
-                Sàn cần bán tối thiểu <strong className="text-amber-300 text-[13.5px]">{bepOrders} đơn/tháng</strong> để tự nuôi sống mình và không phải bù tiền túi!
-              </span>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ========================================================
-          TẦNG 2: BÌNH DÂN HÓA THUẬT NGỮ TRÊN CÁC CARD KPI
-      ======================================================== */}
-      {cvp && (
-        <div className="mb-6 space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Card 1: Lợi nhuận ròng 30 ngày */}
-            <div className={cx(CARD, 'p-4')}>
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-bold uppercase tracking-wider text-admin-muted">
-                  Lợi Nhuận Ròng (30 Ngày)
-                </span>
-                <span
-                  className={cx(
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-extrabold',
-                    cvp.is_profitable
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-rose-100 text-rose-800'
-                  )}
-                >
-                  {cvp.is_profitable ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  {cvp.is_profitable ? 'CÓ LÃI' : 'BÙ LỖ'}
-                </span>
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span
-                  className={cx(
-                    'text-[24px] font-extrabold tabular-nums tracking-tight',
-                    cvp.is_profitable ? 'text-emerald-700' : 'text-rose-700'
-                  )}
-                >
-                  {cvp.net_profit < 0 ? `- ${money(Math.abs(cvp.net_profit))}` : `+ ${money(cvp.net_profit)}`}
-                </span>
-              </div>
-              <div className="mt-1 text-[12px] font-medium text-admin-muted">
-                {cvp.is_profitable ? (
-                  <span className="text-emerald-700">✓ Sàn tự nuôi sống được máy chủ</span>
-                ) : (
-                  <span className="text-rose-600 font-semibold">⚠ Admin đang phải bỏ tiền túi bù lỗ</span>
-                )}
-              </div>
-              <div className="mt-1.5 pt-1.5 border-t border-admin-line-soft flex justify-between text-[11.5px] text-admin-muted">
-                <span>Thu sàn: {compactMoney(cvp.actual_platform_revenue)}</span>
-                <span>Chi phí: {compactMoney(cvp.total_costs)}</span>
-              </div>
-            </div>
-
-            {/* Card 2: Số đơn cần để hòa vốn */}
-            <div className={cx(CARD, 'p-4')}>
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-bold uppercase tracking-wider text-admin-muted">
-                  Số Đơn Cần Để Hòa Vốn
-                </span>
-                <Calculator size={16} className="text-admin-brand" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-[24px] font-extrabold tabular-nums tracking-tight text-admin-ink">
-                  {bepOrders.toLocaleString()}
-                </span>
-                <span className="text-[13px] font-bold text-admin-muted">đơn/tháng</span>
-              </div>
-              <div className="mt-1 text-[12px] text-admin-muted">
-                Hiện tại: <strong className="text-admin-ink">{currentOrders} đơn</strong>
-                {missingOrders > 0 ? (
-                  <span className="text-rose-600 font-bold"> (Còn thiếu {missingOrders} đơn)</span>
-                ) : (
-                  <span className="text-emerald-600 font-bold"> (Đã vượt mục tiêu)</span>
-                )}
-              </div>
-              <div className="mt-1.5 pt-1.5 border-t border-admin-line-soft text-[11.5px] text-admin-muted">
-                Đạt từ đơn số {bepOrders} trở đi sẽ bắt đầu có lãi thuần
-              </div>
-            </div>
-
-            {/* Card 3: Doanh số toàn sàn cần đạt */}
-            <div className={cx(CARD, 'p-4')}>
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-bold uppercase tracking-wider text-admin-muted">
-                  Doanh Số Toàn Sàn Cần Đạt
-                </span>
-                <DollarSign size={16} className="text-blue-600" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-[24px] font-extrabold tabular-nums tracking-tight text-admin-ink">
-                  {compactMoney(cvp.break_even_gmv)}
-                </span>
-              </div>
-              <div className="mt-1 text-[12px] text-admin-muted">
-                Hiện tại: <strong className="text-admin-ink">{compactMoney(cvp.total_gmv)}</strong>
-                {cvp.break_even_gmv > cvp.total_gmv && (
-                  <span className="text-rose-600 font-medium"> (Thiếu {compactMoney(cvp.break_even_gmv - cvp.total_gmv)})</span>
-                )}
-              </div>
-              <div className="mt-1.5 pt-1.5 border-t border-admin-line-soft text-[11.5px] text-admin-muted">
-                Tổng giá trị giao dịch người mua chi trả trên sàn
-              </div>
-            </div>
-
-            {/* Card 4: Mức độ thiếu hụt / Đạt ngưỡng an toàn */}
-            <div className={cx(CARD, 'p-4')}>
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-bold uppercase tracking-wider text-admin-muted">
-                  Mức Độ Sống Sót Của Sàn
-                </span>
-                <ShieldAlert
-                  size={16}
-                  className={survivePercent >= 100 ? 'text-emerald-600' : 'text-amber-600'}
-                />
-              </div>
-              <div className="mt-2 flex items-baseline justify-between">
-                <span
-                  className={cx(
-                    'text-[24px] font-extrabold tabular-nums tracking-tight',
-                    survivePercent >= 100 ? 'text-emerald-700' : 'text-amber-700'
-                  )}
-                >
-                  {survivePercent}%
-                </span>
-                <span className="text-[12px] font-bold text-admin-muted">
-                  {currentOrders}/{bepOrders} đơn
-                </span>
-              </div>
-
-              {/* Progress bar trực quan */}
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-stone-200">
-                <div
-                  className={cx(
-                    'h-full rounded-full transition-all duration-500',
-                    survivePercent >= 100 ? 'bg-emerald-600' : 'bg-amber-500'
-                  )}
-                  style={{ width: `${Math.min(100, survivePercent)}%` }}
-                />
-              </div>
-
-              <div className="mt-1.5 pt-1.5 border-t border-admin-line-soft text-[11.5px] text-admin-muted">
-                {survivePercent >= 100
-                  ? 'Đã vượt ngưỡng an toàn tài chính'
-                  : `Đạt ${survivePercent}% ngưỡng để sàn tự nuôi được mình`}
-              </div>
-            </div>
-          </div>
-
-          {/* Dải 4 ô Cơ cấu tiền trên 1 đơn hàng (Bình dân hóa) */}
-          <div className="rounded-xl border border-admin-line bg-admin-surface p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-[13px] font-bold text-admin-ink flex items-center gap-1.5">
-                <Layers size={15} className="text-admin-brand" />
-                Cơ Cấu Tiền Trên 1 Đơn Hàng (AOV: {money(aov)})
-              </span>
-              <span className="text-[12px] text-admin-muted">
-                Định phí cố định: <strong className="text-admin-ink">{money(fixedTotal)}/tháng</strong>
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-lg bg-admin-canvas p-3 border border-admin-line-soft">
-                <div className="text-[11.5px] font-bold text-admin-muted">1. Phí sàn thu trên 1 đơn</div>
-                <div className="mt-1 text-[17px] font-extrabold text-admin-ink tabular-nums">
-                  {money(revPerOrder)}
-                </div>
-                <div className="text-[11px] text-admin-muted mt-0.5">Tỷ lệ phí dịch vụ {((revPerOrder / aov) * 100).toFixed(0)}%</div>
-              </div>
-              <div className="rounded-lg bg-admin-canvas p-3 border border-admin-line-soft">
-                <div className="text-[11.5px] font-bold text-admin-muted">2. Phí cổng thanh toán & thông báo</div>
-                <div className="mt-1 text-[17px] font-extrabold text-rose-700 tabular-nums">
-                  -{money(vcPerOrder)}
-                </div>
-                <div className="text-[11px] text-admin-muted mt-0.5">Chi phí trung gian bắt buộc</div>
-              </div>
-              <div className="rounded-lg bg-emerald-50/70 p-3 border border-emerald-200">
-                <div className="text-[11.5px] font-bold text-emerald-800">3. Lãi thuần sàn giữ lại (= 1 - 2)</div>
-                <div className="mt-1 text-[17px] font-extrabold text-emerald-800 tabular-nums">
-                  +{money(cmPerOrder)}
-                </div>
-                <div className="text-[11px] text-emerald-700 mt-0.5">Tiền thực đút túi nuôi máy chủ</div>
-              </div>
-              <div className="rounded-lg bg-admin-canvas p-3 border border-admin-line-soft">
-                <div className="text-[11.5px] font-bold text-admin-muted">4. Hiệu suất giữ tiền</div>
-                <div className="mt-1 text-[17px] font-extrabold text-blue-700 tabular-nums">
-                  {((cmPerOrder / (revPerOrder || 1)) * 100).toFixed(1)}%
-                </div>
-                <div className="text-[11px] text-admin-muted mt-0.5">Tỷ lệ giữ lại sau chi phí cổng</div>
-              </div>
-            </div>
-          </div>
+          {refreshButton}
         </div>
-      )}
 
-      {/* ========================================================
-          TẦNG 3: CHIA RÕ 2 TAB HÀNH ĐỘNG CHO ADMIN
-          Tab 1: 🎮 Kịch Bản & Mô Phỏng Giả Lập
-          Tab 2: ⚙️ Cấu Hình Đơn Giá Dịch Vụ
-      ======================================================== */}
-      <div className="mb-4 flex border-b border-admin-line gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab('simulator')}
-          className={cx(
-            'flex items-center gap-2 px-4 py-2.5 text-[14px] font-bold transition-all border-b-2 -mb-[2px]',
-            activeTab === 'simulator'
-              ? 'border-admin-brand text-admin-brand bg-emerald-50/50 rounded-t-lg'
-              : 'border-transparent text-admin-muted hover:text-admin-ink'
-          )}
-        >
-          <SlidersHorizontal size={16} />
-          <span> Kịch Bản & Mô Phỏng Giả Lập (What-If Simulator)</span>
-        </button>
+        <div className={cx('transition-opacity duration-150', loading && 'opacity-60')}>
+          <Summary o={o} cash={cash} />
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('config')}
-          className={cx(
-            'flex items-center gap-2 px-4 py-2.5 text-[14px] font-bold transition-all border-b-2 -mb-[2px]',
-            activeTab === 'config'
-              ? 'border-admin-brand text-admin-brand bg-emerald-50/50 rounded-t-lg'
-              : 'border-transparent text-admin-muted hover:text-admin-ink'
-          )}
-        >
-          <Settings size={16} />
-          <span> Cấu Hình Đơn Giá Dịch Vụ (Platform Cost Config)</span>
-        </button>
-      </div>
+          <div className={cx(CARD, 'mb-5 grid grid-cols-1 gap-px bg-admin-line sm:grid-cols-2 xl:grid-cols-4')}>
+            <Kpi
+              label="Doanh thu thuần"
+              term="Doanh thu thuần"
+              value={money(o.pnl.net_revenue)}
+              delta={<Delta value={changePercent(o.pnl.net_revenue, prev.net_revenue)} format={pctFormat} />}
+            />
+            <Kpi
+              label="Lãi góp mỗi đơn"
+              term="Lãi góp"
+              value={cpo === null ? '—' : signedMoney(cpo)}
+              tone={cpo !== null && cpo < 0 ? 'bad' : undefined}
+              delta={
+                <Delta
+                  value={cpo !== null && prevCpo !== null ? cpo - prevCpo : null}
+                  format={v => `${signedMoney(v)}/đơn`}
+                />
+              }
+            />
+            <Kpi
+              label="Đơn đã thanh toán"
+              value={count(o.orders.paid)}
+              delta={<Delta value={changePercent(o.orders.paid, prev.orders)} format={pctFormat} />}
+            />
+            <Kpi
+              label="Tổng tiền hàng (GMV)"
+              term="Tổng tiền hàng (GMV)"
+              value={money(o.gmv)}
+              delta={<Delta value={changePercent(o.gmv, prev.gmv)} format={pctFormat} />}
+              sub={
+                <>
+                  Sàn giữ {pct(o.take_rate)}
+                  <Hint term="Take rate" />
+                </>
+              }
+            />
+          </div>
 
-      {/* --------------------------------------------------------
-          NỘI DUNG TAB 1: KỊCH BẢN & MÔ PHỎNG GIẢ LẬP
-      -------------------------------------------------------- */}
-      {activeTab === 'simulator' && (
-        <section className={cx(CARD, 'mb-6 p-5')}>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-admin-line pb-3">
-            <div>
-              <h2 className="m-0 text-[16px] font-bold text-admin-ink flex items-center gap-2">
-                <Sliders size={18} className="text-admin-brand" />
-                Bộ Giả Lập Dòng Tiền & Điểm Thoát Lỗ (What-If Playground)
-              </h2>
-              <p className="mt-0.5 text-[12.5px] text-admin-muted">
-                Điều chỉnh số lượng đơn và mức hoa hồng để thử nghiệm các quyết định kinh doanh trước khi ban hành chính sách.
-              </p>
+          <Panel icon={Receipt} title={`Tiền đi đâu ${periodText(o.period)}`} sub="Từ hoa hồng sàn thu, trừ dần từng khoản chi tới lãi/lỗ ròng.">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+              <div className="min-w-0 px-[18px] pt-4 xl:pb-2">
+                <WaterfallChart o={o} height={380} />
+              </div>
+              <div className="border-t border-admin-line xl:border-l xl:border-t-0">
+                <MoneyFlow rows={flow} />
+              </div>
             </div>
-            {simulation && (
-              <span className="rounded-lg bg-admin-canvas px-3 py-1.5 text-[12px] font-semibold text-admin-muted border border-admin-line">
-                AOV chuẩn giả lập: <strong className="text-admin-ink">{money(simulation.simulated_aov)}</strong>
+          </Panel>
+
+          <Panel icon={TrendingUp} title="Xu hướng 6 tháng gần nhất" sub={trendSummary(o.trend)}>
+            <div className="px-[18px] pt-4">
+              <TrendBars trend={o.trend} />
+            </div>
+            <p className={cx(FIELD_HINT, 'm-0 px-[18px] pb-3')}>
+              Tháng nào cột Lãi góp cao hơn cột Chi phí cố định là tháng đó có lãi. * Tháng này tính đến hôm nay; các tháng
+              trước dùng chi phí cố định đang cấu hình.
+            </p>
+            <details className="border-t border-admin-line">
+              <summary className="cursor-pointer select-none px-[18px] py-3 text-[13px] font-semibold text-admin-ink">
+                Xem bảng số theo tháng
+              </summary>
+              <div className="overflow-x-auto">
+              <table className={TABLE}>
+                <thead>
+                  <tr>
+                    <th>Tháng</th>
+                    <th className="text-right">Đơn</th>
+                    <th className="text-right">Lãi góp</th>
+                    <th className="text-right">Chi phí cố định</th>
+                    <th className="text-right">Lãi/lỗ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {o.trend.map(t => (
+                    <tr key={t.month}>
+                      <td>{monthLabel(t)}</td>
+                      <td className="text-right tabular-nums">{count(t.orders)}</td>
+                      <td className="text-right tabular-nums">{money(t.contribution)}</td>
+                      <td className="text-right tabular-nums">{money(t.fixed_costs)}</td>
+                      <td
+                        className={cx(
+                          'text-right font-semibold tabular-nums',
+                          t.net_profit < 0 ? 'text-[#b91c1c]' : 'text-admin-brand'
+                        )}
+                      >
+                        {signedMoney(t.net_profit)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              </div>
+            </details>
+          </Panel>
+
+          <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <Panel
+              icon={Split}
+              title="Một đơn trung bình chia tiền thế nào"
+              sub="Tiền khách trả chia cho người bán, vận chuyển và sàn."
+              className="mb-0"
+            >
+              <div className="p-[18px]">
+                <OrderSplit o={o} />
+              </div>
+            </Panel>
+            <Panel icon={Scale} title="Phí sàn mỗi đơn so với các sàn lớn" sub={benchmarkSummary(feeRate)} className="mb-0">
+              <div className="px-[18px] pt-3">
+                <BenchmarkChart rate={feeRate} />
+              </div>
+              <p className={cx(FIELD_HINT, 'm-0 px-[18px] pb-4')}>
+                Phí VietCraft = hoa hồng ÷ tổng tiền hàng. Shopee: phí cố định 9–12% + phí xử lý giao dịch 6%. Etsy: 6,5% +
+                3% thanh toán. Số đối thủ là tham khảo 2026 từ nguồn tổng hợp.
+              </p>
+            </Panel>
+          </div>
+
+          <Glossary />
+        </div>
+      </>
+    );
+  };
+
+  /* ---------------------------------------------------------------- Tab Mô phỏng */
+  const renderSimulation = (sim: SimInput, result: ReturnType<typeof simulate>) => {
+    const runway = result.netProfit < 0 && cash > 0 ? cash / -result.netProfit : null;
+    const ref = o?.orders.paid ? 'số thật' : 'giả định ban đầu';
+    // Lệch so với điểm xuất phát: kéo thanh nào là thấy ngay lãi/lỗ đổi bao nhiêu.
+    const vsBase = (now: number, then: number | undefined, format: (v: number) => string) => {
+      const d = Math.round(now - (then ?? now));
+      if (!d) return <span>Bằng {ref}</span>;
+      return (
+        <span className={cx('font-semibold', d > 0 ? 'text-admin-brand-700' : 'text-[#b91c1c]')}>
+          {format(d)} <span className="font-normal text-admin-muted">so với {ref}</span>
+        </span>
+      );
+    };
+    const receipt: [string, number][] = [
+      ['Hoa hồng', result.commissionPerOrder],
+      ['Phí cổng thanh toán', -result.paymentFeePerOrder],
+      ['Voucher sàn', -sim.voucherPerOrder],
+      ['Thất thoát do hoàn tiền', -result.refundLossPerOrder],
+      ['Gửi thông báo', -sim.notificationPerOrder],
+    ];
+    const top = shocks[0];
+    const topDelta = top ? Math.round(top.profitDelta) : 0;
+    return (
+      <>
+        <Panel
+          icon={SlidersHorizontal}
+          title="Mô phỏng: nếu thay đổi thì sao?"
+          sub={
+            scenario === 'base'
+              ? o?.orders.paid
+                ? `Xuất phát từ số thật ${periodText(o.period)} — đổi kỳ ở tab Tổng quan.`
+                : 'Chưa có đơn trong kỳ nên điểm xuất phát là giả định.'
+              : (SCENARIOS.find(s => s.key === scenario)?.note ?? 'Đang dùng giá trị bạn tự chỉnh') + '.'
+          }
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[12.5px] font-semibold text-admin-muted" aria-hidden>
+                Kịch bản
               </span>
+              <SegmentedControl
+                value={scenario}
+                onChange={pickScenario}
+                options={SCENARIOS.map(s => ({ value: s.key, label: s.label }))}
+                label="Kịch bản"
+              />
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 gap-6 p-[18px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+            <div className="flex flex-col gap-4">
+              <SimField
+                label="Số đơn thành công mỗi tháng"
+                value={sim.orders}
+                onChange={v => setSimField({ orders: Math.round(v) })}
+                min={0}
+                max={Math.max(2000, (base?.orders ?? 0) * 3)}
+                step={10}
+                unit="đơn"
+              />
+              <SimField
+                label="Tiền hàng trung bình mỗi đơn"
+                hint="Giá khách thấy trên sàn, chưa gồm ship."
+                value={Math.round(sim.aov)}
+                onChange={v => setSimField({ aov: v })}
+                min={0}
+                max={2_000_000}
+                step={5000}
+                unit="đ"
+              />
+              <SimField
+                label="Mức hoa hồng"
+                hint={
+                  <>
+                    Chỉ để thử. Muốn áp dụng thật hãy đổi ở trang{' '}
+                    <Link to="/admin/commission" className="font-semibold text-admin-brand hover:underline">
+                      Cấu hình lợi nhuận
+                    </Link>
+                    .
+                  </>
+                }
+                value={round2(sim.commissionPercent)}
+                onChange={v => setSimField({ commissionPercent: v })}
+                min={0}
+                max={30}
+                step={0.5}
+                unit="%"
+              />
+
+              <details className="rounded-admin border border-admin-line">
+                <summary className="cursor-pointer select-none px-4 py-3 text-[13px] font-semibold text-admin-ink">
+                  Nâng cao{' '}
+                  <span className="font-normal text-admin-muted">
+                    — phí cổng {pct(sim.paymentFeeRate)}, đơn hoàn {pct(sim.refundRate)}, voucher sàn{' '}
+                    {money(Math.round(sim.voucherPerOrder))}/đơn, chi phí cố định {money(Math.round(sim.monthlyFixed))}
+                  </span>
+                </summary>
+                <div className="flex flex-col gap-4 border-t border-admin-line p-4">
+                  <SimField
+                    label="Phí cổng thanh toán"
+                    hint="Trung bình trên tiền hàng + ship, đã gồm cả đơn COD."
+                    value={round2(sim.paymentFeeRate * 100)}
+                    onChange={v => setSimField({ paymentFeeRate: v / 100 })}
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    unit="%"
+                  />
+                  <SimField
+                    label="Tỷ lệ đơn bị hoàn tiền"
+                    value={round2(sim.refundRate * 100)}
+                    onChange={v => setSimField({ refundRate: Math.min(90, v) / 100 })}
+                    min={0}
+                    max={50}
+                    step={1}
+                    unit="%"
+                  />
+                  <SimField
+                    label="Voucher sàn trung bình mỗi đơn"
+                    hint="Ví dụ 10% số đơn dùng mã 20.000đ thì bằng 2.000đ mỗi đơn."
+                    value={Math.round(sim.voucherPerOrder)}
+                    onChange={v => setSimField({ voucherPerOrder: Math.round(v) })}
+                    min={0}
+                    max={50_000}
+                    step={500}
+                    unit="đ"
+                  />
+                  <SimField
+                    label="Chi phí cố định mỗi tháng"
+                    value={Math.round(sim.monthlyFixed)}
+                    onChange={v => setSimField({ monthlyFixed: v })}
+                    min={0}
+                    max={Math.max(20_000_000, (base?.monthlyFixed ?? 0) * 3)}
+                    step={100_000}
+                    unit="đ"
+                  />
+                </div>
+              </details>
+
+              <section aria-label="Mỗi đơn sàn còn lại bao nhiêu" className="rounded-admin border border-admin-line">
+                <h3 className="m-0 border-b border-admin-line bg-[#fafcfa] px-4 py-2.5 text-[13px] font-semibold text-admin-ink">
+                  Mỗi đơn sàn còn lại bao nhiêu
+                </h3>
+                <dl className="m-0 px-4 py-2 text-[13px]">
+                  {receipt.map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between gap-3 py-1">
+                      <dt className="text-admin-body">{k}</dt>
+                      <dd className="m-0 tabular-nums text-admin-ink">
+                        {Math.round(v) === 0 ? money(0) : v > 0 ? `+${money(Math.round(v))}` : `−${money(Math.round(-v))}`}
+                      </dd>
+                    </div>
+                  ))}
+                  <div className="mt-1 flex items-center justify-between gap-3 border-t border-admin-line pb-1 pt-2 font-bold">
+                    <dt className="text-admin-ink">
+                      = Lãi góp mỗi đơn
+                      <Hint term="Lãi góp" />
+                    </dt>
+                    <dd
+                      className={cx(
+                        'm-0 tabular-nums',
+                        result.contributionPerOrder < 0 ? 'text-[#b91c1c]' : 'text-admin-brand'
+                      )}
+                    >
+                      {signedMoney(Math.round(result.contributionPerOrder))}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+            </div>
+
+            <div className="min-w-0">
+              <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Metric
+                  emphasis
+                  label="Lãi/lỗ mỗi tháng"
+                  term="Lãi/lỗ ròng"
+                  value={signedMoney(Math.round(result.netProfit))}
+                  tone={toneOf(result.netProfit)}
+                  sub={vsBase(result.netProfit, baseResult?.netProfit, signedMoney)}
+                />
+                <Metric
+                  label="Lãi góp mỗi đơn"
+                  term="Lãi góp"
+                  value={signedMoney(Math.round(result.contributionPerOrder))}
+                  sub={vsBase(result.contributionPerOrder, baseResult?.contributionPerOrder, v => `${signedMoney(v)}/đơn`)}
+                />
+                <Metric
+                  label="Cần để hòa vốn mỗi tháng"
+                  term="Hòa vốn"
+                  value={result.breakEvenOrders === null ? 'Không thể' : `${count(result.breakEvenOrders)} đơn`}
+                  sub={
+                    <>
+                      {result.breakEvenGmv !== null && <>≈ {money(result.breakEvenGmv)} tiền hàng</>}
+                      {baseResult && result.breakEvenOrders !== baseResult.breakEvenOrders && (
+                        <>
+                          {result.breakEvenGmv !== null && ' · '}
+                          {ref}:{' '}
+                          {baseResult.breakEvenOrders === null ? 'không thể' : `${count(baseResult.breakEvenOrders)} đơn`}
+                        </>
+                      )}
+                    </>
+                  }
+                />
+                <Metric
+                  label="Vốn dự phòng trụ được"
+                  term="Runway (số tháng trụ được)"
+                  value={result.netProfit >= 0 ? 'Không hao vốn' : runway !== null ? months(runway) : '—'}
+                  sub={
+                    result.netProfit >= 0 ? (
+                      'Đang có lãi'
+                    ) : cash > 0 ? (
+                      `Vốn ${money(cash)} ÷ lỗ ${money(Math.round(-result.netProfit))}/tháng`
+                    ) : (
+                      <>
+                        Nhập vốn ở tab{' '}
+                        <Link to="/admin/finance?tab=chi-phi" className="font-semibold text-admin-brand hover:underline">
+                          Chi phí vận hành
+                        </Link>
+                      </>
+                    )
+                  }
+                />
+              </div>
+
+              <h3 className="m-0 text-[13.5px] font-bold text-admin-ink">Lãi/lỗ mỗi tháng theo số đơn</h3>
+              <p className={cx(FIELD_HINT, 'mb-2 mt-0.5')}>
+                Mỗi cột: bán được ngần ấy đơn/tháng thì lãi hay lỗ bao nhiêu; cột đậm là mức đang chọn.{' '}
+                {result.breakEvenOrders === null
+                  ? 'Ở mức phí này bán bao nhiêu cũng lỗ.'
+                  : `Từ ${count(result.breakEvenOrders)} đơn/tháng trở lên là có lãi.`}
+              </p>
+              <ProfitBarsChart bars={bars} />
+            </div>
+          </div>
+        </Panel>
+
+        <Panel
+          icon={Gauge}
+          title="Yếu tố nào ảnh hưởng mạnh nhất?"
+          sub="Đổi từng yếu tố một so với mô phỏng đang xem. Cột đỏ: làm lỗ thêm · cột xanh: làm lãi thêm."
+        >
+          {top && topDelta !== 0 && (
+            <p className="m-0 px-[18px] pt-3 text-[13px] text-admin-body">
+              Mạnh nhất: nếu <b className="text-admin-ink">{top.label.charAt(0).toLowerCase() + top.label.slice(1)}</b>,
+              mỗi tháng sàn {topDelta < 0 ? 'mất thêm' : 'được thêm'}{' '}
+              <b className={topDelta < 0 ? 'text-[#b91c1c]' : 'text-admin-brand'}>{money(Math.abs(topDelta))}</b>.
+            </p>
+          )}
+          <div className="px-[18px] pt-3">
+            <SensitivityChart shocks={shocks} />
+          </div>
+          <details className="border-t border-admin-line">
+            <summary className="cursor-pointer select-none px-[18px] py-3 text-[13px] font-semibold text-admin-ink">
+              Xem bảng số
+            </summary>
+            <div className="overflow-x-auto">
+              <table className={TABLE}>
+                <thead>
+                  <tr>
+                    <th>Nếu</th>
+                    <th className="text-right">Lãi/lỗ mỗi tháng thay đổi</th>
+                    <th className="text-right">Cần để hòa vốn</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shocks.map(s => (
+                    <tr key={s.label}>
+                      <td>{s.label}</td>
+                      <td
+                        className={cx(
+                          'text-right font-semibold tabular-nums',
+                          s.profitDelta < 0 ? 'text-[#b91c1c]' : s.profitDelta > 0 ? 'text-admin-brand' : 'text-admin-muted'
+                        )}
+                      >
+                        {signedMoney(Math.round(s.profitDelta))}
+                      </td>
+                      <td className="text-right tabular-nums">
+                        {s.breakEvenOrders === null ? 'Không thể hòa vốn' : `${count(s.breakEvenOrders)} đơn/tháng`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </Panel>
+      </>
+    );
+  };
+
+  /* ---------------------------------------------------------------- Tab Chi phí vận hành */
+  const renderCosts = (form: FinanceConfig) => (
+    <>
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+        <Panel
+          icon={Server}
+          title="Chi phí cố định mỗi tháng"
+          sub="Phải trả dù không có đơn nào: máy chủ, tên miền, Atlas, Cloudinary, API AI…"
+          className="mb-0"
+        >
+        <div className="p-[18px]">
+          <p className={cx(FIELD_HINT, 'mb-3 mt-0')}>
+            Khoản có ổ khóa chỉ sửa số tiền, dùng gói miễn phí thì để 0. Khoản tự thêm thì sửa và xóa được.
+          </p>
+          <div className="flex flex-col gap-2">
+            {form.monthly_costs.map((c, idx) => (
+              <div key={idx} className="grid grid-cols-[minmax(0,1fr)_160px_auto] items-center gap-2">
+                <input
+                  aria-label={`Tên khoản chi phí ${idx + 1}`}
+                  value={c.name}
+                  maxLength={60}
+                  placeholder="VD: MongoDB Atlas"
+                  disabled={!!c.key}
+                  onChange={e => updateCost(idx, { name: e.target.value })}
+                  className={cx(FIELD, 'py-2', !c.name.trim() && 'border-[#f6caca]')}
+                />
+                <MoneyInput
+                  value={c.amount}
+                  onChange={v => updateCost(idx, { amount: v })}
+                  label={`Số tiền mỗi tháng của khoản ${c.name || idx + 1}`}
+                />
+                {c.key ? (
+                  <span
+                    role="img"
+                    aria-label="Khoản mặc định: không xóa được, chỉ sửa số tiền"
+                    title="Khoản mặc định: không xóa được, chỉ sửa số tiền"
+                    className="inline-flex h-10 w-10 items-center justify-center text-admin-muted md:h-9 md:w-9"
+                  >
+                    <Lock size={15} aria-hidden />
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className={ICON_BTN_DANGER}
+                    aria-label={`Xóa khoản ${c.name || idx + 1}`}
+                    onClick={() => setForm(f => f && { ...f, monthly_costs: f.monthly_costs.filter((_, i) => i !== idx) })}
+                  >
+                    <Trash2 size={15} aria-hidden />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              className={BTN_SECONDARY_SM}
+              disabled={form.monthly_costs.length >= 30}
+              onClick={() => setForm(f => f && { ...f, monthly_costs: [...f.monthly_costs, { name: '', amount: 0 }] })}
+            >
+              <Plus size={14} aria-hidden /> Thêm khoản
+            </button>
+            <span className="text-[13px] text-admin-muted">
+              Tổng{' '}
+              <b className="text-[15px] text-admin-ink">
+                {money(form.monthly_costs.reduce((s, c) => s + (Number(c.amount) || 0), 0))}
+              </b>
+              /tháng
+            </span>
+          </div>
+          {costsInvalid && <p className="mb-0 mt-2 text-[12px] text-[#b91c1c]">Mỗi khoản cần có tên trước khi lưu.</p>}
+        </div>
+        <div className="border-t border-admin-line px-[18px] py-4">
+          <h3 className="mb-2 mt-0 text-[13px] font-bold text-admin-ink">Khoản nào tốn nhất</h3>
+          <CostBarsChart costs={form.monthly_costs} />
+        </div>
+        </Panel>
+
+        <div className="flex flex-col gap-5">
+        <Panel
+          icon={CreditCard}
+          title="Phí cổng thanh toán"
+          sub="Theo hợp đồng, tính trên toàn bộ tiền khách trả. Chưa thu phí thì để 0."
+          className="mb-0"
+        >
+          <div className="overflow-x-auto">
+            <table className={TABLE}>
+              <thead>
+                <tr>
+                  <th>Phương thức</th>
+                  <th>Phí theo %</th>
+                  <th>Phí cố định mỗi giao dịch</th>
+                  <th aria-label="Thao tác" />
+                </tr>
+              </thead>
+              <tbody>
+                {form.payment_fees.map((g, idx) => {
+                  const label = g.name || `cổng ${idx + 1}`;
+                  return (
+                    <tr key={idx}>
+                      <td className="font-semibold">
+                        {g.is_default ? (
+                          g.name
+                        ) : (
+                          <>
+                            <input
+                              aria-label={`Tên cổng thanh toán ${idx + 1}`}
+                              value={g.name}
+                              maxLength={40}
+                              placeholder="VD: MoMo"
+                              onChange={e => updateFee(idx, { name: e.target.value })}
+                              className={cx(FIELD, 'w-[140px] py-1.5', !gatewayCode(g.name) && 'border-[#f6caca]')}
+                            />
+                            <div className="mt-1 text-[11.5px] font-normal text-admin-muted">
+                              Mã: {gatewayCode(g.name) || '—'}
+                            </div>
+                          </>
+                        )}
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            aria-label={`Phí phần trăm của ${label}`}
+                            type="number"
+                            min={0}
+                            max={20}
+                            step={0.1}
+                            value={Math.round(g.rate * 1_000_000) / 10_000}
+                            onChange={e => updateFee(idx, { rate: Math.max(0, Number(e.target.value) || 0) / 100 })}
+                            className={cx(FIELD, 'w-[90px] py-1.5 text-right tabular-nums')}
+                          />
+                          <span className="text-[12px] text-admin-muted">%</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5">
+                          <MoneyInput
+                            value={g.fixed}
+                            onChange={v => updateFee(idx, { fixed: v })}
+                            label={`Phí cố định của ${label}`}
+                            className="w-[110px] py-1.5"
+                          />
+                          <span className="text-[12px] text-admin-muted">đ</span>
+                        </div>
+                      </td>
+                      <td className="w-12">
+                        {g.is_default ? (
+                          <span
+                            role="img"
+                            aria-label="Cổng mặc định: không xóa được, chỉ sửa phí"
+                            title="Cổng mặc định: không xóa được, chỉ sửa phí"
+                            className="inline-flex h-10 w-10 items-center justify-center text-admin-muted md:h-9 md:w-9"
+                          >
+                            <Lock size={15} aria-hidden />
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className={ICON_BTN_DANGER}
+                            aria-label={`Xóa ${label}`}
+                            onClick={() =>
+                              setForm(f => f && { ...f, payment_fees: f.payment_fees.filter((_, i) => i !== idx) })
+                            }
+                          >
+                            <Trash2 size={15} aria-hidden />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="border-t border-admin-line px-[18px] py-3">
+            <button
+              type="button"
+              className={BTN_SECONDARY_SM}
+              disabled={form.payment_fees.length >= 10}
+              onClick={() => setForm(f => f && { ...f, payment_fees: [...f.payment_fees, { name: '', rate: 0, fixed: 0 }] })}
+            >
+              <Plus size={14} aria-hidden /> Thêm cổng
+            </button>
+            <p className={cx(FIELD_HINT, 'mb-0')}>
+              Mã cổng tạo từ tên và phải trùng mã phương thức thanh toán lưu trong đơn hàng. COD là phí thu hộ của đơn vị vận
+              chuyển.
+            </p>
+            {gatewaysInvalid && (
+              <p className="mb-0 mt-2 text-[12px] text-[#b91c1c]">Cổng thêm mới cần tên có chữ hoặc số trước khi lưu.</p>
             )}
           </div>
+        </Panel>
 
-          {/* Khối gợi ý nhanh: 3 Câu hỏi tình huống phổ biến của Admin */}
-          <div className="mb-5">
-            <span className="text-[12px] font-bold uppercase tracking-wider text-admin-muted block mb-2">
-              💡 Thử nhanh các tình huống thực chiến:
-            </span>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={() => { setSimRatePercent(12); }}
-                className="text-left rounded-lg border border-admin-line bg-admin-canvas p-3 transition-all hover:border-admin-brand hover:bg-emerald-50/30 group"
-              >
-                <div className="text-[12.5px] font-bold text-admin-ink group-hover:text-admin-brand">
-                  Tăng hoa hồng lên 12%
-                </div>
-                <div className="text-[11.5px] text-admin-muted mt-0.5">
-                  Cần bán bao nhiêu đơn thì bắt đầu có lãi?
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setSimOrders(50); }}
-                className="text-left rounded-lg border border-admin-line bg-admin-canvas p-3 transition-all hover:border-admin-brand hover:bg-emerald-50/30 group"
-              >
-                <div className="text-[12.5px] font-bold text-admin-ink group-hover:text-admin-brand">
-                  Tháng tới ế ẩm: chỉ được 50 đơn
-                </div>
-                <div className="text-[11.5px] text-admin-muted mt-0.5">
-                  Sàn sẽ thâm hụt bao nhiêu tiền túi?
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setSimOrders(150); setSimRatePercent(8); }}
-                className="text-left rounded-lg border border-admin-line bg-admin-canvas p-3 transition-all hover:border-admin-brand hover:bg-emerald-50/30 group"
-              >
-                <div className="text-[12.5px] font-bold text-admin-ink group-hover:text-admin-brand">
-                  Giảm phí còn 8% để hút Seller
-                </div>
-                <div className="text-[11.5px] text-admin-muted mt-0.5">
-                  Bán 150 đơn thì sàn có tự nuôi được mình?
-                </div>
-              </button>
+        <Panel icon={Wallet} title="Chi phí khác & vốn" className="mb-0">
+          <div className="divide-y divide-admin-line-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-[18px] py-3.5">
+              <span className="text-[13.5px] font-semibold text-admin-ink">Phí gửi thông báo mỗi đơn</span>
+              <span className="flex items-center gap-1.5">
+                <MoneyInput
+                  value={form.notification_per_order}
+                  onChange={v => setForm(f => f && { ...f, notification_per_order: v })}
+                  label="Phí gửi thông báo mỗi đơn"
+                  className="w-[160px] py-1.5"
+                />
+                <span className="w-3 text-[12px] text-admin-muted">đ</span>
+              </span>
+            </div>
+            <div className="px-[18px] py-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-[13.5px] font-semibold text-admin-ink">
+                  Vốn dự phòng hiện có
+                  <Hint term="Runway (số tháng trụ được)" />
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <MoneyInput
+                    value={form.cash_reserve}
+                    onChange={v => setForm(f => f && { ...f, cash_reserve: v })}
+                    label="Vốn dự phòng hiện có"
+                    className="w-[160px] py-1.5"
+                  />
+                  <span className="w-3 text-[12px] text-admin-muted">đ</span>
+                </span>
+              </div>
+              <p className={cx(FIELD_HINT, 'mb-0')}>Tiền nhóm còn để bù lỗ. Để 0 nếu chưa có.</p>
             </div>
           </div>
+        </Panel>
+        </div>
+      </div>
 
-          {/* 2 Slider điều khiển */}
-          <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2">
-            {/* Slider 1: Sản lượng đơn dự kiến */}
-            <div className="rounded-xl border border-admin-line bg-admin-canvas p-4">
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="sim-orders-input" className="text-[13px] font-bold text-admin-ink">
-                  Sản lượng đơn dự kiến / tháng:
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    id="sim-orders-input"
-                    type="number"
-                    min="10"
-                    max="5000"
-                    value={simOrders}
-                    onChange={(e) => setSimOrders(Math.max(1, Number(e.target.value) || 0))}
-                    className="w-20 rounded-md border border-[#ccc] bg-white px-2 py-1 text-right text-[14px] font-extrabold text-admin-ink outline-none focus:border-admin-brand"
-                  />
-                  <span className="text-[12px] font-semibold text-admin-muted">đơn</span>
-                </div>
-              </div>
-              <input
-                type="range"
-                min="10"
-                max="2000"
-                step="10"
-                value={simOrders}
-                onChange={(e) => setSimOrders(Number(e.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-[#ddd] accent-admin-brand"
-              />
-              <div className="mt-2 flex justify-between text-[11px] text-admin-muted font-medium">
-                <span>10 đơn</span>
-                <span>500 đơn</span>
-                <span>1.000 đơn</span>
-                <span>2.000 đơn</span>
-              </div>
-            </div>
-
-            {/* Slider 2: Tỷ lệ hoa hồng sàn */}
-            <div className="rounded-xl border border-admin-line bg-admin-canvas p-4">
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="sim-rate-input" className="text-[13px] font-bold text-admin-ink">
-                  Tỷ lệ phí dịch vụ sàn thu:
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    id="sim-rate-input"
-                    type="number"
-                    min="1"
-                    max="40"
-                    step="0.5"
-                    value={simRatePercent}
-                    onChange={(e) => setSimRatePercent(Math.max(0.5, Number(e.target.value) || 0))}
-                    className="w-16 rounded-md border border-[#ccc] bg-white px-2 py-1 text-right text-[14px] font-extrabold text-admin-ink outline-none focus:border-admin-brand"
-                  />
-                  <span className="text-[13px] font-bold text-admin-brand">%</span>
-                </div>
-              </div>
-              <input
-                type="range"
-                min="3"
-                max="25"
-                step="0.5"
-                value={simRatePercent}
-                onChange={(e) => setSimRatePercent(Number(e.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-[#ddd] accent-admin-brand"
-              />
-              <div className="mt-2 flex justify-between text-[11px] text-admin-muted font-medium">
-                <span>3% (Hạ giá)</span>
-                <span>8%</span>
-                <span>10% (Gốc)</span>
-                <span>15%</span>
-                <span>25%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Thẻ kết quả mô phỏng nhanh */}
-          {simulation && (
-            <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-lg bg-emerald-50/60 p-3.5 border border-emerald-200">
-                <div className="text-[11.5px] font-bold uppercase text-emerald-800">Hoa Hồng Thu Về Dự Phóng</div>
-                <div className="mt-1 text-[19px] font-extrabold text-emerald-900 tabular-nums">
-                  {money(simulation.projected_revenue)}
-                </div>
-                <div className="text-[11.5px] text-emerald-700 font-medium">
-                  ~{money(Math.round(simulation.projected_revenue / simOrders))}/đơn
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-slate-50 p-3.5 border border-slate-200">
-                <div className="text-[11.5px] font-bold uppercase text-slate-700">Chi Phí Duy Trì Sàn Dự Phóng</div>
-                <div className="mt-1 text-[19px] font-extrabold text-slate-900 tabular-nums">
-                  {money(simulation.projected_total_cost)}
-                </div>
-                <div className="text-[11.5px] text-slate-600 font-medium">
-                  Máy chủ + Phí cổng thanh toán
-                </div>
-              </div>
-
-              <div
-                className={cx(
-                  'rounded-lg p-3.5 border',
-                  simulation.is_profitable
-                    ? 'bg-emerald-50 border-emerald-300'
-                    : 'bg-rose-50 border-rose-300'
-                )}
-              >
-                <div
-                  className={cx(
-                    'text-[11.5px] font-bold uppercase',
-                    simulation.is_profitable ? 'text-emerald-800' : 'text-rose-800'
-                  )}
-                >
-                  Lợi Nhuận Ròng Dự Phóng
-                </div>
-                <div
-                  className={cx(
-                    'mt-1 text-[19px] font-extrabold tabular-nums',
-                    simulation.is_profitable ? 'text-emerald-900' : 'text-rose-900'
-                  )}
-                >
-                  {simulation.projected_net_profit < 0
-                    ? `- ${money(Math.abs(simulation.projected_net_profit))}`
-                    : `+ ${money(simulation.projected_net_profit)}`}
-                </div>
-                <div
-                  className={cx(
-                    'text-[11.5px] font-bold',
-                    simulation.is_profitable ? 'text-emerald-700' : 'text-rose-700'
-                  )}
-                >
-                  {simulation.is_profitable ? '✓ Sàn vận hành có lãi' : '⚠ Thâm hụt ngân sách'}
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-indigo-50/60 p-3.5 border border-indigo-200">
-                <div className="text-[11.5px] font-bold uppercase text-indigo-800">Điểm Thoát Lỗ Kịch Bản Này</div>
-                <div className="mt-1 text-[19px] font-extrabold text-indigo-900 tabular-nums">
-                  {simulation.break_even_orders.toLocaleString()} đơn
-                </div>
-                <div className="text-[11.5px] text-indigo-700 font-medium">
-                  GMV hòa vốn: {compactMoney(simulation.break_even_gmv)}
-                </div>
-              </div>
-            </div>
+      {/* Thanh lưu dính đáy: sửa ở thẻ nào cũng thấy nút lưu mà không phải cuộn lên. */}
+      <div
+        className={cx(
+          'sticky bottom-4 z-20 mt-5 flex flex-wrap items-center justify-between gap-3 rounded-admin border bg-admin-surface px-4 py-3 shadow-admin-md',
+          dirty ? 'border-[#b7e0b7]' : 'border-admin-line'
+        )}
+      >
+        <span className="text-[13px] text-admin-muted" aria-live="polite">
+          {dirty ? (
+            <b className="text-admin-ink">Có thay đổi chưa lưu</b>
+          ) : config?.updated_at ? (
+            `Lưu lần cuối ${new Date(config.updated_at).toLocaleString('vi-VN')}`
+          ) : (
+            'Chưa có thay đổi'
           )}
+        </span>
+        <div className="flex items-center gap-2">
+          <button type="button" className={BTN_SECONDARY} onClick={() => setForm(config)} disabled={!dirty || saving}>
+            <Undo2 size={15} aria-hidden /> Hoàn tác
+          </button>
+          <button
+            type="button"
+            className={BTN_PRIMARY}
+            onClick={() => void save()}
+            disabled={!dirty || formInvalid || saving}
+          >
+            <Save size={15} aria-hidden /> {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
 
-          {/* Biểu đồ CVP Recharts với nhãn bình dân hóa */}
-          {simulation && simulation.chart_series.length > 0 && (
-            <div className="rounded-xl border border-admin-line bg-white p-4">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h3 className="m-0 text-[13.5px] font-bold text-admin-ink flex items-center gap-2">
-                  Đồ Thị Hòa Vốn & Thoát Lỗ Thực Tế
-                </h3>
-                <div className="flex flex-wrap items-center gap-4 text-[12px]">
-                  <span className="flex items-center gap-1.5 font-semibold text-emerald-800">
-                    <span className="h-3 w-3 rounded-full bg-[#1a6b1a]" /> Hoa hồng thu về
-                  </span>
-                  <span className="flex items-center gap-1.5 font-semibold text-rose-800">
-                    <span className="h-3 w-3 rounded-full bg-[#d03b3b]" /> Chi phí duy trì sàn
-                  </span>
-                  <span className="flex items-center gap-1.5 font-semibold text-blue-800">
-                    <span className="h-0.5 w-3 border-t-2 border-dashed border-[#2a78d6]" /> Tiền cố định VPS + Tên miền
-                  </span>
-                </div>
-              </div>
-
-              <div className="h-[320px] w-full pt-3">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={simulation.chart_series}
-                    margin={{ top: 10, right: 30, left: 20, bottom: 20 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f0" />
-                    <XAxis
-                      dataKey="quantity"
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
-                      label={{
-                        value: 'Sản lượng đơn hàng bán được trong tháng (đơn)',
-                        position: 'insideBottom',
-                        offset: -12,
-                        fontSize: 12,
-                        fill: '#4b5563',
-                      }}
-                    />
-                    <YAxis
-                      tickFormatter={(v) => compactMoney(v)}
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
-                      label={{
-                        value: 'Số tiền (VND)',
-                        angle: -90,
-                        position: 'insideLeft',
-                        fontSize: 12,
-                        fill: '#4b5563',
-                      }}
-                    />
-                    <Tooltip
-                      formatter={(value: any, name: string) => {
-                        const labelMap: Record<string, string> = {
-                          totalRevenue: 'Hoa hồng thu về',
-                          totalCost: 'Chi phí duy trì sàn',
-                          fixedCost: 'Tiền cố định VPS + Tên miền',
-                          netProfit: 'Lợi nhuận ròng',
-                        };
-                        return [money(value), labelMap[name] || name];
-                      }}
-                      labelFormatter={(label) => `Bán được: ${label} đơn`}
-                      contentStyle={{
-                        backgroundColor: '#ffffff',
-                        borderRadius: '8px',
-                        border: '1px solid #e5e7eb',
-                        fontSize: '12px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                      }}
-                    />
-                    {/* Đường Chi phí cố định */}
-                    <Line
-                      type="monotone"
-                      dataKey="fixedCost"
-                      stroke="#2a78d6"
-                      strokeWidth={1.5}
-                      strokeDasharray="4 4"
-                      dot={false}
-                      name="fixedCost"
-                    />
-                    {/* Đường Tổng Chi Phí */}
-                    <Line
-                      type="monotone"
-                      dataKey="totalCost"
-                      stroke="#d03b3b"
-                      strokeWidth={2.5}
-                      dot={{ r: 3 }}
-                      name="totalCost"
-                    />
-                    {/* Đường Tổng Doanh Thu */}
-                    <Line
-                      type="monotone"
-                      dataKey="totalRevenue"
-                      stroke="#1a6b1a"
-                      strokeWidth={2.5}
-                      dot={{ r: 3 }}
-                      name="totalRevenue"
-                    />
-                    {/* Đường đánh dấu số đơn mô phỏng hiện tại */}
-                    <ReferenceLine
-                      x={simOrders}
-                      stroke="#007700"
-                      strokeDasharray="3 3"
-                      label={{
-                        value: `Kịch bản: ${simOrders} đơn`,
-                        fill: '#007700',
-                        fontSize: 11,
-                        position: 'top',
-                      }}
-                    />
-                    {/* Đường đánh dấu Điểm hòa vốn */}
-                    {simulation.break_even_orders > 0 && simulation.break_even_orders < 3000 && (
-                      <ReferenceLine
-                        x={simulation.break_even_orders}
-                        stroke="#991b1b"
-                        strokeDasharray="2 2"
-                        label={{
-                          value: `Điểm thoát lỗ: ${simulation.break_even_orders} đơn`,
-                          fill: '#991b1b',
-                          fontSize: 11,
-                          position: 'insideTopLeft',
-                        }}
-                      />
-                    )}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-
-          {/* Khuyến nghị thông minh từ Auto Advisor */}
-          {autoAdvisorMessage && (
-            <div
-              className={cx(
-                'mt-4 rounded-xl border p-4 text-[13px]',
-                autoAdvisorMessage.tone === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-900',
-                autoAdvisorMessage.tone === 'warning' && 'border-amber-200 bg-amber-50 text-amber-900',
-                autoAdvisorMessage.tone === 'danger' && 'border-rose-200 bg-rose-50 text-rose-900'
-              )}
-            >
-              <div className="flex items-center gap-2 font-bold text-[14px]">
-                <Info size={17} />
-                <span>Gợi Ý Cân Đối Chi Phí: {autoAdvisorMessage.title}</span>
-              </div>
-              <p className="mb-0 mt-1.5 leading-relaxed">{autoAdvisorMessage.desc}</p>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* --------------------------------------------------------
-          NỘI DUNG TAB 2: CẤU HÌNH ĐƠN GIÁ DỊCH VỤ
-      -------------------------------------------------------- */}
-      {activeTab === 'config' && formConfig && (
-        <form onSubmit={handleSaveConfig} className={cx(CARD, 'p-5')}>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-admin-line pb-3">
-            <div>
-              <h2 className="m-0 text-[16px] font-bold text-admin-ink flex items-center gap-2">
-                <Server size={18} className="text-admin-brand" />
-                Cấu Hình Đơn Giá Chi Phí Vận Hành & Chính Sách Thu Phí
-              </h2>
-              <p className="mt-0.5 text-[12.5px] text-admin-muted">
-                💡 <strong className="text-stone-700">Hướng dẫn:</strong> Chỉ chỉnh sửa các thông số này khi nhà cung cấp máy chủ, Cloudinary, hoặc cổng thanh toán tăng giá.
-                {config?.updated_at && (
-                  <span className="ml-1 text-admin-muted font-normal">
-                    (Lần lưu gần nhất: {new Date(config.updated_at).toLocaleString('vi-VN')})
-                  </span>
-                )}
-              </p>
-            </div>
-            <button
-              type="submit"
-              disabled={saving}
-              className={cx(BTN_PRIMARY, 'flex items-center gap-1.5 px-4 py-2')}
-            >
-              <Save size={16} />
-              <span>{saving ? 'Đang lưu...' : 'Lưu Thay Đổi'}</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Cột 1: Chi phí cố định hàng tháng */}
-            <div className="space-y-4 rounded-xl border border-admin-line bg-admin-canvas p-4">
-              <h3 className="m-0 text-[13.5px] font-bold text-admin-ink flex items-center gap-2 pb-2 border-b border-admin-line-soft">
-                <Server size={15} className="text-blue-600" />
-                Định Phí Hàng Tháng (Nuôi Hạ Tầng)
-              </h3>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  VPS / Cloud Server cơ bản (đ/tháng):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="50000"
-                  value={formConfig.fixed_costs.vps_base_monthly}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      fixed_costs: {
-                        ...formConfig.fixed_costs,
-                        vps_base_monthly: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Frontend Hosting / CDN (đ/tháng):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="50000"
-                  value={formConfig.fixed_costs.frontend_hosting}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      fixed_costs: {
-                        ...formConfig.fixed_costs,
-                        frontend_hosting: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Tên miền & DNS (đ/tháng):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="10000"
-                  value={formConfig.fixed_costs.domain_monthly}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      fixed_costs: {
-                        ...formConfig.fixed_costs,
-                        domain_monthly: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Bảo mật SSL & WAF (đ/tháng):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="10000"
-                  value={formConfig.fixed_costs.security_ssl}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      fixed_costs: {
-                        ...formConfig.fixed_costs,
-                        security_ssl: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-            </div>
-
-            {/* Cột 2: Đơn giá biến phí & Hạ tầng theo tải */}
-            <div className="space-y-4 rounded-xl border border-admin-line bg-admin-canvas p-4">
-              <h3 className="m-0 text-[13.5px] font-bold text-admin-ink flex items-center gap-2 pb-2 border-b border-admin-line-soft">
-                <Database size={15} className="text-amber-600" />
-                Biến Phí Theo Đơn & Quy Mô
-              </h3>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Phí cổng thanh toán trực tuyến (%):
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type="number"
-                    min="0"
-                    max="0.1"
-                    step="0.001"
-                    value={formConfig.unit_costs.payment_gateway_rate}
-                    onChange={(e) =>
-                      setFormConfig({
-                        ...formConfig,
-                        unit_costs: {
-                          ...formConfig.unit_costs,
-                          payment_gateway_rate: Number(e.target.value),
-                        },
-                      })
-                    }
-                    className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                  />
-                  <span className="absolute right-3 text-[12px] text-admin-muted">
-                    = {(formConfig.unit_costs.payment_gateway_rate * 100).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Phí thông báo SMS / Email (đ/đơn):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="100"
-                  value={formConfig.unit_costs.notification_per_order}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      unit_costs: {
-                        ...formConfig.unit_costs,
-                        notification_per_order: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Lưu trữ Artwork Cloudinary (đ/GB/tháng):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="50"
-                  value={formConfig.unit_costs.storage_per_gb}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      unit_costs: {
-                        ...formConfig.unit_costs,
-                        storage_per_gb: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Chi phí AI phân tích xu hướng (đ/lượt):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="10"
-                  value={formConfig.unit_costs.ai_per_request}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      unit_costs: {
-                        ...formConfig.unit_costs,
-                        ai_per_request: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Tải DB trên mỗi Người Bán (đ/shop/tháng):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="500"
-                  value={formConfig.unit_costs.db_per_active_seller}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      unit_costs: {
-                        ...formConfig.unit_costs,
-                        db_per_active_seller: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-            </div>
-
-            {/* Cột 3: Chính sách sàn & Hạn mức miễn phí */}
-            <div className="space-y-4 rounded-xl border border-admin-line bg-admin-canvas p-4">
-              <h3 className="m-0 text-[13.5px] font-bold text-admin-ink flex items-center gap-2 pb-2 border-b border-admin-line-soft">
-                <Percent size={15} className="text-emerald-700" />
-                Chính Sách Thu Phí & Hạn Mức
-              </h3>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Tỷ lệ hoa hồng mặc định sàn:
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type="number"
-                    min="0.01"
-                    max="0.5"
-                    step="0.01"
-                    value={formConfig.policies.default_commission_rate}
-                    onChange={(e) =>
-                      setFormConfig({
-                        ...formConfig,
-                        policies: {
-                          ...formConfig.policies,
-                          default_commission_rate: Number(e.target.value),
-                        },
-                      })
-                    }
-                    className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                  />
-                  <span className="absolute right-3 text-[12px] font-bold text-admin-brand">
-                    = {(formConfig.policies.default_commission_rate * 100).toFixed(0)}%
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Mức phí sàn tối thiểu / đơn hàng (đ):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={formConfig.policies.min_order_fee}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      policies: {
-                        ...formConfig.policies,
-                        min_order_fee: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Dung lượng lưu trữ miễn phí / shop (GB):
-                </label>
-                <input
-                  type="number"
-                  min="0.1"
-                  step="0.5"
-                  value={formConfig.seller_quotas.free_storage_gb}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      seller_quotas: {
-                        ...formConfig.seller_quotas,
-                        free_storage_gb: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Lượt AI xu hướng miễn phí / shop:
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="5"
-                  value={formConfig.seller_quotas.free_ai_requests}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      seller_quotas: {
-                        ...formConfig.seller_quotas,
-                        free_ai_requests: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-admin-muted mb-1">
-                  Tỷ lệ phụ thu vượt hạn mức (%):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={formConfig.seller_quotas.overage_markup_rate}
-                  onChange={(e) =>
-                    setFormConfig({
-                      ...formConfig,
-                      seller_quotas: {
-                        ...formConfig.seller_quotas,
-                        overage_markup_rate: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-md border border-[#ccc] bg-white px-3 py-1.5 text-[13px] font-bold text-admin-ink outline-none focus:border-admin-brand"
-                />
-              </div>
-            </div>
-          </div>
-        </form>
-      )}
+  return (
+    <div className={PAGE}>
+      {header}
+      {error && <Alert tone="danger" onDismiss={() => setError('')}>{error}</Alert>}
+      {notice && <Alert tone="success" onDismiss={() => setNotice('')}>{notice}</Alert>}
+      {section === 'tong-quan' && o && renderOverview(o)}
+      {section === 'mo-phong' && sim && result && renderSimulation(sim, result)}
+      {section === 'chi-phi' && form && renderCosts(form)}
     </div>
   );
 }

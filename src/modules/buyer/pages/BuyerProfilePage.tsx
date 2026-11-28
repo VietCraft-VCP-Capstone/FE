@@ -146,7 +146,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                     
                     const mapped = favItems.slice(0, 3).map((p: any) => ({
                         title: p.title || p.name || 'Sản phẩm sáng tạo',
-                        image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
+                        image: p.image || p.thumbnail || p.images?.[0] || '/image-not-found.jpg'
                     }));
 
                     if (mapped.length === 0) {
@@ -154,7 +154,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                         const products: any[] = Array.isArray(allProducts) ? allProducts : (allProducts?.items || []);
                         const fallbackMapped = products.slice(0, 3).map((p: any) => ({
                             title: p.title || p.name || 'Sản phẩm sáng tạo',
-                            image: p.image || p.thumbnail || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'
+                            image: p.image || p.thumbnail || p.images?.[0] || '/image-not-found.jpg'
                         }));
                         setSavedProducts(fallbackMapped);
                     } else {
@@ -231,10 +231,28 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
         setIsAddressModalOpen(true);
     };
 
-    if (loading || !profile) {
+    if (loading) {
         return (
             <div className="max-w-7xl mx-auto px-4 py-16 text-center">
                 <p className="text-gray-500 font-semibold">Đang tải thông tin cá nhân...</p>
+            </div>
+        );
+    }
+
+    if (!profile) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-16 text-center space-y-4">
+                <p className="text-gray-600 font-medium">Không thể tải thông tin cá nhân hoặc phiên đăng nhập không hợp lệ.</p>
+                <button
+                    onClick={() => {
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        window.location.href = '/login';
+                    }}
+                    className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition shadow-sm"
+                >
+                    Đăng nhập lại
+                </button>
             </div>
         );
     }
@@ -258,7 +276,7 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
             <div className="bg-white rounded-[24px] border border-gray-200 p-6 flex flex-row items-center gap-6">
                 <div className="relative group w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border border-gray-150 flex-shrink-0 cursor-pointer">
                     <img 
-                        src={profile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150'} 
+                        src={profile.avatar || '/placeholder-avatar.svg'} 
                         alt={profile.full_name} 
                         className="w-full h-full object-cover transition-all group-hover:scale-105" 
                     />
@@ -557,11 +575,11 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                         <div className="flex items-center gap-4">
                                             <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0 flex items-center justify-center">
                                                 <img
-                                                    src={lastOrder.items[0]?.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'}
+                                                    src={lastOrder.items[0]?.image || '/image-not-found.jpg'}
                                                     alt={lastOrder.items[0]?.title || 'Sản phẩm'}
                                                     className="w-full h-full object-cover"
                                                     onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150';
+                                                        (e.target as HTMLImageElement).src = '/image-not-found.jpg';
                                                     }}
                                                 />
                                             </div>
@@ -596,11 +614,11 @@ export function BuyerProfilePage({ onLogout }: BuyerProfilePageProps) {
                                         <div key={i} className="flex flex-col items-center">
                                             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-50 border border-gray-150 aspect-square cursor-pointer hover:scale-105 transition-all">
                                                 <img
-                                                    src={p.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150'}
+                                                    src={p.image || '/image-not-found.jpg'}
                                                     alt={p.title}
                                                     className="w-full h-full object-cover"
                                                     onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=150';
+                                                        (e.target as HTMLImageElement).src = '/image-not-found.jpg';
                                                     }}
                                                 />
                                             </div>

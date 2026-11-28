@@ -45,12 +45,14 @@ export function SellerFollowedCompetitorsPage() {
   };
 
   const totalListings = shops.reduce((acc, s) => acc + (s.listingCount || 0), 0);
-  const avgRating = shops.length
-    ? (shops.reduce((acc, s) => acc + (s.averageRating || s.rating || 5), 0) / shops.length).toFixed(1)
-    : '0.0';
+  // Trung bình theo lượt đánh giá, bỏ shop chưa có đánh giá
+  const ratedCount = shops.reduce((acc, s) => acc + (s.ratingCount || 0), 0);
+  const avgRating = ratedCount
+    ? (shops.reduce((acc, s) => acc + (s.averageRating ?? s.rating ?? 0) * (s.ratingCount || 0), 0) / ratedCount).toFixed(1)
+    : '—';
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-fade-in font-sans">
+    <div className="space-y-6 animate-fade-in font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-stone-200">
         <div>
           <div className="flex items-center gap-2">
@@ -101,7 +103,7 @@ export function SellerFollowedCompetitorsPage() {
             <Star size={22} className="fill-amber-500 text-amber-500" />
           </div>
           <div>
-            <div className="text-2xl font-black text-stone-900">{avgRating} / 5.0</div>
+            <div className="text-2xl font-black text-stone-900">{ratedCount ? `${avgRating} / 5.0` : '—'}</div>
             <div className="text-xs font-semibold text-stone-500">Đánh giá trung bình đối thủ</div>
           </div>
         </div>

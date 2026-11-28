@@ -222,7 +222,6 @@ export function BuyerOrderDetailPage() {
     const getPaymentMethodLabel = (method: string | undefined) => {
         switch (method?.toLowerCase()) {
             case 'payos': return 'payOS (QR ngân hàng)';
-            case 'vnpay': return 'VNPay';
             case 'cod': return 'Thanh toán khi nhận hàng (COD)';
             default: return 'Ví điện tử';
         }
@@ -236,7 +235,7 @@ export function BuyerOrderDetailPage() {
         }
     };
 
-    // Đơn trả trước (payOS/VNPay) đã nhận tiền nhưng shop chưa duyệt: khách phải thấy rõ là đã trả.
+    // Đơn trả trước (payOS) đã nhận tiền nhưng shop chưa duyệt: khách phải thấy rõ là đã trả.
     const isPrepaidPaid = order.paymentMethod !== 'COD' && order.paymentStatus === 'PAID';
     const paidAmountText = `${Number(order.totalAmount || 0).toLocaleString('vi-VN')}đ`;
 
@@ -493,15 +492,15 @@ export function BuyerOrderDetailPage() {
             {/* Shop & Items */}
             <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
                 {/* Shop Header */}
-                <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/10">
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
-                            <img src={order.shopLogo || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=80'} alt={order.shopName} className="w-full h-full object-cover" />
+                <div className="p-4 border-b border-gray-50 flex flex-wrap items-center justify-between gap-2 bg-gray-50/10">
+                    <div className="flex min-w-0 items-center gap-2">
+                        <div className="w-6 h-6 shrink-0 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
+                            <img src={order.shopLogo || '/placeholder-shop.svg'} alt={order.shopName} className="w-full h-full object-cover" />
                         </div>
-                        <span className="font-extrabold text-sm text-gray-800">{order.shopName || 'VietCraft Shop'}</span>
+                        <span className="truncate font-extrabold text-sm text-gray-800">{order.shopName || 'VietCraft Shop'}</span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full items-center gap-2 sm:w-auto max-sm:[&>button]:flex-1 max-sm:[&>button]:justify-center">
                         <button
                             onClick={() => {
                                 if (order.shopId) {
@@ -510,14 +509,14 @@ export function BuyerOrderDetailPage() {
                                     showToast('Gian hàng này không còn hoạt động', 'error');
                                 }
                             }}
-                            className="border border-emerald-500 hover:bg-emerald-50 text-emerald-600 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
+                            className="border border-emerald-500 hover:bg-emerald-50 text-emerald-600 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 whitespace-nowrap transition-colors"
                         >
                             <MessageSquare size={12} />
                             <span>Chat với Shop</span>
                         </button>
                         <button
                             onClick={() => order.shopId ? navigate(`/shop/${order.shopId}`) : showToast('Gian hàng này không còn hoạt động', 'error')}
-                            className="border border-gray-200 hover:bg-gray-50 text-gray-500 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
+                            className="border border-gray-200 hover:bg-gray-50 text-gray-500 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 whitespace-nowrap transition-colors"
                         >
                             <Store size={12} />
                             <span>Xem Shop</span>
@@ -557,6 +556,8 @@ export function BuyerOrderDetailPage() {
             {!awaitingPayment && <RefundRequestPanel
                 orderId={order.id}
                 refundOrderId={order._id}
+                orderCode={order.id}
+                paymentMethod={order.paymentMethod}
                 formOpen={refundFormOpen}
                 onFormClose={() => setRefundFormOpen(false)}
                 onCreated={() => { setRefundFormOpen(false); setHasLegacyRefund(true); }}
@@ -601,7 +602,7 @@ export function BuyerOrderDetailPage() {
 
                 {/* Right block (Metadata info) */}
                 <div className="flex-1 pt-6 md:pt-0 md:pl-8 space-y-3">
-                    <h3 className="font-extrabold text-gray-900 text-xs tracking-wider uppercase md:opacity-0 md:h-5">Metadata</h3>
+                    <h3 className="hidden font-extrabold text-gray-900 text-xs tracking-wider uppercase md:block md:opacity-0 md:h-5">Metadata</h3>
                     <div className="space-y-2.5 text-xs text-gray-600 font-medium">
                         <div className="flex items-center justify-between">
                             <span>Mã đơn hàng</span>
