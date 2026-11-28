@@ -188,6 +188,8 @@ export interface AnomalyAlert {
   direction: 'spike' | 'drop';
   /** daily: một ngày lệch · zero_run: nhiều ngày liền bằng 0 (date là ngày cuối). */
   rule: 'daily' | 'zero_run';
+  /** Số ngày liền bằng 0 (zero_run); daily = 1. Bản ghi cũ có thể thiếu. */
+  run_days?: number | null;
   z: number;
   /** VND nếu metric là revenue, lượt xem nếu views. */
   expected: number;

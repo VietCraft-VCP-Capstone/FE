@@ -4,16 +4,16 @@
  * Đọc GET /seller/analytics/alerts (tham số period = 7d · 30d · 90d · all, mặc định 30d).
  */
 
-import { Hourglass, ShieldCheck } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { count, money } from '../../../shared/utils/format';
 import { RangeTabs } from '../../seller/components/dashboard/SellerDashboardUi';
+import { groupAlerts } from '../alertGroups';
 import { AlertsTable } from '../components/AlertsTable';
+import { AlertVerdict } from '../components/AlertVerdict';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { SourceFooter } from '../components/SourceFooter';
-import { InsightCard, KpiTile, Note } from '../components/ui';
-import { decimal } from '../format';
+import { InsightCard, Note } from '../components/ui';
 import { useInsight } from '../hooks/useInsight';
 import type { AlertPeriod, AnomalyAlerts } from '../types';
 
@@ -42,63 +42,43 @@ export function AlertsPage() {
   return (
     <InsightPage
       title="Cảnh báo bất thường"
-      question="Có ngày nào doanh thu hoặc lượt xem lệch hẳn khỏi mức thường ngày không?"
+      question="Shop của bạn có đang bán ổn không?"
       actions={<RangeTabs<AlertPeriod> value={period} onChange={setPeriod} options={PERIOD_OPTIONS} label="Kỳ xem cảnh báo" />}
     >
       <InsightBlock state={state} onRetry={reload}>
         {(data, meta) => {
-          const alerts = [...data.alerts].sort((a, b) => b.date.localeCompare(a.date) || a.metric.localeCompare(b.metric));
-          const drops = alerts.filter(a => a.direction === 'drop').length;
-          const spikes = alerts.length - drops;
-          const revenue = alerts.filter(a => a.metric === 'revenue').length;
-          const views = alerts.length - revenue;
+          const groups = groupAlerts(data.alerts);
+          const drops = groups.filter(g => g.alert.direction === 'drop');
+          const spikes = groups.filter(g => g.alert.direction === 'spike');
+          const idle = !data.shop_was_analysed && groups.length === 0;
           const t = data.threshold;
-          const idle = !data.shop_was_analysed && alerts.length === 0;
-          const kpi = (n: number) => (idle ? '—' : count(n));
 
           return (
             <div className="space-y-5">
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-                <KpiTile label="Cảnh báo" value={kpi(data.total)} hint={period === 'all' ? 'Trên toàn bộ lịch sử' : `Trong ${period.replace('d', ' ngày')} gần nhất`} />
-                <KpiTile label="Tụt xuống" value={kpi(drops)} hint="Thấp hơn mức thường" />
-                <KpiTile label="Vọt lên" value={kpi(spikes)} hint="Cao hơn mức thường" />
-                <KpiTile label="Doanh thu" value={kpi(revenue)} hint="Cảnh báo theo doanh thu" />
-                <KpiTile label="Lượt xem" value={kpi(views)} hint="Cảnh báo theo lượt xem" />
-              </div>
+              <AlertVerdict groups={groups} idle={idle} limitation={data.limitation} />
 
-              <InsightCard
-                title={alerts.length > 0 ? `${alerts.length} cảnh báo` : idle ? 'Chưa đủ dữ liệu để dò bất thường' : 'Không có cảnh báo nào'}
-                description="Sắp xếp theo ngày mới nhất trước."
-                bodyClassName={alerts.length > 0 ? 'px-4 py-3' : 'p-4'}
-                footer={<SourceFooter meta={meta} limitation={data.limitation} />}
-              >
-                {alerts.length === 0 ? (
-                  <div className="flex items-start gap-3">
-                    <span className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${idle ? 'bg-stone-100 text-stone-500' : 'bg-[#EAF0E2] text-[#005B00]'}`} aria-hidden>
-                      {idle ? <Hourglass size={18} /> : <ShieldCheck size={18} />}
-                    </span>
-                    <div>
-                      <p className="m-0 text-sm font-bold text-stone-800">
-                        {idle ? 'Chưa kết luận được gì cho shop này.' : 'Không có cảnh báo nào. Đó là tin tốt.'}
-                      </p>
-                      <p className="mb-0 mt-1 text-xs leading-relaxed text-stone-500">
-                        {data.shop_was_analysed
-                          ? 'Shop đã được phân tích đầy đủ trong kỳ này, nghĩa là doanh thu và lượt xem đi theo nhịp thường ngày.'
-                          : data.limitation ?? 'Chưa phân tích được shop trong kỳ này, nên chưa kết luận được. Thử chọn kỳ dài hơn.'}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <AlertsTable alerts={alerts} />
-                )}
-              </InsightCard>
+              {drops.length > 0 && (
+                <InsightCard title={`Cần chú ý (${drops.length})`} description="Lúc shop bán ít hoặc ít người xem hơn hẳn mọi khi." bodyClassName="px-4 py-1">
+                  <AlertsTable groups={drops} />
+                </InsightCard>
+              )}
 
-              <InsightCard title="Quy tắc báo động">
+              {spikes.length > 0 && (
+                <InsightCard title={`Tăng đột biến (${spikes.length})`} description="Thường nhờ dịp lễ, quảng cáo hoặc được chia sẻ. Bạn không cần làm gì." bodyClassName="px-4 py-1">
+                  <AlertsTable groups={spikes} />
+                </InsightCard>
+              )}
+
+              <details className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
+                <summary className="cursor-pointer font-semibold text-stone-800">Hệ thống báo khi nào?</summary>
                 <Note>
-                  Cảnh báo khi điểm z vượt ±{decimal(t.z, 1)}, lệch ít nhất {count(t.min_change_pct)}% và (doanh thu) ít nhất{' '}
-                  {money(t.min_change_vnd)}; tối đa {count(t.weekly_cap)} thông báo mỗi tuần.
+                  Mỗi sáng, hệ thống so ngày hôm qua với 4 tuần gần nhất của shop. Bạn nhận thông báo khi lệch từ{' '}
+                  {count(t.min_change_pct)}% (doanh thu phải lệch từ {money(t.min_change_vnd)}). Tối đa {count(t.weekly_cap)} thông
+                  báo mỗi tuần; nhiều ngày liền không có đơn chỉ báo một lần.
                 </Note>
-              </InsightCard>
+              </details>
+
+              <SourceFooter meta={meta} limitation={data.limitation} />
             </div>
           );
         }}

@@ -7,10 +7,12 @@ const DAY = 86_400_000;
 export function statusNote(v: Item, now = Date.now()): string {
   const end = v.end_date ? new Date(v.end_date).getTime() : null;
   switch (v.status) {
-    case 'unused': return '0 lượt dùng';
-    case 'low': return `mới dùng ${Math.round((v.used / v.limit) * 100)}% lượt`;
+    case 'new': return v.age_days ? `mới chạy ${v.age_days} ngày` : 'mới tạo hôm nay';
+    case 'unused': return v.age_days ? `0 lượt sau ${v.age_days} ngày` : '0 lượt dùng';
+    case 'low': return `${v.used}/${v.limit} lượt sau ${v.age_days ?? '?'} ngày, chậm hơn dự kiến`;
+    case 'running_out': return `còn ${v.limit - v.used} lượt, khoảng ${v.sold_out_in} ngày nữa hết`;
     case 'expiring': return end ? `còn ${Math.max(0, Math.ceil((end - now) / DAY))} ngày` : '';
-    case 'ended': return end !== null && end < now ? 'đã quá hạn' : 'shop đã tắt';
+    case 'ended': return v.expired ? 'đã quá hạn' : v.limit && v.used >= v.limit ? 'đã hết lượt' : 'shop đã tắt';
     default: return '';
   }
 }
@@ -18,7 +20,9 @@ export function statusNote(v: Item, now = Date.now()): string {
 export function idleNote(items: Item[]): string {
   const unused = items.filter(v => v.status === 'unused').length;
   const low = items.filter(v => v.status === 'low').length;
-  return [unused && `${unused} chưa ai dùng`, low && `${low} dùng dưới 20% lượt`].filter(Boolean).join(', ') || 'Mã nào cũng có người dùng';
+  const fresh = items.filter(v => v.status === 'new').length;
+  return [unused && `${unused} chưa ai dùng`, low && `${low} dùng chậm so với thời gian chạy`, fresh && `${fresh} mới chạy, chưa đánh giá`]
+    .filter(Boolean).join(', ') || 'Mã nào cũng dùng đều';
 }
 
 const vnd = (n: number) => `${n.toLocaleString('vi-VN')}đ`;

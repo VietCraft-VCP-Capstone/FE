@@ -55,7 +55,7 @@ export interface MoneyAdvice { source: 'llm' | 'none'; provider: string | null; 
 
 export type AdviceKey = 'next_voucher';
 
-export type VoucherStatus = 'ok' | 'unused' | 'low' | 'expiring' | 'ended';
+export type VoucherStatus = 'ok' | 'new' | 'unused' | 'low' | 'running_out' | 'expiring' | 'ended';
 
 export interface VoucherStock {
   total: number;
@@ -63,8 +63,8 @@ export interface VoucherStock {
   used: number;
   limit: number;
   idle: number;
-  items: { code: string; title: string; type: string; value: number; used: number; limit: number; orders_in_range: number; end_date: string | null; status: VoucherStatus }[];
-  suggest: { type: string; action?: 'keep' | 'reactivate' | 'create'; code?: string | null; reason: string; points?: string[]; draft?: VoucherDraft | null } | null;
+  items: { code: string; title: string; type: string; value: number; used: number; limit: number; orders_in_range: number; age_days: number | null; sold_out_in: number | null; end_date: string | null; expired: boolean; status: VoucherStatus }[];
+  suggest: { type: string; action?: 'reactivate' | 'create'; code?: string | null; reason: string; points?: string[]; draft?: VoucherDraft | null } | null;
 }
 
 export interface VoucherDraft {
