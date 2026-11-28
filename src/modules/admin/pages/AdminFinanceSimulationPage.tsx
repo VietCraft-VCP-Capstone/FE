@@ -1,7 +1,27 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Tooltip } from 'antd';
-import { HelpCircle, Loader2, Lock, Plus, RefreshCw, Save, Trash2, TrendingDown, TrendingUp, Undo2 } from 'lucide-react';
+import {
+  CreditCard,
+  Gauge,
+  HelpCircle,
+  Loader2,
+  Lock,
+  type LucideIcon,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Save,
+  Scale,
+  Server,
+  SlidersHorizontal,
+  Split,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+  Undo2,
+  Wallet,
+} from 'lucide-react';
 
 import {
   adminFinanceService,
@@ -12,7 +32,7 @@ import {
   TrendMonth,
 } from '../services/adminFinanceService';
 import { SCENARIOS, SimInput, profitBars, sensitivity, simulate } from '../services/financeSimulation';
-import { Alert, SegmentedControl } from '../components/AdminPrimitives';
+import { Alert, PageHeader, SegmentedControl, StatusPill } from '../components/AdminPrimitives';
 import {
   BTN_PRIMARY,
   BTN_SECONDARY,
@@ -39,9 +59,15 @@ import {
   monthLabel,
 } from '../components/finance/FinanceCharts';
 import { SERIES } from '../../../shared/components/charts/chartTheme';
-import { compactMoney, count, money } from '../../../shared/utils/format';
+import { count, money } from '../../../shared/utils/format';
 
-export type FinanceSection = 'tong-quan' | 'mo-phong' | 'chi-phi';
+type FinanceSection = 'tong-quan' | 'mo-phong' | 'chi-phi';
+
+const SECTIONS: { value: FinanceSection; label: string }[] = [
+  { value: 'tong-quan', label: 'Tổng quan' },
+  { value: 'mo-phong', label: 'Mô phỏng' },
+  { value: 'chi-phi', label: 'Chi phí vận hành' },
+];
 
 type RangeKey = '7' | '30' | 'thang-nay' | 'thang-truoc' | '90' | '365' | 'tuy-chon';
 
@@ -113,8 +139,9 @@ function pct(v: number | null | undefined, digits = 1): string {
   return `${(v * 100).toLocaleString('vi-VN', { maximumFractionDigits: digits })}%`;
 }
 
+// Dấu trừ thật "−" giống nhãn biểu đồ.
 function signedMoney(v: number): string {
-  return v > 0 ? `+${money(v)}` : money(v);
+  return v > 0 ? `+${money(v)}` : v < 0 ? `−${money(-v)}` : money(0);
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -191,7 +218,10 @@ function savedNotice(before: FinanceOverview | null, after: FinanceOverview | nu
 const GLOSSARY: [string, string][] = [
   ['Tổng tiền hàng (GMV)', 'Tổng giá trị hàng bán qua sàn. Đây là tiền của người bán, sàn chỉ giữ hộ.'],
   ['Hoa hồng', 'Phần sàn thu trên mỗi đơn (mặc định 5% tiền người bán muốn nhận, cộng vào giá khách trả).'],
+  ['Voucher sàn', 'Mã giảm giá do sàn tài trợ: khách được giảm nhưng người bán vẫn nhận đủ, sàn bù phần chênh.'],
   ['Doanh thu thuần', 'Hoa hồng trừ phần voucher sàn bù cho khách — phần thật sự thuộc về sàn.'],
+  ['Phí cổng thanh toán', 'Phí cổng (và phí thu hộ COD) tính trên toàn bộ tiền khách trả, gồm cả ship.'],
+  ['Thất thoát do hoàn tiền', 'Đơn bị hoàn: cổng không trả lại phí đã thu, và sàn không thu được hoa hồng của đơn đó.'],
   ['Take rate', 'Doanh thu thuần chia tổng tiền hàng: sàn giữ được bao nhiêu % trên mỗi đồng hàng bán ra.'],
   ['Biến phí', 'Chi phí sinh ra theo từng đơn: phí cổng thanh toán, tin nhắn, phí cổng mất ở đơn hoàn.'],
   ['Chi phí cố định (định phí)', 'Trả mỗi tháng dù không bán được gì: server, tên miền, hosting…'],
@@ -237,49 +267,85 @@ function Delta({ value, format }: { value: number | null; format: (v: number) =>
   );
 }
 
-function Tile({
+type Tone = 'good' | 'bad' | undefined;
+const TONE_INK = (tone: Tone) => (tone === 'good' ? 'text-admin-brand' : tone === 'bad' ? 'text-[#b91c1c]' : 'text-admin-ink');
+const toneOf = (v: number | null | undefined): Tone => (v === null || v === undefined ? undefined : v < 0 ? 'bad' : 'good');
+
+const LABEL = 'flex items-center text-[12px] font-semibold text-admin-muted';
+
+/** Một ô trong dải chỉ số; các ô ngăn nhau bằng khe 1px của nền viền (gap-px) nên xếp mấy cột cũng đều. */
+function Kpi({
   label,
   term,
   value,
   tone,
   delta,
-  children,
+  sub,
 }: {
   label: string;
   term?: string;
   value: string;
-  tone?: 'good' | 'bad';
+  tone?: Tone;
   delta?: React.ReactNode;
-  children?: React.ReactNode;
+  sub?: React.ReactNode;
 }) {
   return (
-    <div className={cx(CARD, 'px-[18px] py-4')}>
-      <div className="text-[12.5px] font-semibold text-admin-muted">
+    <div className="min-w-0 bg-admin-surface px-5 py-4">
+      <div className={LABEL}>
         {label}
         {term && <Hint term={term} />}
       </div>
-      <div
-        className={cx(
-          'mt-1.5 text-[23px] font-extrabold leading-none',
-          tone === 'good' ? 'text-admin-brand' : tone === 'bad' ? 'text-[#b91c1c]' : 'text-admin-ink'
-        )}
-      >
-        {value}
+      <div className={cx('mt-1.5 text-[22px] font-bold leading-tight tracking-[-0.01em]', TONE_INK(tone))}>{value}</div>
+      {delta && <div className="mt-1">{delta}</div>}
+      {sub && <div className="mt-0.5 text-[12px] text-admin-muted">{sub}</div>}
+    </div>
+  );
+}
+
+/** Ô kết quả của tab Mô phỏng; ô nhấn mạnh được tô nền theo lãi/lỗ. */
+function Metric({
+  label,
+  term,
+  value,
+  tone,
+  sub,
+  emphasis,
+}: {
+  label: string;
+  term?: string;
+  value: string;
+  tone?: Tone;
+  sub?: React.ReactNode;
+  emphasis?: boolean;
+}) {
+  const box =
+    emphasis && tone === 'bad'
+      ? 'border-[#f6caca] bg-admin-danger-050'
+      : emphasis && tone === 'good'
+        ? 'border-[#b7e0b7] bg-admin-brand-050'
+        : 'border-admin-line bg-admin-surface';
+  return (
+    <div className={cx('rounded-admin border px-4 py-3', box)}>
+      <div className={LABEL}>
+        {label}
+        {term && <Hint term={term} />}
       </div>
-      {delta && <div className="mt-2">{delta}</div>}
-      {children && <div className="mt-1.5 text-[12px] leading-[1.5] text-admin-muted">{children}</div>}
+      <div className={cx('mt-1 text-[22px] font-bold leading-tight tracking-[-0.01em]', TONE_INK(tone))}>{value}</div>
+      {sub && <div className="mt-0.5 text-[12px] text-admin-muted">{sub}</div>}
     </div>
   );
 }
 
 function Panel({
   title,
+  icon: Icon,
   sub,
   actions,
   className,
   children,
 }: {
   title: string;
+  icon?: LucideIcon;
   sub?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
@@ -288,9 +354,16 @@ function Panel({
   return (
     <section className={cx(CARD, 'mb-5', className)}>
       <div className={CARD_HEADER}>
-        <div className="min-w-0">
-          <h2 className="m-0 text-[15px] font-bold text-admin-ink">{title}</h2>
-          {sub && <p className="m-0 mt-0.5 text-[12px] text-admin-muted">{sub}</p>}
+        <div className="flex min-w-0 items-center gap-3">
+          {Icon && (
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-admin-brand-050 text-admin-brand" aria-hidden>
+              <Icon size={16} />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h2 className="m-0 text-[15px] font-bold text-admin-ink">{title}</h2>
+            {sub && <p className="m-0 mt-0.5 text-[12px] text-admin-muted">{sub}</p>}
+          </div>
         </div>
         {actions}
       </div>
@@ -384,12 +457,15 @@ function SimField({
 interface FlowRow {
   label: string;
   term?: string;
-  note: string;
+  note?: string;
   value: number;
   kind: 'in' | 'out' | 'sum';
 }
 
-/** Bảng số đi kèm biểu đồ thác nước: mỗi dòng có câu giải thích. */
+// Cùng màu với cột tương ứng trong biểu đồ thác nước để mắt nối bảng với cột.
+const FLOW_DOT = { in: SERIES.green, out: SERIES.red, sum: '#9ca3af' };
+
+/** Bảng số đi kèm biểu đồ thác nước. */
 function MoneyFlow({ rows }: { rows: FlowRow[] }) {
   return (
     <ul className="m-0 list-none p-0">
@@ -407,22 +483,24 @@ function MoneyFlow({ rows }: { rows: FlowRow[] }) {
           <li
             key={r.label}
             className={cx(
-              'flex items-start justify-between gap-4 border-t border-admin-line-soft px-[18px] py-2.5',
+              'flex items-start justify-between gap-4 border-b border-admin-line-soft px-[18px] py-2 last:border-b-0',
               sum && 'bg-[#fafcfa]'
             )}
           >
-            <div className="min-w-0 [overflow-wrap:anywhere]">
-              <div className={cx('text-[13.5px] text-admin-ink', sum ? 'font-bold' : 'font-semibold')}>
-                {r.label}
-                {r.term && <Hint term={r.term} />}
+            <div className="flex min-w-0 gap-2.5 [overflow-wrap:anywhere]">
+              <span className="mt-[5px] h-2 w-2 shrink-0 rounded-[2px]" style={{ backgroundColor: FLOW_DOT[r.kind] }} aria-hidden />
+              <div className="min-w-0">
+                <div className={cx('text-[13px] text-admin-ink', sum ? 'font-bold' : 'font-medium')}>
+                  {r.label}
+                  {r.term && <Hint term={r.term} />}
+                </div>
+                {r.note && <div className="text-[11.5px] leading-[1.45] text-admin-muted">{r.note}</div>}
               </div>
-              <div className="text-[12px] leading-[1.5] text-admin-muted">{r.note}</div>
             </div>
             <div
               className={cx(
-                'shrink-0 text-right text-[14px] tabular-nums',
-                sum ? 'font-extrabold' : 'font-semibold text-admin-ink',
-                sum && (r.value < 0 ? 'text-[#b91c1c]' : 'text-admin-brand')
+                'shrink-0 text-right text-[13.5px] tabular-nums',
+                sum ? cx('font-bold', TONE_INK(toneOf(r.value))) : 'font-medium text-admin-ink'
               )}
             >
               {text}
@@ -434,88 +512,147 @@ function MoneyFlow({ rows }: { rows: FlowRow[] }) {
   );
 }
 
-const VERDICT_TONE = {
-  good: { box: 'border-[#b7e0b7] bg-admin-brand-050', ink: 'text-admin-brand-700' },
-  warn: { box: 'border-[#fdba74] bg-[#fff7ed]', ink: 'text-[#9a3412]' },
-  bad: { box: 'border-[#f6caca] bg-admin-danger-050', ink: 'text-[#b91c1c]' },
-};
+const STATUS = {
+  good: { pill: 'brand', label: 'Có lãi', bar: SERIES.green },
+  warn: { pill: 'warn', label: 'Đang lỗ', bar: SERIES.red },
+  bad: { pill: 'danger', label: 'Lỗ theo từng đơn', bar: SERIES.red },
+  none: { pill: 'neutral', label: 'Chưa có đơn', bar: SERIES.red },
+} as const;
 
-/** Kết luận đầu trang: một câu kết quả, rồi vì sao, trụ được bao lâu và nên làm gì tiếp. */
-function Verdict({ o, cash }: { o: FinanceOverview; cash: number }) {
-  const when = periodText(o.period);
-  const When = when[0].toUpperCase() + when.slice(1);
+/** Đầu trang: lãi/lỗ ròng và tiến độ tới hòa vốn, kèm một câu vì sao và việc nên làm. Mỗi số chỉ xuất hiện ở đây. */
+function Summary({ o, cash }: { o: FinanceOverview; cash: number }) {
   const profit = o.pnl.net_profit;
   const be = o.monthly.break_even_orders;
   const perMonth = o.monthly.orders;
   const cpo = o.contribution_per_order ?? 0;
   const runway = o.monthly.runway_months;
+  const reach = be ? Math.min(100, (perMonth / be) * 100) : 0;
+  const state: keyof typeof STATUS = !o.orders.paid ? 'none' : profit >= 0 ? 'good' : be === null ? 'bad' : 'warn';
+  const s = STATUS[state];
   const tab = (key: string, text: string) => (
-    <Link to={`/admin/finance?tab=${key}`} className="font-semibold text-admin-brand">
+    <Link to={`/admin/finance?tab=${key}`} className="font-semibold text-admin-brand hover:underline">
       {text}
     </Link>
   );
+
+  const why =
+    state === 'none'
+      ? 'Chưa có đơn đã thanh toán trong kỳ; tab Mô phỏng đang dùng số giả định.'
+      : state === 'good'
+        ? `Đạt khoảng ${count(perMonth)} đơn/tháng, vượt mức hòa vốn ${count(be ?? 0)} đơn.`
+        : state === 'bad'
+          ? `${cpo < 0 ? `Mỗi đơn làm sàn lỗ thêm ${money(-cpo)}` : 'Mỗi đơn không góp được đồng nào'} vì phí cổng, voucher sàn và hoàn tiền lớn hơn hoa hồng — bán thêm cũng không hòa vốn.`
+          : `Mỗi đơn góp ${money(cpo)} để trả chi phí cố định ${money(o.monthly.fixed_costs)}/tháng.`;
+  const advice =
+    state === 'good' ? (
+      <>Thử kịch bản Bi quan ở tab {tab('mo-phong', 'Mô phỏng')} để xem nếu đơn giảm thì còn lãi không.</>
+    ) : state === 'bad' ? (
+      <>Tăng hoa hồng hoặc giảm voucher sàn; thử trước ở tab {tab('mo-phong', 'Mô phỏng')}.</>
+    ) : (
+      <>Thử tăng số đơn, hoa hồng hoặc giảm chi phí ở tab {tab('mo-phong', 'Mô phỏng')} để xem cách nào giảm lỗ nhiều nhất.</>
+    );
   const lasts =
     runway !== null ? (
       <>
-        Với vốn dự phòng {compactMoney(cash)}, nếu cứ lỗ như vậy sàn trụ được khoảng <b>{months(runway)}</b>.
+        Vốn dự phòng {money(cash)} đủ bù lỗ khoảng <b className="text-admin-ink">{months(runway)}</b>.
       </>
     ) : (
-      <>Chưa biết — nhập vốn dự phòng ở tab {tab('chi-phi', 'Chi phí vận hành')} để biết sàn trụ được bao lâu.</>
+      <>Chưa biết — nhập vốn dự phòng ở tab {tab('chi-phi', 'Chi phí vận hành')}.</>
     );
 
-  let tone: keyof typeof VERDICT_TONE = 'warn';
-  let headline: string;
-  const rows: [string, React.ReactNode][] = [];
-  if (!o.orders.paid) {
-    headline = `Chưa có đơn đã thanh toán ${when}.`;
-    rows.push(['Lưu ý', 'Bảng bên dưới chỉ còn chi phí cố định; phần mô phỏng đang dùng giá trị giả định — hãy sửa cho sát thực tế.']);
-    if (profit < 0) rows.push(['Trụ được', lasts]);
-  } else if (profit >= 0) {
-    tone = 'good';
-    headline = `${When} sàn lãi ${money(profit)} sau mọi chi phí.`;
-    rows.push(['Vì sao', `Cần ${count(be ?? 0)} đơn/tháng để hòa vốn, hiện đạt khoảng ${count(perMonth)} đơn/tháng.`]);
-    rows.push(['Nên làm gì', <>Thử kịch bản Bi quan ở tab {tab('mo-phong', 'Mô phỏng')} để biết nếu đơn giảm thì sàn còn lãi không.</>]);
-  } else if (be === null) {
-    tone = 'bad';
-    headline = `${When} sàn lỗ ${money(-profit)}.`;
-    rows.push([
-      'Vì sao',
-      `${cpo < 0 ? `Mỗi đơn đang làm sàn lỗ thêm ${money(-cpo)}` : 'Mỗi đơn không góp được đồng nào'} vì phí cổng, voucher sàn và hoàn tiền lớn hơn hoa hồng — bán thêm cũng không hòa vốn được.`,
-    ]);
-    rows.push(['Trụ được', lasts]);
-    rows.push(['Nên làm gì', <>Tăng hoa hồng hoặc giảm voucher sàn; thử trước ở tab {tab('mo-phong', 'Mô phỏng')}.</>]);
-  } else {
-    headline = `${When} sàn lỗ ${money(-profit)}.`;
-    rows.push([
-      'Vì sao',
-      <>
-        Mỗi đơn góp {money(cpo)} để trả chi phí cố định {compactMoney(o.monthly.fixed_costs)}/tháng, nên cần{' '}
-        <b>{count(be)} đơn/tháng</b> để hòa vốn — hiện khoảng {count(perMonth)} đơn/tháng, còn thiếu{' '}
-        {count(Math.max(0, be - perMonth))}.
-      </>,
-    ]);
-    rows.push(['Trụ được', lasts]);
-    rows.push([
-      'Nên làm gì',
-      <>
-        Vào tab {tab('mo-phong', 'Mô phỏng')} thử tăng số đơn, tăng hoa hồng hoặc giảm voucher sàn, chi phí cố định —
-        xem cách nào giảm lỗ nhiều nhất.
-      </>,
-    ]);
-  }
-  const t = VERDICT_TONE[tone];
   return (
-    <section aria-label="Kết luận" className={cx('mb-4 rounded-admin border px-[18px] py-3.5', t.box)}>
-      <p className={cx('m-0 text-[15px] font-bold', t.ink)}>{headline}</p>
-      <dl className="m-0 mt-2 grid grid-cols-1 gap-x-4 text-[13px] leading-[1.55] sm:grid-cols-[88px_minmax(0,1fr)] sm:gap-y-1">
-        {rows.map(([k, v]) => (
-          <React.Fragment key={k}>
-            <dt className={cx('font-bold', t.ink)}>{k}</dt>
-            <dd className="m-0 mb-1.5 text-admin-body sm:mb-0">{v}</dd>
-          </React.Fragment>
-        ))}
+    <section aria-label="Kết luận" className={cx(CARD, 'mb-4')}>
+      <div className="grid grid-cols-1 gap-px bg-admin-line lg:grid-cols-2">
+        <div className="bg-admin-surface px-5 py-[18px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={LABEL}>
+              Lãi/lỗ ròng {periodText(o.period)}
+              <Hint term="Lãi/lỗ ròng" />
+            </span>
+            <StatusPill tone={s.pill}>{s.label}</StatusPill>
+          </div>
+          <div className={cx('mt-2 text-[34px] font-bold leading-none tracking-[-0.02em]', TONE_INK(toneOf(profit)))}>
+            {signedMoney(profit)}
+          </div>
+          <div className="mt-2">
+            <Delta value={profit - o.previous.net_profit} format={signedMoney} />
+          </div>
+          <p className="mb-0 mt-3 max-w-[60ch] text-[13px] leading-[1.55] text-admin-body">{why}</p>
+        </div>
+
+        <div className="bg-admin-surface px-5 py-[18px]">
+          <span className={LABEL}>
+            Đơn mỗi tháng so với mức hòa vốn
+            <Hint term="Hòa vốn" />
+          </span>
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+            <span className="text-[34px] font-bold leading-none tracking-[-0.02em] text-admin-ink">{count(perMonth)}</span>
+            <span className="text-[15px] font-semibold text-admin-muted">/ {be === null ? '—' : count(be)} đơn</span>
+          </div>
+          <div
+            className="mt-3 h-2.5 overflow-hidden rounded-full bg-admin-line-soft"
+            role="progressbar"
+            aria-label="Tiến độ tới hòa vốn"
+            aria-valuenow={Math.floor(reach)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className="h-full rounded-full" style={{ width: `${reach}%`, backgroundColor: reach >= 100 ? SERIES.green : s.bar }} />
+          </div>
+          <p className="mb-0 mt-2.5 text-[13px] leading-[1.55] text-admin-body">
+            {be === null ? (
+              'Không thể hòa vốn ở mức phí hiện tại.'
+            ) : perMonth >= be ? (
+              <>Đã vượt hòa vốn, biên an toàn <b className="text-admin-ink">{pct(o.monthly.margin_of_safety)}</b>.</>
+            ) : (
+              <>
+                Đạt {Math.floor(reach)}% — còn thiếu <b className="text-admin-ink">{count(be - perMonth)} đơn/tháng</b>
+                {o.monthly.break_even_gmv !== null && <>, tức khoảng {money(o.monthly.break_even_gmv)} tiền hàng/tháng</>}.
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      <dl className="m-0 grid grid-cols-1 gap-x-8 gap-y-1.5 border-t border-admin-line bg-[#fafcfa] px-5 py-3 text-[12.5px] leading-[1.55] lg:grid-cols-2">
+        {profit < 0 && (
+          <div className="flex gap-2">
+            <dt className="shrink-0 font-bold text-admin-ink">Trụ được:</dt>
+            <dd className="m-0 text-admin-body">{lasts}</dd>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <dt className="shrink-0 font-bold text-admin-ink">Nên làm gì:</dt>
+          <dd className="m-0 text-admin-body">{advice}</dd>
+        </div>
       </dl>
     </section>
+  );
+}
+
+/** Tab gạch chân giữa các mục của trang; tab nằm trên URL (?tab=...) để tải lại hay mở link vẫn đúng mục. */
+function SectionTabs({ value, onChange }: { value: FinanceSection; onChange: (v: FinanceSection) => void }) {
+  return (
+    <div role="tablist" aria-label="Mục tài chính" className="mb-5 flex gap-1 overflow-x-auto border-b border-admin-line">
+      {SECTIONS.map(opt => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.value)}
+            className={cx(
+              '-mb-px cursor-pointer whitespace-nowrap border-0 border-b-2 border-solid bg-transparent px-4 py-2.5 text-[14px] font-semibold transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-admin-brand motion-reduce:transition-none',
+              active ? 'border-admin-brand text-admin-brand' : 'border-transparent text-admin-muted hover:text-admin-ink'
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -539,7 +676,9 @@ function Glossary() {
 
 /* ------------------------------------------------------------------ Trang */
 
-export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?: FinanceSection }) {
+export function AdminFinanceSimulationPage() {
+  const [params, setParams] = useSearchParams();
+  const section = SECTIONS.find(s => s.value === params.get('tab'))?.value ?? 'tong-quan';
   const [range, setRange] = useState<RangeKey>('30');
   const [query, setQuery] = useState<OverviewQuery>({ days: 30 });
   const [custom, setCustom] = useState({ from: '', to: '' });
@@ -639,9 +778,20 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
     }
   };
 
+  const header = (
+    <>
+      <PageHeader
+        title="Tài chính"
+        description="Sàn thu bao nhiêu, tốn bao nhiêu và cần bán bao nhiêu đơn để hòa vốn. Chỉ tính đơn đã thanh toán."
+      />
+      <SectionTabs value={section} onChange={v => setParams(v === 'tong-quan' ? {} : { tab: v })} />
+    </>
+  );
+
   if (loading && !overview) {
     return (
       <div className={PAGE}>
+        {header}
         <div className="flex items-center gap-2.5 py-16 text-[13.5px] text-admin-muted">
           <Loader2 size={18} className="animate-spin" aria-hidden /> Đang tính số liệu tài chính…
         </div>
@@ -662,81 +812,52 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
   const renderOverview = (o: FinanceOverview) => {
     const days = o.period.days;
     const prev = o.previous;
-    const be = o.monthly.break_even_orders;
-    const reach = be ? Math.min(100, (o.monthly.orders / be) * 100) : 0;
     const cpo = o.contribution_per_order;
     const prevCpo = prev.orders ? Math.round(prev.contribution / prev.orders) : null;
-    const pctFormat = (v: number) => `${v > 0 ? '+' : ''}${v.toLocaleString('vi-VN')}%`;
+    const pctFormat = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toLocaleString('vi-VN')}%`;
     const feeRate = o.gmv > 0 ? o.pnl.commission / o.gmv : o.commission_percent / (100 + o.commission_percent);
+    const mix = o.payment_mix.filter(m => m.orders);
     const flow: FlowRow[] = [
       {
         label: 'Hoa hồng thu được',
         term: 'Hoa hồng',
-        note: `${count(o.orders.paid)} đơn đã thanh toán. Tổng tiền hàng ${compactMoney(o.gmv)} là tiền của người bán — sàn chỉ giữ hộ.`,
+        note: `${count(o.orders.paid)} đơn đã thanh toán`,
         value: o.pnl.commission,
         kind: 'in',
       },
-      {
-        label: 'Voucher sàn tài trợ',
-        note: 'Mã giảm giá của sàn: khách được giảm nhưng người bán vẫn nhận đủ, sàn bù phần chênh.',
-        value: o.pnl.platform_voucher,
-        kind: 'out',
-      },
-      {
-        label: 'Doanh thu thuần của sàn',
-        term: 'Doanh thu thuần',
-        note: '= Hoa hồng − voucher sàn. Phần thật sự thuộc về sàn.',
-        value: o.pnl.net_revenue,
-        kind: 'sum',
-      },
+      { label: 'Voucher sàn tài trợ', term: 'Voucher sàn', value: o.pnl.platform_voucher, kind: 'out' },
+      { label: 'Doanh thu thuần', term: 'Doanh thu thuần', value: o.pnl.net_revenue, kind: 'sum' },
       {
         label: 'Phí cổng thanh toán',
-        note:
-          `Tính trên toàn bộ tiền khách trả (gồm ship) ${compactMoney(o.paid_amount)}` +
-          (o.orders.paid
-            ? ` — ${o.payment_mix
-                .filter(m => m.orders)
-                .map(m => `${m.name} ${count(m.orders)} đơn`)
-                .join(' · ')}.`
-            : '.'),
+        term: 'Phí cổng thanh toán',
+        note: mix.length ? mix.map(m => `${m.name} ${count(m.orders)}`).join(' · ') + ' đơn' : undefined,
         value: o.pnl.payment_fees,
         kind: 'out',
       },
       {
         label: 'Thất thoát do hoàn tiền',
+        term: 'Thất thoát do hoàn tiền',
         note: o.orders.refunded
-          ? `${count(o.orders.refunded)} đơn đã hoàn: cổng không trả lại phí đã thu. Hoa hồng ${compactMoney(o.refunded_commission)} của các đơn này cũng không thu được.`
-          : 'Kỳ này không có đơn hoàn tiền.',
+          ? `${count(o.orders.refunded)} đơn hoàn, mất hoa hồng ${money(o.refunded_commission)}`
+          : 'Không có đơn hoàn',
         value: o.pnl.refund_losses,
         kind: 'out',
       },
       {
         label: 'Gửi thông báo email/SMS',
-        note: `${count(o.orders.paid + o.orders.refunded)} đơn × ${money(o.baseline.notification_per_order)}.`,
+        note: `${count(o.orders.paid + o.orders.refunded)} đơn × ${money(o.baseline.notification_per_order)}`,
         value: o.pnl.notification,
         kind: 'out',
       },
-      {
-        label: 'Lãi góp',
-        term: 'Lãi góp',
-        note: '= Doanh thu thuần − phí cổng − hoàn tiền − thông báo. Còn lại để trả chi phí cố định.',
-        value: o.pnl.contribution,
-        kind: 'sum',
-      },
+      { label: 'Lãi góp', term: 'Lãi góp', value: o.pnl.contribution, kind: 'sum' },
       {
         label: 'Chi phí cố định',
         term: 'Chi phí cố định (định phí)',
-        note: `${money(o.monthly.fixed_costs)}/tháng, tính cho ${days} ngày.`,
+        note: `${money(o.monthly.fixed_costs)}/tháng × ${days} ngày`,
         value: o.pnl.fixed_costs,
         kind: 'out',
       },
-      {
-        label: 'Lãi/lỗ ròng',
-        term: 'Lãi/lỗ ròng',
-        note: '= Lãi góp − chi phí cố định. Sau mọi chi phí.',
-        value: o.pnl.net_profit,
-        kind: 'sum',
-      },
+      { label: 'Lãi/lỗ ròng', term: 'Lãi/lỗ ròng', value: o.pnl.net_profit, kind: 'sum' },
     ];
 
     return (
@@ -790,27 +911,16 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
         </div>
 
         <div className={cx('transition-opacity duration-150', loading && 'opacity-60')}>
-          <Verdict o={o} cash={cash} />
+          <Summary o={o} cash={cash} />
 
-          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Tile
-              label="Lãi/lỗ ròng"
-              term="Lãi/lỗ ròng"
-              value={signedMoney(o.pnl.net_profit)}
-              tone={o.pnl.net_profit < 0 ? 'bad' : 'good'}
-              delta={<Delta value={o.pnl.net_profit - prev.net_profit} format={signedMoney} />}
-            >
-              {days} ngày, sau mọi chi phí
-            </Tile>
-            <Tile
-              label="Doanh thu thuần của sàn"
+          <div className={cx(CARD, 'mb-5 grid grid-cols-1 gap-px bg-admin-line sm:grid-cols-2 xl:grid-cols-4')}>
+            <Kpi
+              label="Doanh thu thuần"
               term="Doanh thu thuần"
               value={money(o.pnl.net_revenue)}
               delta={<Delta value={changePercent(o.pnl.net_revenue, prev.net_revenue)} format={pctFormat} />}
-            >
-              Bằng {pct(o.take_rate)} tổng tiền hàng {compactMoney(o.gmv)}
-            </Tile>
-            <Tile
+            />
+            <Kpi
               label="Lãi góp mỗi đơn"
               term="Lãi góp"
               value={cpo === null ? '—' : signedMoney(cpo)}
@@ -821,56 +931,44 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                   format={v => `${signedMoney(v)}/đơn`}
                 />
               }
-            >
-              Phần mỗi đơn còn lại để trả chi phí cố định
-            </Tile>
-            <Tile
-              label="Đơn mỗi tháng / cần để hòa vốn"
-              term="Hòa vốn"
-              value={`${count(o.monthly.orders)} / ${be === null ? '—' : count(be)}`}
-              delta={<Delta value={changePercent(o.orders.paid, prev.orders)} format={v => `${pctFormat(v)} số đơn`} />}
-            >
-              <div className="mb-1.5 h-2 rounded-full bg-admin-line-soft" aria-hidden>
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${reach}%`, backgroundColor: reach >= 100 ? SERIES.green : SERIES.red }}
-                />
-              </div>
-              {be === null
-                ? 'Không thể hòa vốn ở mức phí hiện tại'
-                : o.monthly.orders >= be
-                  ? `Vượt điểm hòa vốn, biên an toàn ${pct(o.monthly.margin_of_safety)}`
-                  : `Còn thiếu ${count(be - o.monthly.orders)} đơn/tháng (mới đạt ${Math.floor(reach)}%)`}
-              {o.monthly.break_even_gmv !== null && (
-                <> · tức khoảng {compactMoney(o.monthly.break_even_gmv)} tiền hàng/tháng</>
-              )}
-            </Tile>
+            />
+            <Kpi
+              label="Đơn đã thanh toán"
+              value={count(o.orders.paid)}
+              delta={<Delta value={changePercent(o.orders.paid, prev.orders)} format={pctFormat} />}
+            />
+            <Kpi
+              label="Tổng tiền hàng (GMV)"
+              term="Tổng tiền hàng (GMV)"
+              value={money(o.gmv)}
+              delta={<Delta value={changePercent(o.gmv, prev.gmv)} format={pctFormat} />}
+              sub={
+                <>
+                  Sàn giữ {pct(o.take_rate)}
+                  <Hint term="Take rate" />
+                </>
+              }
+            />
           </div>
 
-          <Panel
-            title={`Tiền đi đâu ${periodText(o.period)}`}
-            sub="Đọc từ trái sang phải: bắt đầu từ hoa hồng sàn thu, trừ dần từng khoản chi; cột cuối là lãi/lỗ."
-          >
-            <div className="px-[18px] pt-4">
-              <WaterfallChart o={o} />
+          <Panel icon={Receipt} title={`Tiền đi đâu ${periodText(o.period)}`} sub="Từ hoa hồng sàn thu, trừ dần từng khoản chi tới lãi/lỗ ròng.">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+              <div className="min-w-0 px-[18px] pt-4 xl:pb-2">
+                <WaterfallChart o={o} height={380} />
+              </div>
+              <div className="border-t border-admin-line xl:border-l xl:border-t-0">
+                <MoneyFlow rows={flow} />
+              </div>
             </div>
-            <MoneyFlow rows={flow} />
           </Panel>
 
-          <Panel
-            title="Xu hướng 6 tháng gần nhất"
-            sub={
-              <>
-                <b className="font-semibold text-admin-ink">{trendSummary(o.trend)}</b> Tháng nào cột xanh lá (lãi góp) cao
-                hơn cột xanh dương (chi phí cố định) là tháng đó có lãi.
-              </>
-            }
-          >
+          <Panel icon={TrendingUp} title="Xu hướng 6 tháng gần nhất" sub={trendSummary(o.trend)}>
             <div className="px-[18px] pt-4">
               <TrendBars trend={o.trend} />
             </div>
             <p className={cx(FIELD_HINT, 'm-0 px-[18px] pb-3')}>
-              * Tháng này tính đến hôm nay. Chi phí cố định của các tháng trước dùng mức đang cấu hình.
+              Tháng nào cột Lãi góp cao hơn cột Chi phí cố định là tháng đó có lãi. * Tháng này tính đến hôm nay; các tháng
+              trước dùng chi phí cố định đang cấu hình.
             </p>
             <details className="border-t border-admin-line">
               <summary className="cursor-pointer select-none px-[18px] py-3 text-[13px] font-semibold text-admin-ink">
@@ -911,12 +1009,17 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
           </Panel>
 
           <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <Panel title="Một đơn trung bình chia tiền thế nào" className="mb-0">
+            <Panel
+              icon={Split}
+              title="Một đơn trung bình chia tiền thế nào"
+              sub="Tiền khách trả chia cho người bán, vận chuyển và sàn."
+              className="mb-0"
+            >
               <div className="p-[18px]">
                 <OrderSplit o={o} />
               </div>
             </Panel>
-            <Panel title="Phí sàn mỗi đơn so với các sàn lớn" sub={benchmarkSummary(feeRate)} className="mb-0">
+            <Panel icon={Scale} title="Phí sàn mỗi đơn so với các sàn lớn" sub={benchmarkSummary(feeRate)} className="mb-0">
               <div className="px-[18px] pt-3">
                 <BenchmarkChart rate={feeRate} />
               </div>
@@ -959,15 +1062,14 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
     return (
       <>
         <Panel
+          icon={SlidersHorizontal}
           title="Mô phỏng: nếu thay đổi thì sao?"
           sub={
-            <>
-              {SCENARIOS.find(s => s.key === scenario)?.note ?? 'Đang dùng giá trị bạn tự chỉnh'}
-              {o &&
-                (o.orders.paid
-                  ? ` · điểm xuất phát là số thật ${periodText(o.period)} (đổi kỳ ở tab Tổng quan)`
-                  : ' · chưa có đơn trong kỳ nên điểm xuất phát là giả định')}
-            </>
+            scenario === 'base'
+              ? o?.orders.paid
+                ? `Xuất phát từ số thật ${periodText(o.period)} — đổi kỳ ở tab Tổng quan.`
+                : 'Chưa có đơn trong kỳ nên điểm xuất phát là giả định.'
+              : (SCENARIOS.find(s => s.key === scenario)?.note ?? 'Đang dùng giá trị bạn tự chỉnh') + '.'
           }
           actions={
             <div className="flex flex-wrap items-center gap-2">
@@ -1008,9 +1110,9 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                 label="Mức hoa hồng"
                 hint={
                   <>
-                    Chỉ để thử. Muốn áp dụng thật hãy đổi ở tab{' '}
-                    <Link to="/admin/finance?tab=hoa-hong" className="text-admin-brand">
-                      Cấu hình lợi nhuận (%)
+                    Chỉ để thử. Muốn áp dụng thật hãy đổi ở trang{' '}
+                    <Link to="/admin/commission" className="font-semibold text-admin-brand hover:underline">
+                      Cấu hình lợi nhuận
                     </Link>
                     .
                   </>
@@ -1028,7 +1130,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                   Nâng cao{' '}
                   <span className="font-normal text-admin-muted">
                     — phí cổng {pct(sim.paymentFeeRate)}, đơn hoàn {pct(sim.refundRate)}, voucher sàn{' '}
-                    {money(Math.round(sim.voucherPerOrder))}/đơn, chi phí cố định {compactMoney(sim.monthlyFixed)}
+                    {money(Math.round(sim.voucherPerOrder))}/đơn, chi phí cố định {money(Math.round(sim.monthlyFixed))}
                   </span>
                 </summary>
                 <div className="flex flex-col gap-4 border-t border-admin-line p-4">
@@ -1105,78 +1207,57 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
             </div>
 
             <div className="min-w-0">
-              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-admin border border-admin-line px-4 py-3">
-                  <div className="text-[12px] font-semibold text-admin-muted">
-                    Lãi/lỗ mỗi tháng
-                    <Hint term="Lãi/lỗ ròng" />
-                  </div>
-                  <div
-                    className={cx(
-                      'mt-1 text-[20px] font-extrabold',
-                      result.netProfit < 0 ? 'text-[#b91c1c]' : 'text-admin-brand'
-                    )}
-                  >
-                    {signedMoney(Math.round(result.netProfit))}
-                  </div>
-                  <div className="mt-0.5 text-[12px] text-admin-muted">
-                    {vsBase(result.netProfit, baseResult?.netProfit, signedMoney)}
-                  </div>
-                </div>
-                <div className="rounded-admin border border-admin-line px-4 py-3">
-                  <div className="text-[12px] font-semibold text-admin-muted">
-                    Lãi góp mỗi đơn
-                    <Hint term="Lãi góp" />
-                  </div>
-                  <div className="mt-1 text-[20px] font-extrabold text-admin-ink">
-                    {signedMoney(Math.round(result.contributionPerOrder))}
-                  </div>
-                  <div className="mt-0.5 text-[12px] text-admin-muted">
-                    {vsBase(result.contributionPerOrder, baseResult?.contributionPerOrder, v => `${signedMoney(v)}/đơn`)}
-                  </div>
-                </div>
-                <div className="rounded-admin border border-admin-line px-4 py-3">
-                  <div className="text-[12px] font-semibold text-admin-muted">
-                    Cần để hòa vốn mỗi tháng
-                    <Hint term="Hòa vốn" />
-                  </div>
-                  <div className="mt-1 text-[20px] font-extrabold text-admin-ink">
-                    {result.breakEvenOrders === null ? 'Không thể' : `${count(result.breakEvenOrders)} đơn`}
-                  </div>
-                  <div className="mt-0.5 text-[12px] text-admin-muted">
-                    {result.breakEvenGmv !== null && <>≈ {compactMoney(result.breakEvenGmv)} tiền hàng</>}
-                    {baseResult && result.breakEvenOrders !== baseResult.breakEvenOrders && (
-                      <>
-                        {result.breakEvenGmv !== null && ' · '}
-                        {ref}:{' '}
-                        {baseResult.breakEvenOrders === null ? 'không thể' : `${count(baseResult.breakEvenOrders)} đơn`}
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-admin border border-admin-line px-4 py-3">
-                  <div className="text-[12px] font-semibold text-admin-muted">
-                    Vốn dự phòng trụ được
-                    <Hint term="Runway (số tháng trụ được)" />
-                  </div>
-                  <div className="mt-1 text-[20px] font-extrabold text-admin-ink">
-                    {result.netProfit >= 0 ? 'Không hao vốn' : runway !== null ? months(runway) : '—'}
-                  </div>
-                  <div className="mt-0.5 text-[12px] text-admin-muted">
-                    {result.netProfit >= 0 ? (
+              <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Metric
+                  emphasis
+                  label="Lãi/lỗ mỗi tháng"
+                  term="Lãi/lỗ ròng"
+                  value={signedMoney(Math.round(result.netProfit))}
+                  tone={toneOf(result.netProfit)}
+                  sub={vsBase(result.netProfit, baseResult?.netProfit, signedMoney)}
+                />
+                <Metric
+                  label="Lãi góp mỗi đơn"
+                  term="Lãi góp"
+                  value={signedMoney(Math.round(result.contributionPerOrder))}
+                  sub={vsBase(result.contributionPerOrder, baseResult?.contributionPerOrder, v => `${signedMoney(v)}/đơn`)}
+                />
+                <Metric
+                  label="Cần để hòa vốn mỗi tháng"
+                  term="Hòa vốn"
+                  value={result.breakEvenOrders === null ? 'Không thể' : `${count(result.breakEvenOrders)} đơn`}
+                  sub={
+                    <>
+                      {result.breakEvenGmv !== null && <>≈ {money(result.breakEvenGmv)} tiền hàng</>}
+                      {baseResult && result.breakEvenOrders !== baseResult.breakEvenOrders && (
+                        <>
+                          {result.breakEvenGmv !== null && ' · '}
+                          {ref}:{' '}
+                          {baseResult.breakEvenOrders === null ? 'không thể' : `${count(baseResult.breakEvenOrders)} đơn`}
+                        </>
+                      )}
+                    </>
+                  }
+                />
+                <Metric
+                  label="Vốn dự phòng trụ được"
+                  term="Runway (số tháng trụ được)"
+                  value={result.netProfit >= 0 ? 'Không hao vốn' : runway !== null ? months(runway) : '—'}
+                  sub={
+                    result.netProfit >= 0 ? (
                       'Đang có lãi'
                     ) : cash > 0 ? (
-                      `Vốn ${compactMoney(cash)} ÷ lỗ ${compactMoney(-result.netProfit)}/tháng`
+                      `Vốn ${money(cash)} ÷ lỗ ${money(Math.round(-result.netProfit))}/tháng`
                     ) : (
                       <>
                         Nhập vốn ở tab{' '}
-                        <Link to="/admin/finance?tab=chi-phi" className="text-admin-brand">
+                        <Link to="/admin/finance?tab=chi-phi" className="font-semibold text-admin-brand hover:underline">
                           Chi phí vận hành
                         </Link>
                       </>
-                    )}
-                  </div>
-                </div>
+                    )
+                  }
+                />
               </div>
 
               <h3 className="m-0 text-[13.5px] font-bold text-admin-ink">Lãi/lỗ mỗi tháng theo số đơn</h3>
@@ -1192,6 +1273,7 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
         </Panel>
 
         <Panel
+          icon={Gauge}
           title="Yếu tố nào ảnh hưởng mạnh nhất?"
           sub="Đổi từng yếu tố một so với mô phỏng đang xem. Cột đỏ: làm lỗ thêm · cột xanh: làm lãi thêm."
         >
@@ -1246,36 +1328,17 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
 
   /* ---------------------------------------------------------------- Tab Chi phí vận hành */
   const renderCosts = (form: FinanceConfig) => (
-    <Panel
-      title="Chi phí vận hành"
-      sub={
-        <>
-          Nhập theo hóa đơn thật.
-          {config?.updated_at && ` Lưu lần cuối ${new Date(config.updated_at).toLocaleString('vi-VN')}.`}
-        </>
-      }
-      actions={
-        <div className="flex items-center gap-2">
-          <button type="button" className={BTN_SECONDARY} onClick={() => setForm(config)} disabled={!dirty || saving}>
-            <Undo2 size={15} aria-hidden /> Hoàn tác
-          </button>
-          <button
-            type="button"
-            className={BTN_PRIMARY}
-            onClick={() => void save()}
-            disabled={!dirty || formInvalid || saving}
-          >
-            <Save size={15} aria-hidden /> {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
-          </button>
-        </div>
-      }
-    >
-      <div className="grid grid-cols-1 gap-8 p-[18px] xl:grid-cols-2">
-        <div>
-          <h3 className="m-0 text-[13.5px] font-bold text-admin-ink">Chi phí cố định mỗi tháng</h3>
-          <p className={cx(FIELD_HINT, 'mb-3')}>
-            Khoản phải trả dù không có đơn nào: máy chủ, tên miền, Vercel, MongoDB Atlas, Cloudinary, API AI… 4 khoản mặc
-            định (có ổ khóa) chỉ sửa số tiền, dùng gói miễn phí thì để 0. Khoản tự thêm thì sửa và xóa được.
+    <>
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+        <Panel
+          icon={Server}
+          title="Chi phí cố định mỗi tháng"
+          sub="Phải trả dù không có đơn nào: máy chủ, tên miền, Atlas, Cloudinary, API AI…"
+          className="mb-0"
+        >
+        <div className="p-[18px]">
+          <p className={cx(FIELD_HINT, 'mb-3 mt-0')}>
+            Khoản có ổ khóa chỉ sửa số tiền, dùng gói miễn phí thì để 0. Khoản tự thêm thì sửa và xóa được.
           </p>
           <div className="flex flex-col gap-2">
             {form.monthly_costs.map((c, idx) => (
@@ -1327,26 +1390,28 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
             </button>
             <span className="text-[13px] text-admin-muted">
               Tổng{' '}
-              <b className="text-admin-ink tabular-nums">
+              <b className="text-[15px] text-admin-ink">
                 {money(form.monthly_costs.reduce((s, c) => s + (Number(c.amount) || 0), 0))}
               </b>
               /tháng
             </span>
           </div>
           {costsInvalid && <p className="mb-0 mt-2 text-[12px] text-[#b91c1c]">Mỗi khoản cần có tên trước khi lưu.</p>}
-
-          <h3 className="mb-2 mt-6 text-[13.5px] font-bold text-admin-ink">Khoản nào tốn nhất</h3>
+        </div>
+        <div className="border-t border-admin-line px-[18px] py-4">
+          <h3 className="mb-2 mt-0 text-[13px] font-bold text-admin-ink">Khoản nào tốn nhất</h3>
           <CostBarsChart costs={form.monthly_costs} />
         </div>
+        </Panel>
 
-        <div>
-          <h3 className="m-0 text-[13.5px] font-bold text-admin-ink">Phí cổng thanh toán</h3>
-          <p className={cx(FIELD_HINT, 'mb-3')}>
-            Hiện chưa tính phí cổng nên để 0. Khi cổng bắt đầu thu phí thì nhập theo hợp đồng; phí tính trên toàn bộ tiền
-            khách trả. COD là phí thu hộ của đơn vị vận chuyển. Tích hợp cổng mới (vd MoMo) thì bấm <b>Thêm cổng</b>: mã cổng
-            tạo từ tên và phải trùng mã phương thức thanh toán lưu trong đơn hàng.
-          </p>
-          <div className="overflow-x-auto rounded-admin border border-admin-line">
+        <div className="flex flex-col gap-5">
+        <Panel
+          icon={CreditCard}
+          title="Phí cổng thanh toán"
+          sub="Theo hợp đồng, tính trên toàn bộ tiền khách trả. Chưa thu phí thì để 0."
+          className="mb-0"
+        >
+          <div className="overflow-x-auto">
             <table className={TABLE}>
               <thead>
                 <tr>
@@ -1435,34 +1500,45 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
               </tbody>
             </table>
           </div>
-          <button
-            type="button"
-            className={cx(BTN_SECONDARY_SM, 'mt-3')}
-            disabled={form.payment_fees.length >= 10}
-            onClick={() => setForm(f => f && { ...f, payment_fees: [...f.payment_fees, { name: '', rate: 0, fixed: 0 }] })}
-          >
-            <Plus size={14} aria-hidden /> Thêm cổng
-          </button>
-          {gatewaysInvalid && (
-            <p className="mb-0 mt-2 text-[12px] text-[#b91c1c]">Cổng thêm mới cần tên có chữ hoặc số trước khi lưu.</p>
-          )}
+          <div className="border-t border-admin-line px-[18px] py-3">
+            <button
+              type="button"
+              className={BTN_SECONDARY_SM}
+              disabled={form.payment_fees.length >= 10}
+              onClick={() => setForm(f => f && { ...f, payment_fees: [...f.payment_fees, { name: '', rate: 0, fixed: 0 }] })}
+            >
+              <Plus size={14} aria-hidden /> Thêm cổng
+            </button>
+            <p className={cx(FIELD_HINT, 'mb-0')}>
+              Mã cổng tạo từ tên và phải trùng mã phương thức thanh toán lưu trong đơn hàng. COD là phí thu hộ của đơn vị vận
+              chuyển.
+            </p>
+            {gatewaysInvalid && (
+              <p className="mb-0 mt-2 text-[12px] text-[#b91c1c]">Cổng thêm mới cần tên có chữ hoặc số trước khi lưu.</p>
+            )}
+          </div>
+        </Panel>
 
-          <div className="mt-6 flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[13.5px] font-bold text-admin-ink">Phí gửi thông báo mỗi đơn</span>
+        <Panel icon={Wallet} title="Chi phí khác & vốn" className="mb-0">
+          <div className="divide-y divide-admin-line-soft">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-[18px] py-3.5">
+              <span className="text-[13.5px] font-semibold text-admin-ink">Phí gửi thông báo mỗi đơn</span>
               <span className="flex items-center gap-1.5">
                 <MoneyInput
                   value={form.notification_per_order}
                   onChange={v => setForm(f => f && { ...f, notification_per_order: v })}
                   label="Phí gửi thông báo mỗi đơn"
-                  className="w-[120px] py-1.5"
+                  className="w-[160px] py-1.5"
                 />
-                <span className="text-[12px] text-admin-muted">đ</span>
+                <span className="w-3 text-[12px] text-admin-muted">đ</span>
               </span>
             </div>
-            <div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[13.5px] font-bold text-admin-ink">Vốn dự phòng hiện có</span>
+            <div className="px-[18px] py-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-[13.5px] font-semibold text-admin-ink">
+                  Vốn dự phòng hiện có
+                  <Hint term="Runway (số tháng trụ được)" />
+                </span>
                 <span className="flex items-center gap-1.5">
                   <MoneyInput
                     value={form.cash_reserve}
@@ -1470,21 +1546,52 @@ export function AdminFinanceSimulationPage({ section = 'tong-quan' }: { section?
                     label="Vốn dự phòng hiện có"
                     className="w-[160px] py-1.5"
                   />
-                  <span className="text-[12px] text-admin-muted">đ</span>
+                  <span className="w-3 text-[12px] text-admin-muted">đ</span>
                 </span>
               </div>
-              <p className={cx(FIELD_HINT, 'mb-0')}>
-                Tiền nhóm còn để bù lỗ. Khi sàn đang lỗ, trang tính được sàn trụ được bao nhiêu tháng. Để 0 nếu chưa có.
-              </p>
+              <p className={cx(FIELD_HINT, 'mb-0')}>Tiền nhóm còn để bù lỗ. Để 0 nếu chưa có.</p>
             </div>
           </div>
+        </Panel>
         </div>
       </div>
-    </Panel>
+
+      {/* Thanh lưu dính đáy: sửa ở thẻ nào cũng thấy nút lưu mà không phải cuộn lên. */}
+      <div
+        className={cx(
+          'sticky bottom-4 z-20 mt-5 flex flex-wrap items-center justify-between gap-3 rounded-admin border bg-admin-surface px-4 py-3 shadow-admin-md',
+          dirty ? 'border-[#b7e0b7]' : 'border-admin-line'
+        )}
+      >
+        <span className="text-[13px] text-admin-muted" aria-live="polite">
+          {dirty ? (
+            <b className="text-admin-ink">Có thay đổi chưa lưu</b>
+          ) : config?.updated_at ? (
+            `Lưu lần cuối ${new Date(config.updated_at).toLocaleString('vi-VN')}`
+          ) : (
+            'Chưa có thay đổi'
+          )}
+        </span>
+        <div className="flex items-center gap-2">
+          <button type="button" className={BTN_SECONDARY} onClick={() => setForm(config)} disabled={!dirty || saving}>
+            <Undo2 size={15} aria-hidden /> Hoàn tác
+          </button>
+          <button
+            type="button"
+            className={BTN_PRIMARY}
+            onClick={() => void save()}
+            disabled={!dirty || formInvalid || saving}
+          >
+            <Save size={15} aria-hidden /> {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+          </button>
+        </div>
+      </div>
+    </>
   );
 
   return (
     <div className={PAGE}>
+      {header}
       {error && <Alert tone="danger" onDismiss={() => setError('')}>{error}</Alert>}
       {notice && <Alert tone="success" onDismiss={() => setNotice('')}>{notice}</Alert>}
       {section === 'tong-quan' && o && renderOverview(o)}
