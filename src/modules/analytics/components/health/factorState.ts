@@ -17,6 +17,7 @@ export const AI_HINT = 'AI đoán, có thể nhầm nên không trừ điểm. B
 export function factorStateChip(f: HealthFactorV3): { label: string; tone: Tone } {
   switch (f.state) {
     case 'scored':
+      if (f.key === 'review' && f.evidence?.total === 0) return { label: 'Chưa có đánh giá, tính theo mức chung của sàn', tone: 'neutral' };
       return f.sub_score === 100 ? { label: 'Đạt yêu cầu', tone: 'good' } : { label: 'Chưa đạt yêu cầu', tone: 'warn' };
     case 'seller_missing':
       return { label: 'Chưa điền', tone: 'warn' };

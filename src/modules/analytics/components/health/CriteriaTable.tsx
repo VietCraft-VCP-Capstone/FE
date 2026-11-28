@@ -4,6 +4,11 @@ import { TIER_COLOR } from './tier';
 import { Chip } from '../ui';
 import { factorStateChip, isExcluded } from './factorState';
 
+const GROUPS: { title: string; keys: HealthFactorKey[] }[] = [
+  { title: 'Phần bạn sửa được ngay', keys: ['image', 'description', 'tags'] },
+  { title: 'Uy tín và giá', keys: ['review', 'price'] },
+];
+
 const ICON: Record<HealthFactorKey, LucideIcon> = { image: Image, description: FileText, tags: Tag, review: Star, price: Banknote };
 
 function FactorRow({ f }: { f: HealthFactorV3 }) {
@@ -52,9 +57,17 @@ export function CriteriaTable({ factors, onExplain }: { factors?: HealthFactorV3
         )}
       </div>
       {factors?.length ? (
-        <ul className="m-0 mt-1 list-none divide-y divide-stone-100 p-0">
-          {factors.map(f => <FactorRow key={f.key} f={f} />)}
-        </ul>
+        GROUPS.map(g => {
+          const rows = factors.filter(f => g.keys.includes(f.key));
+          return rows.length ? (
+            <div key={g.title} className="mt-2">
+              <p className="m-0 text-xs font-semibold uppercase tracking-wide text-stone-400">{g.title}</p>
+              <ul className="m-0 list-none divide-y divide-stone-100 p-0">
+                {rows.map(f => <FactorRow key={f.key} f={f} />)}
+              </ul>
+            </div>
+          ) : null;
+        })
       ) : (
         <p className="m-0 mt-2 text-sm text-stone-500">Chưa có chi tiết tiêu chí. Lưu lại sản phẩm để tính lại điểm theo 5 tiêu chí.</p>
       )}

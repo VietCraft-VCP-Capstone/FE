@@ -7,7 +7,8 @@ import { PART } from './whyText';
 const NOTES = [
   SCORE_MEANING,
   'Từ 80 điểm trở lên là Tốt, từ 50 đến 79 là Cần cải thiện, dưới 50 là Kém.',
-  'Tiêu chí chưa có đánh giá, không áp dụng hoặc chưa đánh giá được thì không tính vào mẫu số. Điểm được quy về thang 100 trên các tiêu chí còn lại.',
+  'Mô tả: một nửa điểm theo độ dài so với sản phẩm cùng loại, một nửa theo 3 thông tin: kích thước, chất liệu, không chép lại tên.',
+  'Sản phẩm chưa có đánh giá được tạm tính bằng tỉ lệ đánh giá tốt chung của sàn, nên có thêm đánh giá tốt là điểm tăng. Tiêu chí không áp dụng hoặc chưa đánh giá được thì không tính vào mẫu số; điểm quy về thang 100 trên các tiêu chí còn lại.',
   'Tiêu chí chưa điền thì tính 0 điểm.',
   'Điểm không trực tiếp đẩy thứ hạng, nhưng các mục được chấm thì có: tìm kiếm của sàn chỉ hiện sản phẩm khi mọi từ khách gõ có trong tên, tag hoặc danh mục (khớp tên +5, khớp tag +3), và sao đánh giá cũng được cộng vào thứ hạng. Ảnh và mô tả là thứ khách xem trước khi quyết định mua.',
 ];

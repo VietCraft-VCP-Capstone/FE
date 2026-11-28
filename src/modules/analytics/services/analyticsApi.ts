@@ -36,7 +36,7 @@ export function seasonalSaveError(err: unknown, fallback: string): string {
 }
 import type { HealthStatus, InsightContext, InsightEnvelope, SeasonalIdeaSnapshot, ShopSearchResult } from '../types';
 import type { ListingHealthList } from '../healthTypes';
-import type { HealthDraftBody, HealthPreview, ListingHealth, PreviewInputs } from '../healthTypes';
+import type { FeedbackVerdict, HealthDraftBody, HealthPreview, ListingHealth, PreviewInputs } from '../healthTypes';
 
 /**
  * Gọi 16 tính năng phân tích qua cổng BE /api/seller/analytics.
@@ -84,6 +84,13 @@ export const analyticsApi = {
 
   async recordHealthAction(productId: string, body: { recommendation_id: string; action: 'open' | 'apply' | 'dismiss'; kind?: string }): Promise<void> {
     await api.post(`${BASE}/listings/${productId}/health/actions`, body);
+  },
+
+  async healthFeedback(productId: string, body: { image_url: string; verdict: FeedbackVerdict }): Promise<void> {
+    const res = await api.post(`${BASE}/listings/${productId}/health/feedback`, body);
+    if (res.data?.meta?.status !== 'ok' || res.data?.data == null) {
+      throw new Error(`healthFeedback: ${res.data?.meta?.status ?? 'no status'}`);
+    }
   },
 
   async healthDraft(body: HealthDraftBody, signal?: AbortSignal): Promise<InsightEnvelope<ListingHealth>> {

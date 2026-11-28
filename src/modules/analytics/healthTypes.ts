@@ -96,6 +96,35 @@ export interface AiFinding {
   metric: string;
 }
 
+export type FeedbackVerdict = 'ai_wrong' | 'ai_right';
+
+export type ImageVerdict = 'ok' | 'mismatch' | 'duplicate' | 'not_learned' | 'unanalyzed';
+
+export interface ImageAi {
+  verdict: ImageVerdict;
+  cos: number | null;
+  counted: boolean;
+}
+
+export interface ImageEvidence {
+  url: string;
+  ai?: ImageAi;
+}
+
+export interface HealthFeedback {
+  image_url: string;
+  verdict: FeedbackVerdict;
+  updated_at?: string;
+}
+
+export interface ScoreChange {
+  from: number;
+  to: number;
+  reason: 'content' | 'market';
+  factor: string | null;
+  text: string;
+}
+
 export interface ListingHealth {
   ai?: AiFinding[];
   product_id: string;
@@ -115,6 +144,8 @@ export interface ListingHealth {
   blockers?: HealthBlocker[];
   recommendations?: HealthRecommendation[];
   checks?: HealthCheck[];
+  change?: ScoreChange | null;
+  feedback?: HealthFeedback[];
   confidence?: { level: 'Cao' | 'Vừa' | 'Thấp'; factors: string; peers: number } | null;
   content_snapshot?: ContentSnapshot | null;
   versions?: { score: string; siglip: string | null; relevance: string; benchmark: string | null };
