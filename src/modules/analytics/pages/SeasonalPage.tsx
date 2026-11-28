@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { SeasonalNavbar } from '../components/seasonal/SeasonalNavbar';
 import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
@@ -14,8 +14,10 @@ import { OccasionTraitChart } from '../components/seasonal/OccasionTraitChart';
 import { OpportunityKeywordTable } from '../components/seasonal/OpportunityKeywordTable';
 import { CampaignFunnelCard } from '../components/seasonal/CampaignFunnelCard';
 import { ApplyPlaybookCard } from '../components/seasonal/ApplyPlaybookCard';
-import { SeasonalImpactCard } from '../components/seasonal/SeasonalImpactCard';
-import { analyticsApi } from '../services/analyticsApi';
+import { PreviousSeasonLessonCard } from '../components/seasonal/PreviousSeasonLessonCard';
+import { DEFAULT_TEST_ORDERS, PLAYBOOK_SLOTS, playbookStepKey } from '../components/seasonal/playbookSteps';
+import { SeasonalImpactCard, type IdeaReviewValue, type OccasionReview } from '../components/seasonal/SeasonalImpactCard';
+import { analyticsApi, occasionVoucherHref, planRefOf, seasonalSaveError, type SeasonalPlanRef } from '../services/analyticsApi';
 
 // Hub components (Khối A-H)
 import { HubActionFeed, type UnifiedOccasionAction } from '../components/seasonal/hub/HubActionFeed';
@@ -27,6 +29,7 @@ import type {
   PotentialProfile,
   SeasonalCampaign,
   SeasonalForecast,
+  SeasonalIdeaSnapshot,
 } from '../types';
 import type { Evidence, OccasionTraitItem, OpportunityCluster } from '../types/evidence';
 import { GLOSSARY } from '../i18n/vi.glossary';
@@ -58,6 +61,10 @@ export function SeasonalPage() {
 
   // Quản lý trạng thái đánh dấu hoàn thành các mốc kế hoạch (đồng bộ database shop)
   const [checkedMilestones, setCheckedMilestones] = useState<Record<string, boolean>>({});
+  // Đánh giá vừa lưu trong phiên (dữ liệu trang không tải lại sau khi lưu)
+  const [savedReviews, setSavedReviews] = useState<
+    Record<string, { review: OccasionReview | null; ideas: Record<string, IdeaReviewValue> }>
+  >({});
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Quản lý mở Drawer hồ sơ tiềm năng 5 lớp & tính hòa vốn
@@ -116,27 +123,58 @@ export function SeasonalPage() {
       if (state.data.checked_milestones && typeof state.data.checked_milestones === 'object') {
         setCheckedMilestones(state.data.checked_milestones);
       }
+      setSavedSnapshots(state.data.saved_idea_snapshots || {});
     }
   }, [state]);
 
-  const toggleSaveIdea = async (key: string) => {
+  // Kỳ dịp (mã + năm của ngày lễ) để lưu kế hoạch đúng kỳ; không có campId thì là dịp đang xem
+  const planRefFor = (campId?: string): SeasonalPlanRef | null => {
+    const d = lastReadyDataRef.current?.data;
+    if (!d) return null;
+    const camp = campId ? (d.all_campaigns || []).find(c => c.id === campId) : d.active_campaign;
+    return planRefOf(camp);
+  };
+
+  const [savedSnapshots, setSavedSnapshots] = useState<Record<string, SeasonalIdeaSnapshot>>({});
+
+  const toggleSaveIdea = async (key: string, snapshot?: SeasonalIdeaSnapshot) => {
+    const plan = planRefFor();
+    if (!plan) {
+      setSaveError('Chưa xác định được dịp đang xem, vui lòng tải lại trang.');
+      return;
+    }
     const prevSnapshot = { ...savedIdeas };
     setSaveError(null);
     setSavedIdeas(prev => ({ ...prev, [key]: !prev[key] }));
     try {
-      const res = await analyticsApi.saveSeasonalIdea(key);
+      const res = await analyticsApi.saveSeasonalIdea(key, plan, savedIdeas[key] ? undefined : snapshot);
+      if (res?.idea_snapshots) setSavedSnapshots(res.idea_snapshots);
       if (!res?.success) {
         setSavedIdeas(prevSnapshot);
         setSaveError('Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.');
       }
-    } catch {
+    } catch (err) {
       setSavedIdeas(prevSnapshot);
-      setSaveError('Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.');
+      setSaveError(seasonalSaveError(err, 'Không thể lưu ý tưởng vào CSDL gian hàng. Vui lòng thử lại.'));
     }
   };
 
+  // Áp dụng ý tưởng vào sản phẩm có sẵn rồi tải lại để thấy thành quả đo từ đơn thật
+  const linkIdeaProduct = async (ideaId: string, productId: string, linked: boolean) => {
+    const plan = planRefFor();
+    if (!plan) throw new Error('missing_plan_ref');
+    const res = await analyticsApi.linkSeasonalIdeaProduct({ ...plan, idea_id: ideaId, product_id: productId, linked });
+    if (!res?.success) throw new Error('link_failed');
+    reload();
+  };
+
   const toggleMilestone = async (idx: number, nextVal?: boolean, ideaId?: string) => {
-    const campId = currentCampaignId || '';
+    const plan = planRefFor();
+    if (!plan) {
+      setSaveError('Chưa xác định được dịp đang xem, vui lòng tải lại trang.');
+      return;
+    }
+    const campId = plan.camp_id;
     const keyParts = [];
     if (campId) keyParts.push(campId);
     if (ideaId) keyParts.push(ideaId);
@@ -145,39 +183,44 @@ export function SeasonalPage() {
     const val = nextVal !== undefined ? nextVal : !checkedMilestones[key];
     const prevSnapshot = { ...checkedMilestones };
     setSaveError(null);
+    // Bước của ý tưởng chỉ ghi khóa `${idea}_${slot}`; không ghi `${idx}` trần vì đó là khóa mốc chiến dịch
     setCheckedMilestones(prev => ({
       ...prev,
       [key]: val,
-      ...(ideaId ? { [`${ideaId}_${idx}`]: val } : {}),
-      [String(idx)]: val,
+      ...(ideaId ? { [`${ideaId}_${idx}`]: val } : { [String(idx)]: val }),
     }));
     try {
-      const res = await analyticsApi.toggleSeasonalMilestone(idx, val, campId || undefined, ideaId);
+      const res = await analyticsApi.toggleSeasonalMilestone(idx, val, plan, ideaId);
       if (!res?.success) {
         setCheckedMilestones(prevSnapshot);
         setSaveError('Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.');
       }
-    } catch {
+    } catch (err) {
       setCheckedMilestones(prevSnapshot);
-      setSaveError('Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.');
+      setSaveError(seasonalSaveError(err, 'Không thể cập nhật tiến độ mốc thời gian. Vui lòng thử lại.'));
     }
   };
 
   const handleToggleCampMilestone = async (campId: string, stageIdx: number) => {
+    const plan = planRefFor(campId);
+    if (!plan) {
+      setSaveError('Chưa xác định được kỳ của dịp này, vui lòng tải lại trang.');
+      return;
+    }
     const key = `${campId}_${stageIdx}`;
     const nextVal = !checkedMilestones[key];
     const prevSnapshot = { ...checkedMilestones };
     setSaveError(null);
     setCheckedMilestones(prev => ({ ...prev, [key]: nextVal }));
     try {
-      const res = await analyticsApi.toggleSeasonalMilestone(stageIdx, nextVal, campId);
+      const res = await analyticsApi.toggleSeasonalMilestone(stageIdx, nextVal, plan);
       if (!res?.success) {
         setCheckedMilestones(prevSnapshot);
         setSaveError('Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.');
       }
-    } catch {
+    } catch (err) {
       setCheckedMilestones(prevSnapshot);
-      setSaveError('Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.');
+      setSaveError(seasonalSaveError(err, 'Không thể cập nhật tiến độ mốc chiến dịch. Vui lòng thử lại.'));
     }
   };
 
@@ -359,15 +402,20 @@ export function SeasonalPage() {
               evidence: {
                 id: `ev_act_${c.id}`,
                 definition: `Căn cứ thời điểm và gợi ý vận hành dịp ${c.name}.`,
-                sources: ['Lịch sự kiện Việt Nam (calendar_vn)', 'Thời gian sản xuất & giao hàng thực tế của xưởng'],
-                howObtained: 'Tính toán lùi từ ngày diễn ra sự kiện theo thời gian sản xuất P90 và vận chuyển an toàn.',
-                period: ['2026-10-01', '2026-11-30'],
-                n: 4,
+                sources: [
+                  'Lịch sự kiện Việt Nam (calendar_vn)',
+                  ocWin?.lead_time_source === 'shop_measured'
+                    ? 'Thời gian giao thực tế của shop (p90 đơn đã giao)'
+                    : 'Thời gian sản xuất & giao hàng mặc định của dịp (shop chưa đủ đơn đã giao để đo)',
+                ],
+                howObtained: 'Tính lùi từ ngày lễ: hạn chốt = ngày lễ − thời gian sản xuất & giao hàng; các mốc khác theo khung thời gian của dịp.',
+                period: [rdIso || tractionIso, ocWin?.peak_date || cutoffIso],
+                n: milestones.length,
                 formula: recommendation.calculationBasis,
                 confidence: (c.confidence?.level || 'fair') as 'high' | 'fair' | 'preliminary',
-                confidenceReason: 'Tính toán theo công thức ngày thực tế, không có số liệu ước lượng ảo.',
+                confidenceReason: 'Mốc ngày tính theo công thức từ ngày lễ và thời gian giao; không có số ước lượng.',
                 mayBeWrongBecause: ['Thời tiết bất lợi hoặc đơn vị vận chuyển quá tải vào tuần cao điểm.'],
-                updatedAt: '2026-11-01',
+                updatedAt: new Date().toISOString().slice(0, 10),
               },
             };
           });
@@ -376,110 +424,6 @@ export function SeasonalPage() {
           const opportunityClusters: OpportunityCluster[] = (() => {
             if (Array.isArray(data.opportunity_clusters) && data.opportunity_clusters.length > 0) {
               return data.opportunity_clusters as OpportunityCluster[];
-            }
-
-            if (readyIdeas.length > 0 || podBlanks.length > 0) {
-              const list: OpportunityCluster[] = [];
-              readyIdeas.forEach((idea, idx) => {
-                const sellerCnt = idea.seller_count ?? 6;
-                const trendPct = idea.search_trend_pct ?? 45;
-                const priceNum = parseInt((idea.suggested_price || '250000').replace(/\D/g, ''), 10) || 250000;
-                const platformName = idea.platform || 'Tiki';
-                list.push({
-                  id: `clust-idea-${idx}`,
-                  title: idea.title || 'Sản phẩm gợi ý',
-                  category: idea.category || 'Thời trang & May mặc',
-                  quadrant: sellerCnt <= 8 ? 'good_opportunity' : 'high_competition',
-                  quadrantLabel: sellerCnt <= 8 ? 'Cơ hội tốt' : 'Cạnh tranh cao',
-                  orderCountRange: idea.sold_count ? `${idea.sold_count.toLocaleString('vi-VN')} lượt bán` : '200 – 350 đơn/tháng',
-                  sellerCount: sellerCnt,
-                  newSellersLast30Days: Math.max(1, Math.floor(sellerCnt / 4)),
-                  searchTrendPct: trendPct,
-                  priceRange: idea.market_price_range || idea.suggested_price || '200.000đ – 350.000đ',
-                  platform: platformName,
-                  productUrl: idea.product_url || '',
-                  sellerName: idea.seller_name || '',
-                  soldCount: idea.sold_count ?? 0,
-                  representativeProducts: [
-                    {
-                      title: idea.title || 'Sản phẩm đang bán',
-                      imageUrl: idea.image_url || '',
-                      priceVnd: priceNum,
-                      platform: platformName,
-                      productUrl: idea.product_url || '',
-                      sellerName: idea.seller_name || '',
-                      soldCount: idea.sold_count ?? 0,
-                      ratingAverage: idea.rating_average ?? 0,
-                    },
-                  ],
-                  clusteringMethod: `Thu thập trực tiếp từ ${platformName} (trạng thái: Đang bán)`,
-                  evidence: {
-                    id: `ev_clust_${idx}`,
-                    definition: idea.why_it_sells || 'Nhóm sản phẩm đang mở bán thực tế có nhu cầu tăng cao trước dịp lễ.',
-                    sources: [`API sản phẩm đang bán ${platformName}`, 'external_market_products'],
-                    howObtained: 'Truy vấn các listing đang mở bán (availability=1) và gom nhóm theo phân khúc.',
-                    period: ['2026-10-01', '2026-10-31'],
-                    n: sellerCnt,
-                    formula: `Khoảng giá thực tế ${idea.market_price_range || idea.suggested_price} trên ${sellerCnt} gian hàng đang bán.`,
-                    confidence: 'high',
-                    confidenceReason: idea.sourcing_tip || 'Dữ liệu thực tế từ sản phẩm đang mở bán trên sàn TMĐT.',
-                    mayBeWrongBecause: ['Giá bán có thể biến động nhẹ trong các khung giờ Flash Sale.'],
-                    updatedAt: '2026-11-05',
-                    rawDataUrl: idea.product_url || '',
-                  },
-                });
-              });
-
-              podBlanks.forEach((blank, idx) => {
-                const bTitle = blank.title || blank.name || 'Phôi in chất lượng cao';
-                const bCat = blank.category || 'Sản phẩm in theo yêu cầu';
-                const provCnt = blank.seller_count ?? 4;
-                const platformName = blank.platform || 'Printify';
-                list.push({
-                  id: `clust-blank-${idx}`,
-                  title: bTitle,
-                  category: bCat,
-                  quadrant: 'niche_market',
-                  quadrantLabel: 'Thị trường ngách',
-                  orderCountRange: `${provCnt} nhà in sẵn phôi`,
-                  sellerCount: provCnt,
-                  newSellersLast30Days: 0,
-                  searchTrendPct: 38,
-                  priceRange: blank.market_price_range || '150.000đ – 260.000đ',
-                  platform: platformName,
-                  productUrl: blank.product_url || '',
-                  sellerName: blank.seller_name || '',
-                  soldCount: blank.sold_count ?? 0,
-                  representativeProducts: [
-                    {
-                      title: blank.name || bTitle,
-                      imageUrl: blank.image_url || '',
-                      priceVnd: blank.base_cost ? Math.round(blank.base_cost * 2.2) : 185000,
-                      platform: platformName,
-                      productUrl: blank.product_url || '',
-                      sellerName: blank.seller_name || '',
-                      soldCount: blank.sold_count ?? 0,
-                    },
-                  ],
-                  clusteringMethod: `Danh mục phôi POD đang hoạt động từ ${platformName} Catalog API`,
-                  evidence: {
-                    id: `ev_clust_blank_${idx}`,
-                    definition: blank.suggested_theme || 'Sản phẩm chủ lực cá nhân hóa theo đơn.',
-                    sources: [`${platformName} Catalog API`, 'printify_variants.json'],
-                    howObtained: 'Đồng bộ trực tiếp blueprint đang mở bán kèm ảnh gốc và chi phí phôi.',
-                    period: ['2026-10-01', '2026-10-31'],
-                    n: provCnt,
-                    formula: `Biên lợi nhuận kỳ vọng ${blank.expected_profit_margin || '50% – 60%'}.`,
-                    confidence: 'high',
-                    confidenceReason: 'Phôi thật từ catalog đang hoạt động, chỉ in khi có khách đặt đơn.',
-                    mayBeWrongBecause: ['Xưởng in có thể tăng nhẹ thời gian xử lý vào tuần cao điểm.'],
-                    updatedAt: '2026-11-05',
-                    rawDataUrl: blank.product_url || '',
-                  },
-                });
-              });
-
-              return list.slice(0, 6);
             }
 
             return [];
@@ -511,14 +455,19 @@ export function SeasonalPage() {
           const aiIdeas: any[] = Array.isArray((data as any).ai_ideas) ? (data as any).ai_ideas : [];
           const shopDna = (data as any).shop_dna;
           const savedIdeaDrafts: Record<string, any> = (data as any).saved_idea_drafts || {};
-          const occasionReviews: Record<string, any> = (data as any).occasion_reviews || {};
+          const occasionReviews: Record<string, OccasionReview> = (data as any).occasion_reviews || {};
 
           const savedIdeaItems = Object.entries(savedIdeas)
             .filter(([, v]) => Boolean(v))
             .map(([id]) => {
               const draft = savedIdeaDrafts[id];
+              const snap = savedSnapshots[id];
               if (draft?.title) {
                 return { id, title: draft.title, subtitle: 'Bản đã chỉnh sửa' };
+              }
+              if (snap?.title) {
+                const kindLabel: Record<string, string> = { ai: 'Ý tưởng AI cho shop', ready: 'Mẫu thị trường', pod: 'Phôi POD', keyword: 'Từ khóa cơ hội' };
+                return { id, title: snap.title, subtitle: kindLabel[snap.kind] || 'Ý tưởng đã chọn' };
               }
               const aiMatch = aiIdeas.find((a: any) => a.id === id);
               if (aiMatch) {
@@ -538,70 +487,36 @@ export function SeasonalPage() {
               return { id, title: id, subtitle: 'Ý tưởng đã chọn' };
             });
 
-          const stopWords = new Set(['cho', 'dịp', 'mùa', 'tặng', 'quà', 'set', 'bộ', 'mẫu', 'sản', 'phẩm', 'và', 'của', 'theo', 'phong', 'cách', 'phiên', 'bản', 'siêu', 'sale']);
+          // Ý tưởng → sản phẩm áp dụng → đơn hợp lệ trong kỳ dịp: BE đo theo source_idea_id, không đoán theo tên
+          const outcomeItems = data.idea_outcomes?.items || [];
+          const outcomeById = new Map(outcomeItems.map(o => [o.idea_id, o]));
           const campPrefix = activeCamp?.id ? `${activeCamp.id}_` : '';
-
+          const testTarget =
+            data.apply_playbooks?.[0]?.steps.find(s => playbookStepKey(s) === 'test')?.target_orders ?? DEFAULT_TEST_ORDERS;
           const ideaProgressList = savedIdeaItems.map(idea => {
-            const iTitleLower = (idea.title || '').toLowerCase().trim();
-            const tokens = iTitleLower
-              .split(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/i)
-              .filter((w: string) => w.length >= 3 && !stopWords.has(w));
-
-            const matched = allShopProducts.filter((p: any) => {
-              if (p.source_idea_id && p.source_idea_id === idea.id) return true;
-              const pName = String(p.name || p.title || '').toLowerCase().trim();
-              if (iTitleLower && (pName === iTitleLower || pName.includes(iTitleLower))) return true;
-              if (tokens.length < 3) return false;
-              const hits = tokens.filter((tk: string) => pName.includes(tk)).length;
-              return hits >= Math.max(4, Math.ceil(tokens.length * 0.65));
-            });
-
-            const matchedProductsCount = matched.length;
-            const inStockCount = matched.filter((p: any) => (p.stock ?? 1) > 0).length;
-            const ordersCount = matched.reduce((sum: number, p: any) => sum + Number(p.sold_count ?? p.orders_count ?? 0), 0);
-
-            const step1Done = matchedProductsCount > 0;
-            const step2Done = ordersCount > 0 || Boolean(checkedMilestones[`${campPrefix}${idea.id}_1`] ?? checkedMilestones[`${campPrefix}1`]);
-            const step3Done = Boolean(checkedMilestones[`${campPrefix}${idea.id}_2`] ?? checkedMilestones[`${campPrefix}2`]);
-            const step4Done = Boolean(checkedMilestones[`${campPrefix}${idea.id}_3`] ?? checkedMilestones[`${campPrefix}3`]);
-            const step5Done = Boolean(checkedMilestones[`${campPrefix}${idea.id}_4`] ?? checkedMilestones[`${campPrefix}4`]);
-            const completedStepsCount = [step1Done, step2Done, step3Done, step4Done, step5Done].filter(Boolean).length;
-
+            const oc = outcomeById.get(idea.id);
+            const ticked = (key: keyof typeof PLAYBOOK_SLOTS) =>
+              Boolean(checkedMilestones[`${campPrefix}${idea.id}_${PLAYBOOK_SLOTS[key]}`]);
+            // step1Done chỉ tính sản phẩm thật (dùng đếm "ý tưởng đã triển khai"); tick tay vẫn tính vào số bước xong
+            const step1Done = Boolean(oc && oc.products.length > 0);
+            const listingDone = step1Done || ticked('listing');
+            const step2Done = Boolean(oc && oc.orders >= testTarget) || ticked('test');
+            const step3Done = ticked('decide');
+            const step4Done = Boolean(oc && oc.products.length > 0 && oc.orders > 0) || ticked('produce');
+            const step5Done = ticked('cutoff');
             return {
               id: idea.id,
               title: idea.title,
-              matchedProductsCount,
-              inStockCount,
-              ordersCount,
+              matchedProductsCount: oc ? oc.products.length : 0,
+              ordersCount: oc ? oc.orders : 0,
+              revenue: oc ? oc.revenue : 0,
               step1Done,
-              completedStepsCount,
+              completedStepsCount: [listingDone, step2Done, step3Done, step4Done, step5Done].filter(Boolean).length,
               totalStepsCount: 5,
             };
           });
-
           const implementedIdeasCount = ideaProgressList.filter(item => item.step1Done).length;
-          const ideaMatchedProducts = savedIdeaItems.length === 0
-            ? []
-            : allShopProducts.filter((p: any) => {
-                if (p.source_idea_id && savedIdeaItems.some(i => i.id === p.source_idea_id)) return true;
-                const pName = String(p.name || p.title || '').toLowerCase().trim();
-                return savedIdeaItems.some(idea => {
-                  const iTitle = (idea.title || '').toLowerCase().trim();
-                  if (iTitle && (pName === iTitle || pName.includes(iTitle))) return true;
-                  const tokens = iTitle
-                    .split(/[^a-z0-9àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+/i)
-                    .filter((w: string) => w.length >= 3 && !stopWords.has(w));
-                  if (tokens.length < 3) return false;
-                  const hits = tokens.filter((tk: string) => pName.includes(tk)).length;
-                  return hits >= Math.max(4, Math.ceil(tokens.length * 0.65));
-                });
-              });
-
-          const ideaInStockCount = ideaMatchedProducts.filter((p: any) => (p.stock ?? 1) > 0).length;
-          const ideaOrdersCount = ideaMatchedProducts.reduce(
-            (sum: number, p: any) => sum + Number(p.sold_count ?? p.orders_count ?? 0),
-            0
-          );
+          const ideaProductsCount = outcomeItems.reduce((sum, o) => sum + o.products.length, 0);
 
           const isRefreshing = state.kind === 'loading' && Boolean(lastReadyDataRef.current);
 
@@ -610,6 +525,24 @@ export function SeasonalPage() {
               {isRefreshing && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
                   Đang cập nhật dữ liệu mới cho dịp đã chọn...
+                </div>
+              )}
+              {(() => {
+                const stale = Object.values(data.data_freshness || {}).filter(f => f.stale);
+                if (stale.length === 0) return null;
+                return (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <strong>Dữ liệu thị trường chưa được cập nhật:</strong>{' '}
+                    {stale
+                      .map(f => (f.as_of ? `${f.label} thu đến ${f.as_of.slice(8, 10)}/${f.as_of.slice(5, 7)} (${f.age_days} ngày trước)` : `${f.label} chưa có dữ liệu`))
+                      .join('; ')}
+                    . Các số liên quan có thể đã cũ.
+                  </div>
+                );
+              })()}
+              {data.can_save_plan === false && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
+                  Bạn đang xem gian hàng mẫu nên chỉ xem được, chưa lưu được ý tưởng hay tiến độ. Hãy mở gian hàng để lập kế hoạch của riêng bạn.
                 </div>
               )}
               {saveError && (
@@ -661,6 +594,29 @@ export function SeasonalPage() {
                     onSelectCampaign={handleSelectCampaign}
                   />
 
+                  {/* Hành động nhanh cho dịp đang xem: dùng đúng chức năng sẵn có của sàn */}
+                  {activeCamp && data.can_save_plan !== false && (() => {
+                    const voucherHref = occasionVoucherHref(activeCamp);
+                    return (
+                      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs">
+                        <span className="font-semibold text-stone-700">Hành động nhanh · {activeCamp.name}:</span>
+                        {voucherHref ? (
+                          <Link to={voucherHref} className="rounded-lg border border-[#007700] px-2.5 py-1 font-semibold text-[#007700] hover:bg-[#EAF0E2]/50">
+                            Tạo mã giảm giá cho dịp
+                          </Link>
+                        ) : (
+                          <span className="text-stone-400">Đã qua hạn chốt đơn: không tạo mã cho dịp này</span>
+                        )}
+                        <button type="button" onClick={() => handleSelectTab('potential')} className="rounded-lg border border-stone-200 px-2.5 py-1 font-semibold text-stone-700 hover:bg-stone-50">
+                          Chọn ý tưởng sản phẩm
+                        </button>
+                        <button type="button" onClick={() => handleSelectTab('readiness')} className="rounded-lg border border-stone-200 px-2.5 py-1 font-semibold text-stone-700 hover:bg-stone-50">
+                          Kiểm tra hàng & số lượng
+                        </button>
+                      </div>
+                    );
+                  })()}
+
                   {/* Việc ưu tiên tuần này & Theo dõi tiến độ */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -706,7 +662,7 @@ export function SeasonalPage() {
                       occasionName={activeCamp.name}
                       onOpenEvidence={handleOpenEvidence}
                       savedIdeas={savedIdeas}
-                      onToggleStar={tag => toggleSaveIdea(`kw_${tag}`)}
+                      onToggleStar={tag => toggleSaveIdea(`kw_${tag}`, { title: tag, kind: 'keyword', keyword: tag })}
                     />
                   )}
 
@@ -758,6 +714,7 @@ export function SeasonalPage() {
               {/* TAB 1: Ý TƯỞNG (Sắp xếp theo mức độ ưu tiên hành động: Từ khóa cơ hội -> Sản phẩm tiềm năng -> Hành vi & Lịch chuẩn bị) */}
               {(activeDetailTab === 'act1' || activeDetailTab === 'traits' || activeDetailTab === 'potential') && activeCamp && (
                 <div className="space-y-6">
+                  <PreviousSeasonLessonCard lesson={data.previous_season_lesson} occasionName={activeCamp.name} />
 
                   {/* 1. Ma trận từ khóa cơ hội (Ưu tiên cao nhất: chọn ngách & gắn thẻ / tạo sản phẩm ngay) */}
                   <OpportunityKeywordTable
@@ -765,7 +722,7 @@ export function SeasonalPage() {
                     occasionName={activeCamp.name}
                     onOpenEvidence={handleOpenEvidence}
                     savedIdeas={savedIdeas}
-                    onToggleStar={tag => toggleSaveIdea(`kw_${tag}`)}
+                    onToggleStar={tag => toggleSaveIdea(`kw_${tag}`, { title: tag, kind: 'keyword', keyword: tag })}
                   />
 
                   {/* 2. Hồ sơ sản phẩm tiềm năng (Hàng sẵn & Phôi POD kèm phân tích hòa vốn) */}
@@ -776,9 +733,11 @@ export function SeasonalPage() {
                       </h4>
                     </div>
                     <SeasonalPotentialTab
+                      planRef={planRefOf(activeCamp)}
                       readyIdeas={readyIdeas}
                       podBlanks={podBlanks}
                       aiIdeas={aiIdeas}
+                      aiIdeasStatus={data.ai_ideas_status}
                       shopDna={shopDna}
                       savedIdeaDrafts={savedIdeaDrafts}
                       focusIdeaId={focusIdeaId}
@@ -812,15 +771,15 @@ export function SeasonalPage() {
               {/* TAB 2: ÁP DỤNG (Gọn, không lặp lại timeline hay số liệu thử nghiệm fix cứng) */}
               {(activeDetailTab === 'act2' || activeDetailTab === 'readiness' || activeDetailTab === 'trial' || activeDetailTab === 'timeline') && activeCamp && (
                 <div className="space-y-6">
+                  <PreviousSeasonLessonCard lesson={data.previous_season_lesson} occasionName={activeCamp.name} />
                   <ApplyPlaybookCard
                     playbooks={data.apply_playbooks}
                     savedIdeas={savedIdeas}
                     savedIdeaItems={savedIdeaItems}
                     aiIdeas={aiIdeas}
                     allShopProducts={allShopProducts}
-                    matchingProductsCount={ideaMatchedProducts.length}
-                    inStockMatchingCount={ideaInStockCount}
-                    actualOrdersCount={ideaOrdersCount}
+                    outcomes={outcomeItems}
+                    onLinkProduct={data.can_save_plan === false ? null : linkIdeaProduct}
                     checkedMilestones={checkedMilestones}
                     onToggleMilestone={toggleMilestone}
                     onEditSavedIdea={id => {
@@ -849,6 +808,8 @@ export function SeasonalPage() {
                     impact={data.impact}
                     occasionName={activeCamp.name}
                     campId={activeCamp.id}
+                    planRef={planRefOf(activeCamp)}
+                    forecastReview={data.forecast_review}
                     savedIdeaTitles={savedIdeaItems.map(x => x.title)}
                     appliedSummary={{
                       selectedIdeasCount: savedIdeaItems.length,
@@ -856,10 +817,16 @@ export function SeasonalPage() {
                       completedMilestonesCount: ideaProgressList.reduce((acc, curr) => acc + curr.completedStepsCount, 0),
                       totalMilestonesCount: Math.max(1, savedIdeaItems.length) * 5,
                       matchingProductsCount: matchingProducts.length,
-                      ideaProductsCount: ideaMatchedProducts.length,
+                      ideaProductsCount,
                       ideasDetail: ideaProgressList,
+                      outcomeTotals: data.idea_outcomes?.totals,
                     }}
-                    initialReview={occasionReviews[activeCamp.id]}
+                    initialReview={
+                      savedReviews[activeCamp.id] ? savedReviews[activeCamp.id].review ?? undefined : occasionReviews[activeCamp.id]
+                    }
+                    initialIdeaReviews={savedReviews[activeCamp.id]?.ideas ?? (data as any).idea_reviews ?? {}}
+                    onReviewSaved={(review, ideas) => setSavedReviews(prev => ({ ...prev, [activeCamp.id]: { review, ideas } }))}
+                    canSave={data.can_save_plan !== false}
                   />
 
                   {/* Phễu chuyển đổi & đóng góp kênh bán thực tế */}

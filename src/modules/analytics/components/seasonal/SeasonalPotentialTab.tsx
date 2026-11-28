@@ -13,16 +13,14 @@ import {
   Wand2,
   X,
 } from 'lucide-react';
-import type { PodBlankSuggestion, PotentialProfile, ReadyToShipIdea } from '../../types';
-import { analyticsApi } from '../../services/analyticsApi';
+import type { PodBlankSuggestion, PotentialProfile, ReadyToShipIdea, SeasonalIdeaSnapshot } from '../../types';
+import { analyticsApi, seasonalSaveError, type SeasonalPlanRef } from '../../services/analyticsApi';
 
 export interface AiShopIdea {
   id: string;
   title: string;
   concept: string;
   target_price_vnd: number;
-  estimated_cost_vnd: number;
-  expected_margin_pct: number;
   tags: string[];
   why_it_fits_shop: string;
   source_type?: 'llm_scoped' | 'draft_synthesized';
@@ -52,6 +50,8 @@ export interface SavedIdeaDraftMap {
 }
 
 interface SeasonalPotentialTabProps {
+  /** kỳ dịp (mã + năm) để lưu bản nháp đúng kỳ */
+  planRef?: SeasonalPlanRef | null;
   readyIdeas: ReadyToShipIdea[];
   podBlanks: PodBlankSuggestion[];
   aiIdeas?: AiShopIdea[];
@@ -61,15 +61,29 @@ interface SeasonalPotentialTabProps {
   onClearFocusIdea?: () => void;
   potentialProfiles?: PotentialProfile[];
   savedIdeas: Record<string, boolean>;
-  onToggleSaveIdea: (ideaId: string) => void;
+  onToggleSaveIdea: (ideaId: string, snapshot?: SeasonalIdeaSnapshot) => void;
+  /** 'generating': AI đang soạn ý tưởng riêng ở nền, đang hiện bản phác thảo từ số liệu */
+  aiIdeasStatus?: 'ready' | 'generating' | 'draft' | 'none';
   onOpenProfileDrawer: (profile: PotentialProfile) => void;
   onApplyIdea?: () => void;
 }
 
+const NO_AI_IDEAS: AiShopIdea[] = [];
+
+/** Loại ý tưởng theo tiền tố ID để lưu bản chụp đúng loại. */
+function snapshotKindOf(id: string, isPod?: boolean): SeasonalIdeaSnapshot['kind'] {
+  if (isPod || id.startsWith('pod')) return 'pod';
+  if (id.startsWith('kw_')) return 'keyword';
+  if (id.startsWith('ready')) return 'ready';
+  return 'ai';
+}
+
 export function SeasonalPotentialTab({
+  planRef,
   readyIdeas,
   podBlanks,
-  aiIdeas = [],
+  aiIdeas: aiIdeasProp = NO_AI_IDEAS,
+  aiIdeasStatus,
   shopDna,
   savedIdeaDrafts = {},
   focusIdeaId,
@@ -80,6 +94,15 @@ export function SeasonalPotentialTab({
   onOpenProfileDrawer,
   onApplyIdea,
 }: SeasonalPotentialTabProps) {
+  // Danh sách ý tưởng AI: theo trang, cộng các ý tưởng vừa "Gợi ý thêm" (BE đã lưu, lần tải sau trang trả đủ)
+  const [aiIdeas, setAiIdeas] = useState<AiShopIdea[]>(aiIdeasProp);
+  const [moreState, setMoreState] = useState<'idle' | 'loading' | 'exhausted'>('idle');
+  const [moreNotice, setMoreNotice] = useState<string | null>(null);
+  useEffect(() => {
+    setAiIdeas(aiIdeasProp);
+    setMoreState('idle');
+    setMoreNotice(null);
+  }, [aiIdeasProp]);
   const [activeTab, setActiveTab] = useState<'ai' | 'ready' | 'pod'>(aiIdeas.length > 0 ? 'ai' : 'ready');
   const [sortOption, setSortOption] = useState<'profit' | 'newest'>('profit');
   const [localDrafts, setLocalDrafts] = useState<SavedIdeaDraftMap>(savedIdeaDrafts);
@@ -98,6 +121,24 @@ export function SeasonalPotentialTab({
     setLocalDrafts(prev => ({ ...savedIdeaDrafts, ...prev }));
   }, [savedIdeaDrafts]);
 
+  const loadMoreIdeas = async () => {
+    if (!planRef || moreState !== 'idle') return;
+    setMoreState('loading');
+    setMoreNotice(null);
+    try {
+      const res = await analyticsApi.moreSeasonalIdeas(planRef);
+      const next: AiShopIdea[] = Array.isArray(res?.ideas) ? res.ideas : aiIdeas;
+      const added = next.length - aiIdeas.length;
+      setAiIdeas(next);
+      setMoreState('idle');
+      setMoreNotice(added > 0 ? `Đã thêm ${added} ý tưởng mới.` : null);
+    } catch (err) {
+      const code = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setMoreState(code === 'no_more_signals' || code === 'limit_reached' ? 'exhausted' : 'idle');
+      setMoreNotice(seasonalSaveError(err, 'Chưa gợi ý thêm được, vui lòng thử lại.'));
+    }
+  };
+
   useEffect(() => {
     if (!focusIdeaId) return;
     const aiMatch = aiIdeas.find(a => a.id === focusIdeaId);
@@ -114,7 +155,9 @@ export function SeasonalPotentialTab({
       onClearFocusIdea?.();
       return;
     }
-    const readyMatch = readyIdeas.find((r, i) => `ready_${i}_${r.title}` === focusIdeaId);
+    const readyMatch =
+      readyIdeas.find(r => r.id === focusIdeaId) ||
+      readyIdeas.find((r, i) => `ready-${i}-${r.title}` === focusIdeaId);
     if (readyMatch) {
       const d = localDrafts[focusIdeaId];
       setActiveTab('ready');
@@ -122,7 +165,7 @@ export function SeasonalPotentialTab({
         id: focusIdeaId,
         title: d?.title || readyMatch.title,
         concept: d?.concept || readyMatch.why_it_sells || '',
-        price_vnd: d?.price_vnd || Number(String(readyMatch.suggested_price || '').replace(/[^\d]/g, '')) || 250000,
+        price_vnd: d?.price_vnd || Number(String(readyMatch.suggested_price || '').replace(/[^\d]/g, '')) || 0,
         tagsText: (d?.tags || [readyMatch.keyword || ''].filter(Boolean)).join(', '),
       });
       onClearFocusIdea?.();
@@ -135,7 +178,7 @@ export function SeasonalPotentialTab({
         id: focusIdeaId,
         title: d?.title || `Sản phẩm đón dịp: ${kw}`,
         concept: d?.concept || `Triển khai sản phẩm mới tối ưu từ khóa "${kw}".`,
-        price_vnd: d?.price_vnd || shopDna?.price_band?.avg || 250000,
+        price_vnd: d?.price_vnd || shopDna?.price_band?.avg || 0,
         tagsText: (d?.tags || [kw]).join(', '),
       });
       onClearFocusIdea?.();
@@ -150,7 +193,9 @@ export function SeasonalPotentialTab({
       .map(s => s.trim())
       .filter(Boolean);
     try {
+      if (!planRef) throw new Error('missing_plan_ref');
       await analyticsApi.saveSeasonalIdeaDraft({
+        ...planRef,
         idea_id: editingIdea.id,
         title: editingIdea.title,
         concept: editingIdea.concept,
@@ -167,12 +212,17 @@ export function SeasonalPotentialTab({
         },
       }));
       if (!savedIdeas[editingIdea.id]) {
-        onToggleSaveIdea(editingIdea.id);
+        onToggleSaveIdea(editingIdea.id, {
+          title: editingIdea.title,
+          kind: snapshotKindOf(editingIdea.id, editingIdea.isPod),
+          price_vnd: editingIdea.price_vnd || undefined,
+          keyword: parsedTags[0],
+        });
       }
       setDraftNotice(`Đã lưu bản chỉnh sửa ý tưởng «${editingIdea.title}».`);
       setTimeout(() => setDraftNotice(null), 3000);
-    } catch {
-      setDraftNotice('Không thể lưu bản sửa lúc này (kiểm tra kết nối backend).');
+    } catch (err) {
+      setDraftNotice(seasonalSaveError(err, 'Không thể lưu bản sửa lúc này.'));
       setTimeout(() => setDraftNotice(null), 3500);
     } finally {
       setSavingDraft(false);
@@ -187,7 +237,9 @@ export function SeasonalPotentialTab({
       .map(s => s.trim())
       .filter(Boolean);
     try {
+      if (!planRef) throw new Error('missing_plan_ref');
       await analyticsApi.saveSeasonalIdeaDraft({
+        ...planRef,
         idea_id: editingIdea.id,
         title: editingIdea.title,
         concept: editingIdea.concept,
@@ -299,6 +351,13 @@ export function SeasonalPotentialTab({
 
       {activeTab === 'ai' && (
         <div className="space-y-4">
+          {aiIdeasStatus && aiIdeasStatus !== 'ready' && aiIdeas.length > 0 && (
+            <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600">
+              {aiIdeasStatus === 'generating'
+                ? 'Đây là bản phác thảo từ số liệu của shop và thị trường. AI đang soạn ý tưởng riêng cho shop, tải lại trang sau ít phút để xem.'
+                : 'Đây là bản phác thảo từ số liệu của shop và thị trường (AI chưa soạn được ý tưởng riêng lúc này).'}
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {aiIdeas.map(ai => {
               const draft = localDrafts[ai.id];
@@ -353,15 +412,10 @@ export function SeasonalPotentialTab({
                         ))}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-50 border border-stone-200/70 p-2.5 text-xs">
-                        <div>
-                          <span className="text-[11px] text-stone-500 block">Giá bán đề xuất</span>
-                          <strong className="text-[#007700]">{displayPrice.toLocaleString('vi-VN')}đ</strong>
-                        </div>
-                        <div>
-                          <span className="text-[11px] text-stone-500 block">Biên lãi dự kiến</span>
-                          <strong className="text-stone-900">{ai.expected_margin_pct}%</strong>
-                        </div>
+                      {/* Ý tưởng chưa có giá vốn thật nên không hiện biên lãi */}
+                      <div className="rounded-xl bg-stone-50 border border-stone-200/70 p-2.5 text-xs">
+                        <span className="text-[11px] text-stone-500 block">Giá bán đề xuất</span>
+                        <strong className="text-[#007700]">{displayPrice.toLocaleString('vi-VN')}đ</strong>
                       </div>
                     </div>
                   </div>
@@ -397,8 +451,9 @@ export function SeasonalPotentialTab({
                               tags: displayTags,
                             },
                           }));
-                          analyticsApi
+                          if (planRef) analyticsApi
                             .saveSeasonalIdeaDraft({
+                              ...planRef,
                               idea_id: ai.id,
                               title: displayTitle,
                               concept: displayConcept,
@@ -407,7 +462,13 @@ export function SeasonalPotentialTab({
                             })
                             .catch(() => {});
                         }
-                        onToggleSaveIdea(ai.id);
+                        onToggleSaveIdea(ai.id, {
+                          title: displayTitle,
+                          kind: 'ai',
+                          price_vnd: displayPrice || undefined,
+                          keyword: displayTags[0],
+                          source: ai.source_type === 'llm_scoped' ? 'AI soạn riêng cho shop' : 'Phác thảo từ số liệu',
+                        });
                       }}
                       className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
                         isSaved
@@ -430,6 +491,21 @@ export function SeasonalPotentialTab({
               );
             })}
           </div>
+
+          {aiIdeasStatus === 'ready' && planRef && (
+            <div className="flex flex-col items-center gap-1.5 pt-1">
+              <button
+                type="button"
+                onClick={loadMoreIdeas}
+                disabled={moreState !== 'idle'}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#007700]/40 bg-white px-4 py-2 text-xs font-bold text-[#007700] hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-stone-200 disabled:text-stone-400 disabled:hover:bg-white transition-colors"
+              >
+                <Sparkles size={14} />
+                {moreState === 'loading' ? 'AI đang soạn thêm ý tưởng… (khoảng 20 giây)' : 'Gợi ý thêm 3 ý tưởng'}
+              </button>
+              {moreNotice && <p className="m-0 text-[11px] text-stone-500" role="status">{moreNotice}</p>}
+            </div>
+          )}
         </div>
       )}
 
@@ -437,15 +513,13 @@ export function SeasonalPotentialTab({
       {activeTab !== 'ai' && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {displayIdeas.slice(0, 4).map((item: any, idx: number) => {
-          const ideaId = `${activeTab}-${idx}-${item.title || item.name}`;
+          const ideaId: string = item.id || `${activeTab}-${idx}-${item.title || item.name}`;
           const isSaved = Boolean(savedIdeas[ideaId]);
-          const profitMargin =
-            item.expected_profit_margin ||
-            item.estimated_profit ||
-            (item.suggested_price && item.base_cost
-              ? `${Math.max(20, Math.round(((parseInt(String(item.suggested_price).replace(/\D/g, '')) - parseInt(String(item.base_cost).replace(/\D/g, ''))) / Math.max(1, parseInt(String(item.suggested_price).replace(/\D/g, '')))) * 100))}%`
-              : 'ước tính theo ngành');
-          const profile = potentialProfiles[idx % (potentialProfiles.length || 1)];
+          // Chỉ có khi biết giá vốn thật của đúng mẫu đó (phôi POD, sản phẩm VietCraft)
+          const profitMargin: string | null = item.expected_profit_margin || item.estimated_profit || null;
+          const marginPct = profitMargin ? Number.parseInt(String(profitMargin), 10) : null;
+          // Hồ sơ tiềm năng được dựng theo đúng thứ tự mẫu hàng sẵn của AI, không theo thứ tự sau khi sắp xếp
+          const profile = activeTab === 'ready' ? potentialProfiles[readyIdeas.indexOf(item)] : undefined;
 
           return (
             <div
@@ -508,15 +582,22 @@ export function SeasonalPotentialTab({
                       )}
                     </div>
                   </div>
-                  <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200/60">
-                    Lãi {profitMargin}
-                  </span>
+                  {profitMargin && (
+                    <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200/60">
+                      Lãi {profitMargin}
+                    </span>
+                  )}
                 </div>
 
-                {/* Progress bar lợi nhuận */}
-                <div className="my-2.5 h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
-                  <div className="h-full rounded-full bg-gradient-to-r from-amber-400 via-lime-500 to-[#16a34a] w-3/4" />
-                </div>
+                {/* Thanh biên lãi theo đúng % lãi; không có giá vốn thật thì không vẽ */}
+                {marginPct != null && (
+                  <div className="my-2.5 h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-amber-400 via-lime-500 to-[#16a34a]"
+                      style={{ width: `${Math.max(0, Math.min(100, marginPct))}%` }}
+                    />
+                  </div>
+                )}
 
                 {/* Chi tiết ý tưởng */}
                 <div className="space-y-1.5 text-xs leading-relaxed text-stone-600">
@@ -607,7 +688,7 @@ export function SeasonalPotentialTab({
                   type="button"
                   onClick={() => {
                     const d = localDrafts[ideaId];
-                    const parsedPrice = Number(String(item.suggested_price || '').replace(/[^\d]/g, '')) || 250000;
+                    const parsedPrice = Number(String(item.suggested_price || '').replace(/[^\d]/g, '')) || 0;
                     setEditingIdea({
                       id: ideaId,
                       title: d?.title || item.title,
@@ -625,7 +706,15 @@ export function SeasonalPotentialTab({
                 {/* Nút thêm vào kế hoạch & chuyển sang Áp dụng */}
                 <button
                   type="button"
-                  onClick={() => onToggleSaveIdea(ideaId)}
+                  onClick={() =>
+                    onToggleSaveIdea(ideaId, {
+                      title: item.title || item.name,
+                      kind: activeTab === 'pod' ? 'pod' : 'ready',
+                      keyword: item.keyword,
+                      price_vnd: Number(String(item.suggested_price || '').replace(/[^\d]/g, '')) || undefined,
+                      source: item.platform,
+                    })
+                  }
                   className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
                     isSaved
                       ? 'bg-[#007700] text-white shadow-xs'
@@ -693,7 +782,8 @@ export function SeasonalPotentialTab({
                   <label className="block font-semibold text-stone-700 mb-1">Giá bán dự kiến (VNĐ)</label>
                   <input
                     type="number"
-                    value={editingIdea.price_vnd}
+                    value={editingIdea.price_vnd || ''}
+                    placeholder="Nhập giá bán"
                     onChange={e => setEditingIdea({ ...editingIdea, price_vnd: Number(e.target.value) || 0 })}
                     className="w-full rounded-lg border border-stone-300 px-3 py-2 text-xs text-stone-900 outline-none focus:border-[#007700]"
                   />

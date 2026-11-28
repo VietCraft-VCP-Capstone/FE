@@ -130,6 +130,13 @@ export function SellerPromotionsPage() {
         if (preset && ['PERCENTAGE', 'FIXED_AMOUNT', 'FREE_SHIPPING', 'FLASH_SALE', 'BUNDLE'].includes(preset)) {
             const num = (k: string, d?: number) => (searchParams.get(k) !== null && !isNaN(Number(searchParams.get(k))) ? Number(searchParams.get(k)) : d);
             const days = num('days', 7) as number;
+            // ?start=YYYY-MM-DD&end=YYYY-MM-DD (từ kế hoạch mùa vụ: mở bán → hạn chốt đơn của dịp)
+            const isDay = (v: string | null) => Boolean(v && /^\d{4}-\d{2}-\d{2}$/.test(v));
+            const startParam = searchParams.get('start');
+            const endParam = searchParams.get('end');
+            const nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            const startDate = isDay(startParam) && `${startParam}T00:00` > nowLocal ? `${startParam}T00:00` : nowLocal;
+            const endDate = isDay(endParam) ? `${endParam}T23:59` : new Date(Date.now() + days * 86400000).toISOString().slice(0, 16);
             setFormData({
                 ...initialForm, discount_type: preset as CouponDiscountType,
                 code: (searchParams.get('code') || '').toUpperCase(), title: searchParams.get('title') || '',
@@ -137,7 +144,8 @@ export function SellerPromotionsPage() {
                 min_order_value: num('min', initialForm.min_order_value),
                 max_discount_amount: num('max', initialForm.max_discount_amount) || undefined,
                 usage_limit: num('limit', initialForm.usage_limit),
-                end_date: new Date(Date.now() + days * 86400000).toISOString().slice(0, 16),
+                start_date: startDate,
+                end_date: endDate,
             });
             setShowModal(true);
             fetchSelectableProducts();

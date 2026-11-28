@@ -11,11 +11,18 @@ import {
 import type { SeasonalCampaign, SeasonalStoryChapter } from '../../types';
 import { getCampaignLucideIcon } from './SeasonalMonthMatrix';
 
+// Cùng bộ mã nhóm ngành với AI (ai-analysic/app/core/category_groups.py)
 export const CATEGORY_OPTIONS = [
   { value: 'thoi-trang', label: 'Thời trang & May mặc' },
   { value: 'phu-kien', label: 'Phụ kiện & Túi ví' },
-  { value: 'nha-cua', label: 'Nhà cửa & Đời sống' },
+  { value: 'nha-cua-doi-song', label: 'Nhà cửa & Đời sống' },
   { value: 'thu-cong-qua-tang', label: 'Thủ công & Quà tặng' },
+  { value: 'sac-dep', label: 'Sắc đẹp & Mỹ phẩm' },
+  { value: 'dien-tu', label: 'Thiết bị điện tử & Phụ kiện số' },
+  { value: 'me-be', label: 'Mẹ & Bé' },
+  { value: 'bach-hoa', label: 'Bách hóa & Thực phẩm' },
+  { value: 'the-thao', label: 'Thể thao & Dã ngoại' },
+  { value: 'van-phong-pham', label: 'Văn phòng phẩm' },
 ];
 
 export interface SavedIdeaSummaryItem {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Check,
   Copy,
@@ -16,7 +16,7 @@ import {
 import type { OpportunityKeywordItem } from '../../types';
 import type { Evidence } from '../../types/evidence';
 import { money } from '../../../../shared/utils/format';
-import { analyticsApi } from '../../services/analyticsApi';
+import { analyticsApi, seasonalSaveError } from '../../services/analyticsApi';
 
 interface Props {
   keywords: OpportunityKeywordItem[];
@@ -196,7 +196,9 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
     setTimeout(() => setCopyNotice(null), 2500);
   };
 
-  const getTargetProducts = (kw: OpportunityKeywordItem): Array<{ id: string; title: string }> => {
+  const getTargetProducts = (
+    kw: OpportunityKeywordItem
+  ): Array<{ id: string; title: string; matched_by?: string }> => {
     const covProds = (kw.shop_coverage as any)?.products;
     if (Array.isArray(covProds) && covProds.length > 0) return covProds;
     if (kw.matched_product?.id && kw.matched_product?.title) {
@@ -223,8 +225,8 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
           : `Thẻ «${kw.tag}» đã có sẵn trên sản phẩm${targetSummary}`
       );
       setTimeout(() => setCopyNotice(null), 4000);
-    } catch {
-      setCopyNotice(`Không thể gắn thẻ «${kw.tag}» tự động (kiểm tra backend đã restart chưa). Đã sao chép thẻ vào bộ nhớ tạm.`);
+    } catch (err) {
+      setCopyNotice(`${seasonalSaveError(err, `Không thể gắn thẻ «${kw.tag}» tự động.`)} Đã sao chép thẻ vào bộ nhớ tạm.`);
       navigator.clipboard?.writeText(kw.tag);
       setTimeout(() => setCopyNotice(null), 4000);
     } finally {
@@ -232,8 +234,25 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
     }
   };
 
-  const selectedList = keywords.filter(k => selectedIds[k.id]);
-  const displayKeywords = isExpanded ? keywords : keywords.slice(0, 7);
+  // Điểm cao lên đầu, N/A xuống cuối; cùng điểm thì ưu tiên từ khóa gắn với dịp, rồi tới lượt bán.
+  const sortedKeywords = useMemo(() => {
+    const isOccasionLinked = (k: OpportunityKeywordItem) =>
+      (k.origins ?? []).some(o => o !== 'catalog_general');
+    return [...keywords].sort((a, b) => {
+      const sa = a.keyword_score ?? -1;
+      const sb = b.keyword_score ?? -1;
+      if (sb !== sa) return sb - sa;
+      const oa = isOccasionLinked(a) ? 1 : 0;
+      const ob = isOccasionLinked(b) ? 1 : 0;
+      if (ob !== oa) return ob - oa;
+      const soldDiff = (b.sold_count_real ?? 0) - (a.sold_count_real ?? 0);
+      if (soldDiff !== 0) return soldDiff;
+      return (b.etsy_favorers ?? 0) - (a.etsy_favorers ?? 0);
+    });
+  }, [keywords]);
+
+  const selectedList = sortedKeywords.filter(k => selectedIds[k.id]);
+  const displayKeywords = isExpanded ? sortedKeywords : sortedKeywords.slice(0, 7);
 
   return (
     <div
@@ -267,7 +286,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
 
           <button
             type="button"
-            onClick={() => copyTags(keywords.slice(0, 13).map(k => k.tag))}
+            onClick={() => copyTags(sortedKeywords.slice(0, 13).map(k => k.tag))}
             title="Sao chép các thẻ tag gợi ý để dán vào sản phẩm"
             className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
           >
@@ -296,10 +315,19 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
 
       {/* 2. Bảng dữ liệu chuyên nghiệp (Data-Dense Table) */}
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full text-left border-collapse select-none">
+        <table className="w-full min-w-[1000px] table-fixed text-left border-collapse select-none">
+          <colgroup>
+            <col className="w-11" />
+            <col />
+            <col className="w-[156px]" />
+            <col className="w-[148px]" />
+            <col className="w-[112px]" />
+            <col className="w-[168px]" />
+            <col className="w-[212px]" />
+          </colgroup>
           <thead>
-            <tr className="border-b border-stone-200 text-[11px] font-bold uppercase tracking-wider text-stone-500 bg-stone-50/70">
-              <th className="py-2.5 px-3 w-8 text-center">
+            <tr className="border-b border-stone-200 text-[11px] font-bold uppercase tracking-wider text-stone-500 bg-stone-50/70 whitespace-nowrap">
+              <th className="py-2.5 px-3 text-center">
                 <input
                   type="checkbox"
                   aria-label="Chọn tất cả từ khóa"
@@ -309,8 +337,8 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                 />
               </th>
               <th className="py-2.5 px-3">Từ khóa / Thẻ Tag</th>
-              <th className="py-2.5 px-3">Nhu cầu toàn ngành</th>
-              <th className="py-2.5 px-3">Đối thủ toàn ngành</th>
+              <th className="py-2.5 px-3" title="Nhu cầu toàn ngành">Nhu cầu ngành</th>
+              <th className="py-2.5 px-3" title="Đối thủ toàn ngành">Đối thủ ngành</th>
               <th className="py-2.5 px-3 text-center">
                 <span
                   tabIndex={0}
@@ -325,7 +353,7 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                 </span>
               </th>
               <th className="py-2.5 px-3 text-center">Trạng thái shop</th>
-              <th className="py-2.5 px-3 w-40 text-center">Thao tác</th>
+              <th className="py-2.5 px-3 text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100 text-xs">
@@ -380,79 +408,85 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
 
                     {/* Tag Name */}
                     <td className="py-3 px-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedRowId(isRowExpanded ? null : kw.id)}
-                          title="Nhấn để xem tỉ lệ POD, cá nhân hóa và phân bố sản phẩm theo sàn"
-                          className="font-bold text-stone-900 hover:text-[#007700] text-left transition-colors flex items-center gap-1.5"
+                      <button
+                        type="button"
+                        onClick={() => setExpandedRowId(isRowExpanded ? null : kw.id)}
+                        title="Nhấn để xem tỉ lệ POD, cá nhân hóa và phân bố sản phẩm theo sàn"
+                        className="max-w-full font-bold text-[13px] text-stone-900 hover:text-[#007700] text-left transition-colors flex items-center gap-1.5"
+                      >
+                        <span className="truncate">{kw.tag}</span>
+                        {isRowExpanded ? (
+                          <ChevronUp size={13} className="shrink-0 text-stone-400" />
+                        ) : (
+                          <ChevronDown size={13} className="shrink-0 text-stone-400" />
+                        )}
+                      </button>
+                      {kw.origin_labels && kw.origin_labels.length > 0 && (
+                        <div
+                          className="mt-1 truncate text-[11px] text-stone-500"
+                          title={kw.origin_labels.join(' · ')}
                         >
-                          <span>{kw.tag}</span>
-                          {isRowExpanded ? (
-                            <ChevronUp size={13} className="text-stone-400" />
-                          ) : (
-                            <ChevronDown size={13} className="text-stone-400" />
-                          )}
-                        </button>
-                      </div>
+                          {kw.origin_labels.join(' · ')}
+                        </div>
+                      )}
                     </td>
 
                     {/* Volume / Nhu cầu đo được */}
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-3 whitespace-nowrap">
                       <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-2 w-2 rounded-full ring-4 ${volDotColor}`} />
+                        <div className="flex items-baseline gap-1.5">
+                          <span className={`h-2 w-2 shrink-0 self-center rounded-full ring-4 ${volDotColor}`} />
                           {(kw.sold_count_real ?? 0) > 0 ? (
                             <>
-                              <span className="font-bold text-stone-900">
+                              <span className="ml-1 font-bold tabular-nums text-stone-900">
                                 {Number(kw.sold_count_real).toLocaleString('vi-VN')}
                               </span>
                               <span className="text-[11px] text-stone-400">lượt bán</span>
                             </>
                           ) : (kw.etsy_favorers ?? 0) > 0 ? (
                             <>
-                              <span className="font-bold text-stone-900">
+                              <span className="ml-1 font-bold tabular-nums text-stone-900">
                                 {Number(kw.etsy_favorers).toLocaleString('vi-VN')}
                               </span>
-                              <span className="text-[11px] text-stone-400">lượt thích (Etsy)</span>
+                              <span className="text-[11px] text-stone-400">thích Etsy</span>
                             </>
                           ) : kw.trend_match === 'exact' && kw.trend_index != null ? (
                             <>
-                              <span className="font-bold text-stone-900">
+                              <span className="ml-1 font-bold tabular-nums text-stone-900">
                                 {kw.trend_index}/100
                               </span>
-                              <span className="text-[11px] text-stone-400">chỉ số Trends</span>
+                              <span className="text-[11px] text-stone-400">Trends</span>
                             </>
                           ) : (
-                            <span className="text-[11px] text-stone-400">Chưa có dữ liệu</span>
+                            <span className="ml-1 text-[11px] text-stone-400">Chưa có dữ liệu</span>
                           )}
                         </div>
                         {(kw.sold_count_real ?? 0) > 0 && (kw.etsy_favorers ?? 0) > 0 && (
-                          <span className="pl-4 text-[10px] font-medium text-stone-500">
-                            +{Number(kw.etsy_favorers).toLocaleString('vi-VN')} lượt thích Etsy
+                          <span className="pl-[18px] text-[10.5px] tabular-nums text-stone-500">
+                            +{Number(kw.etsy_favorers).toLocaleString('vi-VN')} thích Etsy
                           </span>
                         )}
                       </div>
                     </td>
 
                     {/* Competition */}
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-3 whitespace-nowrap">
                       <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-2 w-2 rounded-full ring-4 ${compDotColor}`} />
+                        <div className="flex items-baseline gap-1.5">
+                          <span className={`h-2 w-2 shrink-0 self-center rounded-full ring-4 ${compDotColor}`} />
                           {kw.competition > 0 ? (
                             <>
-                              <span className="font-medium text-stone-700">
+                              <span className="ml-1 font-bold tabular-nums text-stone-900">
                                 {kw.competition.toLocaleString('vi-VN')}
                               </span>
                               <span className="text-[11px] text-stone-400">gian hàng</span>
                             </>
                           ) : (
-                            <span className="text-[11px] text-stone-400">Chưa đo được</span>
+                            <span className="ml-1 text-[11px] text-stone-400">Chưa đo được</span>
                           )}
                         </div>
                         {kw.sales_per_shop != null && (
-                          <span className="pl-4 text-[10px] font-medium text-stone-500">
+                          <span className="pl-[18px] text-[10.5px] tabular-nums text-stone-500">
                             ~{kw.sales_per_shop.toLocaleString('vi-VN')} {(kw.etsy_favorers ?? 0) > 0 && (kw.sold_count_real ?? 0) === 0 ? 'cầu/shop' : 'bán/shop'}
                           </span>
                         )}
@@ -467,14 +501,14 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                         onMouseLeave={() => setScoreTooltip(null)}
                         onFocus={e => openScoreTooltip(e.currentTarget, 'row', kw)}
                         onBlur={() => setScoreTooltip(null)}
-                        className={`inline-block rounded-md px-2.5 py-1 text-xs cursor-help transition-shadow hover:ring-2 hover:ring-stone-300/70 focus:outline-none focus:ring-2 focus:ring-[#007700]/40 ${scoreBadgeClass}`}
+                        className={`inline-flex min-w-[40px] justify-center rounded-md px-2.5 py-1 text-xs tabular-nums cursor-help transition-shadow hover:ring-2 hover:ring-stone-300/70 focus:outline-none focus:ring-2 focus:ring-[#007700]/40 ${scoreBadgeClass}`}
                       >
                         {hasScore ? kw.keyword_score : 'N/A'}
                       </span>
                     </td>
 
                     {/* Shop Match */}
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
                       {kw.shop_coverage ? (
                         kw.shop_coverage.matching > 0 ? (() => {
                           const targetProds = getTargetProducts(kw);
@@ -511,9 +545,14 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                                     {targetProds.map((p) => (
                                       <li
                                         key={p.id}
-                                        className="text-[11px] leading-snug text-stone-700 bg-stone-50 rounded-md px-2 py-1 border border-stone-100"
+                                        className="text-[11px] leading-snug text-stone-700 bg-stone-50 rounded-md px-2 py-1 border border-stone-100 whitespace-normal"
                                       >
-                                        {p.title}
+                                        <span className="block">{p.title}</span>
+                                        {p.matched_by && (
+                                          <span className="block text-[10px] text-stone-400">
+                                            Khớp theo {p.matched_by}
+                                          </span>
+                                        )}
                                       </li>
                                     ))}
                                   </ul>
@@ -534,8 +573,23 @@ export const OpportunityKeywordTable: React.FC<Props> = ({
                         <span className="text-[11px] text-stone-400">Chưa khai thác</span>
                       )}
                       {kw.search_wow_pct != null && (
-                        <div className="mt-0.5 text-[11px] font-medium text-stone-500">
-                          Xu hướng 4 tuần: {kw.search_wow_pct > 0 ? '+' : ''}{kw.search_wow_pct}%
+                        <div
+                          className="mt-1 text-[10.5px] tabular-nums text-stone-500"
+                          title="Thay đổi lượt tìm kiếm trong 4 tuần gần nhất"
+                        >
+                          4 tuần:{' '}
+                          <span
+                            className={`font-semibold ${
+                              kw.search_wow_pct > 0
+                                ? 'text-emerald-700'
+                                : kw.search_wow_pct < 0
+                                ? 'text-rose-600'
+                                : 'text-stone-500'
+                            }`}
+                          >
+                            {kw.search_wow_pct > 0 ? '▲ ' : kw.search_wow_pct < 0 ? '▼ ' : ''}
+                            {Math.abs(kw.search_wow_pct).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%
+                          </span>
                         </div>
                       )}
                     </td>
