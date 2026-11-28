@@ -5,6 +5,7 @@ import { InsightBlock } from '../components/InsightBlock';
 import { InsightPage } from '../components/InsightPage';
 import { HealthTheme } from '../components/health/HealthTheme';
 import { AiInsights } from '../components/health/AiInsights';
+import { ImageVerdicts } from '../components/health/ImageVerdicts';
 import { ChecksCard } from '../components/health/ChecksCard';
 import { CriteriaTable } from '../components/health/CriteriaTable';
 import { DetailHeader } from '../components/health/DetailHeader';
@@ -54,15 +55,22 @@ function ListingDetail({ id }: { id: string }) {
                 </div>
               </section>
 
-              <AiInsights items={data.ai} />
-
-              <ChecksCard data={data} productId={id} />
-
               <Recommendations data={data} productId={id} />
 
-              <SearchInsightsCard productId={id} />
+              <AiInsights items={data.ai} />
 
-              <ImpactCard productId={id} />
+              <ImageVerdicts data={data} productId={id} />
+
+              <details className="rounded-2xl border border-stone-200/90 bg-white shadow-2xs">
+                <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-stone-700 sm:px-6">
+                  Xem thêm: kiểm tra chi tiết, từ khoá khách tìm, kết quả trước và sau khi sửa
+                </summary>
+                <div className="space-y-4 px-2 pb-2 sm:px-3 sm:pb-3">
+                  <ChecksCard data={data} productId={id} />
+                  <SearchInsightsCard productId={id} />
+                  <ImpactCard productId={id} />
+                </div>
+              </details>
 
               <section className="pt-2">
                 <h2 className="m-0 text-base font-bold text-stone-900">Phân tích thêm</h2>

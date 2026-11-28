@@ -1,4 +1,4 @@
-import { Info, TrendingUp } from 'lucide-react';
+import { History, Info, TrendingUp } from 'lucide-react';
 import { Popover } from 'antd';
 import { decimal, scoreText } from '../../format';
 import type { HealthBlocker, ListingHealth } from '../../healthTypes';
@@ -78,6 +78,12 @@ export function ScoreHero({ data }: { data: ListingHealth }) {
         {coverage && <span className="text-xs text-stone-500">Đánh giá {coverage.evaluated}/{coverage.total} tiêu chí</span>}
         {data.confidence && <span className="text-xs text-stone-500">Độ tin cậy: {data.confidence.level} (so với {data.confidence.peers} tin)</span>}
       </div>
+      {data.change && (
+        <p className="m-0 mt-2 text-xs leading-snug text-stone-600">
+          <History size={13} aria-hidden className="mr-1 inline align-[-2px]" />
+          {data.change.text}
+        </p>
+      )}
       <Popover content={<Breakdown data={data} />} placement="bottom">
         <span className="mt-2 inline-flex cursor-help items-center gap-1 text-xs font-semibold text-stone-500 underline decoration-dotted underline-offset-2 hover:text-[#007700]">
           <Info size={13} aria-hidden />
