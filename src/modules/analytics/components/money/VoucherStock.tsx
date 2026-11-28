@@ -1,4 +1,4 @@
-/** Kho voucher: có bao nhiêu mã, đã dùng bao nhiêu, mã nào hiệu quả thấp, kèm gợi ý loại nên tạo tiếp. */
+/** Kho voucher: có bao nhiêu mã, đã dùng bao nhiêu, mã nào dùng chậm, kèm việc nên làm khi có. */
 import { count } from '../../../../shared/utils/format';
 import { shortDate } from '../../format';
 import type { VoucherStatus, VoucherStock as Stock } from '../../moneyTypes';
@@ -10,7 +10,7 @@ export const VOUCHER_TYPE: Record<string, string> = {
   PERCENTAGE: 'Giảm %', FIXED_AMOUNT: 'Giảm tiền', FREE_SHIPPING: 'Miễn phí ship', FLASH_SALE: 'Flash sale', BUNDLE: 'Mua kèm',
 };
 const STATUS: Record<VoucherStatus, [string, Tone]> = {
-  ok: ['Đang chạy', 'good'], unused: ['Chưa ai dùng', 'bad'], low: ['Ít dùng', 'warn'], expiring: ['Sắp hết hạn', 'warn'], ended: ['Đã kết thúc', 'neutral'],
+  ok: ['Đang chạy', 'good'], new: ['Mới chạy', 'neutral'], running_out: ['Sắp hết lượt', 'warn'], unused: ['Chưa ai dùng', 'bad'], low: ['Ít dùng', 'warn'], expiring: ['Sắp hết hạn', 'warn'], ended: ['Đã kết thúc', 'neutral'],
 };
 
 export function VoucherStock({ stock, tip, aiLoading }: { stock: Stock; tip?: string; aiLoading: boolean }) {
@@ -18,7 +18,7 @@ export function VoucherStock({ stock, tip, aiLoading }: { stock: Stock; tip?: st
   const cells: [string, string, string][] = [
     ['Tổng số mã', count(stock.total), `${count(stock.active)} đang chạy${ended ? `, ${count(ended)} đã kết thúc` : ''}`],
     ['Đã dùng', stock.limit ? `${count(stock.used)}/${count(stock.limit)} lượt` : count(stock.used), 'Cộng mọi mã, tính từ lúc tạo'],
-    ['Mã hiệu quả thấp', count(stock.idle), idleNote(stock.items)],
+    ['Mã ít người dùng', count(stock.idle), idleNote(stock.items)],
   ];
   return (
     <InsightCard title="Kho voucher" bodyClassName="px-4 py-3">
@@ -54,6 +54,9 @@ export function VoucherStock({ stock, tip, aiLoading }: { stock: Stock; tip?: st
               </tr>
             ))}
           </DataTable>
+        )}
+        {stock.items.length > 0 && (
+          <Note>"Đã dùng" đếm mọi lượt từ lúc tạo mã. "Trong kỳ" chỉ đếm đơn đã giao trong khoảng thời gian bạn chọn. Mã chạy dưới 7 ngày chưa bị đánh giá.</Note>
         )}
       </div>
     </InsightCard>

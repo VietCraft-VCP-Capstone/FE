@@ -55,13 +55,13 @@ export const SearchPopover: React.FC<SearchPopoverProps> = ({
               <Sparkles size={15} color="#eab308" className="shrink-0" />
               <span>Tìm kiếm thịnh hành</span>
             </div>
-            <span className="shrink-0 whitespace-nowrap rounded-[10px] bg-[#ecfdf5] px-2 py-0.5 text-[11px] font-semibold text-[#059669]">AI Trend</span>
+            <span className="shrink-0 whitespace-nowrap rounded-[10px] bg-[#ecfdf5] px-2 py-0.5 text-[11px] font-semibold text-[#059669]">Xu hướng</span>
           </div>
 
           {trendingKeywords === null ? (
             <div className="flex items-center gap-1.5 py-2 text-[12px] text-[#78716c]">
               <Loader2 size={13} className="animate-spin" />
-              <span>Đang cập nhật xu hướng từ AI Analyst...</span>
+              <span>Đang cập nhật xu hướng...</span>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
