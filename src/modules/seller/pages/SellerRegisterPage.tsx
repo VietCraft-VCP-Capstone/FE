@@ -296,7 +296,7 @@ export function SellerRegisterPage() {
     const [checkingPortrait, setCheckingPortrait] = useState(false);
     const [frontVerification, setFrontVerification] = useState<CccdVerification | null>(null);
     const [backVerification, setBackVerification] = useState<CccdVerification | null>(null);
-    const [ocrNotice, setOcrNotice] = useState<{ type: 'success' | 'warning' | 'error'; message: string } | null>(null);
+    const [ocrNotice, setOcrNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     const [companyName, setCompanyName] = useState('');
     const [businessLicenseNumber, setBusinessLicenseNumber] = useState('');
@@ -1044,12 +1044,7 @@ export function SellerRegisterPage() {
                         setDateOfBirth(toDisplayDate(res.ocr_data.date_of_birth));
                     }
 
-                    if (res.verification?.warnings && res.verification.warnings.length > 0) {
-                        setOcrNotice({
-                            type: 'warning',
-                            message: `Đã trích xuất thông tin, nhưng có cảnh báo: ${res.verification.warnings.join('; ')}`
-                        });
-                    } else {
+                    if (!res.verification?.warnings?.length) {
                         const filled = [
                             res.ocr_data.full_name && 'họ tên',
                             res.ocr_data.id_number && 'số CCCD',
@@ -1071,12 +1066,7 @@ export function SellerRegisterPage() {
                         setIdIssuePlace(res.ocr_data.issuing_authority);
                     }
 
-                    if (res.verification?.warnings && res.verification.warnings.length > 0) {
-                        setOcrNotice({
-                            type: 'warning',
-                            message: `Đã trích xuất mặt sau, có cảnh báo: ${res.verification.warnings.join('; ')}`
-                        });
-                    } else {
+                    if (!res.verification?.warnings?.length) {
                         setOcrNotice({
                             type: 'success',
                             message: `AI đã quét thành công mặt sau CCCD và tự động điền ngày cấp, nơi cấp.`
@@ -1573,11 +1563,9 @@ export function SellerRegisterPage() {
                             {/* Thông báo quét OCR CCCD */}
                             {ocrNotice && (
                                 <div className={`p-3 rounded-xl text-xs font-medium flex items-start gap-2 ${ocrNotice.type === 'success' ? 'bg-emerald-100/90 text-emerald-900 border border-emerald-300' :
-                                    ocrNotice.type === 'warning' ? 'bg-amber-100/90 text-amber-900 border border-amber-300' :
                                         'bg-rose-100/90 text-rose-900 border border-rose-300'
                                     }`}>
                                     {ocrNotice.type === 'success' && <CheckCircle2 size={16} className="text-emerald-700 shrink-0 mt-0.5" />}
-                                    {ocrNotice.type === 'warning' && <AlertTriangle size={16} className="text-amber-700 shrink-0 mt-0.5" />}
                                     {ocrNotice.type === 'error' && <AlertCircle size={16} className="text-rose-700 shrink-0 mt-0.5" />}
                                     <div className="flex-1">{ocrNotice.message}</div>
                                 </div>
@@ -1809,28 +1797,6 @@ export function SellerRegisterPage() {
                                                 }
                                             />
                                         </div>
-
-                                        {/* Warnings List */}
-                                        {((frontVerification?.warnings && frontVerification.warnings.length > 0) ||
-                                            (backVerification?.warnings && backVerification.warnings.length > 0)) && (
-                                                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11.5px] space-y-1">
-                                                    <span className="font-bold flex items-center gap-1">
-                                                        <AlertTriangle size={13} className="text-amber-700" /> Lưu ý khi thẩm định:
-                                                    </span>
-                                                    <ul className="list-disc list-inside space-y-0.5 text-slate-700 pl-1">
-                                                        {frontVerification?.warnings?.map((w, idx) => (
-                                                            <li key={`f-${idx}`}>Mặt trước: {w}</li>
-                                                        ))}
-                                                        {backVerification?.warnings?.map((w, idx) => (
-                                                            <li key={`b-${idx}`}>Mặt sau: {w}</li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-
-                                        <p className="text-[11px] text-slate-500 italic bg-slate-100/70 p-2 rounded-lg border border-slate-200/80">
-                                            * Lưu ý: Kết quả phân tích chất lượng ảnh và trích xuất OCR chỉ hỗ trợ nhận diện và điền tự động biểu mẫu, không thay thế việc đối chiếu với cơ sở dữ liệu định danh quốc gia. Hồ sơ đăng ký sẽ được Quản trị viên thẩm định độc lập trước khi phê duyệt.
-                                        </p>
                                     </div>
                                 )}
                             </div>
