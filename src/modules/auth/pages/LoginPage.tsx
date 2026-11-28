@@ -76,11 +76,6 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
 
-  if (user) {
-    const target = getRedirectTarget(user, nextUrl);
-    return <Navigate to={target} replace />;
-  }
-
   const validateEmail = (val: string): string | undefined => {
     const em = sanitize(val);
     if (!em) return 'Vui lòng nhập địa chỉ email.';
@@ -217,6 +212,12 @@ export function LoginPage({ onLogin, onGoogleLogin, user }: LoginPageProps) {
     color: '#1c1917',
     transition: 'border-color 0.2s',
   });
+
+  // Đặt sau mọi hook: đăng nhập xong `user` đổi, return sớm hơn sẽ làm React gọi thiếu hook.
+  if (user) {
+    const target = getRedirectTarget(user, nextUrl);
+    return <Navigate to={target} replace />;
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Epilogue Variable', system-ui, sans-serif" }}>

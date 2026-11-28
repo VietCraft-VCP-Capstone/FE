@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ModalOverlay } from '../../../shared/components/ModalOverlay';
 import { ProductItem } from '../types/product';
 import { ProductImage } from './ProductImage';
@@ -35,9 +35,12 @@ export function ProductDetailModal({
   onEdit,
   onDelete,
 }: ProductDetailModalProps) {
-  if (!isOpen || !product) return null;
-
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  // Mở lại hoặc đổi sản phẩm thì quay về ảnh đầu
+  useEffect(() => setActiveImageIndex(0), [isOpen, product?.id]);
+
+  if (!isOpen || !product) return null;
 
   const images = product.images && product.images.length > 0 ? product.images : [product.thumbnail];
   const activeImage = images[activeImageIndex] || product.thumbnail;
