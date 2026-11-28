@@ -13,17 +13,8 @@ import { SUPPORTED_BANKS } from '../types/settings';
 import { getApiErrorMessage } from '../../../infrastructure/api/interceptors';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { useToast } from '../../../shared/components/Toast';
-
-const CRAFT_CATEGORIES = [
-    'Gốm sứ thủ công (Bát Tràng, Chu Đậu)',
-    'Mây tre đan & Cói thủ công',
-    'Dệt thổ cẩm & Lụa tơ tằm',
-    'Tranh nghệ thuật, Sơn mài & Khắc gỗ',
-    'Sản phẩm in theo yêu cầu (POD)',
-    'Nến thơm & Thủ công tinh dầu thảo mộc',
-    'Đồ lưu niệm & Quà tặng thủ công Việt Nam',
-    'Thời trang & Phụ kiện tái chế thủ công'
-];
+import { productsService } from '../../product/services/productsService';
+import type { CatalogOption } from '../../product/types/product';
 
 function normalizeName(str: string) {
     if (!str) return '';
@@ -378,8 +369,34 @@ export function SellerRegisterPage() {
 
     const [shopName, setShopName] = useState('');
     const [shopDescription, setShopDescription] = useState('');
-    const [mainCategory, setMainCategory] = useState(CRAFT_CATEGORIES[0]);
+    const [mainCategory, setMainCategory] = useState('');
     const [isCustomCategory, setIsCustomCategory] = useState(false);
+    // Ngành hàng chính = danh mục gốc của sàn (admin quản lý), không hardcode ở đây.
+    const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+    const [categoriesStatus, setCategoriesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+
+    useEffect(() => {
+        let alive = true;
+        productsService.getCategories()
+            .then((data: CatalogOption[]) => {
+                if (!alive) return;
+                const all = Array.isArray(data) ? data : [];
+                const roots = all.filter(c => !c.parent_id);
+                setCategoryOptions((roots.length ? roots : all).map(c => c.name));
+                setCategoriesStatus('ready');
+            })
+            .catch(() => { if (alive) setCategoriesStatus('error'); });
+        return () => { alive = false; };
+    }, []);
+
+    // Danh mục đã lưu không còn trong danh sách của sàn (hoặc tải lỗi) → chuyển sang ô tự điền để không mất dữ liệu.
+    useEffect(() => {
+        if (categoriesStatus === 'loading') return;
+        if (categoriesStatus === 'error' || categoryOptions.length === 0
+            || (mainCategory && !categoryOptions.includes(mainCategory))) {
+            setIsCustomCategory(true);
+        }
+    }, [categoriesStatus, categoryOptions, mainCategory]);
     const [recipientName, setRecipientName] = useState('');
     const [pickupPhone, setPickupPhone] = useState('');
     const [pickupPhoneError, setPickupPhoneError] = useState<string | null>(null);
@@ -951,11 +968,7 @@ export function SellerRegisterPage() {
                 if (app.shop_info) {
                     setShopName(app.shop_info.shop_name || '');
                     setShopDescription(app.shop_info.description || '');
-                    const savedCategory = app.shop_info.main_category || CRAFT_CATEGORIES[0];
-                    setMainCategory(savedCategory);
-                    if (app.shop_info.main_category && !CRAFT_CATEGORIES.includes(app.shop_info.main_category)) {
-                        setIsCustomCategory(true);
-                    }
+                    setMainCategory(app.shop_info.main_category || '');
                     if (app.shop_info.pickup_address) {
                         setRecipientName(app.shop_info.pickup_address.recipient_name || '');
                         setPickupPhone(app.shop_info.pickup_address.phone || '');
@@ -2146,15 +2159,16 @@ export function SellerRegisterPage() {
                                     <div className="space-y-1.5">
                                         <div className="flex items-center justify-between">
                                             <label className="text-xs font-bold text-slate-700">
-                                                Danh mục thủ công mỹ nghệ chủ đạo <span className="text-rose-500">*</span>
+                                                Ngành hàng chính <span className="text-rose-500">*</span>
                                             </label>
+                                            {categoryOptions.length > 0 && (
                                             <button
                                                 type="button"
                                                 onClick={() => {
                                                     if (isCustomCategory) {
                                                         setIsCustomCategory(false);
-                                                        if (!CRAFT_CATEGORIES.includes(mainCategory)) {
-                                                            setMainCategory(CRAFT_CATEGORIES[0]);
+                                                        if (!categoryOptions.includes(mainCategory)) {
+                                                            setMainCategory('');
                                                         }
                                                     } else {
                                                         setIsCustomCategory(true);
@@ -2163,8 +2177,9 @@ export function SellerRegisterPage() {
                                                 }}
                                                 className="text-[11px] font-semibold text-[#007700] hover:text-[#005B00] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
                                             >
-                                                {isCustomCategory ? '📋 Chọn từ danh mục mẫu' : '✏️ Tự điền danh mục khác'}
+                                                {isCustomCategory ? '📋 Chọn từ danh mục của sàn' : '✏️ Tự điền ngành hàng khác'}
                                             </button>
+                                            )}
                                         </div>
 
                                         {isCustomCategory ? (
@@ -2172,14 +2187,16 @@ export function SellerRegisterPage() {
                                                 <input
                                                     type="text"
                                                     autoFocus
-                                                    placeholder="Nhập tên ngành nghề / danh mục của bạn (ví dụ: Trầm hương, Đồ da thủ công, Khảm xà cừ...)"
+                                                    placeholder="Nhập ngành hàng chính của gian hàng (ví dụ: Đồ gia dụng, Phụ kiện điện thoại...)"
                                                     value={mainCategory}
                                                     onChange={(e) => setMainCategory(e.target.value)}
                                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
                                                     required
                                                 />
                                                 <p className="text-[11px] text-slate-400">
-                                                    Nhập ngành nghề / sản phẩm thủ công đặc thù của xưởng hoặc gian hàng của bạn.
+                                                    {categoriesStatus === 'error'
+                                                        ? 'Không tải được danh mục của sàn, bạn có thể tự điền ngành hàng.'
+                                                        : 'Chỉ dùng khi ngành hàng của bạn chưa có trong danh mục của sàn.'}
                                                 </p>
                                             </div>
                                         ) : (
@@ -2193,12 +2210,16 @@ export function SellerRegisterPage() {
                                                         setMainCategory(e.target.value);
                                                     }
                                                 }}
+                                                disabled={categoriesStatus === 'loading'}
                                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15 cursor-pointer"
                                             >
-                                                {CRAFT_CATEGORIES.map(cat => (
+                                                <option value="" disabled>
+                                                    {categoriesStatus === 'loading' ? 'Đang tải danh mục...' : '-- Chọn ngành hàng chính --'}
+                                                </option>
+                                                {categoryOptions.map(cat => (
                                                     <option key={cat} value={cat}>{cat}</option>
                                                 ))}
-                                                <option value="__CUSTOM__">✨ Khác (Tự điền danh mục thủ công...)</option>
+                                                <option value="__CUSTOM__">✨ Khác (Tự điền ngành hàng...)</option>
                                             </select>
                                         )}
                                     </div>
@@ -2508,7 +2529,7 @@ export function SellerRegisterPage() {
                                             return;
                                         }
                                         if (!mainCategory || !mainCategory.trim()) {
-                                            setError('Vui lòng chọn hoặc tự điền danh mục thủ công mỹ nghệ chủ đạo.');
+                                            setError('Vui lòng chọn hoặc tự điền ngành hàng chính.');
                                             return;
                                         }
                                         if (!province || !district || !specificAddress) {

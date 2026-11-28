@@ -85,6 +85,8 @@ export interface CatalogOption {
   _id: string;
   name: string;
   slug?: string;
+  /** Chỉ có ở danh mục: null/không có = danh mục gốc (ngành hàng chính). */
+  parent_id?: string | null;
   color?: string;
   /** Chỉ có ở thẻ: số sản phẩm cùng nhóm danh mục đang dùng thẻ này. */
   related_count?: number;
