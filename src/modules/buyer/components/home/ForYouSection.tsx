@@ -46,8 +46,8 @@ export function ForYouSection({ favIds, onToggleFav, renderHead }: ForYouSection
   if (visible && !loading && items.length === 0) return null;
 
   return (
-    <section ref={ref} className="mt-14" aria-label="Gợi ý cho bạn">
-      {renderHead('Gợi ý cho bạn', 'Dựa trên sản phẩm bạn đã xem và tìm kiếm')}
+    <section ref={ref} className="mt-14" aria-label="Có thể bạn sẽ thích">
+      {renderHead('Có thể bạn sẽ thích', 'Dựa trên sản phẩm bạn đã xem và tìm kiếm')}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
         {loading
           ? Array.from({ length: 4 }, (_, i) => <HomeProductSkeleton key={i} />)
