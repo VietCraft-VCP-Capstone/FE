@@ -61,7 +61,7 @@ export function LandingFooter({
             </div>
             
             <p className="text-stone-400 text-sm max-w-sm leading-relaxed">
-              Nền tảng thương mại điện tử chuyên biệt về sản phẩm in theo yêu cầu (POD) & thủ công mỹ nghệ Việt Nam.
+              Sàn thương mại điện tử đa ngành, mua sắm dễ dàng và in theo yêu cầu (POD) tại Việt Nam.
             </p>
             
             {/* Form đăng ký Newsletter */}

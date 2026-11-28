@@ -63,7 +63,7 @@ export function GeneralSizeManager({
             Quy Cách / Kích Thước Sản Phẩm ({sizes.length})
           </label>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-            Thủ công mỹ nghệ & Decor
+            Đồ trang trí & Decor
           </span>
         </div>
 
@@ -107,7 +107,7 @@ export function GeneralSizeManager({
 
       {sizes.length === 0 && (
         <p className="text-xs text-amber-900 bg-amber-100/70 border border-amber-200/80 rounded-lg px-3 py-1.5 font-medium">
-          💡 Dành cho hàng thủ công mỹ nghệ, gốm sứ, tranh decor, phụ kiện: Bạn có thể chọn quy chuẩn hoặc kích thước đóng gói (cm) để người mua chọn khi đặt hàng (hoặc để trống nếu sản phẩm chỉ có duy nhất 1 kích thước).
+          💡 Dành cho đồ trang trí, gốm sứ, tranh decor, phụ kiện: Bạn có thể chọn quy chuẩn hoặc kích thước đóng gói (cm) để người mua chọn khi đặt hàng (hoặc để trống nếu sản phẩm chỉ có duy nhất 1 kích thước).
         </p>
       )}
 

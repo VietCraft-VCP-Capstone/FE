@@ -110,7 +110,7 @@ export function ProductPreviewModal({ product, onClose }: { product: ProductItem
                 <ChevronUp size={16} />
               </div>
               <div style={{ padding: '0 16px 14px', fontSize: 13.5, color: '#555', lineHeight: 1.7 }}>
-                {product.description || 'Sản phẩm chất lượng cao, được làm thủ công từ nguyên liệu tự nhiên. Phù hợp làm quà tặng hoặc dùng cá nhân.'}
+                {product.description || 'Chưa có mô tả sản phẩm.'}
               </div>
             </div>
           </div>

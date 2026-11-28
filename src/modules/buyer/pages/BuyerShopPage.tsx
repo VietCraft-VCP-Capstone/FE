@@ -385,7 +385,7 @@ export function BuyerShopPage() {
                       title="Gian hàng đạt điểm uy tín từ 90 trở lên nhờ chuỗi đơn hàng không khiếu nại"
                       className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-200 shrink-0 shadow-2xs">
                       <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Nghệ Nhân Uy Tín</span>
+                      <span>Shop Uy Tín</span>
                     </span>
                   )}
                 </div>

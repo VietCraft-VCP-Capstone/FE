@@ -25,7 +25,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   rating = 4.8,
   salesCount = 120,
   imageUrl,
-  shopName = 'VietCraft Artisan',
+  shopName = 'Gian hàng VietCraft',
   productType = 'READY_TO_SHIP',
   isFavorite = false,
   onAddToCart,

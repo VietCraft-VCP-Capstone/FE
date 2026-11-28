@@ -291,7 +291,7 @@ export function NotificationSettingsTab({
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-xs font-bold text-stone-800">Chương trình khuyến mãi từ VietCraft</h4>
-                  <p className="text-[11px] text-stone-500">Mời tham gia các chiến dịch lễ hội làng nghề, Flash Sale và hỗ trợ voucher từ sàn</p>
+                  <p className="text-[11px] text-stone-500">Mời tham gia các chiến dịch khuyến mãi theo mùa, Flash Sale và hỗ trợ voucher từ sàn</p>
                 </div>
                 <div className="flex items-center gap-12 sm:gap-16 pr-4">
                   <div className="w-16 flex justify-center">

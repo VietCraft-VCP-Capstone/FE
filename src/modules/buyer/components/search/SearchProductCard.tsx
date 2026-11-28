@@ -21,7 +21,7 @@ export const SearchProductCard: React.FC<SearchProductCardProps> = ({
   // Giá chính = giá thanh toán khi chưa áp mã; giá sau mã hiện thành dòng riêng.
   const price = Number(product.price) || 0;
   const oldPrice = product.originalPrice;
-  const shopName = product.shopInfo?.name || 'VietCraft Artisan';
+  const shopName = product.shopInfo?.name || 'Gian hàng VietCraft';
 
   return (
     <div

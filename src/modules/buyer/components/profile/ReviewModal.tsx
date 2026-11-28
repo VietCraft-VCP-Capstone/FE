@@ -301,7 +301,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                                 <div className="flex gap-3 overflow-x-auto pb-2 pt-0.5 no-scrollbar scroll-smooth">
                                     {items.map((it, idx) => {
                                         const isSelected = selectedItemIndex === idx;
-                                        const itemTitle = it.title || it.name || 'Sản phẩm thủ công';
+                                        const itemTitle = it.title || it.name || 'Sản phẩm';
                                         const itemImage = it.image || it.thumbnail || '';
                                         const itemPrice = Number(it.price || 0);
                                         const variantText = `${it.color || ''} ${it.size || ''}`.trim();
@@ -380,7 +380,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                                     </div>
                                     <div className="min-w-0 flex-1 pr-6">
                                         <h4 className="text-sm font-semibold text-gray-800 line-clamp-1 leading-snug">
-                                            {selectedItem.title || selectedItem.name || 'Sản phẩm thủ công'}
+                                            {selectedItem.title || selectedItem.name || 'Sản phẩm'}
                                         </h4>
                                         {Boolean(`${selectedItem.color || ''} ${selectedItem.size || ''}`.trim()) && (
                                             <p className="text-xs text-gray-500 truncate mt-0.5">
@@ -462,7 +462,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                                             rows={3}
                                             value={comment}
                                             onChange={e => setComment(e.target.value)}
-                                            placeholder="Hãy chia sẻ cảm nhận của bạn về chất lượng sản phẩm, độ hoàn thiện thủ công, độ sắc nét và dịch vụ đóng gói..."
+                                            placeholder="Hãy chia sẻ cảm nhận của bạn về chất lượng sản phẩm, độ hoàn thiện, độ sắc nét và dịch vụ đóng gói..."
                                             maxLength={500}
                                             className="bg-transparent resize-none w-full text-sm text-gray-800 placeholder-gray-400 outline-none min-h-[90px] leading-relaxed"
                                         />

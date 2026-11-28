@@ -1496,9 +1496,9 @@ export function SellerRegisterPage() {
                                             Phổ biến
                                         </span>
                                     </div>
-                                    <h4 className="font-extrabold text-base text-slate-900">Cá nhân / Nghệ nhân</h4>
+                                    <h4 className="font-extrabold text-base text-slate-900">Cá nhân / Hộ gia đình</h4>
                                     <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                                        Dành cho thợ thủ công, nghệ nhân làng nghề, cá nhân sáng tạo hoặc các gia đình tự chế tác sản phẩm.
+                                        Dành cho cá nhân, hộ gia đình kinh doanh hoặc người bán chưa đăng ký doanh nghiệp.
                                     </p>
                                     <ul className="text-xs text-slate-500 mt-4 space-y-1.5 font-medium">
                                         <li>✓ CCCD/CMND chính chủ (2 mặt)</li>
@@ -1524,7 +1524,7 @@ export function SellerRegisterPage() {
                                     </div>
                                     <h4 className="font-extrabold text-base text-slate-900">Hộ kinh doanh / Doanh nghiệp</h4>
                                     <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                                        Dành cho xưởng sản xuất, hợp tác xã thủ công mỹ nghệ, công ty POD và các đơn vị đã đăng ký kinh doanh.
+                                        Dành cho doanh nghiệp, xưởng sản xuất, hợp tác xã, công ty POD và các đơn vị đã đăng ký kinh doanh.
                                     </p>
                                     <ul className="text-xs text-slate-500 mt-4 space-y-1.5 font-medium">
                                         <li>✓ Giấy phép Đăng ký Kinh doanh (GPKD)</li>
@@ -1988,7 +1988,7 @@ export function SellerRegisterPage() {
                                             </label>
                                             <input
                                                 type="text"
-                                                placeholder="CÔNG TY TNHH THỦ CÔNG VIỆTCRAFT"
+                                                placeholder="CÔNG TY TNHH VIETCRAFT"
                                                 value={companyName}
                                                 onChange={(e) => setCompanyName(e.target.value)}
                                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm uppercase focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
@@ -2221,7 +2221,7 @@ export function SellerRegisterPage() {
                                         <label className="text-xs font-bold text-slate-700">Mô tả câu chuyện thương hiệu</label>
                                         <textarea
                                             rows={2}
-                                            placeholder="Giới thiệu nét độc đáo, xuất xứ làng nghề truyền thống hoặc kỹ thuật chế tác..."
+                                            placeholder="Giới thiệu gian hàng, sản phẩm chủ lực và điểm nổi bật của bạn..."
                                             value={shopDescription}
                                             onChange={(e) => setShopDescription(e.target.value)}
                                             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-[#007700] focus:ring-2 focus:ring-emerald-500/15"
@@ -2587,7 +2587,7 @@ export function SellerRegisterPage() {
                                 </label>
                                 <div className="h-44 overflow-y-auto p-4 rounded-2xl bg-slate-50/80 border border-slate-200 text-xs text-slate-600 leading-relaxed space-y-3 shadow-inner">
                                     <p className="font-bold text-slate-900">1. NGHĨA VỤ VÀ TRÁCH NHIỆM CỦA NGƯỜI BÁN (SELLER):</p>
-                                    <p>- Cam kết mọi sản phẩm đăng bán trên sàn VietCraft là hàng thủ công mỹ nghệ, sản phẩm in theo yêu cầu (POD) có nguồn gốc xuất xứ hợp pháp, không vi phạm bản quyền sở hữu trí tuệ hoặc hàng cấm theo pháp luật Việt Nam.</p>
+                                    <p>- Cam kết mọi sản phẩm đăng bán trên sàn VietCraft là hàng hóa, sản phẩm in theo yêu cầu (POD) có nguồn gốc xuất xứ hợp pháp, không vi phạm bản quyền sở hữu trí tuệ hoặc hàng cấm theo pháp luật Việt Nam.</p>
                                     <p>- Cung cấp trung thực, đầy đủ và chính xác thông tin định danh cá nhân/doanh nghiệp, địa chỉ xưởng sản xuất và số tài khoản ngân hàng chính chủ.</p>
                                     <p className="font-bold text-slate-900">2. QUY ĐỊNH PHÁP LÝ TMĐT (Nghị định 52/2013/NĐ-CP & 85/2021/NĐ-CP):</p>
                                     <p>- Sàn VietCraft có trách nhiệm lưu trữ thông tin của Người bán và sẵn sàng cung cấp cho cơ quan quản lý nhà nước có thẩm quyền khi có yêu cầu (phục vụ quản lý thuế, chống hàng giả, bảo vệ quyền lợi người tiêu dùng).</p>

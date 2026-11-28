@@ -131,7 +131,7 @@ export function ProductTable({
 
   const getProductColors = (p: ProductItem) => {
     if (p.colors && p.colors.length > 0) return p.colors;
-    // Default artisan craft colors fallback
+    // Default colors fallback
     return [
       { name: 'Gỗ tự nhiên', hex: '#5C4033' },
       { name: 'Men gốm ngà', hex: '#E5E7EB' }
@@ -266,7 +266,7 @@ export function ProductTable({
                   {/* Category */}
                   <td className="py-3 px-4">
                     <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200/50">
-                      {product.category || 'Thủ công mỹ nghệ'}
+                      {product.category || 'Chưa phân loại'}
                     </span>
                   </td>
 

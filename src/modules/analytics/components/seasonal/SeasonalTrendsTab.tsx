@@ -23,7 +23,7 @@ export function SeasonalTrendsTab({
   sampleSizeN = 1200,
   measuredCycles = 2,
   onOpenEvidence,
-  categoryName = 'Thời trang & Thủ công',
+  categoryName = 'Ngành hàng của bạn',
 }: SeasonalTrendsTabProps) {
   const campName = activeCamp.name || 'Dịp cao điểm';
 

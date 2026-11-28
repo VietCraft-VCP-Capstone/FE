@@ -60,7 +60,7 @@ const toCard = (item: any, index: number): WishCard => {
     id: productIdOf(item),
     order: index,
     product: p,
-    title: p.title || p.name || 'Sản phẩm thủ công',
+    title: p.title || p.name || 'Sản phẩm',
     price: toNumber(p.price ?? p.retail_price ?? variants[0]?.price ?? variants[0]?.retail_price),
     shopId: p.shopInfo?.id || '',
     shopName: p.shopInfo?.name || p.shopName || 'VietCraft Selection',
